@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio — Web制作・開発実績</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --border: rgba(255,255,255,0.07);
+  --accent: #6366f1;
+  --accent2: #a78bfa;
+  --gold: #f0b429;
+  --green: #34d399;
+  --text: #e8eaf6;
+  --text2: #8b8fa8;
+  --text3: #4a4d6a;
+  --ease: cubic-bezier(0.6,0.05,0.2,1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Syne', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Noise texture */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 9999;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+a { color: inherit; text-decoration: none; }
+.container { width: min(92%, 1100px); margin: 0 auto; }
+
+/* ── Hero ── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  padding: 120px 0 80px;
+}
+
+/* Gradient orbs */
+.hero::before {
+  content: "";
+  position: absolute;
+  top: -200px; left: -200px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+  pointer-events: none;
+  animation: orb1 8s ease-in-out infinite;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  bottom: -150px; right: -100px;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 70%);
+  pointer-events: none;
+  animation: orb2 10s ease-in-out infinite;
+}
+@keyframes orb1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(60px,40px); } }
+@keyframes orb2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-40px,-30px); } }
+
+.hero-inner { position: relative; z-index: 1; }
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(99,102,241,0.1);
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 99px;
+  font-size: 0.72rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent2);
+  margin-bottom: 2rem;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.2s forwards;
+}
+.hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.hero h1 {
+  font-size: clamp(2.8rem, 7vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.5rem;
+  opacity: 0;
+  animation: fadeUp 0.9s var(--ease) 0.4s forwards;
+}
+.hero h1 .line1 { display: block; color: var(--text); }
+.hero h1 .line2 {
+  display: block;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: 1rem;
+  color: var(--text2);
+  max-width: 540px;
+  margin-bottom: 2.5rem;
+  font-weight: 400;
+  line-height: 1.9;
+  opacity: 0;
+  animation: fadeUp 0.9s var(--ease) 0.6s forwards;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 2.5rem;
+  opacity: 0;
+  animation: fadeUp 0.9s var(--ease) 0.7s forwards;
+}
+.tag {
+  padding: 5px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  font-size: 0.75rem;
+  color: var(--text2);
+  letter-spacing: 0.05em;
+}
+
+.hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition: all 0.3s var(--ease);
+  opacity: 0;
+  animation: fadeUp 0.9s var(--ease) 0.8s forwards;
+}
+.hero-cta:hover { background: #5254cc; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.4); }
+.hero-cta svg { width: 16px; height: 16px; transition: transform 0.3s var(--ease); }
+.hero-cta:hover svg { transform: translateX(4px); }
+
+/* Stats row */
+.hero-stats {
+  display: flex;
+  gap: 3rem;
+  margin-top: 4rem;
+  padding-top: 3rem;
+  border-top: 1px solid var(--border);
+  opacity: 0;
+  animation: fadeUp 0.9s var(--ease) 1s forwards;
+}
+.hero-stat-num {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, var(--text), var(--text2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-stat-label { font-size: 0.72rem; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 3px; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Section ── */
+.section { padding: clamp(5rem, 10vw, 8rem) 0; }
+
+.section-eyebrow {
+  font-size: 0.68rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--accent2);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.section-eyebrow::before { content: ""; width: 24px; height: 1px; background: var(--accent2); }
+
+.section-title {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+.section-sub { font-size: 0.92rem; color: var(--text2); max-width: 500px; line-height: 1.9; }
+
+/* reveal */
+.reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.8s var(--ease), transform 0.8s var(--ease); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ── Works ── */
+.works-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5px; background: var(--border); margin-top: 4rem; border: 1px solid var(--border); }
+
+.work-card {
+  background: var(--bg);
+  padding: 2.5rem;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background 0.4s var(--ease);
+  group: true;
+}
+.work-card:hover { background: var(--surface); }
+
+.work-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(99,102,241,0.05), transparent);
+  opacity: 0;
+  transition: opacity 0.4s var(--ease);
+}
+.work-card:hover::before { opacity: 1; }
+
+.work-num {
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 1.5rem;
+}
+.work-preview {
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1.8rem;
+  border: 1px solid var(--border);
+  position: relative;
+}
+.work-preview-inner {
+  width: 100%; height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  transition: transform 0.6s var(--ease);
+}
+.work-card:hover .work-preview-inner { transform: scale(1.05); }
+
+/* Preview screens */
+.preview-cafe { background: linear-gradient(135deg, #3d2817 0%, #6b4423 50%, #c9a961 100%); }
+.preview-reserve { background: linear-gradient(135deg, #0f1117 0%, #1a1d27 50%, #4f8ef7 100%); }
+.preview-law { background: linear-gradient(135deg, #0d1b2e 0%, #1e3050 50%, #b8962e 100%); }
+.preview-invoice { background: linear-gradient(135deg, #16192c 0%, #1a1d27 50%, #2563eb 100%); }
+
+.preview-label {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  text-align: center;
+}
+
+.work-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  font-size: 0.67rem;
+  color: var(--text2);
+  letter-spacing: 0.08em;
+  margin-bottom: 0.8rem;
+}
+.work-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.6rem;
+  letter-spacing: -0.01em;
+}
+.work-desc {
+  font-size: 0.82rem;
+  color: var(--text2);
+  line-height: 1.8;
+  margin-bottom: 1.2rem;
+}
+.work-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.5rem; }
+.work-tag {
+  padding: 3px 9px;
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 4px;
+  font-size: 0.67rem;
+  color: var(--accent2);
+}
+.work-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.work-price {
+  font-size: 0.8rem;
+  color: var(--text2);
+}
+.work-price strong { color: var(--gold); font-size: 0.95rem; }
+.work-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--accent2);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition: gap 0.3s var(--ease);
+}
+.work-card:hover .work-link { gap: 9px; }
+.work-link svg { width: 13px; height: 13px; }
+
+/* ── Skills ── */
+.skills { background: var(--surface); }
+.skills-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); margin-top: 3rem; border: 1px solid var(--border); }
+.skill-card { background: var(--surface); padding: 2rem; transition: background 0.3s var(--ease); }
+.skill-card:hover { background: var(--surface2); }
+.skill-icon { width: 40px; height: 40px; border-radius: 9px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.2rem; }
+.skill-icon svg { width: 20px; height: 20px; }
+.skill-name { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem; }
+.skill-desc { font-size: 0.78rem; color: var(--text2); line-height: 1.8; }
+.skill-list { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.skill-item { padding: 2px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-size: 0.65rem; color: var(--text3); }
+
+/* ── Flow ── */
+.flow-section { padding: clamp(5rem,10vw,8rem) 0; }
+.flow-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 0; margin-top: 3.5rem; position: relative; }
+.flow-grid::before {
+  content: "";
+  position: absolute;
+  top: 28px; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), var(--border), transparent);
+}
+.flow-item { text-align: center; padding: 0 1rem; position: relative; }
+.flow-dot {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s var(--ease);
+}
+.flow-dot svg { width: 20px; height: 20px; color: var(--accent2); }
+.flow-item:hover .flow-dot { background: var(--accent); border-color: var(--accent); }
+.flow-item:hover .flow-dot svg { color: white; }
+.flow-step { font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text3); margin-bottom: 0.4rem; }
+.flow-name { font-size: 0.82rem; font-weight: 700; color: var(--text); margin-bottom: 0.4rem; }
+.flow-detail { font-size: 0.72rem; color: var(--text2); line-height: 1.7; }
+
+/* ── CTA ── */
+.cta-section {
+  padding: clamp(5rem,10vw,8rem) 0;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+.cta-section::before {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 800px; height: 400px;
+  background: radial-gradient(ellipse, rgba(99,102,241,0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cta-inner { text-align: center; position: relative; z-index: 1; }
+.cta-title { font-size: clamp(2rem,5vw,3.5rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 1rem; }
+.cta-title span {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.cta-sub { font-size: 0.95rem; color: var(--text2); max-width: 480px; margin: 0 auto 2.5rem; line-height: 1.9; }
+.cta-btns { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+.btn-cta-primary {
+  padding: 14px 28px;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: all 0.3s var(--ease);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-cta-primary:hover { background: #5254cc; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.4); }
+.btn-cta-ghost {
+  padding: 14px 28px;
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition: all 0.3s var(--ease);
+}
+.btn-cta-ghost:hover { border-color: var(--accent2); color: var(--accent2); }
+
+/* ── Footer ── */
+footer {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 2rem 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text3);
+}
+
+@media (max-width: 768px) {
+  .works-grid { grid-template-columns: 1fr; }
+  .skills-grid { grid-template-columns: 1fr; }
+  .flow-grid { grid-template-columns: 1fr 1fr; gap: 2rem; }
+  .flow-grid::before { display: none; }
+  .hero-stats { gap: 2rem; flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container hero-inner">
+    <div class="hero-badge"><span class="hero-badge-dot"></span>Web制作・ツール・アプリ開発</div>
+    <h1>
+      <span class="line1">高品質・短納期・</span>
+      <span class="line2">修正無制限。</span>
+    </h1>
+    <p class="hero-sub">LP制作からコーポレートサイト、業務効率化ツール、スマホアプリまで。オンライン完結で全国どこからでもご依頼いただけます。</p>
+    <div class="hero-tags">
+      <span class="tag">LP制作</span>
+      <span class="tag">コーポレートサイト</span>
+      <span class="tag">ECサイト</span>
+      <span class="tag">予約システム</span>
+      <span class="tag">業務効率化ツール</span>
+      <span class="tag">スマホアプリ</span>
+      <span class="tag">修正回数無制限</span>
+    </div>
+    <a href="#works" class="hero-cta">
+      制作実績を見る
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+    <div class="hero-stats">
+      <div>
+        <div class="hero-stat-num">修正∞</div>
+        <div class="hero-stat-label">修正回数無制限</div>
+      </div>
+      <div>
+        <div class="hero-stat-num">24h</div>
+        <div class="hero-stat-label">返信対応時間</div>
+      </div>
+      <div>
+        <div class="hero-stat-num">100%</div>
+        <div class="hero-stat-label">オンライン完結</div>
+      </div>
+      <div>
+        <div class="hero-stat-num">50k〜</div>
+        <div class="hero-stat-label">LP制作から対応</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Works -->
+<section class="section" id="works">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-eyebrow">Portfolio</div>
+      <h2 class="section-title">制作実績</h2>
+      <p class="section-sub">実際に制作したサンプルをご覧ください。ご要望に合わせてカスタマイズいたします。</p>
+    </div>
+    <div class="works-grid reveal">
+
+      <!-- Cafe LP -->
+      <div class="work-card">
+        <div class="work-num">01 — LP制作</div>
+        <div class="work-preview">
+          <div class="work-preview-inner preview-cafe">☕</div>
+          <div class="preview-label">Café Lumière — ランディングページ</div>
+        </div>
+        <div class="work-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          ランディングページ
+        </div>
+        <div class="work-title">カフェ向けLP</div>
+        <div class="work-desc">高級感あるデザインのカフェ向けLP。ヒーロー・メニュー・ギャラリー・アクセス・問い合わせフォームを含む1ページ完結のサイト。</div>
+        <div class="work-tags">
+          <span class="work-tag">HTML/CSS</span>
+          <span class="work-tag">JavaScript</span>
+          <span class="work-tag">レスポンシブ</span>
+          <span class="work-tag">アニメーション</span>
+        </div>
+        <div class="work-footer">
+          <div class="work-price">参考価格 <strong>¥50,000〜</strong></div>
+          <div class="work-link">詳細を見る <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        </div>
+      </div>
+
+      <!-- Reservation -->
+      <div class="work-card">
+        <div class="work-num">02 — システム開発</div>
+        <div class="work-preview">
+          <div class="work-preview-inner preview-reserve">📅</div>
+          <div class="preview-label">ReserveFlow — 予約管理システム</div>
+        </div>
+        <div class="work-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          業務効率化ツール
+        </div>
+        <div class="work-title">予約管理システム</div>
+        <div class="work-desc">ダッシュボード・予約一覧・カレンダー・統計機能を備えた業務用予約管理ツール。サロン・クリニック・飲食店に対応。</div>
+        <div class="work-tags">
+          <span class="work-tag">HTML/CSS</span>
+          <span class="work-tag">JavaScript</span>
+          <span class="work-tag">ダッシュボード</span>
+          <span class="work-tag">カレンダー</span>
+        </div>
+        <div class="work-footer">
+          <div class="work-price">参考価格 <strong>¥200,000〜</strong></div>
+          <div class="work-link">詳細を見る <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        </div>
+      </div>
+
+      <!-- Law firm -->
+      <div class="work-card">
+        <div class="work-num">03 — コーポレートサイト</div>
+        <div class="work-preview">
+          <div class="work-preview-inner preview-law">⚖️</div>
+          <div class="preview-label">鈴木・田中法律事務所 — コーポレートサイト</div>
+        </div>
+        <div class="work-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          コーポレートサイト
+        </div>
+        <div class="work-title">法律事務所コーポレートサイト</div>
+        <div class="work-desc">信頼感・高級感のある士業向けコーポレートサイト。業務案内・弁護士紹介・お客様の声・無料相談フォームを含む多ページ構成。</div>
+        <div class="work-tags">
+          <span class="work-tag">HTML/CSS</span>
+          <span class="work-tag">JavaScript</span>
+          <span class="work-tag">マルチページ</span>
+          <span class="work-tag">フォーム</span>
+        </div>
+        <div class="work-footer">
+          <div class="work-price">参考価格 <strong>¥120,000〜</strong></div>
+          <div class="work-link">詳細を見る <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        </div>
+      </div>
+
+      <!-- Invoice -->
+      <div class="work-card">
+        <div class="work-num">04 — ツール開発</div>
+        <div class="work-preview">
+          <div class="work-preview-inner preview-invoice">🧾</div>
+          <div class="preview-label">InvoiceFlow — 請求書発行ツール</div>
+        </div>
+        <div class="work-category">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          業務効率化ツール
+        </div>
+        <div class="work-title">請求書自動発行ツール</div>
+        <div class="work-desc">請求先・明細入力からリアルタイムプレビュー・印刷PDF出力まで対応した請求書管理ツール。消費税自動計算・発行履歴管理機能付き。</div>
+        <div class="work-tags">
+          <span class="work-tag">HTML/CSS</span>
+          <span class="work-tag">JavaScript</span>
+          <span class="work-tag">PDF出力</span>
+          <span class="work-tag">自動計算</span>
+        </div>
+        <div class="work-footer">
+          <div class="work-price">参考価格 <strong>¥200,000〜</strong></div>
+          <div class="work-link">詳細を見る <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- Skills -->
+<section class="skills section" id="skills">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-eyebrow">Skills</div>
+      <h2 class="section-title">対応可能な制作</h2>
+      <p class="section-sub">Web制作からシステム開発まで幅広く対応。ご要望に合わせて最適な提案をいたします。</p>
+    </div>
+    <div class="skills-grid reveal">
+      <div class="skill-card">
+        <div class="skill-icon" style="background:rgba(99,102,241,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </div>
+        <div class="skill-name">Web制作</div>
+        <div class="skill-desc">LP・コーポレートサイト・ECサイトまで。レスポンシブ対応・SEO基本対策標準装備。</div>
+        <div class="skill-list">
+          <span class="skill-item">LP</span>
+          <span class="skill-item">コーポレートサイト</span>
+          <span class="skill-item">ECサイト</span>
+          <span class="skill-item">採用サイト</span>
+        </div>
+      </div>
+      <div class="skill-card">
+        <div class="skill-icon" style="background:rgba(52,211,153,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="skill-name">システム開発</div>
+        <div class="skill-desc">予約システム・管理ツール・業務効率化ツールなど、業務に合わせたシステムを開発。</div>
+        <div class="skill-list">
+          <span class="skill-item">予約システム</span>
+          <span class="skill-item">請求書ツール</span>
+          <span class="skill-item">在庫管理</span>
+          <span class="skill-item">顧客管理</span>
+        </div>
+      </div>
+      <div class="skill-card">
+        <div class="skill-icon" style="background:rgba(240,180,41,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#f0b429" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        </div>
+        <div class="skill-name">アプリ開発</div>
+        <div class="skill-desc">iOS/Android対応のスマホアプリ開発。ユーザー管理・通知・決済機能などに対応。</div>
+        <div class="skill-list">
+          <span class="skill-item">iOS</span>
+          <span class="skill-item">Android</span>
+          <span class="skill-item">ログイン機能</span>
+          <span class="skill-item">決済機能</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Flow -->
+<section class="flow-section">
+  <div class="container">
+    <div class="reveal" style="text-align:center; margin-bottom:0">
+      <div class="section-eyebrow" style="justify-content:center">
+        <span style="width:24px;height:1px;background:var(--accent2);display:inline-block"></span>
+        Flow
+      </div>
+      <h2 class="section-title">ご依頼の流れ</h2>
+    </div>
+    <div class="flow-grid reveal">
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <div class="flow-step">Step 01</div>
+        <div class="flow-name">お問い合わせ</div>
+        <div class="flow-detail">メッセージをお送りください。24時間以内に返信します。</div>
+      </div>
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="flow-step">Step 02</div>
+        <div class="flow-name">ヒアリング</div>
+        <div class="flow-detail">要件・デザイン・納期・予算をオンラインで確認します。</div>
+      </div>
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div class="flow-step">Step 03</div>
+        <div class="flow-name">お見積もり</div>
+        <div class="flow-detail">内容を確認後、見積もりをご提示。ご承認後に着手金をお支払い。</div>
+      </div>
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+        <div class="flow-step">Step 04</div>
+        <div class="flow-name">制作・修正</div>
+        <div class="flow-detail">制作開始。修正は回数無制限で対応します。</div>
+      </div>
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+        <div class="flow-step">Step 05</div>
+        <div class="flow-name">納品・完了</div>
+        <div class="flow-detail">最終確認後に納品。残金のお支払いで完了です。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <div class="cta-inner reveal">
+      <h2 class="cta-title">まずは<span>無料相談</span>から。</h2>
+      <p class="cta-sub">どんな小さなご相談でも歓迎いたします。ヒアリング・お見積もりは無料です。</p>
+      <div class="cta-btns">
+        <a href="#" class="btn-cta-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          無料相談を申し込む
+        </a>
+        <a href="#works" class="btn-cta-ghost">実績をもっと見る</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>© 2026 Web制作・開発ポートフォリオ — All Rights Reserved</p>
+  </div>
+</footer>
+
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) {
+      setTimeout(() => entry.target.classList.add('visible'), i * 100);
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
