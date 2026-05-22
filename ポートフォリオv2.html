@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio — Web制作・開発実績</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--border:rgba(255,255,255,0.07);--accent:#6366f1;--accent2:#a78bfa;--gold:#f0b429;--green:#34d399;--text:#e8eaf6;--text2:#8b8fa8;--text3:#4a4d6a;--ease:cubic-bezier(0.6,0.05,0.2,1)}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Syne','Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+a{color:inherit;text-decoration:none}
+.container{width:min(92%,1100px);margin:0 auto}
+
+/* ── Hero ── */
+.hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;padding:120px 0 80px}
+.hero::before{content:"";position:absolute;top:-200px;left:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(99,102,241,0.15) 0%,transparent 70%);pointer-events:none;animation:orb1 8s ease-in-out infinite}
+.hero::after{content:"";position:absolute;bottom:-150px;right:-100px;width:500px;height:500px;background:radial-gradient(circle,rgba(167,139,250,0.1) 0%,transparent 70%);pointer-events:none;animation:orb2 10s ease-in-out infinite}
+@keyframes orb1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
+@keyframes orb2{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,-30px)}}
+.hero-inner{position:relative;z-index:1}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:99px;font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--accent2);margin-bottom:2rem;opacity:0;animation:fadeUp .8s var(--ease) .2s forwards}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hero h1{font-size:clamp(2.8rem,7vw,5.5rem);font-weight:800;line-height:1.1;letter-spacing:-.03em;margin-bottom:1.5rem;opacity:0;animation:fadeUp .9s var(--ease) .4s forwards}
+.hero h1 .line2{display:block;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 50%,var(--gold) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:1rem;color:var(--text2);max-width:540px;margin-bottom:2.5rem;line-height:1.9;opacity:0;animation:fadeUp .9s var(--ease) .6s forwards}
+.hero-tags{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:2.5rem;opacity:0;animation:fadeUp .9s var(--ease) .7s forwards}
+.tag{padding:5px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:99px;font-size:.75rem;color:var(--text2);letter-spacing:.05em}
+.hero-cta{display:inline-flex;align-items:center;gap:10px;padding:14px 28px;background:var(--accent);color:white;border-radius:8px;font-size:.85rem;font-weight:600;letter-spacing:.05em;transition:all .3s var(--ease);opacity:0;animation:fadeUp .9s var(--ease) .8s forwards}
+.hero-cta:hover{background:#5254cc;transform:translateY(-2px);box-shadow:0 8px 24px rgba(99,102,241,.4)}
+.hero-cta svg{width:16px;height:16px;transition:transform .3s var(--ease)}
+.hero-cta:hover svg{transform:translateX(4px)}
+.hero-stats{display:flex;gap:3rem;margin-top:4rem;padding-top:3rem;border-top:1px solid var(--border);opacity:0;animation:fadeUp .9s var(--ease) 1s forwards;flex-wrap:wrap}
+.hero-stat-num{font-size:2rem;font-weight:800;letter-spacing:-.04em;background:linear-gradient(135deg,var(--text),var(--text2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-stat-label{font-size:.72rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-top:3px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Section ── */
+.section{padding:clamp(5rem,10vw,8rem) 0}
+.section-eyebrow{font-size:.68rem;letter-spacing:.35em;text-transform:uppercase;color:var(--accent2);margin-bottom:1rem;display:flex;align-items:center;gap:.8rem}
+.section-eyebrow::before{content:"";width:24px;height:1px;background:var(--accent2)}
+.section-title{font-size:clamp(1.8rem,4vw,3rem);font-weight:800;letter-spacing:-.03em;color:var(--text);line-height:1.2;margin-bottom:1rem}
+.section-sub{font-size:.92rem;color:var(--text2);max-width:500px;line-height:1.9}
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+/* ── Filter ── */
+.works-filter{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:2.5rem}
+.filter-btn{padding:7px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:99px;font-size:.75rem;color:var(--text2);letter-spacing:.06em;cursor:pointer;font-family:inherit;transition:all .25s var(--ease)}
+.filter-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+.filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ── Works Grid ── */
+.works-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5px;background:var(--border);margin-top:2rem;border:1px solid var(--border)}
+.work-card{background:var(--bg);padding:2rem 1.8rem;position:relative;overflow:hidden;cursor:pointer;transition:background .4s var(--ease)}
+.work-card:hover{background:var(--surface)}
+.work-card::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(99,102,241,0.05),transparent);opacity:0;transition:opacity .4s var(--ease)}
+.work-card:hover::before{opacity:1}
+/* click hint overlay */
+.work-card::after{content:"クリックして詳細を見る";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(99,102,241,0.92);color:#fff;padding:8px 18px;border-radius:6px;font-size:.72rem;letter-spacing:.06em;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .25s;z-index:10}
+.work-card:hover::after{opacity:1}
+.work-num{font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;color:var(--text3);margin-bottom:1.2rem}
+.work-preview{aspect-ratio:16/9;border-radius:6px;overflow:hidden;margin-bottom:1.4rem;border:1px solid var(--border);position:relative}
+.work-preview-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2.2rem;transition:transform .6s var(--ease)}
+.work-card:hover .work-preview-inner{transform:scale(1.06)}
+.preview-label{position:absolute;bottom:0;left:0;right:0;padding:6px 10px;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.65);text-align:center}
+.work-category{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:99px;font-size:.64rem;color:var(--text2);letter-spacing:.06em;margin-bottom:.6rem}
+.work-title{font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:.4rem;letter-spacing:-.01em}
+.work-desc{font-size:.78rem;color:var(--text2);line-height:1.8;margin-bottom:1rem}
+.work-tags{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:1.2rem}
+.work-tag{padding:2px 8px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:4px;font-size:.62rem;color:var(--accent2)}
+.work-footer{display:flex;align-items:center;justify-content:space-between}
+.work-price{font-size:.75rem;color:var(--text2)}
+.work-price strong{color:var(--gold);font-size:.88rem}
+.work-link{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;color:var(--accent2);font-weight:600;letter-spacing:.04em;transition:gap .3s var(--ease)}
+.work-card:hover .work-link{gap:8px}
+.work-link svg{width:12px;height:12px}
+.work-hidden{display:none}
+
+/* Preview gradients */
+.preview-cafe{background:linear-gradient(135deg,#3d2817,#6b4423,#c9a961)}
+.preview-law{background:linear-gradient(135deg,#0d1b2e,#1e3050,#b8962e)}
+.preview-shopapp{background:linear-gradient(135deg,#1a0533,#2d0f5c,#7c3aed)}
+.preview-ec{background:linear-gradient(135deg,#1a1a1a,#2d2d2d,#c4a882)}
+.preview-reserve{background:linear-gradient(135deg,#0f1117,#1a1d27,#4f8ef7)}
+.preview-invoice{background:linear-gradient(135deg,#16192c,#1a1d27,#2563eb)}
+.preview-time{background:linear-gradient(135deg,#0a1a1a,#0d2a2a,#0d9488)}
+.preview-stock{background:linear-gradient(135deg,#0a1f0a,#0f2e0f,#16a34a)}
+.preview-aitext{background:linear-gradient(135deg,#1a0a2e,#2d1460,#a855f7)}
+.preview-aiint{background:linear-gradient(135deg,#0f1728,#182440,#3b82f6)}
+.preview-excel{background:linear-gradient(135deg,#0a1a0a,#163016,#217346)}
+.preview-line{background:linear-gradient(135deg,#0a1a0a,#0d2a10,#06c755)}
+.preview-scrape{background:linear-gradient(135deg,#1a150a,#2e2010,#d97706)}
+.preview-care{background:linear-gradient(135deg,#0a0f1a,#0d1a33,#1d6fa4)}
+.preview-req{background:linear-gradient(135deg,#0f0f1a,#1a1a2e,#6366f1)}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;z-index:100000;background:rgba(10,10,15,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .35s var(--ease)}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-window{width:100%;max-width:1240px;height:90vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transform:scale(.94) translateY(20px);transition:transform .35s var(--ease);box-shadow:0 48px 96px rgba(0,0,0,.7)}
+.modal-overlay.open .modal-window{transform:scale(1) translateY(0)}
+.modal-topbar{display:flex;align-items:center;gap:.8rem;padding:0 1rem;height:46px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-dots{display:flex;gap:6px}
+.modal-dot{width:12px;height:12px;border-radius:50%}
+.dot-red{background:#ff5f57;cursor:pointer;transition:filter .2s}
+.dot-red:hover{filter:brightness(1.3)}
+.dot-yellow{background:#febc2e}
+.dot-green{background:#28c840}
+.modal-url{flex:1;display:flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-size:.7rem;color:var(--text3);overflow:hidden;min-width:0}
+.modal-url-icon{flex-shrink:0;width:12px;height:12px;opacity:.5}
+.modal-url-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-actions{display:flex;gap:.4rem;flex-shrink:0}
+.modal-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:5px;font-size:.7rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:inherit;transition:all .2s;white-space:nowrap}
+.modal-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.modal-btn.close-btn{color:#ef4444;border-color:rgba(239,68,68,.3)}
+.modal-btn.close-btn:hover{background:#ef4444;color:#fff;border-color:#ef4444}
+.modal-btn svg{width:11px;height:11px}
+.modal-iframe-wrap{flex:1;position:relative;overflow:hidden}
+.modal-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:var(--surface);z-index:2}
+.modal-spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.modal-loading-text{font-size:.75rem;color:var(--text3);letter-spacing:.08em}
+.modal-iframe{width:100%;height:100%;border:none;display:block}
+
+/* ── Skills ── */
+.skills{background:var(--surface)}
+.skills-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-top:3rem;border:1px solid var(--border)}
+.skill-card{background:var(--surface);padding:1.8rem;transition:background .3s var(--ease)}
+.skill-card:hover{background:var(--surface2)}
+.skill-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:1rem}
+.skill-icon svg{width:18px;height:18px}
+.skill-name{font-size:.88rem;font-weight:700;color:var(--text);margin-bottom:.4rem}
+.skill-desc{font-size:.76rem;color:var(--text2);line-height:1.8}
+.skill-list{margin-top:.8rem;display:flex;flex-wrap:wrap;gap:.35rem}
+.skill-item{padding:2px 7px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:.62rem;color:var(--text3)}
+
+/* ── Flow ── */
+.flow-section{padding:clamp(5rem,10vw,8rem) 0}
+.flow-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:3.5rem;position:relative}
+.flow-grid::before{content:"";position:absolute;top:27px;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,var(--border),var(--border),transparent)}
+.flow-item{text-align:center;padding:0 .8rem;position:relative}
+.flow-dot{width:54px;height:54px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;position:relative;z-index:1;transition:all .3s var(--ease)}
+.flow-dot svg{width:19px;height:19px;color:var(--accent2)}
+.flow-item:hover .flow-dot{background:var(--accent);border-color:var(--accent)}
+.flow-item:hover .flow-dot svg{color:white}
+.flow-step{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);margin-bottom:.3rem}
+.flow-name{font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:.3rem}
+.flow-detail{font-size:.7rem;color:var(--text2);line-height:1.7}
+
+/* ── CTA ── */
+.cta-section{padding:clamp(5rem,10vw,8rem) 0;background:var(--surface);position:relative;overflow:hidden}
+.cta-section::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:800px;height:400px;background:radial-gradient(ellipse,rgba(99,102,241,.1) 0%,transparent 70%);pointer-events:none}
+.cta-inner{text-align:center;position:relative;z-index:1}
+.cta-title{font-size:clamp(2rem,5vw,3.5rem);font-weight:800;letter-spacing:-.03em;margin-bottom:1rem}
+.cta-title span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.cta-sub{font-size:.95rem;color:var(--text2);max-width:480px;margin:0 auto 2.5rem;line-height:1.9}
+.cta-btns{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+.btn-cta-primary{padding:14px 28px;background:var(--accent);color:white;border-radius:8px;font-size:.85rem;font-weight:700;letter-spacing:.05em;transition:all .3s var(--ease);display:inline-flex;align-items:center;gap:8px}
+.btn-cta-primary:hover{background:#5254cc;transform:translateY(-2px);box-shadow:0 8px 24px rgba(99,102,241,.4)}
+.btn-cta-ghost{padding:14px 28px;background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:8px;font-size:.85rem;font-weight:600;letter-spacing:.05em;transition:all .3s var(--ease)}
+.btn-cta-ghost:hover{border-color:var(--accent2);color:var(--accent2)}
+
+footer{background:var(--bg);border-top:1px solid var(--border);padding:2rem 0;text-align:center;font-size:.75rem;color:var(--text3)}
+
+@media(max-width:900px){.works-grid{grid-template-columns:1fr 1fr}.skills-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.works-grid{grid-template-columns:1fr}.skills-grid{grid-template-columns:1fr}.flow-grid{grid-template-columns:1fr 1fr;gap:2rem}.flow-grid::before{display:none}.hero-stats{gap:2rem}.modal-actions .modal-btn:not(.close-btn){display:none}}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     MODAL OVERLAY
+══════════════════════════════════════════ -->
+<div id="workModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-window">
+    <div class="modal-topbar">
+      <div class="modal-dots">
+        <div class="modal-dot dot-red" onclick="closeModal()" title="閉じる"></div>
+        <div class="modal-dot dot-yellow"></div>
+        <div class="modal-dot dot-green"></div>
+      </div>
+      <div class="modal-url">
+        <svg class="modal-url-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span id="modalTitle" class="modal-url-text">読み込み中...</span>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn" onclick="openNewTab()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          新しいタブで開く
+        </button>
+        <button class="modal-btn close-btn" onclick="closeModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          閉じる
+        </button>
+      </div>
+    </div>
+    <div class="modal-iframe-wrap">
+      <div id="modalLoading" class="modal-loading">
+        <div class="modal-spinner"></div>
+        <p class="modal-loading-text">読み込み中...</p>
+      </div>
+      <iframe id="modalIframe" class="modal-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" style="display:none"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     HERO
+══════════════════════════════════════════ -->
+<section class="hero">
+  <div class="container hero-inner">
+    <div class="hero-badge"><span class="hero-badge-dot"></span>Web制作・ツール・アプリ・AI開発</div>
+    <h1>
+      <span>高品質・短納期・</span>
+      <span class="line2">修正無制限。</span>
+    </h1>
+    <p class="hero-sub">LP制作からECサイト・業務効率化ツール・AI活用プロダクトまで。オンライン完結で全国どこからでもご依頼いただけます。</p>
+    <div class="hero-tags">
+      <span class="tag">LP制作</span><span class="tag">コーポレートサイト</span><span class="tag">ECサイト</span>
+      <span class="tag">スマホアプリ</span><span class="tag">LINE構築</span><span class="tag">業務効率化</span>
+      <span class="tag">🤖 AI活用ツール</span><span class="tag">修正回数無制限</span>
+    </div>
+    <a href="#works" class="hero-cta">
+      制作実績を見る
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+    <div class="hero-stats">
+      <div><div class="hero-stat-num">修正∞</div><div class="hero-stat-label">修正回数無制限</div></div>
+      <div><div class="hero-stat-num">24h</div><div class="hero-stat-label">返信対応時間</div></div>
+      <div><div class="hero-stat-num">100%</div><div class="hero-stat-label">オンライン完結</div></div>
+      <div><div class="hero-stat-num">50k〜</div><div class="hero-stat-label">LP制作から対応</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     WORKS
+══════════════════════════════════════════ -->
+<section class="section" id="works">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-eyebrow">Portfolio</div>
+      <h2 class="section-title">制作実績</h2>
+      <p class="section-sub">実際に制作したサンプルをご覧ください。ご要望に合わせてカスタマイズいたします。</p>
+      <!-- Filter -->
+      <div class="works-filter" id="worksFilter">
+        <button class="filter-btn active" data-filter="all">すべて</button>
+        <button class="filter-btn" data-filter="web">Web制作</button>
+        <button class="filter-btn" data-filter="system">システム開発</button>
+        <button class="filter-btn" data-filter="app">アプリ</button>
+        <button class="filter-btn" data-filter="ai">AI活用</button>
+      </div>
+    </div>
+
+    <div class="works-grid reveal" id="worksGrid">
+
+      <!-- 01 カフェLP -->
+      <div class="work-card" data-category="web" onclick="openWork('./カフェLP.html','カフェ向けLP — Café Lumière')">
+        <div class="work-num">01 — LP制作</div>
+        <div class="work-preview"><div class="work-preview-inner preview-cafe">☕</div><div class="preview-label">Café Lumière — ランディングページ</div></div>
+        <div class="work-category">ランディングページ</div>
+        <div class="work-title">カフェ向けLP</div>
+        <div class="work-desc">高級感あるデザインのカフェ向けLP。ヒーロー・メニュー・ギャラリー・アクセス・問い合わせフォームを含む1ページ完結のサイト。</div>
+        <div class="work-tags"><span class="work-tag">HTML/CSS</span><span class="work-tag">JavaScript</span><span class="work-tag">レスポンシブ</span><span class="work-tag">アニメーション</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥50,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 02 法律事務所 -->
+      <div class="work-card" data-category="web" onclick="openWork('./法律事務所コーポレートサイト.html','法律事務所コーポレートサイト')">
+        <div class="work-num">02 — コーポレートサイト</div>
+        <div class="work-preview"><div class="work-preview-inner preview-law">⚖️</div><div class="preview-label">鈴木・田中法律事務所 — コーポレートサイト</div></div>
+        <div class="work-category">コーポレートサイト</div>
+        <div class="work-title">法律事務所サイト</div>
+        <div class="work-desc">信頼感・高級感のある士業向けコーポレートサイト。業務案内・弁護士紹介・お客様の声・無料相談フォームを含む多ページ構成。</div>
+        <div class="work-tags"><span class="work-tag">HTML/CSS</span><span class="work-tag">JavaScript</span><span class="work-tag">マルチページ</span><span class="work-tag">フォーム</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥120,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 03 ECショッピングアプリ -->
+      <div class="work-card" data-category="app" onclick="openWork('./ECショッピングアプリ.html','ECショッピングアプリ — ShopApp')">
+        <div class="work-num">03 — スマホアプリ</div>
+        <div class="work-preview"><div class="work-preview-inner preview-shopapp">📱</div><div class="preview-label">ShopApp — ECショッピングアプリ</div></div>
+        <div class="work-category">スマホアプリ</div>
+        <div class="work-title">ECショッピングアプリ</div>
+        <div class="work-desc">iOS/Android対応のECアプリ。商品一覧・フラッシュセール・カート・お気に入り・決済画面まで実装したフルスタックデモ。</div>
+        <div class="work-tags"><span class="work-tag">React Native</span><span class="work-tag">iOS</span><span class="work-tag">Android</span><span class="work-tag">決済</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥400,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 04 アパレルEC -->
+      <div class="work-card" data-category="web" onclick="openWork('./ECサイト.html','アパレルECサイト — NOIR')">
+        <div class="work-num">04 — ECサイト</div>
+        <div class="work-preview"><div class="work-preview-inner preview-ec">🛍️</div><div class="preview-label">NOIR — プレミアムアパレルECサイト</div></div>
+        <div class="work-category">ECサイト</div>
+        <div class="work-title">アパレルECサイト</div>
+        <div class="work-desc">商品一覧・フィルター・カートサイドバー・ルックブックを備えたプレミアムEC。商品追加・削除・数量変更まで完全動作。</div>
+        <div class="work-tags"><span class="work-tag">HTML/CSS</span><span class="work-tag">JavaScript</span><span class="work-tag">カート機能</span><span class="work-tag">フィルター</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥300,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 05 予約管理 -->
+      <div class="work-card" data-category="system" onclick="openWork('./予約管理ツール.html','予約管理システム — ReserveFlow')">
+        <div class="work-num">05 — システム開発</div>
+        <div class="work-preview"><div class="work-preview-inner preview-reserve">📅</div><div class="preview-label">ReserveFlow — 予約管理システム</div></div>
+        <div class="work-category">業務効率化ツール</div>
+        <div class="work-title">予約管理システム</div>
+        <div class="work-desc">ダッシュボード・予約一覧・カレンダー・統計機能を備えた業務用予約管理ツール。サロン・クリニック・飲食店に対応。</div>
+        <div class="work-tags"><span class="work-tag">JavaScript</span><span class="work-tag">ダッシュボード</span><span class="work-tag">カレンダー</span><span class="work-tag">統計</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥200,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 06 請求書発行 -->
+      <div class="work-card" data-category="system" onclick="openWork('./請求書発行ツール.html','請求書発行ツール — InvoiceFlow')">
+        <div class="work-num">06 — ツール開発</div>
+        <div class="work-preview"><div class="work-preview-inner preview-invoice">🧾</div><div class="preview-label">InvoiceFlow — 請求書発行ツール</div></div>
+        <div class="work-category">業務効率化ツール</div>
+        <div class="work-title">請求書自動発行ツール</div>
+        <div class="work-desc">リアルタイムプレビュー・消費税自動計算・PDF出力まで対応した請求書管理ツール。発行履歴管理・連番自動採番機能付き。</div>
+        <div class="work-tags"><span class="work-tag">JavaScript</span><span class="work-tag">PDF出力</span><span class="work-tag">自動計算</span><span class="work-tag">履歴管理</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥200,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 07 勤怠管理 -->
+      <div class="work-card" data-category="system" onclick="openWork('./勤怠管理システム.html','勤怠管理システム — TimeFlow')">
+        <div class="work-num">07 — システム開発</div>
+        <div class="work-preview"><div class="work-preview-inner preview-time">🕐</div><div class="preview-label">TimeFlow — 勤怠管理システム</div></div>
+        <div class="work-category">業務効率化ツール</div>
+        <div class="work-title">勤怠管理システム</div>
+        <div class="work-desc">出退勤打刻・残業管理・休暇申請・CSV出力まで対応した法人向け勤怠管理システム。月次集計レポート自動生成機能付き。</div>
+        <div class="work-tags"><span class="work-tag">JavaScript</span><span class="work-tag">打刻管理</span><span class="work-tag">CSV出力</span><span class="work-tag">月次集計</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥300,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 08 在庫管理 -->
+      <div class="work-card" data-category="system" onclick="openWork('./在庫管理ツール.html','在庫管理システム — StockFlow')">
+        <div class="work-num">08 — システム開発</div>
+        <div class="work-preview"><div class="work-preview-inner preview-stock">📦</div><div class="preview-label">StockFlow — 在庫管理システム</div></div>
+        <div class="work-category">業務効率化ツール</div>
+        <div class="work-title">在庫管理システム</div>
+        <div class="work-desc">商品一覧・在庫アラート・入出庫管理・カテゴリ別グラフ・CSV出力まで対応。在庫切れや不足をリアルタイムで通知。</div>
+        <div class="work-tags"><span class="work-tag">JavaScript</span><span class="work-tag">在庫アラート</span><span class="work-tag">CSV出力</span><span class="work-tag">グラフ</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥300,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 09 AI文章添削 -->
+      <div class="work-card" data-category="ai" onclick="openWork('./AI添削ツール.html','AI文章添削ツール — TextPro')">
+        <div class="work-num">09 — AI活用ツール</div>
+        <div class="work-preview"><div class="work-preview-inner preview-aitext">✍️</div><div class="preview-label">TextPro — AI文章添削ツール</div></div>
+        <div class="work-category">🤖 AI活用ツール</div>
+        <div class="work-title">AI文章添削ツール</div>
+        <div class="work-desc">Claude AIを活用した企業向け文章添削ツール。文書種別ごとに分析し、総合スコア・指摘事項・修正文章を自動生成します。</div>
+        <div class="work-tags"><span class="work-tag">Claude API</span><span class="work-tag">AI統合</span><span class="work-tag">スコアリング</span><span class="work-tag">自動添削</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥500,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 10 AI面接 -->
+      <div class="work-card" data-category="ai" onclick="openWork('./AI面接ツール.html','AI面接練習ツール')">
+        <div class="work-num">10 — AI活用ツール</div>
+        <div class="work-preview"><div class="work-preview-inner preview-aiint">🎤</div><div class="preview-label">AI面接練習ツール</div></div>
+        <div class="work-category">🤖 AI活用ツール</div>
+        <div class="work-title">AI面接練習ツール</div>
+        <div class="work-desc">AIが面接官役を担うインタラクティブな面接練習ツール。回答に対するフィードバックと改善提案を自動生成します。</div>
+        <div class="work-tags"><span class="work-tag">Claude API</span><span class="work-tag">音声対応</span><span class="work-tag">フィードバック</span><span class="work-tag">採点機能</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥500,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 11 Excel自動化 -->
+      <div class="work-card" data-category="system" onclick="openWork('./Excel自動化ツール.html','Excel業務自動化ツール — AutoExcel')">
+        <div class="work-num">11 — 業務自動化</div>
+        <div class="work-preview"><div class="work-preview-inner preview-excel">📊</div><div class="preview-label">AutoExcel — 業務自動化ツール</div></div>
+        <div class="work-category">業務効率化ツール</div>
+        <div class="work-title">Excel業務自動化ツール</div>
+        <div class="work-desc">マクロ登録・スプレッドシート編集・自動集計・PDF出力。売上集計・請求書・在庫アラートなど5種類のマクロを搭載。</div>
+        <div class="work-tags"><span class="work-tag">JavaScript</span><span class="work-tag">マクロ実行</span><span class="work-tag">CSV/PDF出力</span><span class="work-tag">自動集計</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥30,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 12 LINE構築 -->
+      <div class="work-card" data-category="web" onclick="openWork('./LINE公式アカウント構築.html','LINE公式アカウント構築ダッシュボード')">
+        <div class="work-num">12 — LINE構築</div>
+        <div class="work-preview"><div class="work-preview-inner preview-line">💬</div><div class="preview-label">LINE公式アカウント構築ダッシュボード</div></div>
+        <div class="work-category">LINE公式アカウント</div>
+        <div class="work-title">LINE公式アカウント構築</div>
+        <div class="work-desc">リッチメニュー・ステップ配信・自動応答・一斉配信・分析ダッシュボードまで備えたLINE公式アカウント構築デモ。</div>
+        <div class="work-tags"><span class="work-tag">LINE API</span><span class="work-tag">チャットボット</span><span class="work-tag">ステップ配信</span><span class="work-tag">分析</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥50,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 13 スクレイピング -->
+      <div class="work-card" data-category="system" onclick="openWork('./スクレイピングダッシュボード.html','スクレイピング・データ収集ダッシュボード')">
+        <div class="work-num">13 — データ収集</div>
+        <div class="work-preview"><div class="work-preview-inner preview-scrape">🔍</div><div class="preview-label">ScrapeBoard — データ収集・分析</div></div>
+        <div class="work-category">業務効率化ツール</div>
+        <div class="work-title">スクレイピング・データ収集</div>
+        <div class="work-desc">競合価格監視・求人情報収集・レビュー収集をリアルタイムで行うダッシュボード。価格推移グラフ・アラート・CSV出力まで対応。</div>
+        <div class="work-tags"><span class="work-tag">JavaScript</span><span class="work-tag">データ収集</span><span class="work-tag">価格監視</span><span class="work-tag">グラフ</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥30,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 14 介護施設管理 -->
+      <div class="work-card" data-category="system" onclick="openWork('./介護施設管理システム.html','介護施設管理システム — CareFlow')">
+        <div class="work-num">14 — 業種特化システム</div>
+        <div class="work-preview"><div class="work-preview-inner preview-care">🏥</div><div class="preview-label">CareFlow — 介護施設管理システム</div></div>
+        <div class="work-category">業種特化システム</div>
+        <div class="work-title">介護施設管理システム</div>
+        <div class="work-desc">入居者管理・バイタル記録・服薬チェック・介護記録・スケジュール管理・緊急連絡ボタンを備えた介護施設向け業務管理システム。</div>
+        <div class="work-tags"><span class="work-tag">HTML/CSS</span><span class="work-tag">JavaScript</span><span class="work-tag">バイタル管理</span><span class="work-tag">服薬チェック</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥500,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+      <!-- 15 要件定義 -->
+      <div class="work-card" data-category="system" onclick="openWork('./要件定義ツール.html','要件定義管理ツール — RequireFlow')">
+        <div class="work-num">15 — 社内業務ツール</div>
+        <div class="work-preview"><div class="work-preview-inner preview-req">📋</div><div class="preview-label">RequireFlow — 要件定義管理ツール</div></div>
+        <div class="work-category">社内業務ツール</div>
+        <div class="work-title">要件定義管理ツール</div>
+        <div class="work-desc">MoSCoW優先度・受入条件・ステータス管理・コメント機能を備えた社内向け要件定義ツール。進捗率を自動計算します。</div>
+        <div class="work-tags"><span class="work-tag">HTML/CSS</span><span class="work-tag">JavaScript</span><span class="work-tag">MoSCoW</span><span class="work-tag">進捗管理</span></div>
+        <div class="work-footer"><div class="work-price">参考価格 <strong>¥300,000〜</strong></div><div class="work-link">詳細<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     SKILLS
+══════════════════════════════════════════ -->
+<section class="skills section" id="skills">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-eyebrow">Skills</div>
+      <h2 class="section-title">対応可能な制作</h2>
+      <p class="section-sub">Web制作からAI活用ツールまで幅広く対応。ご要望に合わせて最適な提案をいたします。</p>
+    </div>
+    <div class="skills-grid reveal">
+      <div class="skill-card">
+        <div class="skill-icon" style="background:rgba(99,102,241,0.1)"><svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <div class="skill-name">Web制作</div>
+        <div class="skill-desc">LP・コーポレートサイト・ECサイトまで。レスポンシブ対応・SEO基本対策標準装備。</div>
+        <div class="skill-list"><span class="skill-item">LP</span><span class="skill-item">コーポレートサイト</span><span class="skill-item">ECサイト</span><span class="skill-item">採用サイト</span></div>
+      </div>
+      <div class="skill-card">
+        <div class="skill-icon" style="background:rgba(52,211,153,0.1)"><svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+        <div class="skill-name">システム開発</div>
+        <div class="skill-desc">予約システム・管理ツール・業務効率化など、業務に合わせたシステムを開発。</div>
+        <div class="skill-list"><span class="skill-item">予約システム</span><span class="skill-item">在庫管理</span><span class="skill-item">勤怠管理</span><span class="skill-item">顧客管理</span></div>
+      </div>
+      <div class="skill-card">
+        <div class="skill-icon" style="background:rgba(240,180,41,0.1)"><svg viewBox="0 0 24 24" fill="none" stroke="#f0b429" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div>
+        <div class="skill-name">アプリ・LINE開発</div>
+        <div class="skill-desc">iOS/Android対応のスマホアプリ開発。LINE公式アカウント構築まで対応。</div>
+        <div class="skill-list"><span class="skill-item">iOS/Android</span><span class="skill-item">LINE公式</span><span class="skill-item">チャットボット</span><span class="skill-item">ステップ配信</span></div>
+      </div>
+      <div class="skill-card">
+        <div class="skill-icon" style="background:rgba(167,139,250,0.1)"><svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M4.22 4.22l2.12 2.12m11.32 11.32 2.12 2.12M2 12h3m14 0h3M4.22 19.78l2.12-2.12m11.32-11.32 2.12-2.12"/></svg></div>
+        <div class="skill-name">AI活用ツール</div>
+        <div class="skill-desc">Claude APIを活用した添削・分析・自動化ツールなど企業向けAIプロダクトを開発。</div>
+        <div class="skill-list"><span class="skill-item">Claude API</span><span class="skill-item">添削ツール</span><span class="skill-item">面接ツール</span><span class="skill-item">業務自動化</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     FLOW
+══════════════════════════════════════════ -->
+<section class="flow-section">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-eyebrow" style="justify-content:center">Flow</div>
+      <h2 class="section-title">ご依頼の流れ</h2>
+    </div>
+    <div class="flow-grid reveal">
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <div class="flow-step">Step 01</div><div class="flow-name">お問い合わせ</div>
+        <div class="flow-detail">24時間以内に返信します。</div>
+      </div>
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="flow-step">Step 02</div><div class="flow-name">ヒアリング</div>
+        <div class="flow-detail">要件・デザイン・納期・予算を確認します。</div>
+      </div>
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div class="flow-step">Step 03</div><div class="flow-name">お見積もり</div>
+        <div class="flow-detail">内容確認後、見積もりをご提示。承認後に着手金をお支払い。</div>
+      </div>
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+        <div class="flow-step">Step 04</div><div class="flow-name">制作・修正</div>
+        <div class="flow-detail">制作開始。修正は回数無制限で対応します。</div>
+      </div>
+      <div class="flow-item">
+        <div class="flow-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+        <div class="flow-step">Step 05</div><div class="flow-name">納品・完了</div>
+        <div class="flow-detail">最終確認後に納品。残金のお支払いで完了です。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CTA
+══════════════════════════════════════════ -->
+<section class="cta-section">
+  <div class="container">
+    <div class="cta-inner reveal">
+      <h2 class="cta-title">まずは<span>無料相談</span>から。</h2>
+      <p class="cta-sub">どんな小さなご相談でも歓迎いたします。ヒアリング・お見積もりは無料です。</p>
+      <div class="cta-btns">
+        <a href="#" class="btn-cta-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          無料相談を申し込む
+        </a>
+        <a href="#works" class="btn-cta-ghost">実績をもっと見る</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>© 2026 Web制作・開発ポートフォリオ — All Rights Reserved</p>
+  </div>
+</footer>
+
+<script>
+/* ── Reveal ── */
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if(e.isIntersecting){
+      setTimeout(() => e.target.classList.add('visible'), i * 80);
+      revealObs.unobserve(e.target);
+    }
+  });
+},{threshold:0.08,rootMargin:'0px 0px -60px 0px'});
+document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+
+/* ── Filter ── */
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const f = btn.dataset.filter;
+    document.querySelectorAll('.work-card').forEach(card => {
+      const show = f === 'all' || card.dataset.category === f;
+      card.style.display = show ? '' : 'none';
+    });
+  });
+});
+
+/* ── Modal ── */
+const modal   = document.getElementById('workModal');
+const iframe  = document.getElementById('modalIframe');
+const loading = document.getElementById('modalLoading');
+const titleEl = document.getElementById('modalTitle');
+let currentSrc = '';
+
+function openWork(src, title) {
+  currentSrc = src;
+  titleEl.textContent = title;
+  loading.style.display = 'flex';
+  iframe.style.display = 'none';
+  iframe.src = '';
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  // Small delay then set src
+  setTimeout(() => {
+    iframe.src = src;
+    iframe.onload = () => {
+      loading.style.display = 'none';
+      iframe.style.display = 'block';
+    };
+  }, 80);
+}
+
+function closeModal() {
+  modal.classList.remove('open');
+  document.body.style.overflow = '';
+  setTimeout(() => {
+    iframe.src = '';
+    iframe.style.display = 'none';
+    loading.style.display = 'flex';
+  }, 380);
+}
+
+function openNewTab() {
+  if(currentSrc) window.open(currentSrc, '_blank');
+}
+
+// Click outside to close
+modal.addEventListener('click', e => {
+  if(e.target === modal) closeModal();
+});
+
+// ESC to close
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+});
+</script>
+</body>
+</html>
