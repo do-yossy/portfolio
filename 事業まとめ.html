@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新事業まとめ</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #22263a;
+  --accent: #4f8ef7;
+  --accent2: #7c5cbf;
+  --gold: #f0b429;
+  --green: #2dd4a0;
+  --text: #e8eaf0;
+  --text2: #9ca3b8;
+  --border: rgba(255,255,255,0.07);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 300;
+  line-height: 1.8;
+  font-size: 14px;
+  padding: 2rem 1rem;
+}
+.wrap { max-width: 900px; margin: 0 auto; }
+
+/* Header */
+.page-header {
+  text-align: center;
+  padding: 3rem 0 2.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 3rem;
+}
+.page-header h1 {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+}
+.page-header p {
+  color: var(--text2);
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+}
+
+/* Section */
+.section { margin-bottom: 2.5rem; }
+.section-title {
+  font-size: 0.7rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+.card-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+/* Grid */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+/* Plan cards */
+.plan {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem;
+}
+.plan-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  margin-bottom: 0.3rem;
+}
+.plan-price {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 1.4rem;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+.plan-price span { font-size: 0.75rem; color: var(--text2); }
+.plan-detail {
+  font-size: 0.78rem;
+  color: var(--text2);
+  line-height: 1.7;
+}
+.plan.featured { border-color: var(--accent); background: rgba(79,142,247,0.07); }
+
+/* List */
+.list { list-style: none; }
+.list li {
+  font-size: 0.85rem;
+  color: var(--text2);
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.list li:last-child { border-bottom: none; }
+.list li::before { content: "▸"; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+
+/* Flow */
+.flow { display: flex; flex-direction: column; gap: 0.5rem; }
+.flow-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.flow-num {
+  width: 24px; height: 24px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: white;
+}
+.flow-text { font-size: 0.85rem; color: var(--text2); padding-top: 3px; }
+
+/* Schedule */
+.schedule-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.schedule-header {
+  background: var(--surface2);
+  padding: 0.8rem 1.2rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 0.1em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.schedule-header span { color: var(--text2); font-weight: 300; font-size: 0.72rem; }
+.schedule-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 80px;
+  padding: 0.7rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+  gap: 1rem;
+  align-items: center;
+}
+.schedule-row:last-child { border-bottom: none; }
+.schedule-row .task { color: var(--text); }
+.schedule-row .desc { color: var(--text2); }
+.schedule-row .time {
+  color: var(--gold);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+/* Media */
+.media-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem;
+}
+.media-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.media-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  padding: 0.3rem 0;
+  color: var(--text2);
+}
+.media-row strong { color: var(--text); }
+
+/* Tag */
+.tag {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 99px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.tag-blue { background: rgba(79,142,247,0.15); color: var(--accent); }
+.tag-green { background: rgba(45,212,160,0.15); color: var(--green); }
+.tag-gold { background: rgba(240,180,41,0.15); color: var(--gold); }
+
+/* Timeline */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.timeline-item {
+  display: flex;
+  gap: 1rem;
+  padding-bottom: 1.2rem;
+  position: relative;
+}
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 24px;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+.timeline-item:last-child::before { display: none; }
+.timeline-dot {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 2px solid var(--accent);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.timeline-content { flex: 1; }
+.timeline-label {
+  font-size: 0.7rem;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.2rem;
+}
+.timeline-text { font-size: 0.82rem; color: var(--text2); }
+
+/* Sheet list */
+.sheet-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; }
+.sheet-item {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sheet-item::before { content: "📊"; font-size: 0.9rem; }
+
+@media (max-width: 600px) {
+  .grid-2, .grid-3, .sheet-list { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="page-header">
+    <h1>新事業 立ち上げまとめ</h1>
+    <p>WEB制作・ツール・アプリ開発事業</p>
+  </div>
+
+  <!-- 料金プラン -->
+  <div class="section">
+    <div class="section-title">料金プラン</div>
+    <div class="grid-3">
+      <div class="plan">
+        <div class="plan-name">ライトプラン</div>
+        <div class="plan-price">¥50,000<span> 税別</span></div>
+        <div class="plan-detail">LP・1ページサイト<br>納期：約1週間</div>
+      </div>
+      <div class="plan featured">
+        <div class="plan-name">スタンダードプラン</div>
+        <div class="plan-price">¥120,000<span> 税別</span></div>
+        <div class="plan-detail">5〜10ページWebサイト<br>お問い合わせフォーム付き<br>納期：約2週間</div>
+      </div>
+      <div class="plan">
+        <div class="plan-name">プレミアムプラン</div>
+        <div class="plan-price">¥250,000<span> 税別</span></div>
+        <div class="plan-detail">コーポレートサイト・CMS導入<br>納期：約3〜4週間</div>
+      </div>
+      <div class="plan">
+        <div class="plan-name">システムプラン</div>
+        <div class="plan-price">¥200,000〜<span> 税別</span></div>
+        <div class="plan-detail">業務効率化ツール・予約システム<br>納期：要相談</div>
+      </div>
+      <div class="plan">
+        <div class="plan-name">スマホアプリプラン</div>
+        <div class="plan-price">¥400,000〜<span> 税別</span></div>
+        <div class="plan-detail">iOS/Android対応<br>納期：要相談</div>
+      </div>
+      <div class="plan">
+        <div class="plan-name">月額保守プラン</div>
+        <div class="plan-price">¥10,000〜<span>/月 税別</span></div>
+        <div class="plan-detail">ライト¥10,000<br>スタンダード¥20,000<br>プレミアム¥40,000</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- オプション -->
+  <div class="section">
+    <div class="section-title">オプション料金</div>
+    <div class="card">
+      <div class="grid-2">
+        <ul class="list">
+          <li>追加ページ作成（1ページ）　¥15,000</li>
+          <li>CMS導入（自分で更新可能）　¥40,000</li>
+          <li>予約フォーム設置　¥25,000</li>
+          <li>SEO基本対策　¥15,000</li>
+        </ul>
+        <ul class="list">
+          <li>ロゴデザイン制作　¥25,000</li>
+          <li>バナー画像制作（1点）　¥4,000</li>
+          <li>文章ライティング（1ページ）　¥8,000</li>
+          <li>サーバー・ドメイン代行設定　¥8,000</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- セキュリティ -->
+  <div class="section">
+    <div class="section-title">セキュリティ対応範囲</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">✓ 対応可能</div>
+        <ul class="list">
+          <li>SSL設定（https化）</li>
+          <li>お問い合わせフォームの暗号化</li>
+          <li>基本的なアクセス制限</li>
+          <li>スパム対策</li>
+          <li>WordPress等のCMSセキュリティ設定</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">✗ 対応外（※）</div>
+        <ul class="list">
+          <li>金融機関レベルのセキュリティ</li>
+          <li>医療機関の個人情報を扱うシステム</li>
+          <li>PCI DSS準拠が必要な決済システム</li>
+          <li>官公庁向けのシステム</li>
+          <li>大規模ECサイト（年商数億円規模）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 差別化ポイント・会計方法 -->
+  <div class="section">
+    <div class="section-title">差別化ポイント・会計方法</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">差別化ポイント</div>
+        <ul class="list">
+          <li>修正回数無制限</li>
+          <li>業界相場より短い納期</li>
+          <li>オンライン完結（対面不要）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">会計方法</div>
+        <ul class="list">
+          <li>契約時に50%入金</li>
+          <li>納品後7日以内に残り50%入金</li>
+          <li>プラットフォーム経由のため未払いリスクなし</li>
+          <li>追加料金発生時は必ず事前にご相談</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 集客媒体 -->
+  <div class="section">
+    <div class="section-title">集客媒体・出金スケジュール</div>
+    <div class="grid-3">
+      <div class="media-card">
+        <div class="media-name">クラウドワークス</div>
+        <div class="media-row"><span>登録者数</span><strong>約670万人</strong></div>
+        <div class="media-row"><span>クライアント</span><strong>100万社以上</strong></div>
+        <div class="media-row"><span>手数料</span><strong>5〜20%</strong></div>
+        <div class="media-row"><span>出金</span><strong>月2回</strong></div>
+        <div class="media-row"><span>クイック出金</span><strong>最短4営業日（5%）</strong></div>
+      </div>
+      <div class="media-card">
+        <div class="media-name">ランサーズ</div>
+        <div class="media-row"><span>登録者数</span><strong>110万人以上</strong></div>
+        <div class="media-row"><span>クライアント</span><strong>35万社以上</strong></div>
+        <div class="media-row"><span>手数料</span><strong>一律16.5%</strong></div>
+        <div class="media-row"><span>出金</span><strong>月2回</strong></div>
+        <div class="media-row"><span>即日払い</span><strong>条件達成で翌日（5%）</strong></div>
+      </div>
+      <div class="media-card">
+        <div class="media-name">クラウドワークステック</div>
+        <div class="media-row"><span>クライアント</span><strong>8,000社以上</strong></div>
+        <div class="media-row"><span>平均月額単価</span><strong>80.9万円</strong></div>
+        <div class="media-row"><span>手数料</span><strong>無料</strong></div>
+        <div class="media-row"><span>出金</span><strong>翌々月15日</strong></div>
+        <div class="media-row"><span>特徴</span><strong>法人直請け</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 営業フロー -->
+  <div class="section">
+    <div class="section-title">営業フロー</div>
+    <div class="card">
+      <div class="flow">
+        <div class="flow-item"><div class="flow-num">1</div><div class="flow-text">各媒体に登録・プロフィール作成</div></div>
+        <div class="flow-item"><div class="flow-num">2</div><div class="flow-text">案件応募・提案文送付</div></div>
+        <div class="flow-item"><div class="flow-num">3</div><div class="flow-text">問い合わせ対応（ヒアリング）</div></div>
+        <div class="flow-item"><div class="flow-num">4</div><div class="flow-text">見積もり提示</div></div>
+        <div class="flow-item"><div class="flow-num">5</div><div class="flow-text">契約締結（プラットフォーム内取引）</div></div>
+        <div class="flow-item"><div class="flow-num">6</div><div class="flow-text">着手金（50%）入金確認</div></div>
+        <div class="flow-item"><div class="flow-num">7</div><div class="flow-text">制作開始</div></div>
+        <div class="flow-item"><div class="flow-num">8</div><div class="flow-text">納品・修正対応（無制限）</div></div>
+        <div class="flow-item"><div class="flow-num">9</div><div class="flow-text">残金（50%）入金確認→完了</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理フロー -->
+  <div class="section">
+    <div class="section-title">管理フロー</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">案件ごとの管理</div>
+        <div class="flow">
+          <div class="flow-item"><div class="flow-num">1</div><div class="flow-text">受注確定→案件管理シートに追加</div></div>
+          <div class="flow-item"><div class="flow-num">2</div><div class="flow-text">着手金入金確認・記録</div></div>
+          <div class="flow-item"><div class="flow-num">3</div><div class="flow-text">ヒアリング完了→シート保存</div></div>
+          <div class="flow-item"><div class="flow-num">4</div><div class="flow-text">制作開始→進捗管理シート更新</div></div>
+          <div class="flow-item"><div class="flow-num">5</div><div class="flow-text">中間確認・フィードバック反映</div></div>
+          <div class="flow-item"><div class="flow-num">6</div><div class="flow-text">納品→残金請求</div></div>
+          <div class="flow-item"><div class="flow-num">7</div><div class="flow-text">残金入金確認→完了ステータスへ</div></div>
+          <div class="flow-item"><div class="flow-num">8</div><div class="flow-text">保守契約→顧客管理シートに記録</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">月次管理</div>
+        <ul class="list">
+          <li>売上集計（受注件数・売上・利益）</li>
+          <li>各媒体からの出金確認</li>
+          <li>経費計上</li>
+          <li>翌月の目標設定</li>
+          <li>保守契約顧客リストの確認</li>
+          <li>契約更新時期の事前確認（1ヶ月前）</li>
+        </ul>
+        <div class="card-title" style="margin-top:1.2rem">使用ツール</div>
+        <ul class="list">
+          <li>案件管理：Googleスプレッドシート</li>
+          <li>進捗共有：チャットワーク・LINE</li>
+          <li>ファイル管理：Googleドライブ</li>
+          <li>請求書：freee・マネーフォワード</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日次スケジュール -->
+  <div class="section">
+    <div class="section-title">日次スケジュール</div>
+    <div class="schedule-block">
+      <div class="schedule-header">朝の作業 <span>9:00〜10:00（60分）</span></div>
+      <div class="schedule-row"><span class="task">新着案件チェック</span><span class="desc">クラウドワークス・ランサーズ</span><span class="time">15分</span></div>
+      <div class="schedule-row"><span class="task">メッセージ・問い合わせ対応</span><span class="desc">24時間以内に返信</span><span class="time">15分</span></div>
+      <div class="schedule-row"><span class="task">提案文の送信</span><span class="desc">案件に応募</span><span class="time">20分</span></div>
+      <div class="schedule-row"><span class="task">進捗管理シート更新</span><span class="desc">案件の進捗を記録</span><span class="time">10分</span></div>
+    </div>
+    <div class="schedule-block">
+      <div class="schedule-header">夜の作業 <span>19:00〜21:00（120分）</span></div>
+      <div class="schedule-row"><span class="task">新着案件チェック</span><span class="desc">クラウドワークス・ランサーズ</span><span class="time">15分</span></div>
+      <div class="schedule-row"><span class="task">メッセージ・問い合わせ対応</span><span class="desc">24時間以内に返信</span><span class="time">15分</span></div>
+      <div class="schedule-row"><span class="task">案件の制作作業</span><span class="desc">集中して作業</span><span class="time">60分</span></div>
+      <div class="schedule-row"><span class="task">提案文の送信</span><span class="desc">案件に応募</span><span class="time">20分</span></div>
+      <div class="schedule-row"><span class="task">進捗管理シート更新</span><span class="desc">案件の進捗を記録</span><span class="time">10分</span></div>
+    </div>
+    <div class="schedule-block">
+      <div class="schedule-header">月次作業 <span>月末（30分）</span></div>
+      <div class="schedule-row"><span class="task">売上集計</span><span class="desc">受注件数・売上・利益を集計</span><span class="time">10分</span></div>
+      <div class="schedule-row"><span class="task">出金確認</span><span class="desc">各媒体からの入金確認</span><span class="time">5分</span></div>
+      <div class="schedule-row"><span class="task">経費計上</span><span class="desc">経費を記録</span><span class="time">5分</span></div>
+      <div class="schedule-row"><span class="task">翌月目標設定</span><span class="desc">受注目標・売上目標を設定</span><span class="time">10分</span></div>
+    </div>
+  </div>
+
+  <!-- 準備済み資料 -->
+  <div class="section">
+    <div class="section-title">準備済み資料</div>
+    <div class="card">
+      <div class="sheet-list">
+        <div class="sheet-item">プロフィール文</div>
+        <div class="sheet-item">提案文テンプレート</div>
+        <div class="sheet-item">ヒアリングシート</div>
+        <div class="sheet-item">サンプルポートフォリオ</div>
+        <div class="sheet-item">案件管理シート</div>
+        <div class="sheet-item">売上管理シート</div>
+        <div class="sheet-item">顧客管理シート</div>
+        <div class="sheet-item">進捗管理シート</div>
+        <div class="sheet-item">見積もり管理シート</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 今後のスケジュール -->
+  <div class="section">
+    <div class="section-title">今後のスケジュール・収益見込み</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">スケジュール</div>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-label">今週中</div>
+              <div class="timeline-text">各媒体登録・プロフィール作成・ポートフォリオ追加制作</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-label">1ヶ月以内</div>
+              <div class="timeline-text">初件受注を目指す</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-label">3ヶ月以内</div>
+              <div class="timeline-text">月2件以上の安定受注</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-label">6ヶ月以内</div>
+              <div class="timeline-text">クラウドワークステックで法人案件獲得</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">収益見込み</div>
+        <ul class="list">
+          <li>月1〜2件の受注で20万〜50万円の売上</li>
+          <li>保守契約の積み上げで継続収入確保</li>
+          <li>法人案件獲得で月80万円以上を目指す</li>
+        </ul>
+        <div class="card-title" style="margin-top:1.2rem">対応返信時間</div>
+        <ul class="list">
+          <li>新規問い合わせ：24時間以内</li>
+          <li>制作中の連絡：48時間以内</li>
+          <li>納品後の問い合わせ：72時間以内</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

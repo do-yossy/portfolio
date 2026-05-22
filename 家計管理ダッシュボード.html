@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoneyFlow — 家計管理ダッシュボード</title>
+<link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Cabinet+Grotesk:wght@300;400;500;700;800&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0d0f14;
+  --surface: #141720;
+  --surface2: #1c2030;
+  --surface3: #222840;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.1);
+  --text: #f0f2ff;
+  --text2: #8890b0;
+  --text3: #4a5070;
+  --green: #00e5a0;
+  --green-soft: rgba(0,229,160,0.1);
+  --red: #ff4d6d;
+  --red-soft: rgba(255,77,109,0.1);
+  --blue: #4d9fff;
+  --blue-soft: rgba(77,159,255,0.1);
+  --amber: #ffb830;
+  --amber-soft: rgba(255,184,48,0.1);
+  --purple: #b47aff;
+  --purple-soft: rgba(180,122,255,0.1);
+  --sans: 'Outfit', 'Noto Sans JP', sans-serif;
+  --mono: 'DM Mono', monospace;
+  --ease: cubic-bezier(0.6,0.05,0.2,1);
+  --shadow: 0 8px 32px rgba(0,0,0,0.3);
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Layout */
+.app { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 50;
+}
+.sidebar-logo {
+  padding: 22px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-mark {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--green), var(--blue));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.logo-text { font-size: 1rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.logo-sub { font-size: 0.6rem; color: var(--text3); letter-spacing: 0.1em; margin-top: 1px; }
+
+.sidebar-nav { padding: 14px 12px; flex: 1; }
+.nav-label { font-size: 0.58rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--text3); padding: 0 8px; margin: 14px 0 6px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 9px;
+  cursor: pointer; color: var(--text2);
+  font-size: 0.84rem; font-weight: 400;
+  transition: all 0.2s; margin-bottom: 2px;
+}
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--green-soft); color: var(--green); font-weight: 500; }
+.nav-item .nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 99px; }
+
+.month-selector {
+  padding: 14px 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.month-label { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+.month-control { display: flex; align-items: center; justify-content: space-between; }
+.month-nav { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border2); background: transparent; color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; transition: all 0.2s; }
+.month-nav:hover { background: var(--surface2); color: var(--text); }
+.month-text { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+
+.sidebar-footer { padding: 14px 12px; }
+.user-card { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 9px; background: var(--surface2); }
+.avatar { width: 30px; height: 30px; background: linear-gradient(135deg, var(--green), var(--blue)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; color: white; flex-shrink: 0; }
+.user-name { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+.user-sub { font-size: 0.65rem; color: var(--text3); }
+
+/* Main */
+.main { margin-left: 240px; flex: 1; display: flex; flex-direction: column; }
+
+/* Topbar */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 40;
+}
+.topbar-title { font-size: 0.95rem; font-weight: 700; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px; border-radius: var(--radius-sm);
+  font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  border: none; transition: all 0.2s; font-family: var(--sans);
+}
+.btn svg { width: 14px; height: 14px; }
+.btn-primary { background: var(--green); color: #0d0f14; }
+.btn-primary:hover { background: #00ffb3; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,229,160,0.3); }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+
+/* Content */
+.content { padding: 28px; flex: 1; }
+
+/* Hero cards */
+.hero-cards { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+
+.hero-card {
+  border-radius: var(--radius);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero-card.main-card {
+  background: linear-gradient(135deg, #0a2a1a 0%, #0d3d28 50%, #0a4830 100%);
+  border: 1px solid rgba(0,229,160,0.15);
+}
+.hero-card.income-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.hero-card.expense-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.hero-card::before {
+  content: "";
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 160px; height: 160px;
+  border-radius: 50%;
+  opacity: 0.08;
+}
+.main-card::before { background: var(--green); }
+
+.card-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text2); margin-bottom: 8px; }
+.card-amount {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.main-card .card-amount { color: var(--green); }
+.income-card .card-amount { color: var(--blue); font-size: 1.6rem; }
+.expense-card .card-amount { color: var(--red); font-size: 1.6rem; }
+.card-sub { font-size: 0.75rem; color: var(--text2); }
+.card-change { display: flex; align-items: center; gap: 5px; margin-top: 12px; font-size: 0.75rem; }
+.card-change.up { color: var(--green); }
+.card-change.down { color: var(--red); }
+
+/* Savings bar */
+.savings-bar { margin-top: 16px; }
+.savings-label { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text2); margin-bottom: 6px; }
+.savings-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
+.savings-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--blue)); border-radius: 99px; transition: width 1s var(--ease); }
+
+/* Grid */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+/* Card base */
+.card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+.card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
+.card-header-sub { font-size: 0.72rem; color: var(--text3); margin-top: 1px; }
+
+/* Chart */
+.chart-wrap { padding: 20px; }
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
+.bar-group { flex: 1; display: flex; gap: 3px; align-items: flex-end; height: 100%; }
+.bar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.8s var(--ease), opacity 0.3s;
+  cursor: pointer;
+  position: relative;
+}
+.bar:hover { opacity: 0.8; }
+.bar.income-bar { background: linear-gradient(180deg, var(--blue), rgba(77,159,255,0.4)); }
+.bar.expense-bar { background: linear-gradient(180deg, var(--red), rgba(255,77,109,0.4)); }
+.bar-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface3);
+  color: var(--text);
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  border: 1px solid var(--border2);
+  font-family: var(--mono);
+}
+.bar:hover .bar-tooltip { opacity: 1; }
+
+.chart-labels { display: flex; gap: 8px; margin-top: 8px; }
+.chart-label { flex: 1; text-align: center; font-size: 0.65rem; color: var(--text3); }
+.chart-legend { display: flex; gap: 16px; padding: 0 20px 16px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text2); }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+/* Donut chart */
+.donut-wrap { padding: 20px; display: flex; align-items: center; gap: 20px; }
+.donut-svg { flex-shrink: 0; }
+.donut-legend { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.donut-item { display: flex; align-items: center; justify-content: space-between; }
+.donut-item-left { display: flex; align-items: center; gap: 8px; }
+.donut-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.donut-name { font-size: 0.78rem; color: var(--text2); }
+.donut-pct { font-size: 0.75rem; font-weight: 600; color: var(--text); font-family: var(--mono); }
+
+/* Transaction list */
+.tx-list { padding: 0; }
+.tx-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.tx-item:last-child { border-bottom: none; }
+.tx-item:hover { background: var(--surface2); }
+.tx-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+.tx-info { flex: 1; }
+.tx-name { font-size: 0.83rem; font-weight: 500; color: var(--text); }
+.tx-cat { font-size: 0.7rem; color: var(--text3); margin-top: 1px; }
+.tx-right { text-align: right; }
+.tx-amount { font-size: 0.88rem; font-weight: 700; font-family: var(--mono); }
+.tx-amount.income { color: var(--green); }
+.tx-amount.expense { color: var(--red); }
+.tx-date { font-size: 0.68rem; color: var(--text3); margin-top: 1px; }
+
+/* Budget progress */
+.budget-list { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.budget-item {}
+.budget-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.budget-left { display: flex; align-items: center; gap: 8px; }
+.budget-emoji { font-size: 0.9rem; }
+.budget-name { font-size: 0.8rem; font-weight: 500; color: var(--text); }
+.budget-amounts { font-size: 0.72rem; color: var(--text3); font-family: var(--mono); }
+.budget-track { height: 5px; background: var(--surface3); border-radius: 99px; overflow: hidden; }
+.budget-fill { height: 100%; border-radius: 99px; transition: width 0.8s var(--ease); }
+.budget-pct { font-size: 0.68rem; color: var(--text3); margin-top: 3px; text-align: right; }
+
+/* Goals */
+.goals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+.goal-card { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px; border: 1px solid var(--border); }
+.goal-emoji { font-size: 1.4rem; margin-bottom: 8px; }
+.goal-name { font-size: 0.78rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.goal-progress { font-size: 0.68rem; color: var(--text3); margin-bottom: 8px; font-family: var(--mono); }
+.goal-bar { height: 4px; background: var(--surface3); border-radius: 99px; overflow: hidden; margin-bottom: 4px; }
+.goal-fill { height: 100%; border-radius: 99px; }
+.goal-pct { font-size: 0.68rem; font-weight: 700; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.25s; backdrop-filter: blur(8px); }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 20px; width: 100%; max-width: 420px; box-shadow: var(--shadow); transform: translateY(20px) scale(0.97); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); overflow: hidden; }
+.modal-overlay.open .modal { transform: translateY(0) scale(1); }
+.modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-title { font-size: 1rem; font-weight: 700; }
+.modal-close { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border2); background: transparent; cursor: pointer; color: var(--text2); display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.modal-close:hover { background: var(--red-soft); color: var(--red); border-color: var(--red); }
+.modal-body { padding: 24px; }
+.type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+.type-btn { padding: 10px; border-radius: 9px; border: 1.5px solid var(--border2); background: transparent; font-family: var(--sans); font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text2); }
+.type-btn.income.active { background: var(--blue-soft); color: var(--blue); border-color: var(--blue); }
+.type-btn.expense.active { background: var(--red-soft); color: var(--red); border-color: var(--red); }
+.form-field { margin-bottom: 14px; }
+.form-field label { display: block; font-size: 0.7rem; font-weight: 600; color: var(--text2); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+.form-field input, .form-field select {
+  width: 100%;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  font-family: var(--sans);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-field input:focus, .form-field select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0,229,160,0.1); }
+.form-field input::placeholder { color: var(--text3); }
+.amount-input { font-family: var(--mono); font-size: 1.1rem; font-weight: 600; }
+.cat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.cat-btn { padding: 8px 4px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface2); cursor: pointer; text-align: center; transition: all 0.2s; }
+.cat-btn:hover { border-color: var(--border2); }
+.cat-btn.active { border-color: var(--green); background: var(--green-soft); }
+.cat-btn .emoji { font-size: 1.1rem; display: block; margin-bottom: 3px; }
+.cat-btn span { font-size: 0.6rem; color: var(--text2); display: block; font-family: var(--sans); }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; background: var(--surface2); }
+.modal-footer .btn { flex: 1; justify-content: center; }
+
+/* Toast */
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface3); color: var(--text); border: 1px solid var(--border2); padding: 12px 18px; border-radius: 12px; font-size: 0.82rem; box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px; z-index: 200; transform: translateY(60px); opacity: 0; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-icon { font-size: 1rem; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">💰</div>
+    <div>
+      <div class="logo-text">MoneyFlow</div>
+      <div class="logo-sub">家計管理ダッシュボード</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">メニュー</div>
+    <div class="nav-item active" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      ダッシュボード
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      収支一覧
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      分析レポート
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      予算管理
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      貯蓄目標
+    </div>
+    <div class="nav-label">設定</div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      設定
+    </div>
+  </nav>
+  <div class="month-selector">
+    <div class="month-label">表示月</div>
+    <div class="month-control">
+      <button class="month-nav" onclick="changeMonth(-1)">‹</button>
+      <div class="month-text" id="monthText">2026年5月</div>
+      <button class="month-nav" onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="avatar">田</div>
+      <div>
+        <div class="user-name">田中 健一</div>
+        <div class="user-sub">プレミアムプラン</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">ダッシュボード</div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost" onclick="exportData()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        エクスポート
+      </button>
+      <button class="btn btn-primary" onclick="openModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        収支を追加
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Hero cards -->
+    <div class="hero-cards">
+      <div class="hero-card main-card">
+        <div class="card-label">今月の収支バランス</div>
+        <div class="card-amount" id="balanceAmount">+¥87,500</div>
+        <div class="card-sub">収入 ¥380,000 — 支出 ¥292,500</div>
+        <div class="card-change up">↑ 先月比 +¥12,300</div>
+        <div class="savings-bar">
+          <div class="savings-label"><span>貯蓄率</span><span style="color:var(--green);font-weight:700">23.0%</span></div>
+          <div class="savings-track"><div class="savings-fill" style="width:23%"></div></div>
+        </div>
+      </div>
+      <div class="hero-card income-card">
+        <div class="card-label">収入合計</div>
+        <div class="card-amount">¥380,000</div>
+        <div class="card-sub">今月</div>
+        <div class="card-change up">↑ +¥20,000 先月比</div>
+      </div>
+      <div class="hero-card expense-card">
+        <div class="card-label">支出合計</div>
+        <div class="card-amount">¥292,500</div>
+        <div class="card-sub">今月</div>
+        <div class="card-change down">↑ +¥7,700 先月比</div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid-2">
+
+      <!-- Bar chart -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">月別収支推移</div>
+            <div class="card-header-sub">過去6ヶ月</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <div class="bar-chart" id="barChart"></div>
+          <div class="chart-labels" id="chartLabels"></div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>収入</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>支出</div>
+        </div>
+      </div>
+
+      <!-- Donut chart -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">支出カテゴリ</div>
+            <div class="card-header-sub">今月の内訳</div>
+          </div>
+        </div>
+        <div class="donut-wrap">
+          <svg class="donut-svg" width="120" height="120" viewBox="0 0 120 120" id="donutSvg"></svg>
+          <div class="donut-legend" id="donutLegend"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom row -->
+    <div class="grid-3">
+
+      <!-- Transactions -->
+      <div class="card" style="grid-column: span 2">
+        <div class="card-header">
+          <div>
+            <div class="card-title">最近の取引</div>
+            <div class="card-header-sub">今月の収支記録</div>
+          </div>
+          <button class="btn btn-ghost" style="padding:5px 12px;font-size:0.72rem">すべて見る</button>
+        </div>
+        <div class="tx-list" id="txList"></div>
+      </div>
+
+      <!-- Right column -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <!-- Budget -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">予算進捗</div>
+          </div>
+          <div class="budget-list" id="budgetList"></div>
+        </div>
+
+        <!-- Goals -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">貯蓄目標</div>
+          </div>
+          <div class="goals-grid" id="goalsList"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">収支を追加</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="type-toggle">
+        <button class="type-btn income active" id="typeIncome" onclick="setType('income')">＋ 収入</button>
+        <button class="type-btn expense" id="typeExpense" onclick="setType('expense')">－ 支出</button>
+      </div>
+      <div class="form-field">
+        <label>金額</label>
+        <input type="number" class="amount-input" placeholder="0" id="fAmount">
+      </div>
+      <div class="form-field">
+        <label>カテゴリ</label>
+        <div class="cat-grid" id="catGrid"></div>
+      </div>
+      <div class="form-field">
+        <label>メモ</label>
+        <input type="text" placeholder="内容を入力" id="fNote">
+      </div>
+      <div class="form-field">
+        <label>日付</label>
+        <input type="date" id="fDate">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveTx()">追加する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="toast-icon"></span><span id="toastMsg"></span></div>
+
+<script>
+// ── Data ──
+const months = ['2025年12月','2026年1月','2026年2月','2026年3月','2026年4月','2026年5月'];
+let currentMonth = 5;
+
+const barData = [
+  { income: 350000, expense: 280000 },
+  { income: 360000, expense: 295000 },
+  { income: 340000, expense: 270000 },
+  { income: 380000, expense: 285000 },
+  { income: 360000, expense: 284800 },
+  { income: 380000, expense: 292500 },
+];
+
+const categories = {
+  income: [
+    { emoji:'💼', name:'給与' },
+    { emoji:'📈', name:'投資' },
+    { emoji:'🏠', name:'家賃収入' },
+    { emoji:'🎁', name:'臨時収入' },
+    { emoji:'💻', name:'副業' },
+    { emoji:'📦', name:'フリマ' },
+    { emoji:'🎓', name:'奨学金' },
+    { emoji:'その他', name:'その他' },
+  ],
+  expense: [
+    { emoji:'🍜', name:'食費' },
+    { emoji:'🏠', name:'家賃' },
+    { emoji:'🚃', name:'交通費' },
+    { emoji:'💊', name:'医療費' },
+    { emoji:'👗', name:'衣類' },
+    { emoji:'🎮', name:'娯楽' },
+    { emoji:'📱', name:'通信費' },
+    { emoji:'💡', name:'光熱費' },
+  ],
+};
+
+const transactions = [
+  { emoji:'💼', name:'月給', cat:'給与', amount:350000, type:'income', date:'5/25' },
+  { emoji:'💻', name:'副業収入', cat:'副業', amount:30000, type:'income', date:'5/20' },
+  { emoji:'🏠', name:'家賃', cat:'家賃', amount:85000, type:'expense', date:'5/1' },
+  { emoji:'🍜', name:'スーパー', cat:'食費', amount:12400, type:'expense', date:'5/24' },
+  { emoji:'📱', name:'スマホ代', cat:'通信費', amount:6800, type:'expense', date:'5/10' },
+  { emoji:'🚃', name:'定期券', cat:'交通費', amount:15000, type:'expense', date:'5/1' },
+  { emoji:'🎮', name:'映画・外食', cat:'娯楽', amount:8200, type:'expense', date:'5/22' },
+  { emoji:'💡', name:'電気・ガス', cat:'光熱費', amount:9800, type:'expense', date:'5/15' },
+];
+
+const donutData = [
+  { name:'家賃', pct: 29, color: '#4d9fff' },
+  { name:'食費', pct: 22, color: '#00e5a0' },
+  { name:'交通費', pct: 14, color: '#ffb830' },
+  { name:'娯楽', pct: 12, color: '#b47aff' },
+  { name:'通信費', pct: 10, color: '#ff4d6d' },
+  { name:'その他', pct: 13, color: '#4a5070' },
+];
+
+const budgets = [
+  { emoji:'🍜', name:'食費', used:62400, limit:80000, color:'var(--green)' },
+  { emoji:'🎮', name:'娯楽費', used:22800, limit:30000, color:'var(--purple)' },
+  { emoji:'👗', name:'衣類', used:18500, limit:20000, color:'var(--amber)' },
+  { emoji:'💊', name:'医療費', used:3200, limit:15000, color:'var(--blue)' },
+];
+
+const goals = [
+  { emoji:'✈️', name:'旅行', current:180000, target:300000, color:'var(--blue)' },
+  { emoji:'🏠', name:'頭金', current:1200000, target:5000000, color:'var(--green)' },
+  { emoji:'💻', name:'PC購入', current:85000, target:150000, color:'var(--purple)' },
+  { emoji:'📚', name:'学習費', current:32000, target:50000, color:'var(--amber)' },
+];
+
+// ── Render ──
+function fmt(n) { return '¥' + Math.abs(n).toLocaleString('ja-JP'); }
+
+function renderBarChart() {
+  const maxVal = Math.max(...barData.flatMap(d => [d.income, d.expense]));
+  const chart = document.getElementById('barChart');
+  const labels = document.getElementById('chartLabels');
+  chart.innerHTML = barData.map((d, i) => `
+    <div class="bar-group">
+      <div class="bar income-bar" style="height:${(d.income/maxVal)*100}%">
+        <div class="bar-tooltip">${fmt(d.income)}</div>
+      </div>
+      <div class="bar expense-bar" style="height:${(d.expense/maxVal)*100}%">
+        <div class="bar-tooltip">${fmt(d.expense)}</div>
+      </div>
+    </div>
+  `).join('');
+  labels.innerHTML = months.map(m => `<div class="chart-label">${m.slice(-2,-1)}月</div>`).join('');
+}
+
+function renderDonut() {
+  const svg = document.getElementById('donutSvg');
+  const legend = document.getElementById('donutLegend');
+  const r = 44, cx = 60, cy = 60, stroke = 14;
+  const circ = 2 * Math.PI * r;
+  let offset = -Math.PI / 2;
+  let paths = '';
+  donutData.forEach(d => {
+    const angle = (d.pct / 100) * 2 * Math.PI;
+    const x1 = cx + r * Math.cos(offset);
+    const y1 = cy + r * Math.sin(offset);
+    const x2 = cx + r * Math.cos(offset + angle);
+    const y2 = cy + r * Math.sin(offset + angle);
+    const large = angle > Math.PI ? 1 : 0;
+    paths += `<path d="M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}" fill="none" stroke="${d.color}" stroke-width="${stroke}" stroke-linecap="butt"/>`;
+    offset += angle;
+  });
+  svg.innerHTML = paths + `<text x="60" y="56" text-anchor="middle" font-size="10" fill="#8890b0" font-family="Outfit">支出</text><text x="60" y="70" text-anchor="middle" font-size="13" font-weight="700" fill="#f0f2ff" font-family="Outfit">¥292k</text>`;
+
+  legend.innerHTML = donutData.map(d => `
+    <div class="donut-item">
+      <div class="donut-item-left">
+        <div class="donut-dot" style="background:${d.color}"></div>
+        <div class="donut-name">${d.name}</div>
+      </div>
+      <div class="donut-pct">${d.pct}%</div>
+    </div>
+  `).join('');
+}
+
+function renderTransactions() {
+  document.getElementById('txList').innerHTML = transactions.map(t => `
+    <div class="tx-item">
+      <div class="tx-icon" style="background:${t.type==='income'?'var(--green-soft)':'var(--red-soft)'}">${t.emoji}</div>
+      <div class="tx-info">
+        <div class="tx-name">${t.name}</div>
+        <div class="tx-cat">${t.cat}</div>
+      </div>
+      <div class="tx-right">
+        <div class="tx-amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</div>
+        <div class="tx-date">${t.date}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderBudgets() {
+  document.getElementById('budgetList').innerHTML = budgets.map(b => {
+    const pct = Math.round((b.used / b.limit) * 100);
+    return `
+      <div class="budget-item">
+        <div class="budget-header">
+          <div class="budget-left">
+            <div class="budget-emoji">${b.emoji}</div>
+            <div class="budget-name">${b.name}</div>
+          </div>
+          <div class="budget-amounts">${fmt(b.used)} / ${fmt(b.limit)}</div>
+        </div>
+        <div class="budget-track"><div class="budget-fill" style="width:${pct}%;background:${pct>80?'var(--red)':b.color}"></div></div>
+        <div class="budget-pct">${pct}%</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderGoals() {
+  document.getElementById('goalsList').innerHTML = goals.map(g => {
+    const pct = Math.round((g.current / g.target) * 100);
+    return `
+      <div class="goal-card">
+        <div class="goal-emoji">${g.emoji}</div>
+        <div class="goal-name">${g.name}</div>
+        <div class="goal-progress">${fmt(g.current)} / ${fmt(g.target)}</div>
+        <div class="goal-bar"><div class="goal-fill" style="width:${pct}%;background:${g.color}"></div></div>
+        <div class="goal-pct" style="color:${g.color}">${pct}%</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Month ──
+function changeMonth(delta) {
+  currentMonth = Math.max(0, Math.min(5, currentMonth + delta));
+  document.getElementById('monthText').textContent = months[currentMonth];
+}
+
+// ── Modal ──
+let currentType = 'income';
+let selectedCat = 0;
+
+function openModal() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('fDate').value = today;
+  renderCatGrid();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModalOutside(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+
+function setType(type) {
+  currentType = type;
+  selectedCat = 0;
+  document.getElementById('typeIncome').classList.toggle('active', type === 'income');
+  document.getElementById('typeExpense').classList.toggle('active', type === 'expense');
+  renderCatGrid();
+}
+
+function renderCatGrid() {
+  const cats = categories[currentType];
+  document.getElementById('catGrid').innerHTML = cats.map((c, i) => `
+    <div class="cat-btn${i===selectedCat?' active':''}" onclick="selectCat(${i})">
+      <span class="emoji">${c.emoji}</span>
+      <span>${c.name}</span>
+    </div>
+  `).join('');
+}
+
+function selectCat(i) {
+  selectedCat = i;
+  renderCatGrid();
+}
+
+function saveTx() {
+  const amount = document.getElementById('fAmount').value;
+  if (!amount || amount <= 0) { showToast('⚠️', '金額を入力してください'); return; }
+  const cat = categories[currentType][selectedCat];
+  transactions.unshift({
+    emoji: cat.emoji,
+    name: document.getElementById('fNote').value || cat.name,
+    cat: cat.name,
+    amount: parseInt(amount),
+    type: currentType,
+    date: '5/' + new Date().getDate(),
+  });
+  renderTransactions();
+  closeModal();
+  showToast('✓', `${currentType === 'income' ? '収入' : '支出'}を追加しました`);
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fNote').value = '';
+}
+
+function setActive(el) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function exportData() { showToast('📊', 'CSVをダウンロードしました'); }
+
+function showToast(icon, msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast').querySelector('.toast-icon').textContent = icon;
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── Init ──
+renderBarChart();
+renderDonut();
+renderTransactions();
+renderBudgets();
+renderGoals();
+</script>
+</body>
+</html>

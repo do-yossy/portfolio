@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShopApp — ECショッピングアプリ</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f0f0f5;
+  --primary: #ff385c;
+  --primary-soft: #fff0f3;
+  --primary-dark: #e0294d;
+  --ink: #1a1a2e;
+  --ink2: #6b6b8a;
+  --ink3: #b0b0c8;
+  --border: #e8e8f0;
+  --surface: #ffffff;
+  --surface2: #f8f8fc;
+  --green: #00c48c;
+  --amber: #ffaa00;
+  --sans: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+  --radius: 20px;
+  --radius-sm: 12px;
+  --shadow: 0 8px 32px rgba(26,26,46,0.08);
+  --shadow-sm: 0 2px 8px rgba(26,26,46,0.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+/* ── Phone frame ── */
+.phone-wrap {
+  display: flex;
+  gap: 2.5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.phone {
+  width: 375px;
+  height: 812px;
+  background: var(--surface);
+  border-radius: 48px;
+  overflow: hidden;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.08), inset 0 0 0 2px rgba(255,255,255,0.5);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Status bar */
+.status-bar {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  flex-shrink: 0;
+  background: var(--surface);
+  position: relative;
+  z-index: 10;
+}
+.status-bar::after {
+  content: "";
+  position: absolute;
+  top: 10px; left: 50%;
+  transform: translateX(-50%);
+  width: 120px; height: 28px;
+  background: var(--ink);
+  border-radius: 20px;
+}
+.status-time { font-size: 0.85rem; font-weight: 700; color: var(--ink); z-index: 1; }
+.status-icons { display: flex; align-items: center; gap: 5px; z-index: 1; }
+.status-icons svg { width: 14px; height: 14px; color: var(--ink); }
+
+/* Screen */
+.screen {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg);
+}
+.screen-inner {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  padding-bottom: 80px;
+}
+.screen-inner::-webkit-scrollbar { display: none; }
+
+/* Header */
+.app-header {
+  background: var(--surface);
+  padding: 12px 20px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.header-location { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--ink2); }
+.header-location svg { width: 13px; height: 13px; color: var(--primary); }
+.location-text { font-size: 0.78rem; font-weight: 600; color: var(--ink); }
+.header-actions { display: flex; gap: 10px; }
+.header-btn { width: 36px; height: 36px; border-radius: 12px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; transition: all 0.2s; }
+.header-btn svg { width: 18px; height: 18px; color: var(--ink); }
+.header-btn:active { transform: scale(0.95); }
+.notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: var(--primary); border-radius: 50%; border: 1.5px solid white; }
+.cart-badge { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: var(--primary); border-radius: 50%; font-size: 0.55rem; font-weight: 800; color: white; display: flex; align-items: center; justify-content: center; border: 1.5px solid white; }
+
+/* Search */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+.search-bar svg { width: 17px; height: 17px; color: var(--ink3); flex-shrink: 0; }
+.search-bar input { flex: 1; border: none; background: transparent; font-size: 0.85rem; font-family: var(--sans); color: var(--ink); outline: none; }
+.search-bar input::placeholder { color: var(--ink3); }
+.filter-btn { width: 30px; height: 30px; border-radius: 9px; background: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all 0.2s; }
+.filter-btn svg { width: 15px; height: 15px; color: white; }
+
+/* Banner */
+.banner-wrap { padding: 14px 20px 0; }
+.banner {
+  background: linear-gradient(135deg, #1a1a2e 0%, #ff385c 100%);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.banner::before { content: ""; position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; background: rgba(255,255,255,0.08); border-radius: 50%; }
+.banner::after { content: ""; position: absolute; bottom: -20px; right: 40px; width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%; }
+.banner-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+.banner-title { font-size: 1.1rem; font-weight: 800; color: white; line-height: 1.3; margin-bottom: 10px; }
+.banner-cta { display: inline-flex; align-items: center; gap: 5px; background: white; color: var(--primary); font-size: 0.72rem; font-weight: 700; padding: 6px 14px; border-radius: 99px; cursor: pointer; }
+.banner-emoji { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 2.5rem; }
+.banner-dots { display: flex; gap: 4px; margin-top: 12px; }
+.banner-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); }
+.banner-dot.active { background: white; width: 18px; border-radius: 99px; }
+
+/* Categories */
+.section-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 10px; }
+.section-title { font-size: 0.92rem; font-weight: 700; color: var(--ink); }
+.section-link { font-size: 0.75rem; color: var(--primary); font-weight: 600; cursor: pointer; }
+
+.cats-scroll { display: flex; gap: 10px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; }
+.cats-scroll::-webkit-scrollbar { display: none; }
+.cat-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; }
+.cat-icon { width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; transition: transform 0.2s; }
+.cat-item:active .cat-icon { transform: scale(0.92); }
+.cat-name { font-size: 0.65rem; font-weight: 600; color: var(--ink2); text-align: center; }
+.cat-item.active .cat-name { color: var(--primary); }
+.cat-item.active .cat-icon { transform: scale(1.05); box-shadow: 0 4px 12px rgba(255,56,92,0.3); }
+
+/* Products */
+.products-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 6px 20px 0; }
+.product-card { background: var(--surface); border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow-sm); cursor: pointer; transition: transform 0.2s; }
+.product-card:active { transform: scale(0.97); }
+.product-img { position: relative; aspect-ratio: 1; background: var(--surface2); overflow: hidden; }
+.product-img .emoji { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; }
+.product-img img { width: 100%; height: 100%; object-fit: cover; }
+.fav-btn { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); cursor: pointer; border: none; }
+.fav-btn svg { width: 13px; height: 13px; color: var(--ink3); }
+.fav-btn.active svg { color: var(--primary); fill: var(--primary); }
+.product-badge { position: absolute; top: 8px; left: 8px; background: var(--primary); color: white; font-size: 0.58rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+.product-badge.sale { background: var(--amber); }
+.product-info { padding: 10px 10px 12px; }
+.product-brand { font-size: 0.62rem; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px; }
+.product-name { font-size: 0.78rem; font-weight: 600; color: var(--ink); margin-bottom: 4px; line-height: 1.3; }
+.product-rating { display: flex; align-items: center; gap: 3px; margin-bottom: 6px; }
+.stars { font-size: 0.6rem; color: var(--amber); }
+.rating-num { font-size: 0.62rem; color: var(--ink3); }
+.product-price-row { display: flex; align-items: center; justify-content: space-between; }
+.product-price { font-size: 0.88rem; font-weight: 800; color: var(--ink); }
+.product-original { font-size: 0.68rem; color: var(--ink3); text-decoration: line-through; }
+.add-btn { width: 26px; height: 26px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; transition: all 0.2s; }
+.add-btn:active { transform: scale(0.9); }
+.add-btn svg { width: 13px; height: 13px; color: white; }
+
+/* Flash sale */
+.flash-wrap { padding: 16px 20px 0; }
+.flash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.flash-title { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; font-weight: 700; }
+.flash-icon { font-size: 1rem; }
+.flash-timer { display: flex; gap: 4px; align-items: center; }
+.timer-block { background: var(--ink); color: white; font-size: 0.65rem; font-weight: 800; padding: 3px 6px; border-radius: 5px; font-family: monospace; min-width: 22px; text-align: center; }
+.timer-sep { font-size: 0.75rem; font-weight: 700; color: var(--ink2); }
+
+.flash-scroll { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; }
+.flash-scroll::-webkit-scrollbar { display: none; }
+.flash-card { flex-shrink: 0; width: 130px; background: var(--surface); border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow-sm); cursor: pointer; }
+.flash-img { aspect-ratio: 1; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
+.flash-info { padding: 8px 10px 10px; }
+.flash-name { font-size: 0.72rem; font-weight: 600; color: var(--ink); margin-bottom: 4px; line-height: 1.3; }
+.flash-price { font-size: 0.85rem; font-weight: 800; color: var(--primary); }
+.flash-orig { font-size: 0.62rem; color: var(--ink3); text-decoration: line-through; }
+.flash-progress { margin-top: 6px; }
+.flash-progress-bar { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.flash-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--amber)); border-radius: 99px; }
+.flash-sold { font-size: 0.58rem; color: var(--ink3); margin-top: 3px; }
+
+/* Bottom nav */
+.bottom-nav {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding: 10px 0 20px;
+  z-index: 50;
+}
+.nav-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 4px 0; transition: all 0.2s; }
+.nav-tab svg { width: 22px; height: 22px; color: var(--ink3); transition: all 0.2s; }
+.nav-tab span { font-size: 0.6rem; font-weight: 600; color: var(--ink3); transition: all 0.2s; }
+.nav-tab.active svg { color: var(--primary); }
+.nav-tab.active span { color: var(--primary); }
+.nav-center { position: relative; }
+.nav-center-btn { width: 48px; height: 48px; background: var(--primary); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: -14px auto 0; box-shadow: 0 6px 20px rgba(255,56,92,0.4); }
+.nav-center-btn svg { width: 22px; height: 22px; color: white; }
+
+/* ── Info panel ── */
+.info-panel { width: 320px; }
+.info-title { font-size: 1.6rem; font-weight: 800; color: var(--ink); margin-bottom: 0.8rem; font-family: var(--sans); }
+.info-sub { font-size: 0.88rem; color: var(--ink2); line-height: 1.8; margin-bottom: 2rem; }
+.feature-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 2rem; }
+.feature-item { display: flex; align-items: flex-start; gap: 12px; }
+.feature-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.feature-icon svg { width: 18px; height: 18px; }
+.feature-name { font-size: 0.85rem; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+.feature-desc { font-size: 0.75rem; color: var(--ink2); line-height: 1.6; }
+.price-tag { background: linear-gradient(135deg, #1a1a2e, #ff385c); border-radius: 14px; padding: 18px 20px; color: white; margin-bottom: 1.5rem; }
+.price-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+.price-value { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.03em; }
+.price-sub { font-size: 0.72rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
+.tech-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.tech-tag { padding: 5px 12px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 99px; font-size: 0.72rem; font-weight: 600; color: var(--ink2); }
+</style>
+</head>
+<body>
+
+<div class="phone-wrap">
+
+  <!-- Phone -->
+  <div class="phone">
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="status-time">9:41</div>
+      <div class="status-icons">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 8.5C5.5 4.5 10.5 2.5 12 2.5s6.5 2 10.5 6L21 10c-3-3-5.5-4.5-9-4.5S6 7 3 10z"/><path d="M4.5 11.5c2-2 4.5-3.5 7.5-3.5s5.5 1.5 7.5 3.5L18 13c-1.5-1.5-3.5-2.5-6-2.5s-4.5 1-6 2.5z"/><circle cx="12" cy="17" r="2"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="1" y="6" width="22" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="8" width="14" height="8" rx="1"/><path d="M23 10v4a2 2 0 0 0 0-4z"/></svg>
+      </div>
+    </div>
+
+    <!-- Screen -->
+    <div class="screen">
+      <div class="screen-inner">
+
+        <!-- Header -->
+        <div class="app-header">
+          <div class="header-top">
+            <div class="header-location">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+              <div><div style="font-size:0.6rem;color:var(--ink2)">配送先</div><div class="location-text">東京都渋谷区 ▾</div></div>
+            </div>
+            <div class="header-actions">
+              <div class="header-btn" onclick="showToast('通知')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <div class="notif-dot"></div>
+              </div>
+              <div class="header-btn" onclick="showToast('カートを開く')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                <div class="cart-badge" id="cartBadge">3</div>
+              </div>
+            </div>
+          </div>
+          <div class="search-bar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" placeholder="何をお探しですか？">
+            <div class="filter-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg></div>
+          </div>
+        </div>
+
+        <!-- Banner -->
+        <div class="banner-wrap">
+          <div class="banner">
+            <div class="banner-label">期間限定セール</div>
+            <div class="banner-title">夏の大セール<br>最大70% OFF</div>
+            <div class="banner-cta">今すぐ見る →</div>
+            <div class="banner-emoji">🛍️</div>
+            <div class="banner-dots">
+              <div class="banner-dot active"></div>
+              <div class="banner-dot"></div>
+              <div class="banner-dot"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="section-header">
+          <div class="section-title">カテゴリ</div>
+          <div class="section-link">全て見る</div>
+        </div>
+        <div class="cats-scroll" id="catsScroll"></div>
+
+        <!-- Flash sale -->
+        <div class="flash-wrap">
+          <div class="flash-header">
+            <div class="flash-title">
+              <span class="flash-icon">⚡</span>
+              フラッシュセール
+            </div>
+            <div class="flash-timer">
+              <div class="timer-block" id="timerH">02</div>
+              <div class="timer-sep">:</div>
+              <div class="timer-block" id="timerM">34</div>
+              <div class="timer-sep">:</div>
+              <div class="timer-block" id="timerS">59</div>
+            </div>
+          </div>
+          <div class="flash-scroll" id="flashScroll"></div>
+        </div>
+
+        <!-- Products -->
+        <div class="section-header">
+          <div class="section-title">おすすめ商品</div>
+          <div class="section-link">全て見る</div>
+        </div>
+        <div class="products-grid" id="productsGrid"></div>
+
+      </div>
+
+      <!-- Bottom nav -->
+      <div class="bottom-nav">
+        <div class="nav-tab active" onclick="setTab(this)">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span>ホーム</span>
+        </div>
+        <div class="nav-tab" onclick="setTab(this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <span>検索</span>
+        </div>
+        <div class="nav-tab nav-center" onclick="showToast('カートを開く')">
+          <div class="nav-center-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <span style="margin-top:6px">カート</span>
+        </div>
+        <div class="nav-tab" onclick="setTab(this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span>お気に入り</span>
+        </div>
+        <div class="nav-tab" onclick="setTab(this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>マイページ</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info panel -->
+  <div class="info-panel">
+    <div class="info-title">ECショッピング<br>アプリ</div>
+    <p class="info-sub">iOS・Android対応のスマホアプリ。商品一覧・フラッシュセール・カート・お気に入り・マイページまで実装。</p>
+
+    <div class="feature-list">
+      <div class="feature-item">
+        <div class="feature-icon" style="background:#fff0f3"><svg viewBox="0 0 24 24" fill="none" stroke="#ff385c" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg></div>
+        <div><div class="feature-name">カート機能</div><div class="feature-desc">商品追加・削除・数量変更・合計自動計算</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background:#fff8e6"><svg viewBox="0 0 24 24" fill="none" stroke="#ffaa00" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <div><div class="feature-name">フラッシュセール</div><div class="feature-desc">カウントダウンタイマー・売切れ率表示</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background:#f0fdf4"><svg viewBox="0 0 24 24" fill="none" stroke="#00c48c" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
+        <div><div class="feature-name">検索・フィルター</div><div class="feature-desc">カテゴリ絞り込み・価格ソート・キーワード検索</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background:#f5f3ff"><svg viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+        <div><div class="feature-name">お気に入り機能</div><div class="feature-desc">商品をブックマーク・一覧管理</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background:#eff6ff"><svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></div>
+        <div><div class="feature-name">決済画面</div><div class="feature-desc">クレジットカード・コンビニ・Pay対応</div></div>
+      </div>
+    </div>
+
+    <div class="price-tag">
+      <div class="price-label">参考価格</div>
+      <div class="price-value">¥400,000〜</div>
+      <div class="price-sub">iOS / Android 両対応</div>
+    </div>
+
+    <div class="tech-tags">
+      <span class="tech-tag">React Native</span>
+      <span class="tech-tag">iOS</span>
+      <span class="tech-tag">Android</span>
+      <span class="tech-tag">カート機能</span>
+      <span class="tech-tag">決済連携</span>
+      <span class="tech-tag">プッシュ通知</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:#1a1a2e;color:white;padding:10px 20px;border-radius:99px;font-size:0.8rem;opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:9999;white-space:nowrap;font-family:var(--sans)"></div>
+
+<script>
+const categories = [
+  { emoji:'👗', name:'ファッション', color:'#fff0f3', active: true },
+  { emoji:'📱', name:'スマホ', color:'#eff6ff' },
+  { emoji:'🏠', name:'インテリア', color:'#f0fdf4' },
+  { emoji:'💄', name:'コスメ', color:'#fdf4ff' },
+  { emoji:'🍳', name:'キッチン', color:'#fffbeb' },
+  { emoji:'⚽', name:'スポーツ', color:'#f0fdf4' },
+  { emoji:'📚', name:'本', color:'#fef2f2' },
+];
+
+const flashItems = [
+  { emoji:'👟', name:'スニーカー', price:'¥4,800', orig:'¥12,000', pct: 72 },
+  { emoji:'🎧', name:'ワイヤレスイヤホン', price:'¥3,200', orig:'¥8,800', pct: 58 },
+  { emoji:'💍', name:'アクセサリー', price:'¥1,500', orig:'¥3,800', pct: 85 },
+  { emoji:'👜', name:'トートバッグ', price:'¥2,800', orig:'¥6,500', pct: 44 },
+];
+
+const products = [
+  { emoji:'👗', brand:'ZARA', name:'フローラルドレス', price:'¥6,800', orig:null, rating:'4.8', reviews:'2.3k', badge:'NEW', fav: false },
+  { emoji:'👟', brand:'NIKE', name:'エアマックス 2026', price:'¥12,800', orig:'¥16,000', rating:'4.9', reviews:'5.1k', badge:'SALE', fav: true },
+  { emoji:'💍', brand:'TIFFANY', name:'シルバーリング', price:'¥8,500', orig:null, rating:'4.7', reviews:'891', badge:null, fav: false },
+  { emoji:'👔', brand:'UNIQLO', name:'リネンシャツ', price:'¥3,990', orig:'¥5,990', rating:'4.6', reviews:'3.2k', badge:'SALE', fav: false },
+  { emoji:'👜', brand:'COACH', name:'レザーバッグ', price:'¥24,000', orig:null, rating:'4.8', reviews:'1.4k', badge:'NEW', fav: true },
+  { emoji:'🕶️', brand:'RAY-BAN', name:'ウェイファーラー', price:'¥18,500', orig:'¥22,000', rating:'4.9', reviews:'6.7k', badge:null, fav: false },
+];
+
+// Render categories
+document.getElementById('catsScroll').innerHTML = categories.map(c => `
+  <div class="cat-item${c.active ? ' active' : ''}" onclick="selectCat(this)">
+    <div class="cat-icon" style="background:${c.color}">${c.emoji}</div>
+    <div class="cat-name">${c.name}</div>
+  </div>
+`).join('');
+
+// Render flash
+document.getElementById('flashScroll').innerHTML = flashItems.map(f => `
+  <div class="flash-card">
+    <div class="flash-img">${f.emoji}</div>
+    <div class="flash-info">
+      <div class="flash-name">${f.name}</div>
+      <div class="flash-price">${f.price}</div>
+      <div class="flash-orig">${f.orig}</div>
+      <div class="flash-progress">
+        <div class="flash-progress-bar"><div class="flash-fill" style="width:${f.pct}%"></div></div>
+        <div class="flash-sold">${f.pct}% 売り切れ</div>
+      </div>
+    </div>
+  </div>
+`).join('');
+
+// Render products
+document.getElementById('productsGrid').innerHTML = products.map((p, i) => `
+  <div class="product-card" onclick="addToCart()">
+    <div class="product-img">
+      <div class="emoji">${p.emoji}</div>
+      ${p.badge ? `<div class="product-badge${p.badge==='SALE'?' sale':''}">${p.badge}</div>` : ''}
+      <button class="fav-btn${p.fav?' active':''}" id="fav${i}" onclick="event.stopPropagation();toggleFav(${i})">
+        <svg viewBox="0 0 24 24" fill="${p.fav?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </button>
+    </div>
+    <div class="product-info">
+      <div class="product-brand">${p.brand}</div>
+      <div class="product-name">${p.name}</div>
+      <div class="product-rating">
+        <span class="stars">★★★★★</span>
+        <span class="rating-num">${p.rating} (${p.reviews})</span>
+      </div>
+      <div class="product-price-row">
+        <div>
+          <div class="product-price">${p.price}</div>
+          ${p.orig ? `<div class="product-original">${p.orig}</div>` : ''}
+        </div>
+        <button class="add-btn" onclick="event.stopPropagation();addToCart()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+`).join('');
+
+let cartCount = 3;
+
+function addToCart() {
+  cartCount++;
+  document.getElementById('cartBadge').textContent = cartCount;
+  showToast('カートに追加しました ✓');
+}
+
+function toggleFav(i) {
+  const btn = document.getElementById(`fav${i}`);
+  const active = btn.classList.toggle('active');
+  btn.querySelector('svg').setAttribute('fill', active ? 'currentColor' : 'none');
+  showToast(active ? 'お気に入りに追加しました ♡' : 'お気に入りから削除しました');
+}
+
+function selectCat(el) {
+  document.querySelectorAll('.cat-item').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setTab(el) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// Timer
+let secs = 2 * 3600 + 34 * 60 + 59;
+setInterval(() => {
+  secs--;
+  if (secs < 0) secs = 0;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  document.getElementById('timerH').textContent = String(h).padStart(2,'0');
+  document.getElementById('timerM').textContent = String(m).padStart(2,'0');
+  document.getElementById('timerS').textContent = String(s).padStart(2,'0');
+}, 1000);
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(60px)';
+  }, 2500);
+}
+</script>
+</body>
+</html>

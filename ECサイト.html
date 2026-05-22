@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOIR — Premium Apparel</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f9f7f4;
+  --white: #ffffff;
+  --ink: #1a1a1a;
+  --ink2: #6b6b6b;
+  --ink3: #b0b0b0;
+  --border: #e8e4de;
+  --accent: #1a1a1a;
+  --gold: #c9a96e;
+  --red: #dc2626;
+  --surface: #f4f0ea;
+  --serif: 'Cormorant Garamond', serif;
+  --sans: 'Jost', 'Noto Sans JP', sans-serif;
+  --ease: cubic-bezier(0.6,0.05,0.2,1);
+  --shadow: 0 4px 20px rgba(0,0,0,0.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--sans); background: var(--bg); color: var(--ink); font-weight: 300; line-height: 1.7; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+button { font-family: var(--sans); cursor: pointer; }
+
+/* ── Header ── */
+.header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(249,247,244,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.header-inner { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 3vw; height: 60px; }
+.header-nav { display: flex; gap: 2rem; }
+.header-nav a { font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink2); transition: color 0.3s; }
+.header-nav a:hover { color: var(--ink); }
+.logo { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; letter-spacing: 0.25em; text-transform: uppercase; text-align: center; }
+.header-actions { display: flex; align-items: center; gap: 1.5rem; justify-content: flex-end; }
+.header-icon { width: 20px; height: 20px; cursor: pointer; position: relative; }
+.header-icon svg { width: 20px; height: 20px; color: var(--ink); }
+.cart-count { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; background: var(--ink); color: white; border-radius: 50%; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+
+/* ── Hero ── */
+.hero { height: 100vh; display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; margin-top: 60px; }
+.hero-img { position: relative; overflow: hidden; background: var(--surface); }
+.hero-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 1.4s var(--ease); }
+.hero:hover .hero-img img { transform: scale(1.04); }
+.hero-content { display: flex; flex-direction: column; justify-content: center; padding: clamp(3rem, 6vw, 6rem); background: var(--white); }
+.hero-eyebrow { font-size: 0.68rem; letter-spacing: 0.4em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.5rem; }
+.hero h1 { font-family: var(--serif); font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 400; line-height: 1.15; letter-spacing: 0.02em; margin-bottom: 1.5rem; }
+.hero-sub { font-size: 0.88rem; color: var(--ink2); line-height: 1.95; max-width: 420px; margin-bottom: 2.5rem; }
+.hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; }
+.btn-dark { padding: 13px 28px; background: var(--ink); color: white; font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; border: none; transition: all 0.3s var(--ease); }
+.btn-dark:hover { background: #333; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+.btn-outline { padding: 13px 28px; background: transparent; color: var(--ink); font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; border: 1px solid var(--ink); transition: all 0.3s var(--ease); }
+.btn-outline:hover { background: var(--ink); color: white; }
+
+/* ── Banner ── */
+.banner { background: var(--ink); color: white; padding: 12px; text-align: center; font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase; }
+.banner span { color: var(--gold); }
+
+/* ── Section ── */
+section { padding: clamp(4rem, 8vw, 7rem) 3vw; }
+.section-header { text-align: center; margin-bottom: 3.5rem; }
+.section-eyebrow { font-size: 0.65rem; letter-spacing: 0.4em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.8rem; }
+.section-title { font-family: var(--serif); font-size: clamp(1.8rem, 3.5vw, 2.8rem); font-weight: 400; color: var(--ink); letter-spacing: 0.03em; }
+
+/* ── Products ── */
+.products { background: var(--white); }
+.filter-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2.5rem; padding-bottom: 1.2rem; border-bottom: 1px solid var(--border); }
+.filters { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.filter-btn { padding: 6px 16px; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; border: 1px solid var(--border); background: transparent; color: var(--ink2); transition: all 0.2s; border-radius: 99px; }
+.filter-btn.active, .filter-btn:hover { background: var(--ink); color: white; border-color: var(--ink); }
+.sort-select { font-size: 0.72rem; letter-spacing: 0.1em; border: 1px solid var(--border); background: transparent; padding: 6px 12px; color: var(--ink2); font-family: var(--sans); outline: none; }
+
+.products-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem 1.5rem; }
+.product-card { cursor: pointer; }
+.product-img { position: relative; overflow: hidden; aspect-ratio: 3/4; background: var(--surface); margin-bottom: 1rem; }
+.product-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s var(--ease); }
+.product-card:hover .product-img img { transform: scale(1.06); }
+.product-img .product-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 1.2rem; gap: 0.5rem; opacity: 0; transition: opacity 0.4s var(--ease); background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.3)); }
+.product-card:hover .product-overlay { opacity: 1; }
+.overlay-btn { width: 100%; padding: 10px; background: white; color: var(--ink); font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; border: none; transition: all 0.2s; }
+.overlay-btn:hover { background: var(--ink); color: white; }
+.product-badge { position: absolute; top: 1rem; left: 1rem; padding: 3px 10px; font-size: 0.62rem; letter-spacing: 0.15em; text-transform: uppercase; }
+.badge-new { background: var(--ink); color: white; }
+.badge-sale { background: var(--red); color: white; }
+.product-name { font-size: 0.85rem; font-weight: 400; color: var(--ink); margin-bottom: 0.3rem; letter-spacing: 0.03em; }
+.product-brand { font-size: 0.7rem; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 0.5rem; }
+.product-price { display: flex; align-items: center; gap: 0.7rem; }
+.price-current { font-family: var(--serif); font-size: 1rem; color: var(--ink); }
+.price-original { font-size: 0.8rem; color: var(--ink3); text-decoration: line-through; }
+.product-colors { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+.color-dot { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--border); cursor: pointer; transition: transform 0.2s; }
+.color-dot:hover { transform: scale(1.3); }
+.color-dot.active { border-color: var(--ink); }
+
+/* ── Lookbook ── */
+.lookbook { background: var(--bg); }
+.lookbook-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: auto; gap: 1rem; }
+.look-item { overflow: hidden; position: relative; cursor: pointer; }
+.look-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s var(--ease); }
+.look-item:hover img { transform: scale(1.04); }
+.look-item.tall { grid-row: span 2; }
+.look-item .look-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0); display: flex; align-items: flex-end; padding: 1.5rem; transition: background 0.4s; }
+.look-item:hover .look-overlay { background: rgba(0,0,0,0.3); }
+.look-tag { background: white; color: var(--ink); padding: 5px 14px; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0; transform: translateY(10px); transition: all 0.4s var(--ease); }
+.look-item:hover .look-tag { opacity: 1; transform: translateY(0); }
+
+/* ── Features ── */
+.features { background: var(--white); }
+.features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; }
+.feature-item { text-align: center; padding: 2rem 1.5rem; border: 1px solid var(--border); transition: border-color 0.3s; }
+.feature-item:hover { border-color: var(--gold); }
+.feature-icon { width: 44px; height: 44px; margin: 0 auto 1.2rem; color: var(--gold); }
+.feature-icon svg { width: 44px; height: 44px; }
+.feature-name { font-family: var(--serif); font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem; }
+.feature-desc { font-size: 0.78rem; color: var(--ink2); line-height: 1.8; }
+
+/* ── Cart Sidebar ── */
+.cart-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.cart-overlay.open { opacity: 1; pointer-events: all; }
+.cart-sidebar { position: fixed; top: 0; right: 0; bottom: 0; width: 380px; background: white; z-index: 201; transform: translateX(100%); transition: transform 0.4s var(--ease); display: flex; flex-direction: column; }
+.cart-overlay.open .cart-sidebar { transform: translateX(0); }
+.cart-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.cart-title { font-family: var(--serif); font-size: 1.2rem; font-weight: 500; letter-spacing: 0.05em; }
+.cart-close { width: 30px; height: 30px; border: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink2); transition: all 0.2s; }
+.cart-close:hover { background: var(--ink); color: white; border-color: var(--ink); }
+.cart-items { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.cart-item { display: grid; grid-template-columns: 80px 1fr auto; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--border); align-items: start; }
+.cart-item-img { aspect-ratio: 3/4; overflow: hidden; background: var(--surface); }
+.cart-item-img img { width: 100%; height: 100%; object-fit: cover; }
+.cart-item-name { font-size: 0.83rem; font-weight: 500; margin-bottom: 4px; }
+.cart-item-detail { font-size: 0.72rem; color: var(--ink3); margin-bottom: 8px; }
+.cart-item-price { font-family: var(--serif); font-size: 0.95rem; }
+.cart-qty { display: flex; align-items: center; gap: 0.5rem; }
+.qty-btn { width: 24px; height: 24px; border: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+.qty-btn:hover { background: var(--ink); color: white; border-color: var(--ink); }
+.qty-num { font-size: 0.83rem; min-width: 20px; text-align: center; }
+.cart-remove { color: var(--ink3); cursor: pointer; font-size: 1rem; line-height: 1; background: transparent; border: none; transition: color 0.2s; }
+.cart-remove:hover { color: var(--red); }
+.cart-footer { padding: 20px 24px; border-top: 1px solid var(--border); }
+.cart-total { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem; }
+.cart-total.grand { font-weight: 600; font-size: 1rem; margin-bottom: 1.5rem; padding-top: 10px; border-top: 1px solid var(--border); }
+.cart-checkout { width: 100%; padding: 14px; background: var(--ink); color: white; font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; border: none; cursor: pointer; transition: background 0.3s; }
+.cart-checkout:hover { background: #333; }
+
+/* ── Footer ── */
+footer { background: var(--ink); color: rgba(255,255,255,0.7); padding: 4rem 3vw 2rem; }
+.footer-top { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 3rem; padding-bottom: 3rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.footer-brand .logo { color: white; font-size: 1.4rem; margin-bottom: 1rem; display: block; }
+.footer-brand p { font-size: 0.82rem; line-height: 1.9; max-width: 260px; }
+.footer-col h6 { font-size: 0.65rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.2rem; }
+.footer-col ul { list-style: none; }
+.footer-col li { margin-bottom: 0.6rem; font-size: 0.82rem; }
+.footer-col a { transition: color 0.2s; }
+.footer-col a:hover { color: white; }
+.footer-bottom { display: flex; justify-content: space-between; padding-top: 1.5rem; font-size: 0.72rem; flex-wrap: wrap; gap: 0.5rem; opacity: 0.4; }
+
+/* Toast */
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--ink); color: white; padding: 12px 18px; font-size: 0.82rem; box-shadow: var(--shadow); display: flex; align-items: center; gap: 8px; z-index: 300; transform: translateY(60px); opacity: 0; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-icon { color: var(--gold); }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; height: auto; }
+  .hero-img { height: 60vw; }
+  .products-grid { grid-template-columns: repeat(2,1fr); }
+  .features-grid { grid-template-columns: repeat(2,1fr); }
+  .footer-top { grid-template-columns: 1fr 1fr; }
+  .cart-sidebar { width: 100%; }
+}
+@media (max-width: 560px) {
+  .lookbook-grid { grid-template-columns: 1fr 1fr; }
+  .look-item.tall { grid-row: span 1; }
+  .footer-top { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Banner -->
+<div class="banner">新作入荷 — <span>送料無料</span> キャンペーン実施中</div>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-inner">
+    <nav class="header-nav">
+      <a href="#">New</a>
+      <a href="#">Women</a>
+      <a href="#">Men</a>
+      <a href="#">Sale</a>
+    </nav>
+    <a href="#" class="logo">NOIR</a>
+    <div class="header-actions">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+      <div class="header-icon" onclick="openCart()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <div class="cart-count" id="cartCount">2</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-img">
+    <img src="https://picsum.photos/seed/noir-hero/800/1000" alt="Hero">
+  </div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">2026 Summer Collection</div>
+    <h1>静寂の中に<br>宿る美しさを。</h1>
+    <p class="hero-sub">NOIRは、余白と素材の質感にこだわった日本発のプレミアムアパレルブランドです。時代を超えて愛されるシンプルさを追求しています。</p>
+    <div class="hero-btns">
+      <button class="btn-dark" onclick="scrollToProducts()">コレクションを見る</button>
+      <button class="btn-outline">Lookbook</button>
+    </div>
+  </div>
+</section>
+
+<!-- Products -->
+<section class="products" id="products">
+  <div class="section-header">
+    <div class="section-eyebrow">New Arrivals</div>
+    <h2 class="section-title">新作アイテム</h2>
+  </div>
+  <div class="filter-bar">
+    <div class="filters">
+      <button class="filter-btn active" onclick="filterProducts(this,'all')">All</button>
+      <button class="filter-btn" onclick="filterProducts(this,'tops')">Tops</button>
+      <button class="filter-btn" onclick="filterProducts(this,'bottoms')">Bottoms</button>
+      <button class="filter-btn" onclick="filterProducts(this,'outer')">Outer</button>
+      <button class="filter-btn" onclick="filterProducts(this,'acc')">Accessories</button>
+    </div>
+    <select class="sort-select">
+      <option>新着順</option>
+      <option>価格が低い順</option>
+      <option>価格が高い順</option>
+      <option>人気順</option>
+    </select>
+  </div>
+  <div class="products-grid" id="productsGrid"></div>
+</section>
+
+<!-- Lookbook -->
+<section class="lookbook">
+  <div class="section-header">
+    <div class="section-eyebrow">Lookbook</div>
+    <h2 class="section-title">Summer 2026</h2>
+  </div>
+  <div class="lookbook-grid">
+    <div class="look-item tall" style="aspect-ratio:3/4">
+      <img src="https://picsum.photos/seed/look1/600/800" alt="Look 1">
+      <div class="look-overlay"><div class="look-tag">Shop the Look</div></div>
+    </div>
+    <div class="look-item" style="aspect-ratio:4/3">
+      <img src="https://picsum.photos/seed/look2/600/450" alt="Look 2">
+      <div class="look-overlay"><div class="look-tag">Shop the Look</div></div>
+    </div>
+    <div class="look-item" style="aspect-ratio:1/1">
+      <img src="https://picsum.photos/seed/look3/500/500" alt="Look 3">
+      <div class="look-overlay"><div class="look-tag">Shop the Look</div></div>
+    </div>
+    <div class="look-item" style="aspect-ratio:4/3">
+      <img src="https://picsum.photos/seed/look4/600/450" alt="Look 4">
+      <div class="look-overlay"><div class="look-tag">Shop the Look</div></div>
+    </div>
+    <div class="look-item" style="aspect-ratio:1/1">
+      <img src="https://picsum.photos/seed/look5/500/500" alt="Look 5">
+      <div class="look-overlay"><div class="look-tag">Shop the Look</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features">
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+      <div class="feature-name">送料無料</div>
+      <div class="feature-desc">¥10,000以上のご購入で全国送料無料。翌日配送対応。</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <div class="feature-name">30日返品保証</div>
+      <div class="feature-desc">サイズが合わない場合は30日以内に無料で返品・交換。</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <div class="feature-name">安全な決済</div>
+      <div class="feature-desc">SSL暗号化による安全な決済。クレジットカード・コンビニ対応。</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="feature-name">丁寧なサポート</div>
+      <div class="feature-desc">商品に関するご質問は平日10:00〜18:00にチャットで対応。</div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <span class="logo">NOIR</span>
+      <p>余白と素材の質感にこだわった日本発のプレミアムアパレルブランド。時代を超えて愛されるシンプルさを追求しています。</p>
+    </div>
+    <div class="footer-col">
+      <h6>Shop</h6>
+      <ul>
+        <li><a href="#">New Arrivals</a></li>
+        <li><a href="#">Women</a></li>
+        <li><a href="#">Men</a></li>
+        <li><a href="#">Accessories</a></li>
+        <li><a href="#">Sale</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h6>Help</h6>
+      <ul>
+        <li><a href="#">送料・配送</a></li>
+        <li><a href="#">返品・交換</a></li>
+        <li><a href="#">サイズガイド</a></li>
+        <li><a href="#">お問い合わせ</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h6>Company</h6>
+      <ul>
+        <li><a href="#">About</a></li>
+        <li><a href="#">Sustainability</a></li>
+        <li><a href="#">プライバシーポリシー</a></li>
+        <li><a href="#">特定商取引法</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 NOIR. All rights reserved.</span>
+    <span>Designed in Tokyo, Japan</span>
+  </div>
+</footer>
+
+<!-- Cart Sidebar -->
+<div class="cart-overlay" id="cartOverlay" onclick="closeCartOutside(event)">
+  <div class="cart-sidebar">
+    <div class="cart-header">
+      <div class="cart-title">Shopping Cart</div>
+      <button class="cart-close" onclick="closeCart()">✕</button>
+    </div>
+    <div class="cart-items" id="cartItems"></div>
+    <div class="cart-footer">
+      <div class="cart-total"><span>小計</span><span id="cartSubtotal">¥0</span></div>
+      <div class="cart-total"><span>送料</span><span>無料</span></div>
+      <div class="cart-total grand"><span>合計</span><span id="cartTotal">¥0</span></div>
+      <button class="cart-checkout" onclick="showToast('チェックアウト機能は実装予定です')">Checkout →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span class="toast-icon">✓</span><span id="toastMsg"></span></div>
+
+<script>
+const products = [
+  { id:1, name:'リネンオーバーシャツ', brand:'NOIR', price:18700, original:null, badge:'new', category:'tops', colors:['#1a1a1a','#f4f0ea','#8b7355'], img:'https://picsum.photos/seed/p1/400/533' },
+  { id:2, name:'テーパードトラウザー', brand:'NOIR', price:24200, original:null, badge:null, category:'bottoms', colors:['#1a1a1a','#4a3728','#e8e4de'], img:'https://picsum.photos/seed/p2/400/533' },
+  { id:3, name:'オーバーサイズTee', brand:'NOIR', price:8800, original:12100, badge:'sale', category:'tops', colors:['#ffffff','#1a1a1a','#8b7355'], img:'https://picsum.photos/seed/p3/400/533' },
+  { id:4, name:'ウールブレンドコート', brand:'NOIR', price:68200, original:null, badge:'new', category:'outer', colors:['#1a1a1a','#8b7355'], img:'https://picsum.photos/seed/p4/400/533' },
+  { id:5, name:'ストレートデニム', brand:'NOIR', price:19800, original:null, badge:null, category:'bottoms', colors:['#2a3f6b','#1a1a1a'], img:'https://picsum.photos/seed/p5/400/533' },
+  { id:6, name:'レザートートバッグ', brand:'NOIR', price:38500, original:null, badge:'new', category:'acc', colors:['#1a1a1a','#8b7355','#f4f0ea'], img:'https://picsum.photos/seed/p6/400/533' },
+  { id:7, name:'ドレープブラウス', brand:'NOIR', price:15400, original:22000, badge:'sale', category:'tops', colors:['#f4f0ea','#e8d5c4','#1a1a1a'], img:'https://picsum.photos/seed/p7/400/533' },
+  { id:8, name:'カシミアマフラー', brand:'NOIR', price:28600, original:null, badge:null, category:'acc', colors:['#8b7355','#1a1a1a','#f4f0ea'], img:'https://picsum.photos/seed/p8/400/533' },
+];
+
+let cart = [
+  { ...products[0], qty: 1, size: 'M', selectedColor: 0 },
+  { ...products[3], qty: 1, size: 'S', selectedColor: 0 },
+];
+
+function renderProducts(data) {
+  document.getElementById('productsGrid').innerHTML = data.map(p => `
+    <div class="product-card">
+      <div class="product-img">
+        <img src="${p.img}" alt="${p.name}" loading="lazy">
+        ${p.badge ? `<div class="product-badge badge-${p.badge}">${p.badge === 'new' ? 'NEW' : 'SALE'}</div>` : ''}
+        <div class="product-overlay">
+          <button class="overlay-btn" onclick="addToCart(${p.id})">カートに追加</button>
+          <button class="overlay-btn">クイックビュー</button>
+        </div>
+      </div>
+      <div class="product-brand">${p.brand}</div>
+      <div class="product-name">${p.name}</div>
+      <div class="product-price">
+        <span class="price-current">¥${p.price.toLocaleString()}</span>
+        ${p.original ? `<span class="price-original">¥${p.original.toLocaleString()}</span>` : ''}
+      </div>
+      <div class="product-colors">
+        ${p.colors.map((c,i) => `<div class="color-dot${i===0?' active':''}" style="background:${c}" onclick="this.parentNode.querySelectorAll('.color-dot').forEach(d=>d.classList.remove('active'));this.classList.add('active')"></div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterProducts(btn, cat) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const data = cat === 'all' ? products : products.filter(p => p.category === cat);
+  renderProducts(data);
+}
+
+function addToCart(id) {
+  const p = products.find(p => p.id === id);
+  const existing = cart.find(c => c.id === id);
+  if (existing) existing.qty++;
+  else cart.push({ ...p, qty: 1, size: 'M', selectedColor: 0 });
+  updateCartCount();
+  showToast(`${p.name} をカートに追加しました`);
+}
+
+function updateCartCount() {
+  document.getElementById('cartCount').textContent = cart.reduce((s,c) => s + c.qty, 0);
+}
+
+function renderCart() {
+  const subtotal = cart.reduce((s,c) => s + c.price * c.qty, 0);
+  document.getElementById('cartSubtotal').textContent = `¥${subtotal.toLocaleString()}`;
+  document.getElementById('cartTotal').textContent = `¥${subtotal.toLocaleString()}`;
+  document.getElementById('cartItems').innerHTML = cart.length === 0
+    ? '<div style="text-align:center;padding:3rem;color:var(--ink3);font-size:0.85rem">カートは空です</div>'
+    : cart.map(c => `
+      <div class="cart-item">
+        <div class="cart-item-img"><img src="${c.img}" alt="${c.name}"></div>
+        <div>
+          <div class="cart-item-name">${c.name}</div>
+          <div class="cart-item-detail">Size: ${c.size}</div>
+          <div class="cart-item-price">¥${c.price.toLocaleString()}</div>
+          <div class="cart-qty">
+            <button class="qty-btn" onclick="updateQty(${c.id},-1)">−</button>
+            <span class="qty-num">${c.qty}</span>
+            <button class="qty-btn" onclick="updateQty(${c.id},1)">+</button>
+          </div>
+        </div>
+        <button class="cart-remove" onclick="removeFromCart(${c.id})">×</button>
+      </div>
+    `).join('');
+}
+
+function updateQty(id, delta) {
+  const item = cart.find(c => c.id === id);
+  if (!item) return;
+  item.qty = Math.max(0, item.qty + delta);
+  if (item.qty === 0) cart = cart.filter(c => c.id !== id);
+  updateCartCount();
+  renderCart();
+}
+
+function removeFromCart(id) {
+  cart = cart.filter(c => c.id !== id);
+  updateCartCount();
+  renderCart();
+}
+
+function openCart() { renderCart(); document.getElementById('cartOverlay').classList.add('open'); }
+function closeCart() { document.getElementById('cartOverlay').classList.remove('open'); }
+function closeCartOutside(e) { if (e.target === document.getElementById('cartOverlay')) closeCart(); }
+
+function scrollToProducts() { document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+renderProducts(products);
+updateCartCount();
+</script>
+</body>
+</html>

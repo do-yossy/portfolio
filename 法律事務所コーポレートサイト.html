@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鈴木・田中法律事務所</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400;1,600&family=Noto+Serif+JP:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0d1b2e;
+  --navy2: #162337;
+  --navy3: #1e3050;
+  --gold: #b8962e;
+  --gold2: #d4af5a;
+  --gold-light: #f0e6c8;
+  --cream: #faf8f4;
+  --ivory: #f4f0e8;
+  --sand: #e8e0cc;
+  --text: #1a1a2e;
+  --text2: #4a4a6a;
+  --text3: #8a8aaa;
+  --line: rgba(26,26,46,0.1);
+  --serif: 'Cormorant Garamond', 'Noto Serif JP', serif;
+  --sans: 'Jost', 'Noto Sans JP', sans-serif;
+  --ease: cubic-bezier(0.6,0.05,0.2,1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--cream);
+  color: var(--text);
+  font-weight: 300;
+  line-height: 1.8;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; text-decoration: none; }
+
+.container { width: min(92%, 1160px); margin: 0 auto; }
+
+/* ── Header ── */
+header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  padding: 20px 0;
+  transition: all 0.5s var(--ease);
+}
+header.scrolled {
+  background: rgba(250,248,244,0.95);
+  backdrop-filter: blur(16px);
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 20px rgba(0,0,0,0.05);
+}
+.nav { display: flex; align-items: center; justify-content: space-between; }
+
+.nav-logo { display: flex; flex-direction: column; }
+.logo-en {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--cream);
+  transition: color 0.4s var(--ease);
+  line-height: 1.2;
+}
+header.scrolled .logo-en { color: var(--navy); }
+.logo-jp {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.25em;
+  color: var(--gold2);
+  margin-top: 2px;
+}
+
+.nav-links { display: flex; gap: 2.5rem; list-style: none; }
+.nav-links a {
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(250,248,244,0.8);
+  transition: color 0.3s var(--ease);
+  position: relative;
+  padding: 4px 0;
+}
+header.scrolled .nav-links a { color: var(--text2); }
+.nav-links a::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 0; height: 1px;
+  background: var(--gold);
+  transition: width 0.35s var(--ease);
+}
+.nav-links a:hover::after { width: 100%; }
+
+.nav-cta {
+  padding: 10px 22px;
+  background: var(--gold);
+  color: white !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.2em !important;
+  text-transform: uppercase;
+  transition: all 0.3s var(--ease) !important;
+}
+.nav-cta::after { display: none !important; }
+.nav-cta:hover { background: var(--gold2) !important; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(184,150,46,0.35); }
+
+/* ── Hero ── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  color: var(--cream);
+  overflow: hidden;
+  isolation: isolate;
+}
+.hero-bg {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(135deg, rgba(13,27,46,0.92) 0%, rgba(13,27,46,0.75) 60%, rgba(13,27,46,0.88) 100%),
+    url('https://picsum.photos/seed/law-hero/1800/1100');
+  background-size: cover;
+  background-position: center 30%;
+  z-index: -1;
+  transform: scale(1.04);
+  animation: heroZoom 16s var(--ease) forwards;
+}
+@keyframes heroZoom { to { transform: scale(1); } }
+
+.hero-deco {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 40%;
+  background: linear-gradient(135deg, transparent, rgba(184,150,46,0.06));
+  z-index: -1;
+}
+
+.hero-content { padding-top: 80px; max-width: 720px; }
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 6px 8px;
+  border: 1px solid rgba(184,150,46,0.4);
+  background: rgba(184,150,46,0.1);
+  font-size: 0.68rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold2);
+  margin-bottom: 2rem;
+  opacity: 0;
+  animation: fadeUp 1s var(--ease) 0.3s forwards;
+}
+.hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+
+.hero h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(2rem, 4.5vw, 3.8rem);
+  line-height: 1.3;
+  letter-spacing: 0.03em;
+  margin-bottom: 1.4rem;
+}
+.hero h1 .line { display: block; overflow: hidden; }
+.hero h1 .line span {
+  display: inline-block;
+  transform: translateY(110%);
+  opacity: 0;
+  animation: lineReveal 1.2s var(--ease) forwards;
+}
+.hero h1 .line:nth-child(1) span { animation-delay: 0.5s; }
+.hero h1 .line:nth-child(2) span { animation-delay: 0.7s; }
+.hero h1 .line:nth-child(3) span { animation-delay: 0.9s; }
+@keyframes lineReveal { to { transform: translateY(0); opacity: 1; } }
+
+.hero-sub {
+  font-size: 0.95rem;
+  line-height: 2;
+  color: rgba(250,248,244,0.72);
+  max-width: 520px;
+  margin-bottom: 2.5rem;
+  opacity: 0;
+  animation: fadeUp 1s var(--ease) 1.1s forwards;
+}
+
+.hero-btns {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  opacity: 0;
+  animation: fadeUp 1s var(--ease) 1.3s forwards;
+}
+.btn-gold {
+  padding: 1rem 2.2rem;
+  background: var(--gold);
+  color: white;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: all 0.35s var(--ease);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.btn-gold:hover { background: var(--gold2); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(184,150,46,0.4); }
+.btn-outline {
+  padding: 1rem 2.2rem;
+  border: 1px solid rgba(250,248,244,0.35);
+  color: var(--cream);
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: all 0.35s var(--ease);
+}
+.btn-outline:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.6); }
+
+.hero-stats {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(13,27,46,0.85);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(184,150,46,0.2);
+  opacity: 0;
+  animation: fadeUp 1s var(--ease) 1.6s forwards;
+}
+.hero-stats-inner {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 0;
+}
+.hero-stat {
+  padding: 1.8rem 2rem;
+  border-right: 1px solid rgba(184,150,46,0.15);
+  text-align: center;
+}
+.hero-stat:last-child { border-right: none; }
+.hero-stat-num {
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--gold2);
+  line-height: 1;
+  margin-bottom: 0.4rem;
+}
+.hero-stat-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(250,248,244,0.5); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Sections ── */
+section { padding: clamp(5rem, 10vw, 8rem) 0; position: relative; }
+
+.section-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1.2rem;
+}
+.section-eyebrow::before { content: ""; width: 32px; height: 1px; background: var(--gold); flex-shrink: 0; }
+.section-title {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  color: var(--navy);
+  line-height: 1.4;
+  letter-spacing: 0.03em;
+}
+.section-body {
+  font-size: 0.92rem;
+  line-height: 2;
+  color: var(--text2);
+  max-width: 560px;
+}
+
+/* reveal */
+.reveal { opacity: 0; transform: translateY(36px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ── About ── */
+.about { background: var(--ivory); }
+.about-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(3rem, 7vw, 7rem);
+  align-items: center;
+}
+.about-img {
+  position: relative;
+  aspect-ratio: 4/5;
+  overflow: hidden;
+}
+.about-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 1.4s var(--ease); }
+.about-img:hover img { transform: scale(1.04); }
+.about-img::before {
+  content: "";
+  position: absolute;
+  top: -1rem; left: -1rem;
+  right: 1rem; bottom: 1rem;
+  border: 1px solid var(--gold);
+  z-index: -1;
+  opacity: 0.4;
+}
+.about-img-badge {
+  position: absolute;
+  bottom: 1.5rem; right: -1.5rem;
+  background: var(--navy);
+  color: var(--cream);
+  padding: 1.2rem 1.5rem;
+  font-family: var(--serif);
+  text-align: center;
+}
+.about-img-badge .num { font-size: 2rem; font-weight: 600; color: var(--gold2); display: block; line-height: 1; }
+.about-img-badge .label { font-size: 0.65rem; letter-spacing: 0.2em; color: rgba(250,248,244,0.6); margin-top: 4px; }
+
+.about-list { margin-top: 2rem; display: flex; flex-direction: column; gap: 0; }
+.about-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.about-item:first-child { border-top: 1px solid var(--line); }
+.about-item-icon {
+  width: 40px; height: 40px;
+  background: var(--gold-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.about-item-icon svg { width: 18px; height: 18px; color: var(--gold); }
+.about-item h4 { font-family: var(--serif); font-size: 1rem; font-weight: 500; color: var(--navy); margin-bottom: 0.2rem; }
+.about-item p { font-size: 0.83rem; color: var(--text2); line-height: 1.7; }
+
+/* ── Practice ── */
+.practice { background: var(--cream); }
+.practice-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: end;
+  margin-bottom: 4rem;
+}
+.practice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5px; background: var(--sand); }
+.practice-card {
+  background: var(--cream);
+  padding: 2.5rem 2rem;
+  transition: all 0.4s var(--ease);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.practice-card::before {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--gold);
+  transform: scaleX(0);
+  transition: transform 0.4s var(--ease);
+  transform-origin: left;
+}
+.practice-card:hover { background: var(--ivory); }
+.practice-card:hover::before { transform: scaleX(1); }
+
+.practice-num {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.75rem;
+  color: var(--gold);
+  letter-spacing: 0.3em;
+  margin-bottom: 1.4rem;
+  display: block;
+}
+.practice-icon {
+  width: 48px; height: 48px;
+  margin-bottom: 1.4rem;
+  color: var(--navy);
+  transition: color 0.3s var(--ease);
+}
+.practice-card:hover .practice-icon { color: var(--gold); }
+.practice-card h3 {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--navy);
+  margin-bottom: 0.8rem;
+  line-height: 1.4;
+}
+.practice-card p { font-size: 0.83rem; line-height: 1.9; color: var(--text2); }
+.practice-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  transition: gap 0.3s var(--ease);
+}
+.practice-card:hover .practice-link { gap: 0.8rem; }
+
+/* ── Attorneys ── */
+.attorneys { background: var(--navy); color: var(--cream); }
+.attorneys-header { text-align: center; margin-bottom: 4rem; }
+.attorneys-header .section-eyebrow { justify-content: center; }
+.attorneys-header .section-eyebrow::before { display: none; }
+.attorneys-header .section-title { color: var(--cream); }
+
+.attorneys-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
+.attorney-card {
+  background: var(--navy2);
+  border: 1px solid rgba(184,150,46,0.15);
+  overflow: hidden;
+  transition: transform 0.4s var(--ease), border-color 0.4s var(--ease);
+}
+.attorney-card:hover { transform: translateY(-6px); border-color: rgba(184,150,46,0.4); }
+.attorney-img {
+  position: relative;
+  aspect-ratio: 1/1.1;
+  overflow: hidden;
+  background: var(--navy3);
+}
+.attorney-img img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(20%); transition: all 0.6s var(--ease); }
+.attorney-card:hover .attorney-img img { filter: grayscale(0); transform: scale(1.04); }
+.attorney-img::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 60%, rgba(13,27,46,0.6));
+}
+.attorney-body { padding: 1.5rem; }
+.attorney-name { font-family: var(--serif); font-size: 1.15rem; font-weight: 500; color: var(--cream); margin-bottom: 0.3rem; }
+.attorney-title { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold2); margin-bottom: 0.9rem; }
+.attorney-bio { font-size: 0.82rem; line-height: 1.85; color: rgba(250,248,244,0.65); }
+.attorney-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; }
+.attorney-tag {
+  padding: 3px 10px;
+  border: 1px solid rgba(184,150,46,0.3);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--gold2);
+}
+
+/* ── Testimonials ── */
+.testimonials { background: var(--ivory); }
+.testimonials-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: end;
+  margin-bottom: 4rem;
+}
+.testimonials-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+.testimonial {
+  background: var(--cream);
+  padding: 2.2rem;
+  border-left: 3px solid var(--gold);
+  position: relative;
+}
+.testimonial::before {
+  content: "\201C";
+  position: absolute;
+  top: 1rem; right: 1.5rem;
+  font-family: var(--serif);
+  font-size: 4rem;
+  color: var(--gold-light);
+  line-height: 1;
+}
+.testimonial-text { font-size: 0.9rem; line-height: 2; color: var(--text2); margin-bottom: 1.4rem; font-style: italic; }
+.testimonial-author { display: flex; align-items: center; gap: 1rem; }
+.testimonial-avatar {
+  width: 40px; height: 40px;
+  background: var(--navy);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  color: var(--gold2);
+  flex-shrink: 0;
+}
+.testimonial-name { font-size: 0.85rem; font-weight: 500; color: var(--navy); }
+.testimonial-role { font-size: 0.72rem; color: var(--text3); }
+
+/* ── Contact ── */
+.contact { background: var(--navy); color: var(--cream); }
+.contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: clamp(3rem, 7vw, 7rem);
+  align-items: start;
+}
+.contact .section-title { color: var(--cream); }
+.contact-body { font-size: 0.9rem; line-height: 2; color: rgba(250,248,244,0.65); margin-top: 1.5rem; }
+.contact-info { margin-top: 2.5rem; display: flex; flex-direction: column; gap: 0; }
+.contact-info-item {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid rgba(250,248,244,0.08);
+  font-size: 0.85rem;
+}
+.contact-info-item:first-child { border-top: 1px solid rgba(250,248,244,0.08); }
+.contact-info-label { color: var(--gold2); font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; padding-top: 2px; }
+.contact-info-val { color: rgba(250,248,244,0.8); }
+
+.contact-form { display: flex; flex-direction: column; gap: 1.4rem; }
+.form-field { display: flex; flex-direction: column; gap: 0.5rem; }
+.form-field label { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold2); }
+.form-field input,
+.form-field select,
+.form-field textarea {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 0.9rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.87rem;
+  color: var(--cream);
+  outline: none;
+  transition: border-color 0.3s var(--ease);
+  width: 100%;
+}
+.form-field input::placeholder,
+.form-field textarea::placeholder { color: rgba(250,248,244,0.28); }
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus { border-color: var(--gold); }
+.form-field select option { background: var(--navy); color: var(--cream); }
+.form-field textarea { min-height: 120px; resize: vertical; }
+.form-note { font-size: 0.75rem; color: rgba(250,248,244,0.4); line-height: 1.6; }
+.form-success {
+  display: none;
+  padding: 1rem 1.2rem;
+  background: rgba(184,150,46,0.12);
+  border-left: 2px solid var(--gold);
+  color: var(--gold2);
+  font-size: 0.85rem;
+}
+.form-success.show { display: block; }
+
+/* ── Footer ── */
+footer { background: #08111e; color: rgba(250,248,244,0.55); }
+.footer-top {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 3rem;
+  padding: 4rem 0 3rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.footer-brand .logo-en { color: var(--cream); font-size: 1.2rem; }
+.footer-brand p { font-size: 0.82rem; line-height: 1.9; margin-top: 1rem; max-width: 280px; }
+.footer-col h6 {
+  font-size: 0.68rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold2);
+  margin-bottom: 1.2rem;
+}
+.footer-col ul { list-style: none; }
+.footer-col li { margin-bottom: 0.6rem; font-size: 0.83rem; }
+.footer-col a { transition: color 0.3s; }
+.footer-col a:hover { color: var(--gold2); }
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.5rem 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .about-grid,
+  .practice-header,
+  .attorneys-grid,
+  .testimonials-header,
+  .contact-grid,
+  .footer-top { grid-template-columns: 1fr; gap: 2.5rem; }
+  .practice-grid { grid-template-columns: 1fr 1fr; }
+  .testimonials-grid { grid-template-columns: 1fr; }
+  .hero-stats-inner { grid-template-columns: repeat(2, 1fr); }
+  .footer-top { grid-template-columns: 1fr 1fr; }
+  .footer-brand { grid-column: span 2; }
+  .about-img-badge { right: 0; }
+  .nav-links { display: none; }
+}
+@media (max-width: 580px) {
+  .practice-grid { grid-template-columns: 1fr; }
+  .footer-top { grid-template-columns: 1fr; }
+  .footer-brand { grid-column: span 1; }
+  .hero-stats-inner { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header id="header">
+  <div class="container nav">
+    <a href="#" class="nav-logo">
+      <div class="logo-en">Suzuki & Tanaka</div>
+      <div class="logo-jp">鈴木・田中法律事務所</div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#about">事務所概要</a></li>
+      <li><a href="#practice">業務内容</a></li>
+      <li><a href="#attorneys">弁護士紹介</a></li>
+      <li><a href="#testimonials">お客様の声</a></li>
+      <li><a href="#contact" class="nav-cta">無料相談</a></li>
+    </ul>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-deco"></div>
+  <div class="container hero-content">
+    <div class="hero-badge"><span class="hero-badge-dot"></span>創業35年の信頼と実績</div>
+    <h1>
+      <span class="line"><span>依頼人の未来を、</span></span>
+      <span class="line"><span>誠実な法律で守る。</span></span>
+    </h1>
+    <p class="hero-sub">複雑な法律問題も、経験豊富な弁護士チームが丁寧にサポートします。企業法務から個人の相談まで、あなたの立場に立って最善の解決策をご提案いたします。</p>
+    <div class="hero-btns">
+      <a href="#contact" class="btn-gold">無料相談を予約 →</a>
+      <a href="#practice" class="btn-outline">業務内容を見る</a>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="container">
+      <div class="hero-stats-inner">
+        <div class="hero-stat">
+          <div class="hero-stat-num">3,500+</div>
+          <div class="hero-stat-label">解決実績</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">35年</div>
+          <div class="hero-stat-label">創業からの実績</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">98%</div>
+          <div class="hero-stat-label">顧客満足度</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">12名</div>
+          <div class="hero-stat-label">所属弁護士</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- About -->
+<section class="about" id="about">
+  <div class="container about-grid">
+    <div class="about-img reveal">
+      <img src="https://picsum.photos/seed/law-about/700/900" alt="事務所内観">
+      <div class="about-img-badge">
+        <span class="num">35</span>
+        <span class="label">Years of Trust</span>
+      </div>
+    </div>
+    <div class="reveal">
+      <div class="section-eyebrow">About Us</div>
+      <h2 class="section-title" style="margin-bottom:1.2rem">依頼人一人ひとりに、<br>真摯に向き合う事務所。</h2>
+      <p class="section-body">1990年の創業以来、企業法務・個人の法律問題・紛争解決まで幅広く対応してまいりました。豊富な経験と専門知識を活かし、複雑な法律問題に対しても最善の解決策をご提供します。</p>
+      <div class="about-list">
+        <div class="about-item">
+          <div class="about-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <h4>豊富な解決実績</h4>
+            <p>35年間で3,500件以上の案件を解決。企業間トラブルから個人の相談まで幅広く対応。</p>
+          </div>
+        </div>
+        <div class="about-item">
+          <div class="about-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <h4>専門分野のチーム体制</h4>
+            <p>各分野の専門弁護士が連携することで、複合的な問題にも対応できる体制を整えています。</p>
+          </div>
+        </div>
+        <div class="about-item">
+          <div class="about-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          </div>
+          <div>
+            <h4>迅速・丁寧な対応</h4>
+            <p>ご相談から24時間以内に担当弁護士よりご連絡。緊急案件にも柔軟に対応いたします。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Practice -->
+<section class="practice" id="practice">
+  <div class="container">
+    <div class="practice-header">
+      <div class="reveal">
+        <div class="section-eyebrow">Practice Areas</div>
+        <h2 class="section-title">主な業務分野</h2>
+      </div>
+      <p class="section-body reveal">企業法務から個人の法律問題まで、幅広い分野において専門的なリーガルサービスを提供しています。お困りごとがあればまずはご相談ください。</p>
+    </div>
+    <div class="practice-grid">
+      <div class="practice-card reveal">
+        <span class="practice-num">01</span>
+        <svg class="practice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+        <h3>企業法務</h3>
+        <p>契約書のレビュー・作成、コンプライアンス対応、M&A・事業承継など、企業活動に関する法的サポートを提供します。</p>
+        <div class="practice-link">詳しく見る →</div>
+      </div>
+      <div class="practice-card reveal">
+        <span class="practice-num">02</span>
+        <svg class="practice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 6V4m4 2V4m4 2V4"/></svg>
+        <h3>労働問題</h3>
+        <p>不当解雇・残業代未払い・ハラスメントなど、労使双方の労働トラブルに対して適切な解決策を提案します。</p>
+        <div class="practice-link">詳しく見る →</div>
+      </div>
+      <div class="practice-card reveal">
+        <span class="practice-num">03</span>
+        <svg class="practice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <h3>不動産・相続</h3>
+        <p>遺産分割・遺言書作成・不動産取引トラブルなど、資産に関わる法律問題を丁寧にサポートします。</p>
+        <div class="practice-link">詳しく見る →</div>
+      </div>
+      <div class="practice-card reveal">
+        <span class="practice-num">04</span>
+        <svg class="practice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3>債務整理</h3>
+        <p>借金問題・自己破産・任意整理など、過大な債務でお困りの方に対して最善の解決策をご提案します。</p>
+        <div class="practice-link">詳しく見る →</div>
+      </div>
+      <div class="practice-card reveal">
+        <span class="practice-num">05</span>
+        <svg class="practice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <h3>離婚・家族問題</h3>
+        <p>離婚協議・親権・財産分与など、家族に関する法律問題を感情に寄り添いながら解決に向けてサポートします。</p>
+        <div class="practice-link">詳しく見る →</div>
+      </div>
+      <div class="practice-card reveal">
+        <span class="practice-num">06</span>
+        <svg class="practice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <h3>IT・知的財産</h3>
+        <p>著作権・特許・商標トラブル、ITシステム開発契約など、デジタル時代の法律問題に対応します。</p>
+        <div class="practice-link">詳しく見る →</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Attorneys -->
+<section class="attorneys" id="attorneys">
+  <div class="container">
+    <div class="attorneys-header reveal">
+      <div class="section-eyebrow">Our Team</div>
+      <h2 class="section-title">弁護士紹介</h2>
+      <p class="section-body" style="color:rgba(250,248,244,0.6);margin:1rem auto 0">各分野の専門家が連携し、複合的な問題にも対応できる体制を整えています。</p>
+    </div>
+    <div class="attorneys-grid">
+      <div class="attorney-card reveal">
+        <div class="attorney-img"><img src="https://picsum.photos/seed/atty1/500/550" alt="鈴木弁護士"></div>
+        <div class="attorney-body">
+          <div class="attorney-name">鈴木 健一郎</div>
+          <div class="attorney-title">代表弁護士 / Partner</div>
+          <p class="attorney-bio">東京大学法学部卒。企業法務・M&Aを専門とし、国内外の大型案件を多数手がける。創業者として35年間事務所を牽引。</p>
+          <div class="attorney-tags">
+            <span class="attorney-tag">企業法務</span>
+            <span class="attorney-tag">M&A</span>
+            <span class="attorney-tag">国際取引</span>
+          </div>
+        </div>
+      </div>
+      <div class="attorney-card reveal">
+        <div class="attorney-img"><img src="https://picsum.photos/seed/atty2/500/550" alt="田中弁護士"></div>
+        <div class="attorney-body">
+          <div class="attorney-name">田中 由美子</div>
+          <div class="attorney-title">代表弁護士 / Partner</div>
+          <p class="attorney-bio">京都大学法科大学院卒。労働問題・家族法を専門とし、依頼人の立場に立った丁寧な対応で高い信頼を獲得している。</p>
+          <div class="attorney-tags">
+            <span class="attorney-tag">労働問題</span>
+            <span class="attorney-tag">家族法</span>
+            <span class="attorney-tag">調停</span>
+          </div>
+        </div>
+      </div>
+      <div class="attorney-card reveal">
+        <div class="attorney-img"><img src="https://picsum.photos/seed/atty3/500/550" alt="山本弁護士"></div>
+        <div class="attorney-body">
+          <div class="attorney-name">山本 翔</div>
+          <div class="attorney-title">弁護士 / Associate</div>
+          <p class="attorney-bio">慶應義塾大学法科大学院卒。IT・知的財産・スタートアップ法務を専門とし、デジタル時代の法律問題に精通している。</p>
+          <div class="attorney-tags">
+            <span class="attorney-tag">IT法務</span>
+            <span class="attorney-tag">知的財産</span>
+            <span class="attorney-tag">スタートアップ</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="testimonials" id="testimonials">
+  <div class="container">
+    <div class="testimonials-header">
+      <div class="reveal">
+        <div class="section-eyebrow">Testimonials</div>
+        <h2 class="section-title">お客様の声</h2>
+      </div>
+      <p class="section-body reveal">実際にご依頼いただいたお客様からいただいた声をご紹介します。</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial reveal">
+        <p class="testimonial-text">労働トラブルで途方に暮れていたところ、田中弁護士に相談しました。丁寧なヒアリングと迅速な対応で、想像以上に良い結果を得ることができました。本当に感謝しています。</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">山</div>
+          <div>
+            <div class="testimonial-name">山田 様</div>
+            <div class="testimonial-role">40代 会社員</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial reveal">
+        <p class="testimonial-text">会社の契約書レビューを継続的にお願いしています。専門的な視点からリスクを指摘していただき、おかげで大きなトラブルを未然に防ぐことができています。</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">佐</div>
+          <div>
+            <div class="testimonial-name">佐藤 様</div>
+            <div class="testimonial-role">中小企業 代表取締役</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial reveal">
+        <p class="testimonial-text">相続問題で兄弟間の関係が悪化していましたが、鈴木弁護士の中立的なサポートにより円満に解決することができました。家族関係も修復できて本当に良かったです。</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">高</div>
+          <div>
+            <div class="testimonial-name">高橋 様</div>
+            <div class="testimonial-role">60代 会社役員</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial reveal">
+        <p class="testimonial-text">スタートアップの立ち上げ時から山本弁護士にサポートいただいています。IT・知財の専門知識が豊富で、的確なアドバイスをいただけるので大変心強いです。</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">伊</div>
+          <div>
+            <div class="testimonial-name">伊藤 様</div>
+            <div class="testimonial-role">スタートアップ CEO</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Contact -->
+<section class="contact" id="contact">
+  <div class="container contact-grid">
+    <div class="reveal">
+      <div class="section-eyebrow">Contact</div>
+      <h2 class="section-title">無料相談の<br>ご予約</h2>
+      <p class="contact-body">初回相談は無料です。些細なことでも遠慮なくご相談ください。ご相談内容は守秘義務により厳格に保護されます。</p>
+      <div class="contact-info">
+        <div class="contact-info-item">
+          <span class="contact-info-label">電話</span>
+          <span class="contact-info-val">03-1234-5678<br><small style="opacity:0.5">平日 9:00〜18:00</small></span>
+        </div>
+        <div class="contact-info-item">
+          <span class="contact-info-label">住所</span>
+          <span class="contact-info-val">〒100-0001<br>東京都千代田区〇〇1-2-3<br>○○ビル 8F</span>
+        </div>
+        <div class="contact-info-item">
+          <span class="contact-info-label">アクセス</span>
+          <span class="contact-info-val">東京メトロ〇〇駅 徒歩3分</span>
+        </div>
+      </div>
+    </div>
+    <div class="reveal">
+      <div class="contact-form" id="contactForm">
+        <div class="form-field">
+          <label>お名前</label>
+          <input type="text" placeholder="山田 太郎" id="fName">
+        </div>
+        <div class="form-field">
+          <label>メールアドレス</label>
+          <input type="email" placeholder="example@mail.com" id="fEmail">
+        </div>
+        <div class="form-field">
+          <label>電話番号</label>
+          <input type="tel" placeholder="03-0000-0000" id="fPhone">
+        </div>
+        <div class="form-field">
+          <label>ご相談の分野</label>
+          <select id="fArea">
+            <option value="">選択してください</option>
+            <option>企業法務</option>
+            <option>労働問題</option>
+            <option>不動産・相続</option>
+            <option>債務整理</option>
+            <option>離婚・家族問題</option>
+            <option>IT・知的財産</option>
+            <option>その他</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>ご相談内容</label>
+          <textarea placeholder="ご相談の概要をご記入ください..." id="fMsg"></textarea>
+        </div>
+        <p class="form-note">※ご入力いただいた情報は、ご相談への対応のみに使用し、第三者に提供することはありません。</p>
+        <button class="btn-gold" onclick="submitForm()" style="align-self:flex-start">相談を予約する →</button>
+        <div class="form-success" id="formSuccess">✓ ご相談を受け付けました。担当弁護士より24時間以内にご連絡いたします。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="logo-en">Suzuki & Tanaka</div>
+        <div class="logo-jp" style="margin-top:4px">鈴木・田中法律事務所</div>
+        <p>1990年の創業以来、企業法務から個人の法律問題まで幅広く対応。35年間の実績と信頼を基に、依頼人の未来を守り続けています。</p>
+      </div>
+      <div class="footer-col">
+        <h6>業務内容</h6>
+        <ul>
+          <li><a href="#">企業法務</a></li>
+          <li><a href="#">労働問題</a></li>
+          <li><a href="#">不動産・相続</a></li>
+          <li><a href="#">債務整理</a></li>
+          <li><a href="#">離婚・家族問題</a></li>
+          <li><a href="#">IT・知的財産</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h6>事務所情報</h6>
+        <ul>
+          <li><a href="#">事務所概要</a></li>
+          <li><a href="#">弁護士紹介</a></li>
+          <li><a href="#">お客様の声</a></li>
+          <li><a href="#">採用情報</a></li>
+          <li><a href="#">アクセス</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h6>お問い合わせ</h6>
+        <ul>
+          <li>03-1234-5678</li>
+          <li>平日 9:00〜18:00</li>
+          <li style="margin-top:0.8rem"><a href="#">無料相談予約</a></li>
+          <li><a href="#">プライバシーポリシー</a></li>
+          <li><a href="#">免責事項</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Suzuki & Tanaka Law Office. All rights reserved.</span>
+      <span>東京弁護士会所属</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Header scroll
+const header = document.getElementById('header');
+window.addEventListener('scroll', () => {
+  header.classList.toggle('scrolled', window.scrollY > 80);
+}, { passive: true });
+
+// Reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) {
+      setTimeout(() => entry.target.classList.add('visible'), i * 80);
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Form
+function submitForm() {
+  const name = document.getElementById('fName').value;
+  if (!name) { alert('お名前を入力してください'); return; }
+  document.getElementById('formSuccess').classList.add('show');
+  ['fName','fEmail','fPhone','fMsg'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fArea').value = '';
+  setTimeout(() => document.getElementById('formSuccess').classList.remove('show'), 6000);
+}
+</script>
+</body>
+</html>

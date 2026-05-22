@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoExcel — 業務自動化ツール</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f0f4f8;
+  --surface: #ffffff;
+  --surface2: #f7f9fc;
+  --border: #dde3ee;
+  --ink: #1a2035;
+  --ink2: #5a6580;
+  --ink3: #adb5c8;
+  --accent: #217346;
+  --accent-soft: #e8f5ee;
+  --blue: #1e6fd9;
+  --blue-soft: #e8f0fc;
+  --amber: #c8960c;
+  --amber-soft: #fef8e6;
+  --red: #d32f2f;
+  --red-soft: #fdecea;
+  --sans: 'Inter', 'Noto Sans JP', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --shadow: 0 4px 20px rgba(26,32,53,0.08);
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--bg); color: var(--ink); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+/* Header */
+.header { background: var(--accent); padding: 0 20px; height: 52px; display: flex; align-items: center; justify-content: space-between; }
+.header-logo { display: flex; align-items: center; gap: 10px; color: white; }
+.header-logo svg { width: 22px; height: 22px; }
+.header-logo-text { font-size: 0.95rem; font-weight: 700; letter-spacing: -0.01em; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--sans); }
+.btn svg { width: 12px; height: 12px; }
+.btn-white { background: white; color: var(--accent); }
+.btn-white:hover { background: rgba(255,255,255,0.9); }
+.btn-ghost-white { background: transparent; color: white; border: 1px solid rgba(255,255,255,0.4); }
+.btn-ghost-white:hover { background: rgba(255,255,255,0.1); }
+
+/* Toolbar */
+.toolbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 20px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.toolbar-group { display: flex; align-items: center; gap: 4px; }
+.toolbar-divider { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+.tool-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 5px; border: 1px solid transparent; background: transparent; font-size: 0.72rem; color: var(--ink2); cursor: pointer; transition: all 0.15s; font-family: var(--sans); }
+.tool-btn:hover { background: var(--surface2); border-color: var(--border); }
+.tool-btn.active { background: var(--accent-soft); color: var(--accent); border-color: rgba(33,115,70,0.3); }
+.tool-btn svg { width: 13px; height: 13px; }
+
+/* Layout */
+.layout { display: grid; grid-template-columns: 280px 1fr 300px; height: calc(100vh - 100px); overflow: hidden; }
+
+/* Left panel */
+.left-panel { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.panel-header { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 0.72rem; font-weight: 700; color: var(--ink); letter-spacing: 0.05em; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; background: var(--surface2); }
+.macro-list { flex: 1; overflow-y: auto; padding: 8px; }
+.macro-item { padding: 10px 12px; border-radius: var(--radius); cursor: pointer; transition: all 0.15s; margin-bottom: 4px; border: 1px solid transparent; }
+.macro-item:hover { background: var(--surface2); }
+.macro-item.active { background: var(--accent-soft); border-color: rgba(33,115,70,0.3); }
+.macro-name { font-size: 0.8rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.macro-item.active .macro-name { color: var(--accent); }
+.macro-desc { font-size: 0.68rem; color: var(--ink3); line-height: 1.4; }
+.macro-badge { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 0.6rem; font-weight: 700; margin-top: 4px; }
+.badge-green { background: var(--accent-soft); color: var(--accent); }
+.badge-blue { background: var(--blue-soft); color: var(--blue); }
+.badge-amber { background: var(--amber-soft); color: var(--amber); }
+
+/* Main area */
+.main-area { display: flex; flex-direction: column; overflow: hidden; background: var(--surface2); }
+.sheet-tabs { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: flex-end; gap: 2px; height: 34px; }
+.sheet-tab { padding: 6px 14px; border-radius: 6px 6px 0 0; border: 1px solid var(--border); border-bottom: none; font-size: 0.72rem; cursor: pointer; transition: all 0.15s; color: var(--ink3); background: var(--surface2); }
+.sheet-tab.active { background: white; color: var(--accent); font-weight: 600; border-bottom-color: white; z-index: 1; position: relative; }
+.formula-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 4px 12px; display: flex; align-items: center; gap: 8px; }
+.cell-ref { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-family: var(--mono); font-size: 0.72rem; color: var(--ink); width: 60px; text-align: center; }
+.formula-input { flex: 1; border: none; background: transparent; font-family: var(--mono); font-size: 0.72rem; color: var(--ink); outline: none; }
+
+/* Spreadsheet */
+.spreadsheet-wrap { flex: 1; overflow: auto; position: relative; }
+.spreadsheet { border-collapse: collapse; table-layout: fixed; }
+.spreadsheet th, .spreadsheet td { border: 1px solid #d0d7e3; padding: 0; min-width: 100px; height: 22px; white-space: nowrap; overflow: hidden; position: relative; }
+.spreadsheet thead th { background: #f0f2f7; font-size: 0.65rem; font-weight: 600; color: var(--ink2); text-align: center; min-width: 22px; padding: 0 4px; border-color: #cdd3df; position: sticky; top: 0; z-index: 10; }
+.spreadsheet thead th.col-header { min-width: 100px; }
+.row-header { background: #f0f2f7 !important; font-size: 0.65rem; font-weight: 600; color: var(--ink2) !important; text-align: center !important; min-width: 36px !important; width: 36px !important; position: sticky; left: 0; z-index: 5; border-color: #cdd3df !important; }
+.cell { padding: 2px 6px; font-size: 0.75rem; color: var(--ink); cursor: cell; }
+.cell.selected { outline: 2px solid var(--blue); outline-offset: -1px; background: rgba(30,111,217,0.05); }
+.cell.header-cell { font-weight: 700; background: #e8efda; text-align: center; color: #1a3a1a; font-size: 0.7rem; }
+.cell.total-cell { font-weight: 700; background: #e8efda; color: var(--accent); font-family: var(--mono); font-size: 0.73rem; }
+.cell.data-cell { font-family: var(--mono); font-size: 0.72rem; }
+.cell.money { text-align: right; color: var(--ink); }
+.cell.red-value { color: var(--red); }
+.cell.formula-cell { color: var(--blue); font-family: var(--mono); font-size: 0.7rem; }
+.highlighted-row td { background: rgba(33,115,70,0.06) !important; }
+.processing-row td { animation: rowProcess 0.5s ease forwards; }
+@keyframes rowProcess { from { background: rgba(33,115,70,0.3); } to { background: rgba(33,115,70,0.06); } }
+
+/* Right panel */
+.right-panel { background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.run-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.run-title { font-size: 0.72rem; font-weight: 700; color: var(--ink); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+.macro-info { background: var(--surface2); border-radius: var(--radius); padding: 12px; border: 1px solid var(--border); margin-bottom: 12px; }
+.macro-info-name { font-size: 0.82rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.macro-info-desc { font-size: 0.72rem; color: var(--ink2); line-height: 1.6; }
+.run-btn { width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: var(--sans); transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.run-btn:hover { background: #1a5c38; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(33,115,70,0.3); }
+.run-btn:disabled { background: var(--ink3); cursor: not-allowed; transform: none; box-shadow: none; }
+.run-btn svg { width: 14px; height: 14px; }
+
+/* Log */
+.log-section { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.log-header { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 0.7rem; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between; background: var(--surface2); }
+.clear-btn { font-size: 0.65rem; color: var(--ink3); background: transparent; border: none; cursor: pointer; font-family: var(--sans); }
+.clear-btn:hover { color: var(--red); }
+.log-content { flex: 1; overflow-y: auto; padding: 8px; font-family: var(--mono); font-size: 0.68rem; }
+.log-item { display: flex; gap: 8px; padding: 4px 6px; border-radius: 4px; margin-bottom: 2px; }
+.log-item.info { color: var(--ink2); }
+.log-item.success { color: var(--accent); background: var(--accent-soft); }
+.log-item.warning { color: var(--amber); background: var(--amber-soft); }
+.log-item.error { color: var(--red); background: var(--red-soft); }
+.log-time { color: var(--ink3); flex-shrink: 0; }
+
+/* Progress */
+.progress-section { padding: 12px 16px; border-top: 1px solid var(--border); }
+.progress-label { font-size: 0.68rem; color: var(--ink2); margin-bottom: 6px; display: flex; justify-content: space-between; }
+.progress-bar { height: 5px; background: var(--surface2); border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #34a85a); border-radius: 99px; transition: width 0.3s ease; }
+
+/* Output section */
+.output-section { padding: 10px 16px; border-top: 1px solid var(--border); }
+.output-title { font-size: 0.7rem; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.output-files { display: flex; flex-direction: column; gap: 6px; }
+.output-file { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface2); border-radius: 7px; border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; }
+.output-file:hover { border-color: var(--accent); background: var(--accent-soft); }
+.output-file svg { width: 16px; height: 16px; flex-shrink: 0; }
+.output-file.xlsx svg { color: var(--accent); }
+.output-file.pdf svg { color: var(--red); }
+.output-file-name { font-size: 0.72rem; font-weight: 500; color: var(--ink); flex: 1; }
+.output-file-size { font-size: 0.62rem; color: var(--ink3); font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    <div class="header-logo-text">AutoExcel — 業務自動化ツール</div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost-white">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      CSVインポート
+    </button>
+    <button class="btn btn-white" onclick="exportFile()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Excelで開く
+    </button>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="toolbar-group">
+    <button class="tool-btn active" onclick="setTab(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      データ入力
+    </button>
+    <button class="tool-btn" onclick="setTab(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      集計・分析
+    </button>
+    <button class="tool-btn" onclick="setTab(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      帳票出力
+    </button>
+  </div>
+  <div class="toolbar-divider"></div>
+  <div class="toolbar-group">
+    <button class="tool-btn" onclick="addRow()">行追加</button>
+    <button class="tool-btn" onclick="sortData()">並び替え</button>
+    <button class="tool-btn" onclick="filterData()">フィルター</button>
+    <button class="tool-btn" onclick="calcAll()">再計算</button>
+  </div>
+</div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Left: Macro List -->
+  <div class="left-panel">
+    <div class="panel-header">
+      マクロ一覧
+      <span style="font-size:0.62rem;color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0">5件登録</span>
+    </div>
+    <div class="macro-list">
+      <div class="macro-item active" onclick="selectMacro(this, 0)">
+        <div class="macro-name">売上集計レポート生成</div>
+        <div class="macro-desc">月次売上データを集計し、部門別・商品別のレポートを自動生成します</div>
+        <span class="macro-badge badge-green">月次</span>
+      </div>
+      <div class="macro-item" onclick="selectMacro(this, 1)">
+        <div class="macro-name">請求書自動作成</div>
+        <div class="macro-desc">顧客マスタと受注データから請求書PDFを一括生成します</div>
+        <span class="macro-badge badge-blue">一括処理</span>
+      </div>
+      <div class="macro-item" onclick="selectMacro(this, 2)">
+        <div class="macro-name">在庫アラートチェック</div>
+        <div class="macro-desc">在庫数が閾値を下回った商品をハイライトし、発注書を自動作成します</div>
+        <span class="macro-badge badge-amber">アラート</span>
+      </div>
+      <div class="macro-item" onclick="selectMacro(this, 3)">
+        <div class="macro-name">勤怠集計・給与計算</div>
+        <div class="macro-desc">タイムカードデータから残業・休日出勤を自動集計し給与明細を作成します</div>
+        <span class="macro-badge badge-green">自動計算</span>
+      </div>
+      <div class="macro-item" onclick="selectMacro(this, 4)">
+        <div class="macro-name">メール一括送信</div>
+        <div class="macro-desc">リストの顧客に対してパーソナライズされたメールを自動送信します</div>
+        <span class="macro-badge badge-blue">メール</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main: Spreadsheet -->
+  <div class="main-area">
+    <div class="sheet-tabs">
+      <div class="sheet-tab active">売上データ</div>
+      <div class="sheet-tab">商品マスタ</div>
+      <div class="sheet-tab">集計結果</div>
+      <div class="sheet-tab">+ シート追加</div>
+    </div>
+    <div class="formula-bar">
+      <div class="cell-ref" id="cellRef">A1</div>
+      <span style="color:var(--ink3);font-size:0.75rem">fx</span>
+      <input class="formula-input" id="formulaInput" value="受注番号" readonly>
+    </div>
+    <div class="spreadsheet-wrap" id="spreadsheetWrap">
+      <table class="spreadsheet" id="spreadsheet"></table>
+    </div>
+  </div>
+
+  <!-- Right: Controls -->
+  <div class="right-panel">
+    <div class="run-section">
+      <div class="run-title">マクロ実行</div>
+      <div class="macro-info">
+        <div class="macro-info-name" id="selectedMacroName">売上集計レポート生成</div>
+        <div class="macro-info-desc" id="selectedMacroDesc">月次売上データを集計し、部門別・商品別のレポートを自動生成します</div>
+      </div>
+      <button class="run-btn" id="runBtn" onclick="runMacro()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        マクロを実行
+      </button>
+    </div>
+
+    <div class="log-section">
+      <div class="log-header">
+        実行ログ
+        <button class="clear-btn" onclick="clearLog()">クリア</button>
+      </div>
+      <div class="log-content" id="logContent">
+        <div class="log-item info"><span class="log-time">--:--:--</span><span>ツールが起動しました</span></div>
+      </div>
+    </div>
+
+    <div class="progress-section">
+      <div class="progress-label">
+        <span id="progressLabel">待機中</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="output-section">
+      <div class="output-title">出力ファイル</div>
+      <div class="output-files" id="outputFiles">
+        <div style="font-size:0.72rem;color:var(--ink3);text-align:center;padding:8px">マクロ実行後に出力されます</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Data
+const salesData = [
+  ['受注番号','受注日','顧客名','商品名','数量','単価','金額','担当者','ステータス'],
+  ['ORD-001','2026/05/01','株式会社ABC','プレミアムプラン','3','50,000','150,000','田中','完了'],
+  ['ORD-002','2026/05/02','山田商事','スタンダードプラン','5','30,000','150,000','鈴木','完了'],
+  ['ORD-003','2026/05/03','佐藤商店','プレミアムプラン','1','50,000','50,000','田中','処理中'],
+  ['ORD-004','2026/05/05','株式会社XYZ','ライトプラン','10','10,000','100,000','山田','完了'],
+  ['ORD-005','2026/05/07','テック株式会社','プレミアムプラン','2','50,000','100,000','鈴木','完了'],
+  ['ORD-006','2026/05/08','グローバル商事','スタンダードプラン','4','30,000','120,000','田中','処理中'],
+  ['ORD-007','2026/05/10','日本工業','ライトプラン','8','10,000','80,000','山田','完了'],
+  ['ORD-008','2026/05/12','未来企画','プレミアムプラン','1','50,000','50,000','鈴木','キャンセル'],
+  ['ORD-009','2026/05/14','東京商事','スタンダードプラン','6','30,000','180,000','田中','完了'],
+  ['ORD-010','2026/05/15','大阪ネット','プレミアムプラン','3','50,000','150,000','山田','完了'],
+  ['','','','','','合計','=SUM(G2:G11)','',''],
+];
+
+const macros = [
+  { name:'売上集計レポート生成', desc:'月次売上データを集計し、部門別・商品別のレポートを自動生成します', steps:['データ読み込み中...','重複チェック実行中...','金額集計中...','部門別集計中...','グラフデータ生成中...','レポートフォーマット適用中...','Excelファイル出力中...','完了！'] },
+  { name:'請求書自動作成', desc:'顧客マスタと受注データから請求書PDFを一括生成します', steps:['顧客マスタ読み込み中...','受注データ取得中...','請求書テンプレート適用中...','PDF変換中 (1/10)...','PDF変換中 (5/10)...','PDF変換中 (10/10)...','ファイル圧縮中...','完了！'] },
+  { name:'在庫アラートチェック', desc:'在庫数が閾値を下回った商品をハイライトし、発注書を自動作成します', steps:['在庫データ取得中...','閾値チェック実行中...','アラート商品抽出中...','ハイライト適用中...','発注書テンプレート生成中...','メール下書き作成中...','完了！'] },
+  { name:'勤怠集計・給与計算', desc:'タイムカードデータから残業・休日出勤を自動集計し給与明細を作成します', steps:['タイムカード読み込み中...','出退勤時刻解析中...','残業時間計算中...','休日出勤チェック中...','給与計算実行中...','明細書生成中...','完了！'] },
+  { name:'メール一括送信', desc:'リストの顧客に対してパーソナライズされたメールを自動送信します', steps:['送信リスト読み込み中...','テンプレート解析中...','差し込みデータ生成中...','メール送信 (1/24)...','メール送信 (12/24)...','メール送信 (24/24)...','送信ログ記録中...','完了！'] },
+];
+
+let selectedMacroIdx = 0;
+let isRunning = false;
+
+// Render spreadsheet
+function renderSheet() {
+  const table = document.getElementById('spreadsheet');
+  const colLabels = ['', 'A','B','C','D','E','F','G','H','I'];
+  let html = '<thead><tr>' + colLabels.map((l,i) => `<th${i>0?' class="col-header"':''}>${l}</th>`).join('') + '</tr></thead><tbody>';
+  salesData.forEach((row, ri) => {
+    const isHeader = ri === 0;
+    const isTotal = ri === salesData.length - 1;
+    html += `<tr${ri > 0 && ri % 2 === 0 && !isTotal ? ' class="highlighted-row"' : ''}>`;
+    html += `<td class="row-header">${ri === 0 ? '' : ri}</td>`;
+    row.forEach((cell, ci) => {
+      let cls = 'cell';
+      if (isHeader) cls += ' header-cell';
+      else if (isTotal && ci === 6) cls += ' total-cell';
+      else if (ci >= 4 && !isHeader) cls += ' data-cell';
+      if ((ci === 6 || ci === 5) && !isHeader) cls += ' money';
+      if (cell === 'キャンセル') cls += ' red-value';
+      if (cell.startsWith('=')) cls += ' formula-cell';
+      const display = cell === '=SUM(G2:G11)' ? '¥1,130,000' : (ci >= 5 && !isHeader && !isTotal && cell ? '¥'+cell : cell);
+      html += `<td><div class="${cls}" onclick="selectCell(${ri},${ci},'${cell}')">${display}</div></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function selectCell(r, c, val) {
+  document.querySelectorAll('.cell.selected').forEach(el => el.classList.remove('selected'));
+  event.target.classList.add('selected');
+  const cols = ['A','B','C','D','E','F','G','H','I'];
+  document.getElementById('cellRef').value = (cols[c]||'') + (r+1);
+  document.getElementById('formulaInput').value = val;
+}
+
+// Macro selection
+function selectMacro(el, idx) {
+  document.querySelectorAll('.macro-item').forEach(m => m.classList.remove('active'));
+  el.classList.add('active');
+  selectedMacroIdx = idx;
+  document.getElementById('selectedMacroName').textContent = macros[idx].name;
+  document.getElementById('selectedMacroDesc').textContent = macros[idx].desc;
+}
+
+// Run macro
+async function runMacro() {
+  if (isRunning) return;
+  isRunning = true;
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  clearLog();
+  document.getElementById('outputFiles').innerHTML = '';
+
+  const macro = macros[selectedMacroIdx];
+  const steps = macro.steps;
+
+  for (let i = 0; i < steps.length; i++) {
+    const pct = Math.round(((i+1)/steps.length)*100);
+    document.getElementById('progressLabel').textContent = steps[i];
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('progressFill').style.width = pct + '%';
+
+    const isLast = i === steps.length - 1;
+    addLog(isLast ? 'success' : 'info', steps[i]);
+
+    // Highlight rows during processing
+    if (i === 2) {
+      document.querySelectorAll('tbody tr').forEach((tr, idx) => {
+        setTimeout(() => {
+          tr.classList.add('processing-row');
+          setTimeout(() => tr.classList.remove('processing-row'), 500);
+        }, idx * 80);
+      });
+    }
+    await sleep(isLast ? 200 : 400);
+  }
+
+  // Show output files
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+  document.getElementById('outputFiles').innerHTML = `
+    <div class="output-file xlsx" onclick="showToast('Excelファイルをダウンロードしました')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      <div>
+        <div class="output-file-name">report_${dateStr}.xlsx</div>
+        <div class="output-file-size">128 KB</div>
+      </div>
+    </div>
+    <div class="output-file pdf" onclick="showToast('PDFをダウンロードしました')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <div>
+        <div class="output-file-name">report_${dateStr}.pdf</div>
+        <div class="output-file-size">89 KB</div>
+      </div>
+    </div>
+  `;
+
+  btn.disabled = false;
+  isRunning = false;
+}
+
+function addLog(type, msg) {
+  const log = document.getElementById('logContent');
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const el = document.createElement('div');
+  el.className = `log-item ${type}`;
+  el.innerHTML = `<span class="log-time">${time}</span><span>${msg}</span>`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('logContent').innerHTML = '';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressLabel').textContent = '待機中';
+  document.getElementById('progressPct').textContent = '0%';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function setTab(el) { document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active')); el.classList.add('active'); }
+function addRow() { showToast('行を追加しました'); }
+function sortData() { showToast('データを並び替えました'); }
+function filterData() { showToast('フィルターを適用しました'); }
+function calcAll() { showToast('再計算が完了しました'); }
+function exportFile() { showToast('Excelファイルをダウンロードしました'); }
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#1a2035;color:white;padding:10px 16px;border-radius:8px;font-size:0.78rem;z-index:999;transform:translateY(60px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);font-family:var(--sans)'; document.body.appendChild(t); }
+  t.textContent = '✓ ' + msg;
+  t.style.transform = 'translateY(0)'; t.style.opacity = '1';
+  setTimeout(() => { t.style.transform = 'translateY(60px)'; t.style.opacity = '0'; }, 2500);
+}
+
+renderSheet();
+</script>
+</body>
+</html>

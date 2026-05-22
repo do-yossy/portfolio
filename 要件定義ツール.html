@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RequireFlow — 要件定義ツール</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Noto+Sans+JP:wght@300;400;500;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f5f0;
+  --ink: #1a1714;
+  --ink2: #6b6560;
+  --ink3: #b5b0aa;
+  --surface: #ffffff;
+  --surface2: #f0ede8;
+  --border: #ddd8d0;
+  --must: #c0392b;
+  --must-soft: #fdf0ee;
+  --should: #e67e22;
+  --should-soft: #fef6ed;
+  --could: #27ae60;
+  --could-soft: #edfaf3;
+  --wont: #7f8c8d;
+  --wont-soft: #f4f4f4;
+  --blue: #2980b9;
+  --blue-soft: #eef6fd;
+  --accent: #3d35c8;
+  --accent-soft: #eeeeff;
+  --sans: 'Bricolage Grotesque', 'Noto Sans JP', sans-serif;
+  --mono: 'Fira Code', monospace;
+  --shadow: 0 2px 12px rgba(26,23,20,0.07);
+  --shadow-lg: 0 8px 40px rgba(26,23,20,0.12);
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.header {
+  background: var(--ink);
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-logo { display: flex; align-items: center; gap: 10px; }
+.logo-mark {
+  width: 28px; height: 28px;
+  background: var(--accent);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 800; color: white;
+  letter-spacing: -0.05em;
+}
+.logo-text { font-size: 0.92rem; font-weight: 700; color: white; letter-spacing: -0.01em; }
+.logo-version { font-size: 0.6rem; color: rgba(255,255,255,0.35); letter-spacing: 0.1em; margin-left: 2px; }
+
+.header-center { display: flex; align-items: center; gap: 6px; }
+.project-selector {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  color: white;
+  cursor: pointer;
+  outline: none;
+}
+.project-selector option { background: var(--ink); }
+
+.header-right { display: flex; align-items: center; gap: 8px; }
+.hbtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; border: none;
+  font-family: var(--sans); transition: all 0.15s;
+}
+.hbtn svg { width: 12px; height: 12px; }
+.hbtn-primary { background: var(--accent); color: white; }
+.hbtn-primary:hover { background: #332cb0; transform: translateY(-1px); }
+.hbtn-ghost { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.12); }
+.hbtn-ghost:hover { background: rgba(255,255,255,0.14); color: white; }
+
+/* ── Layout ── */
+.app { display: flex; height: calc(100vh - 52px); overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 240px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+.sidebar-project { padding: 16px; border-bottom: 1px solid var(--border); }
+.project-name { font-size: 0.9rem; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; margin-bottom: 3px; }
+.project-meta { font-size: 0.68rem; color: var(--ink3); }
+.project-progress { margin-top: 10px; }
+.progress-label { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--ink2); margin-bottom: 5px; }
+.progress-bar { height: 4px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.5s ease; }
+
+.nav-section { padding: 10px 12px 4px; }
+.nav-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink3); padding: 0 4px; margin-bottom: 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 7px;
+  cursor: pointer; color: var(--ink2);
+  font-size: 0.8rem; transition: all 0.15s;
+  margin-bottom: 1px;
+}
+.nav-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+.nav-item:hover { background: var(--surface2); color: var(--ink); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav-badge { margin-left: auto; font-size: 0.62rem; background: var(--surface2); color: var(--ink3); padding: 1px 6px; border-radius: 99px; font-family: var(--mono); }
+.nav-item.active .nav-badge { background: rgba(61,53,200,0.1); color: var(--accent); }
+
+.moscow-legend { padding: 12px 14px; border-top: 1px solid var(--border); margin-top: auto; }
+.moscow-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink3); margin-bottom: 8px; }
+.moscow-item { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 0.72rem; color: var(--ink2); }
+.moscow-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── Main ── */
+.main { flex: 1; overflow-y: auto; }
+.main::-webkit-scrollbar { width: 4px; }
+.main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.content { padding: 24px; max-width: 1100px; }
+
+/* ── Page title ── */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.page-title { font-size: 1.2rem; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; }
+.page-sub { font-size: 0.78rem; color: var(--ink3); margin-top: 2px; }
+.page-actions { display: flex; gap: 8px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 7px;
+  font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; border: none;
+  font-family: var(--sans); transition: all 0.15s;
+}
+.btn svg { width: 12px; height: 12px; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: #332cb0; transform: translateY(-1px); box-shadow: 0 3px 10px rgba(61,53,200,0.3); }
+.btn-ghost { background: var(--surface); color: var(--ink2); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface2); color: var(--ink); }
+
+/* ── Overview cards ── */
+.overview-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 22px; }
+.ov-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.ov-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.ov-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.ov-icon svg { width: 14px; height: 14px; }
+.ov-trend { font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.ov-val { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.04em; color: var(--ink); line-height: 1; }
+.ov-label { font-size: 0.7rem; color: var(--ink3); margin-top: 3px; }
+
+/* ── Requirement list ── */
+.req-section { margin-bottom: 20px; }
+.req-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.req-section-title { font-size: 0.82rem; font-weight: 700; color: var(--ink); }
+.req-section-count { font-size: 0.65rem; background: var(--surface2); border: 1px solid var(--border); color: var(--ink2); padding: 2px 8px; border-radius: 99px; font-family: var(--mono); }
+.req-add-btn { margin-left: auto; display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 5px; border: 1px dashed var(--border); background: transparent; font-size: 0.7rem; color: var(--ink3); cursor: pointer; font-family: var(--sans); transition: all 0.15s; }
+.req-add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+.req-list { display: flex; flex-direction: column; gap: 8px; }
+.req-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.req-card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.req-card.must::before { background: var(--must); }
+.req-card.should::before { background: var(--should); }
+.req-card.could::before { background: var(--could); }
+.req-card.wont::before { background: var(--wont); }
+
+.req-card:hover { border-color: var(--accent); box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+
+.req-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.req-id { font-family: var(--mono); font-size: 0.65rem; color: var(--ink3); padding-top: 2px; flex-shrink: 0; min-width: 60px; }
+.req-title { font-size: 0.88rem; font-weight: 600; color: var(--ink); flex: 1; line-height: 1.4; }
+.req-badges { display: flex; gap: 5px; flex-shrink: 0; align-items: center; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 0.65rem; font-weight: 700;
+}
+.badge-must { background: var(--must-soft); color: var(--must); }
+.badge-should { background: var(--should-soft); color: var(--should); }
+.badge-could { background: var(--could-soft); color: var(--could); }
+.badge-wont { background: var(--wont-soft); color: var(--wont); }
+.badge-open { background: var(--blue-soft); color: var(--blue); }
+.badge-progress { background: #fff8e1; color: #f59e0b; }
+.badge-done { background: var(--could-soft); color: var(--could); }
+.badge-hold { background: var(--wont-soft); color: var(--wont); }
+
+.req-desc { font-size: 0.78rem; color: var(--ink2); line-height: 1.7; margin-bottom: 10px; padding-left: 70px; }
+.req-meta { display: flex; align-items: center; gap: 14px; padding-left: 70px; }
+.req-meta-item { display: flex; align-items: center; gap: 4px; font-size: 0.68rem; color: var(--ink3); }
+.req-meta-item svg { width: 11px; height: 11px; }
+.req-meta-item strong { color: var(--ink2); font-weight: 500; }
+
+.req-acceptance { background: var(--surface2); border-radius: 6px; padding: 8px 10px; margin: 8px 0 0 70px; }
+.req-acceptance-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); margin-bottom: 5px; }
+.req-acceptance-list { list-style: none; }
+.req-acceptance-list li { display: flex; align-items: flex-start; gap: 5px; font-size: 0.72rem; color: var(--ink2); margin-bottom: 3px; }
+.req-acceptance-list li::before { content: "✓"; color: var(--could); font-weight: 700; flex-shrink: 0; font-size: 0.65rem; margin-top: 1px; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 4px; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; width: fit-content; }
+.tab {
+  padding: 6px 14px; border-radius: 5px; font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; color: var(--ink2); border: none; background: transparent;
+  font-family: var(--sans); transition: all 0.15s;
+}
+.tab.active { background: var(--ink); color: white; }
+.tab:hover:not(.active) { background: var(--surface2); }
+
+/* ── New req form ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(26,23,20,0.5);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+  padding: 20px; opacity: 0; pointer-events: none;
+  transition: opacity 0.25s; backdrop-filter: blur(6px);
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; width: 100%; max-width: 600px;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(16px) scale(0.98);
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  overflow: hidden;
+}
+.modal-overlay.open .modal { transform: translateY(0) scale(1); }
+.modal-header { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-title { font-size: 0.95rem; font-weight: 700; color: var(--ink); }
+.modal-close { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer; color: var(--ink2); display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-size: 0.9rem; }
+.modal-close:hover { background: var(--must-soft); color: var(--must); border-color: var(--must); }
+.modal-body { padding: 22px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-field.full { grid-column: span 2; }
+.form-field label { font-size: 0.68rem; font-weight: 700; color: var(--ink2); letter-spacing: 0.08em; text-transform: uppercase; }
+.form-field input, .form-field select, .form-field textarea {
+  border: 1.5px solid var(--border); border-radius: 7px;
+  padding: 8px 11px; font-size: 0.83rem;
+  font-family: var(--sans); color: var(--ink);
+  background: var(--surface); outline: none;
+  transition: border-color 0.15s;
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(61,53,200,0.1);
+}
+.form-field textarea { resize: vertical; min-height: 80px; }
+.acceptance-wrap { margin-top: 6px; }
+.acceptance-row { display: flex; gap: 6px; margin-bottom: 5px; }
+.acceptance-input { flex: 1; border: 1.5px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 0.78rem; font-family: var(--sans); color: var(--ink); background: var(--surface); outline: none; transition: border-color 0.15s; }
+.acceptance-input:focus { border-color: var(--accent); }
+.acceptance-rm { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border); background: transparent; cursor: pointer; color: var(--ink3); transition: all 0.15s; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; flex-shrink: 0; }
+.acceptance-rm:hover { background: var(--must-soft); color: var(--must); border-color: var(--must); }
+.add-acceptance-btn { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: var(--accent); cursor: pointer; border: none; background: transparent; font-family: var(--sans); padding: 4px 0; }
+.moscow-picker { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+.moscow-option { padding: 8px 6px; border-radius: 7px; border: 1.5px solid var(--border); background: transparent; cursor: pointer; font-family: var(--sans); font-size: 0.72rem; font-weight: 600; transition: all 0.15s; text-align: center; }
+.moscow-option:hover { border-color: var(--accent); }
+.moscow-option.selected { }
+.moscow-option.must.selected { background: var(--must-soft); border-color: var(--must); color: var(--must); }
+.moscow-option.should.selected { background: var(--should-soft); border-color: var(--should); color: var(--should); }
+.moscow-option.could.selected { background: var(--could-soft); border-color: var(--could); color: var(--could); }
+.moscow-option.wont.selected { background: var(--wont-soft); border-color: var(--wont); color: var(--wont); }
+.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: var(--surface2); }
+
+/* ── Detail panel ── */
+.detail-panel {
+  width: 360px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.3s var(--ease);
+}
+.detail-panel.closed { width: 0; }
+.detail-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.detail-title { font-size: 0.82rem; font-weight: 700; color: var(--ink); }
+.detail-close { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border); background: transparent; cursor: pointer; color: var(--ink2); display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.detail-close:hover { background: var(--surface2); }
+.detail-body { flex: 1; overflow-y: auto; padding: 16px; }
+.detail-body::-webkit-scrollbar { width: 3px; }
+.detail-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.detail-req-id { font-family: var(--mono); font-size: 0.68rem; color: var(--ink3); margin-bottom: 6px; }
+.detail-req-title { font-size: 1rem; font-weight: 700; color: var(--ink); line-height: 1.3; margin-bottom: 12px; letter-spacing: -0.01em; }
+.detail-section { margin-bottom: 16px; }
+.detail-section-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink3); margin-bottom: 6px; }
+.detail-desc { font-size: 0.8rem; color: var(--ink2); line-height: 1.8; background: var(--surface2); border-radius: 6px; padding: 10px 12px; }
+.detail-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.detail-meta-item { background: var(--surface2); border-radius: 6px; padding: 8px 10px; }
+.detail-meta-label { font-size: 0.6rem; color: var(--ink3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
+.detail-meta-val { font-size: 0.8rem; font-weight: 600; color: var(--ink); }
+.checklist { list-style: none; }
+.checklist li { display: flex; align-items: flex-start; gap: 7px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 0.78rem; color: var(--ink2); }
+.checklist li:last-child { border-bottom: none; }
+.check-icon { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all 0.15s; margin-top: 1px; }
+.check-icon.checked { background: var(--could); border-color: var(--could); color: white; font-size: 0.6rem; }
+.check-icon:hover:not(.checked) { border-color: var(--could); }
+.status-select { width: 100%; border: 1.5px solid var(--border); border-radius: 6px; padding: 7px 10px; font-family: var(--sans); font-size: 0.8rem; color: var(--ink); background: var(--surface); outline: none; cursor: pointer; }
+.status-select:focus { border-color: var(--accent); }
+.comment-box { background: var(--surface2); border-radius: 7px; padding: 10px 12px; margin-bottom: 8px; }
+.comment-author { font-size: 0.68rem; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+.comment-text { font-size: 0.75rem; color: var(--ink2); line-height: 1.6; }
+.comment-time { font-size: 0.62rem; color: var(--ink3); margin-top: 3px; }
+.comment-input-wrap { display: flex; gap: 6px; }
+.comment-input { flex: 1; border: 1.5px solid var(--border); border-radius: 6px; padding: 7px 10px; font-family: var(--sans); font-size: 0.78rem; color: var(--ink); background: var(--surface); outline: none; transition: border-color 0.15s; }
+.comment-input:focus { border-color: var(--accent); }
+.comment-send { padding: 7px 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-family: var(--sans); font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.comment-send:hover { background: #332cb0; }
+
+/* Toast */
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--ink); color: white; padding: 10px 16px; border-radius: 9px; font-size: 0.78rem; box-shadow: var(--shadow-lg); z-index: 300; transform: translateY(60px); opacity: 0; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-logo">
+    <div class="logo-mark">RF</div>
+    <div class="logo-text">RequireFlow<span class="logo-version">v1.0</span></div>
+  </div>
+  <div class="header-center">
+    <select class="project-selector" id="projectSelector">
+      <option>新規ECサイト開発</option>
+      <option>社内勤怠システム刷新</option>
+      <option>モバイルアプリ v2.0</option>
+      <option>+ 新規プロジェクト</option>
+    </select>
+  </div>
+  <div class="header-right">
+    <button class="hbtn hbtn-ghost" onclick="exportDoc()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      エクスポート
+    </button>
+    <button class="hbtn hbtn-primary" onclick="openModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      要件を追加
+    </button>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-project">
+      <div class="project-name">新規ECサイト開発</div>
+      <div class="project-meta">2026/05/01 〜 2026/08/31 · 田中 PM</div>
+      <div class="project-progress">
+        <div class="progress-label"><span>進捗</span><span id="progressPct">0%</span></div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">ビュー</div>
+      <div class="nav-item active" onclick="setNav(this,'all')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        すべての要件
+        <span class="nav-badge" id="countAll">0</span>
+      </div>
+      <div class="nav-item" onclick="setNav(this,'must')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Must（必須）
+        <span class="nav-badge" id="countMust">0</span>
+      </div>
+      <div class="nav-item" onclick="setNav(this,'should')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Should（推奨）
+        <span class="nav-badge" id="countShould">0</span>
+      </div>
+      <div class="nav-item" onclick="setNav(this,'could')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/></svg>
+        Could（あれば良い）
+        <span class="nav-badge" id="countCould">0</span>
+      </div>
+      <div class="nav-item" onclick="setNav(this,'wont')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Won't（今回は対象外）
+        <span class="nav-badge" id="countWont">0</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">カテゴリ</div>
+      <div class="nav-item" onclick="setNav(this,'functional')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        機能要件
+        <span class="nav-badge" id="countFunc">0</span>
+      </div>
+      <div class="nav-item" onclick="setNav(this,'nonfunctional')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        非機能要件
+        <span class="nav-badge" id="countNonFunc">0</span>
+      </div>
+    </div>
+
+    <div class="moscow-legend">
+      <div class="moscow-title">MoSCoW 優先度</div>
+      <div class="moscow-item"><div class="moscow-dot" style="background:var(--must)"></div>Must — 必ず実装</div>
+      <div class="moscow-item"><div class="moscow-dot" style="background:var(--should)"></div>Should — できれば実装</div>
+      <div class="moscow-item"><div class="moscow-dot" style="background:var(--could)"></div>Could — 余裕があれば</div>
+      <div class="moscow-item"><div class="moscow-dot" style="background:var(--wont)"></div>Won't — 今回は対象外</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="content">
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="pageTitle">すべての要件</div>
+          <div class="page-sub" id="pageSub">プロジェクト全体の要件一覧</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost" onclick="sortReqs()">並び替え</button>
+          <button class="btn btn-ghost" onclick="filterReqs()">フィルター</button>
+          <button class="btn btn-primary" onclick="openModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            要件を追加
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active" onclick="setTab(this,'all_status')">すべて</div>
+        <div class="tab" onclick="setTab(this,'open')">未対応</div>
+        <div class="tab" onclick="setTab(this,'progress')">対応中</div>
+        <div class="tab" onclick="setTab(this,'done')">完了</div>
+      </div>
+
+      <!-- Overview -->
+      <div class="overview-grid">
+        <div class="ov-card">
+          <div class="ov-card-top">
+            <div class="ov-icon" style="background:var(--accent-soft);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+            <span class="ov-trend" style="background:var(--accent-soft);color:var(--accent)" id="trendTotal">0件</span>
+          </div>
+          <div class="ov-val" id="ovTotal">0</div>
+          <div class="ov-label">総要件数</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-card-top">
+            <div class="ov-icon" style="background:var(--could-soft);color:var(--could)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <span class="ov-trend" style="background:var(--could-soft);color:var(--could)" id="trendDone">0%</span>
+          </div>
+          <div class="ov-val" id="ovDone">0</div>
+          <div class="ov-label">完了済み</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-card-top">
+            <div class="ov-icon" style="background:var(--must-soft);color:var(--must)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+            <span class="ov-trend" style="background:var(--must-soft);color:var(--must)" id="trendMust">Must</span>
+          </div>
+          <div class="ov-val" id="ovMust">0</div>
+          <div class="ov-label">必須要件（Must）</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-card-top">
+            <div class="ov-icon" style="background:var(--should-soft);color:var(--should)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <span class="ov-trend" style="background:var(--should-soft);color:var(--should)" id="trendOpen">未対応</span>
+          </div>
+          <div class="ov-val" id="ovOpen">0</div>
+          <div class="ov-label">未対応件数</div>
+        </div>
+      </div>
+
+      <!-- Requirements -->
+      <div id="reqContainer"></div>
+
+    </div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel closed" id="detailPanel">
+    <div class="detail-header">
+      <div class="detail-title">要件詳細</div>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">新しい要件を追加</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>要件タイトル *</label>
+          <input type="text" id="fTitle" placeholder="例: ユーザーはメールアドレスとパスワードでログインできる">
+        </div>
+        <div class="form-field full">
+          <label>説明・背景</label>
+          <textarea id="fDesc" placeholder="この要件が必要な理由、ユーザーストーリー、制約条件など..."></textarea>
+        </div>
+        <div class="form-field full">
+          <label>優先度（MoSCoW）</label>
+          <div class="moscow-picker" id="moscowPicker">
+            <button class="moscow-option must selected" onclick="selectMoscow(this,'must')">Must<br><span style="font-size:0.6rem;font-weight:400">必須</span></button>
+            <button class="moscow-option should" onclick="selectMoscow(this,'should')">Should<br><span style="font-size:0.6rem;font-weight:400">推奨</span></button>
+            <button class="moscow-option could" onclick="selectMoscow(this,'could')">Could<br><span style="font-size:0.6rem;font-weight:400">任意</span></button>
+            <button class="moscow-option wont" onclick="selectMoscow(this,'wont')">Won't<br><span style="font-size:0.6rem;font-weight:400">対象外</span></button>
+          </div>
+        </div>
+        <div class="form-field">
+          <label>カテゴリ</label>
+          <select id="fCategory">
+            <option value="functional">機能要件</option>
+            <option value="nonfunctional">非機能要件</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>担当者</label>
+          <select id="fAssignee">
+            <option>田中 健一（PM）</option>
+            <option>鈴木 花子（エンジニア）</option>
+            <option>佐藤 誠（デザイナー）</option>
+            <option>山田 美咲（QA）</option>
+            <option>未定</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>見積もり工数</label>
+          <select id="fEstimate">
+            <option>未見積もり</option>
+            <option>XS（〜4h）</option>
+            <option>S（〜1日）</option>
+            <option>M（〜3日）</option>
+            <option>L（〜1週間）</option>
+            <option>XL（1週間以上）</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>ステータス</label>
+          <select id="fStatus">
+            <option value="open">未対応</option>
+            <option value="progress">対応中</option>
+            <option value="done">完了</option>
+            <option value="hold">保留</option>
+          </select>
+        </div>
+        <div class="form-field full">
+          <label>受入条件（Acceptance Criteria）</label>
+          <div class="acceptance-wrap" id="acceptanceWrap">
+            <div class="acceptance-row">
+              <input class="acceptance-input" type="text" placeholder="例: ログイン成功後、ダッシュボードにリダイレクトされる">
+              <button class="acceptance-rm" onclick="removeAcceptance(this)">×</button>
+            </div>
+          </div>
+          <button class="add-acceptance-btn" onclick="addAcceptance()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><path d="M12 5v14M5 12h14"/></svg>
+            受入条件を追加
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveReq()">要件を保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──
+let requirements = [];
+let reqIdCounter = 1;
+let selectedMoscow = 'must';
+let currentFilter = 'all';
+let currentTab = 'all_status';
+let selectedReqId = null;
+
+// ── Sample Data ──
+const samples = [
+  { id:'REQ-001', title:'ユーザーはメールアドレスとパスワードでログインできる', desc:'会員登録済みのユーザーが認証情報を用いてシステムにログインできる。セッション管理はJWTトークンを使用する。', priority:'must', category:'functional', assignee:'鈴木 花子（エンジニア）', estimate:'M（〜3日）', status:'done', acceptance:['ログイン成功後、ダッシュボードにリダイレクトされる','誤った認証情報は適切なエラーメッセージを表示する','5回失敗するとアカウントが一時ロックされる'], comments:['鈴木: 実装完了しました。レビューをお願いします。'] },
+  { id:'REQ-002', title:'商品検索機能（キーワード・カテゴリ・価格帯）', desc:'ユーザーが商品をキーワード、カテゴリ、価格帯で絞り込み検索できる。検索結果は関連度順・価格順・新着順で並び替えられる。', priority:'must', category:'functional', assignee:'鈴木 花子（エンジニア）', estimate:'L（〜1週間）', status:'progress', acceptance:['キーワード検索で部分一致検索ができる','カテゴリとキーワードを組み合わせた絞り込みができる','検索結果が0件の場合は適切なメッセージを表示する'], comments:[] },
+  { id:'REQ-003', title:'カート機能（商品追加・削除・数量変更）', desc:'ユーザーが商品をカートに追加・削除・数量変更できる。カート内容はセッションをまたいで保持される。', priority:'must', category:'functional', assignee:'鈴木 花子（エンジニア）', estimate:'M（〜3日）', status:'open', acceptance:['カートに追加後、バッジで件数が更新される','数量変更時に金額リアルタイムで更新される'], comments:[] },
+  { id:'REQ-004', title:'クレジットカード・コンビニ決済対応', desc:'Stripeを使ったクレジットカード決済と、コンビニ払いに対応する。', priority:'must', category:'functional', assignee:'田中 健一（PM）', estimate:'L（〜1週間）', status:'open', acceptance:['決済完了後に確認メールが自動送信される','決済失敗時はエラー内容を表示する'], comments:[] },
+  { id:'REQ-005', title:'管理画面 — 商品・在庫管理', desc:'管理者が商品の登録・編集・削除と在庫数の管理ができる管理画面を提供する。', priority:'must', category:'functional', assignee:'佐藤 誠（デザイナー）', estimate:'XL（1週間以上）', status:'open', acceptance:['CSVで商品を一括インポートできる','在庫数が閾値を下回るとアラートが表示される'], comments:[] },
+  { id:'REQ-006', title:'レビュー・評価機能', desc:'購入済みユーザーが商品に対して星評価とコメントを投稿できる。', priority:'should', category:'functional', assignee:'未定', estimate:'M（〜3日）', status:'open', acceptance:['購入済みユーザーのみレビューを投稿できる','不適切なレビューを管理者が削除できる'], comments:[] },
+  { id:'REQ-007', title:'会員ランク・ポイント制度', desc:'購入金額に応じてポイントが付与され、次回購入時に使用できる会員ランク制度。', priority:'should', category:'functional', assignee:'未定', estimate:'XL（1週間以上）', status:'open', acceptance:['ポイント有効期限は付与から1年間','ランクアップ時にメール通知が送信される'], comments:[] },
+  { id:'REQ-008', title:'ページ読み込み速度 — LCP 2.5秒以内', desc:'Core Web Vitalsの基準を満たす。LCP（最大コンテンツの描画）が2.5秒以内。', priority:'must', category:'nonfunctional', assignee:'鈴木 花子（エンジニア）', estimate:'M（〜3日）', status:'open', acceptance:['Google PageSpeed Insightsで90点以上','モバイル・PCともに基準を満たす'], comments:[] },
+  { id:'REQ-009', title:'SSL/TLS 暗号化通信', desc:'全ての通信をHTTPS化する。有効なSSL証明書を常時維持する。', priority:'must', category:'nonfunctional', assignee:'鈴木 花子（エンジニア）', estimate:'XS（〜4h）', status:'done', acceptance:['全ページでHTTPSが有効','証明書の自動更新が設定されている'], comments:[] },
+  { id:'REQ-010', title:'AIによる商品レコメンド機能', desc:'閲覧・購入履歴をもとにAIが個人化されたおすすめ商品を表示する。', priority:'could', category:'functional', assignee:'未定', estimate:'未見積もり', status:'hold', acceptance:['トップページとカート画面にレコメンドを表示'], comments:[] },
+  { id:'REQ-011', title:'SNSログイン（Google / LINE）', desc:'GoogleアカウントまたはLINEアカウントでのソーシャルログインに対応する。', priority:'could', category:'functional', assignee:'未定', estimate:'S（〜1日）', status:'open', acceptance:['既存アカウントとSNSアカウントを紐付けできる'], comments:[] },
+  { id:'REQ-012', title:'暗号通貨決済', desc:'ビットコイン・イーサリアムによる決済に対応する。', priority:'wont', category:'functional', assignee:'未定', estimate:'未見積もり', status:'hold', acceptance:[], comments:['田中: 今フェーズでは対象外。将来検討。'] },
+];
+
+function init() {
+  requirements = samples.map((s,i) => ({ ...s, _idx: i }));
+  reqIdCounter = requirements.length + 1;
+  renderAll();
+}
+
+// ── Render ──
+function renderAll() {
+  updateCounts();
+  renderReqs();
+}
+
+function updateCounts() {
+  const total = requirements.length;
+  const done = requirements.filter(r => r.status === 'done').length;
+  const must = requirements.filter(r => r.priority === 'must').length;
+  const open = requirements.filter(r => r.status === 'open').length;
+  const pct = total ? Math.round((done/total)*100) : 0;
+
+  document.getElementById('ovTotal').textContent = total;
+  document.getElementById('ovDone').textContent = done;
+  document.getElementById('ovMust').textContent = must;
+  document.getElementById('ovOpen').textContent = open;
+  document.getElementById('trendTotal').textContent = total + '件';
+  document.getElementById('trendDone').textContent = pct + '%';
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+
+  document.getElementById('countAll').textContent = total;
+  document.getElementById('countMust').textContent = must;
+  document.getElementById('countShould').textContent = requirements.filter(r=>r.priority==='should').length;
+  document.getElementById('countCould').textContent = requirements.filter(r=>r.priority==='could').length;
+  document.getElementById('countWont').textContent = requirements.filter(r=>r.priority==='wont').length;
+  document.getElementById('countFunc').textContent = requirements.filter(r=>r.category==='functional').length;
+  document.getElementById('countNonFunc').textContent = requirements.filter(r=>r.category==='nonfunctional').length;
+}
+
+function getFiltered() {
+  let list = [...requirements];
+  if (currentFilter !== 'all' && currentFilter !== 'functional' && currentFilter !== 'nonfunctional') {
+    list = list.filter(r => r.priority === currentFilter);
+  }
+  if (currentFilter === 'functional') list = list.filter(r => r.category === 'functional');
+  if (currentFilter === 'nonfunctional') list = list.filter(r => r.category === 'nonfunctional');
+  if (currentTab !== 'all_status') list = list.filter(r => r.status === currentTab);
+  return list;
+}
+
+const priorityLabel = { must:'Must', should:'Should', could:'Could', wont:"Won't" };
+const statusLabel = { open:'未対応', progress:'対応中', done:'完了', hold:'保留' };
+const statusBadgeClass = { open:'badge-open', progress:'badge-progress', done:'badge-done', hold:'badge-hold' };
+
+function renderReqs() {
+  const list = getFiltered();
+  const container = document.getElementById('reqContainer');
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--ink3)"><div style="font-size:2rem;margin-bottom:12px">📋</div><div style="font-size:0.9rem;font-weight:600;color:var(--ink2);margin-bottom:6px">要件がありません</div><div style="font-size:0.78rem">「要件を追加」ボタンから追加してください</div></div>';
+    return;
+  }
+
+  // Group by category
+  const functional = list.filter(r => r.category === 'functional');
+  const nonfunctional = list.filter(r => r.category === 'nonfunctional');
+
+  let html = '';
+  if (functional.length > 0) {
+    html += renderSection('機能要件', functional);
+  }
+  if (nonfunctional.length > 0) {
+    html += renderSection('非機能要件', nonfunctional);
+  }
+  container.innerHTML = html;
+}
+
+function renderSection(title, items) {
+  return `
+    <div class="req-section">
+      <div class="req-section-header">
+        <div class="req-section-title">${title}</div>
+        <div class="req-section-count">${items.length}件</div>
+        <button class="req-add-btn" onclick="openModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><path d="M12 5v14M5 12h14"/></svg>
+          追加
+        </button>
+      </div>
+      <div class="req-list">
+        ${items.map(r => renderReqCard(r)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderReqCard(r) {
+  const accHtml = r.acceptance.length > 0 ? `
+    <div class="req-acceptance">
+      <div class="req-acceptance-title">受入条件</div>
+      <ul class="req-acceptance-list">
+        ${r.acceptance.slice(0,2).map(a => `<li>${a}</li>`).join('')}
+        ${r.acceptance.length > 2 ? `<li style="color:var(--ink3)">... 他${r.acceptance.length-2}件</li>` : ''}
+      </ul>
+    </div>
+  ` : '';
+
+  return `
+    <div class="req-card ${r.priority}" onclick="openDetail('${r.id}')">
+      <div class="req-top">
+        <div class="req-id">${r.id}</div>
+        <div class="req-title">${r.title}</div>
+        <div class="req-badges">
+          <span class="badge badge-${r.priority}">${priorityLabel[r.priority]}</span>
+          <span class="badge ${statusBadgeClass[r.status]}">${statusLabel[r.status]}</span>
+        </div>
+      </div>
+      ${r.desc ? `<div class="req-desc">${r.desc.length > 100 ? r.desc.slice(0,100)+'...' : r.desc}</div>` : ''}
+      <div class="req-meta">
+        <div class="req-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><strong>${r.assignee.split('（')[0]}</strong></div>
+        <div class="req-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><strong>${r.estimate}</strong></div>
+        ${r.comments.length > 0 ? `<div class="req-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><strong>${r.comments.length}</strong></div>` : ''}
+        ${r.acceptance.length > 0 ? `<div class="req-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><strong>${r.acceptance.length}件の受入条件</strong></div>` : ''}
+      </div>
+      ${accHtml}
+    </div>
+  `;
+}
+
+// ── Detail panel ──
+function openDetail(id) {
+  const r = requirements.find(req => req.id === id);
+  if (!r) return;
+  selectedReqId = id;
+  document.getElementById('detailPanel').classList.remove('closed');
+
+  const checks = r.acceptance.map((a, i) => `
+    <li>
+      <div class="check-icon ${r.status==='done'?'checked':''}" onclick="toggleCheck(this)">${r.status==='done'?'✓':''}</div>
+      ${a}
+    </li>
+  `).join('');
+
+  const commentsHtml = r.comments.map(c => `
+    <div class="comment-box">
+      <div class="comment-author">${c.split(':')[0]}</div>
+      <div class="comment-text">${c.split(':').slice(1).join(':').trim()}</div>
+      <div class="comment-time">今日</div>
+    </div>
+  `).join('');
+
+  document.getElementById('detailBody').innerHTML = `
+    <div class="detail-req-id">${r.id}</div>
+    <div class="detail-req-title">${r.title}</div>
+    <div style="display:flex;gap:5px;margin-bottom:14px">
+      <span class="badge badge-${r.priority}">${priorityLabel[r.priority]}</span>
+      <span class="badge ${statusBadgeClass[r.status]}">${statusLabel[r.status]}</span>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">説明・背景</div>
+      <div class="detail-desc">${r.desc || '（説明なし）'}</div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">詳細情報</div>
+      <div class="detail-meta-grid">
+        <div class="detail-meta-item"><div class="detail-meta-label">担当者</div><div class="detail-meta-val">${r.assignee.split('（')[0]}</div></div>
+        <div class="detail-meta-item"><div class="detail-meta-label">見積もり</div><div class="detail-meta-val">${r.estimate}</div></div>
+        <div class="detail-meta-item"><div class="detail-meta-label">カテゴリ</div><div class="detail-meta-val">${r.category === 'functional' ? '機能要件' : '非機能要件'}</div></div>
+        <div class="detail-meta-item"><div class="detail-meta-label">優先度</div><div class="detail-meta-val">${priorityLabel[r.priority]}</div></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">ステータス変更</div>
+      <select class="status-select" onchange="changeStatus('${r.id}', this.value)">
+        <option value="open" ${r.status==='open'?'selected':''}>未対応</option>
+        <option value="progress" ${r.status==='progress'?'selected':''}>対応中</option>
+        <option value="done" ${r.status==='done'?'selected':''}>完了</option>
+        <option value="hold" ${r.status==='hold'?'selected':''}>保留</option>
+      </select>
+    </div>
+
+    ${r.acceptance.length > 0 ? `
+    <div class="detail-section">
+      <div class="detail-section-title">受入条件</div>
+      <ul class="checklist">${checks}</ul>
+    </div>` : ''}
+
+    <div class="detail-section">
+      <div class="detail-section-title">コメント</div>
+      ${commentsHtml}
+      <div class="comment-input-wrap">
+        <input class="comment-input" type="text" placeholder="コメントを追加..." id="commentInput" onkeydown="if(event.key==='Enter')addComment('${r.id}')">
+        <button class="comment-send" onclick="addComment('${r.id}')">送信</button>
+      </div>
+    </div>
+  `;
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.add('closed');
+  selectedReqId = null;
+}
+
+function changeStatus(id, status) {
+  const r = requirements.find(req => req.id === id);
+  if (r) { r.status = status; renderAll(); showToast('ステータスを更新しました'); }
+}
+
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  el.textContent = el.classList.contains('checked') ? '✓' : '';
+}
+
+function addComment(id) {
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const r = requirements.find(req => req.id === id);
+  if (r) {
+    r.comments.push('田中: ' + text);
+    input.value = '';
+    openDetail(id);
+    showToast('コメントを追加しました');
+  }
+}
+
+// ── Modal ──
+function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModalOutside(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+
+function selectMoscow(el, val) {
+  document.querySelectorAll('.moscow-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedMoscow = val;
+}
+
+function addAcceptance() {
+  const wrap = document.getElementById('acceptanceWrap');
+  const row = document.createElement('div');
+  row.className = 'acceptance-row';
+  row.innerHTML = `<input class="acceptance-input" type="text" placeholder="受入条件を入力..."><button class="acceptance-rm" onclick="removeAcceptance(this)">×</button>`;
+  wrap.appendChild(row);
+}
+
+function removeAcceptance(btn) {
+  const row = btn.closest('.acceptance-row');
+  if (document.querySelectorAll('.acceptance-row').length > 1) row.remove();
+  else row.querySelector('.acceptance-input').value = '';
+}
+
+function saveReq() {
+  const title = document.getElementById('fTitle').value.trim();
+  if (!title) { showToast('タイトルを入力してください'); return; }
+  const acceptance = [...document.querySelectorAll('.acceptance-input')].map(i => i.value.trim()).filter(Boolean);
+  const newId = 'REQ-' + String(reqIdCounter++).padStart(3,'0');
+  requirements.push({
+    id: newId,
+    title,
+    desc: document.getElementById('fDesc').value.trim(),
+    priority: selectedMoscow,
+    category: document.getElementById('fCategory').value,
+    assignee: document.getElementById('fAssignee').value,
+    estimate: document.getElementById('fEstimate').value,
+    status: document.getElementById('fStatus').value,
+    acceptance,
+    comments: [],
+  });
+  closeModal();
+  renderAll();
+  showToast(`${newId} を追加しました`);
+  // Reset
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fDesc').value = '';
+  document.getElementById('acceptanceWrap').innerHTML = '<div class="acceptance-row"><input class="acceptance-input" type="text" placeholder="例: ログイン成功後、ダッシュボードにリダイレクトされる"><button class="acceptance-rm" onclick="removeAcceptance(this)">×</button></div>';
+}
+
+// ── Navigation ──
+function setNav(el, filter) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = filter;
+  const titles = { all:'すべての要件', must:'Must（必須要件）', should:'Should（推奨要件）', could:'Could（任意要件）', wont:"Won't（対象外）", functional:'機能要件', nonfunctional:'非機能要件' };
+  document.getElementById('pageTitle').textContent = titles[filter] || 'すべての要件';
+  renderReqs();
+}
+
+function setTab(el, tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentTab = tab;
+  renderReqs();
+}
+
+function sortReqs() { showToast('優先度順に並び替えました'); }
+function filterReqs() { showToast('フィルター機能は実装予定です'); }
+function exportDoc() {
+  const total = requirements.length;
+  const done = requirements.filter(r => r.status === 'done').length;
+  showToast(`要件定義書をエクスポートしました（${total}件 / 完了${done}件）`);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+init();
+</script>
+</body>
+</html>

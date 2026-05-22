@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlowBoard — プロジェクト管理ツール</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface2: #f0f1f5;
+  --surface3: #e8eaef;
+  --border: #e2e4ea;
+  --ink: #1a1d2e;
+  --ink2: #6b7094;
+  --ink3: #adb1cc;
+  --accent: #5b5fc7;
+  --accent-soft: #eeeeff;
+  --accent-dark: #4a4ea8;
+  --green: #0ea766;
+  --green-soft: #e6f7ef;
+  --amber: #d97706;
+  --amber-soft: #fef3e2;
+  --red: #dc3545;
+  --red-soft: #fde8ea;
+  --blue: #0284c7;
+  --blue-soft: #e0f2fe;
+  --purple: #7c3aed;
+  --purple-soft: #f3eeff;
+  --sans: 'Inter', 'Noto Sans JP', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --shadow-sm: 0 1px 3px rgba(26,29,46,0.06), 0 1px 2px rgba(26,29,46,0.04);
+  --shadow: 0 4px 16px rgba(26,29,46,0.08);
+  --shadow-lg: 0 12px 40px rgba(26,29,46,0.12);
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top Navigation ── */
+.topnav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+  z-index: 100;
+}
+.nav-logo { display: flex; align-items: center; gap: 8px; margin-right: 28px; }
+.logo-icon { width: 28px; height: 28px; background: linear-gradient(135deg, var(--accent), #8b5cf6); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: white; letter-spacing: -0.03em; flex-shrink: 0; }
+.logo-text { font-size: 0.9rem; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+
+.nav-links { display: flex; align-items: center; gap: 2px; flex: 1; }
+.nav-link { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 500; color: var(--ink2); cursor: pointer; transition: all 0.15s; }
+.nav-link svg { width: 14px; height: 14px; }
+.nav-link:hover { background: var(--surface2); color: var(--ink); }
+.nav-link.active { background: var(--accent-soft); color: var(--accent); }
+
+.nav-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.avatar-stack { display: flex; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; color: white; flex-shrink: 0; cursor: pointer; transition: transform 0.15s; margin-left: -6px; }
+.avatar:first-child { margin-left: 0; }
+.avatar:hover { transform: scale(1.1); z-index: 10; }
+.avatar-count { background: var(--surface2); color: var(--ink2); border-color: var(--border); font-size: 0.6rem; font-weight: 600; }
+
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--sans); }
+.btn svg { width: 12px; height: 12px; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 3px 10px rgba(91,95,199,0.3); }
+.btn-ghost { background: transparent; color: var(--ink2); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface2); color: var(--ink); }
+
+/* ── Sub header ── */
+.subheader {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.project-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--ink2); }
+.project-breadcrumb .sep { color: var(--ink3); }
+.project-breadcrumb .current { font-weight: 600; color: var(--ink); }
+.project-badge { padding: 2px 8px; border-radius: 99px; font-size: 0.65rem; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+
+.subheader-right { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.view-toggle { display: flex; background: var(--surface2); border-radius: var(--radius-sm); padding: 2px; border: 1px solid var(--border); }
+.view-btn { width: 26px; height: 26px; border-radius: 5px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink3); transition: all 0.15s; }
+.view-btn svg { width: 13px; height: 13px; }
+.view-btn.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm); }
+
+.filter-bar { display: flex; align-items: center; gap: 6px; }
+.filter-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); font-size: 0.7rem; color: var(--ink2); cursor: pointer; transition: all 0.15s; }
+.filter-chip:hover { border-color: var(--accent); color: var(--accent); }
+.filter-chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.filter-chip svg { width: 11px; height: 11px; }
+
+/* ── Main Layout ── */
+.layout { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+
+.sidebar-section { padding: 12px 10px 6px; }
+.sidebar-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink3); padding: 0 6px; margin-bottom: 4px; }
+.sidebar-item { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 6px; cursor: pointer; color: var(--ink2); font-size: 0.78rem; transition: all 0.15s; margin-bottom: 1px; }
+.sidebar-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+.sidebar-item:hover { background: var(--surface2); color: var(--ink); }
+.sidebar-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.sidebar-item .item-count { margin-left: auto; font-size: 0.62rem; background: var(--surface3); color: var(--ink3); padding: 1px 6px; border-radius: 99px; }
+.sidebar-item.active .item-count { background: rgba(91,95,199,0.15); color: var(--accent); }
+
+.project-list { padding: 8px 10px; }
+.project-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 7px; cursor: pointer; transition: all 0.15s; margin-bottom: 2px; }
+.project-item:hover { background: var(--surface2); }
+.project-item.active { background: var(--accent-soft); }
+.project-color { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.project-name { font-size: 0.78rem; color: var(--ink); flex: 1; font-weight: 500; }
+.project-item.active .project-name { color: var(--accent); }
+.project-count { font-size: 0.62rem; color: var(--ink3); }
+
+.sidebar-divider { height: 1px; background: var(--border); margin: 6px 10px; }
+
+/* ── Kanban Board ── */
+.board-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.board-header { padding: 16px 20px 12px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.sprint-badge { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 4px 12px 4px 8px; font-size: 0.72rem; font-weight: 600; color: var(--ink); }
+.sprint-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s ease infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.sprint-dates { font-size: 0.68rem; color: var(--ink3); }
+.progress-wrap { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.sprint-progress { width: 120px; height: 5px; background: var(--surface3); border-radius: 99px; overflow: hidden; }
+.sprint-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #8b5cf6); border-radius: 99px; }
+.progress-label { font-size: 0.68rem; color: var(--ink2); font-weight: 600; }
+
+.board { flex: 1; overflow-x: auto; overflow-y: hidden; display: flex; gap: 14px; padding: 0 20px 20px; }
+.board::-webkit-scrollbar { height: 5px; }
+.board::-webkit-scrollbar-track { background: var(--bg); }
+.board::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+
+/* ── Column ── */
+.col { flex-shrink: 0; width: 280px; display: flex; flex-direction: column; }
+.col-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; border-bottom: 2px solid; }
+.col-header.todo { border-bottom-color: var(--ink3); }
+.col-header.inprogress { border-bottom-color: var(--blue); }
+.col-header.review { border-bottom-color: var(--amber); }
+.col-header.done { border-bottom-color: var(--green); }
+
+.col-name { font-size: 0.78rem; font-weight: 700; color: var(--ink); flex: 1; }
+.col-count { width: 20px; height: 20px; border-radius: 5px; background: var(--surface2); color: var(--ink2); font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.col-add { width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--border); background: transparent; color: var(--ink3); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.col-add:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.col-add svg { width: 12px; height: 12px; }
+
+.col-body {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 10px 8px;
+  overflow-y: auto;
+  min-height: 300px;
+  max-height: calc(100vh - 260px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.col-body::-webkit-scrollbar { width: 3px; }
+.col-body::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+
+/* Drag over state */
+.col-body.drag-over { background: rgba(91,95,199,0.05); border-color: var(--accent); }
+
+/* ── Task Card ── */
+.task-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  cursor: grab;
+  transition: all 0.2s;
+  position: relative;
+  user-select: none;
+}
+.task-card:hover { border-color: var(--accent); box-shadow: var(--shadow); transform: translateY(-1px); }
+.task-card:active { cursor: grabbing; }
+.task-card.dragging { opacity: 0.5; transform: rotate(2deg); }
+
+.card-top { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; }
+.card-id { font-family: var(--mono); font-size: 0.6rem; color: var(--ink3); flex-shrink: 0; padding-top: 1px; }
+.card-title { font-size: 0.82rem; font-weight: 500; color: var(--ink); flex: 1; line-height: 1.4; }
+
+.card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.tag { padding: 2px 7px; border-radius: 4px; font-size: 0.62rem; font-weight: 600; }
+.tag-design { background: var(--purple-soft); color: var(--purple); }
+.tag-frontend { background: var(--blue-soft); color: var(--blue); }
+.tag-backend { background: var(--green-soft); color: var(--green); }
+.tag-bug { background: var(--red-soft); color: var(--red); }
+.tag-feature { background: var(--accent-soft); color: var(--accent); }
+.tag-infra { background: var(--amber-soft); color: var(--amber); }
+
+.card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.priority { display: flex; align-items: center; gap: 3px; font-size: 0.65rem; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+.priority-high { background: var(--red-soft); color: var(--red); }
+.priority-mid { background: var(--amber-soft); color: var(--amber); }
+.priority-low { background: var(--green-soft); color: var(--green); }
+.priority svg { width: 9px; height: 9px; }
+.due-date { display: flex; align-items: center; gap: 3px; font-size: 0.65rem; color: var(--ink3); }
+.due-date.overdue { color: var(--red); }
+.due-date svg { width: 10px; height: 10px; }
+.due-date.overdue svg { color: var(--red); }
+
+.card-progress { margin-bottom: 8px; }
+.progress-track { height: 3px; background: var(--surface3); border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), #8b5cf6); }
+.progress-text { font-size: 0.6rem; color: var(--ink3); margin-top: 3px; text-align: right; }
+
+.card-footer { display: flex; align-items: center; justify-content: space-between; }
+.card-assignees { display: flex; }
+.assignee { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 700; color: white; margin-left: -6px; flex-shrink: 0; }
+.assignee:first-child { margin-left: 0; }
+.card-right { display: flex; align-items: center; gap: 6px; }
+.comment-count { display: flex; align-items: center; gap: 3px; font-size: 0.65rem; color: var(--ink3); }
+.comment-count svg { width: 11px; height: 11px; }
+.attachment-count { display: flex; align-items: center; gap: 3px; font-size: 0.65rem; color: var(--ink3); }
+.attachment-count svg { width: 11px; height: 11px; }
+
+/* ── Stats Bar ── */
+.stats-bar { display: flex; gap: 14px; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; }
+.stat-item { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.stat-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-icon svg { width: 13px; height: 13px; }
+.stat-icon.blue { background: var(--blue-soft); color: var(--blue); }
+.stat-icon.green { background: var(--green-soft); color: var(--green); }
+.stat-icon.amber { background: var(--amber-soft); color: var(--amber); }
+.stat-icon.purple { background: var(--purple-soft); color: var(--purple); }
+.stat-val { font-size: 1rem; font-weight: 800; color: var(--ink); letter-spacing: -0.03em; line-height: 1; }
+.stat-label { font-size: 0.65rem; color: var(--ink3); margin-top: 1px; }
+.stat-divider { width: 1px; background: var(--border); height: 30px; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(26,29,46,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(6px); }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 520px; box-shadow: var(--shadow-lg); transform: translateY(16px) scale(0.98); transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1); overflow: hidden; }
+.modal-overlay.open .modal { transform: translateY(0) scale(1); }
+.modal-header { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-title { font-size: 0.92rem; font-weight: 700; }
+.modal-close { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer; color: var(--ink2); display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.modal-close:hover { background: var(--red-soft); color: var(--red); border-color: var(--red); }
+.modal-body { padding: 20px 22px; max-height: 60vh; overflow-y: auto; }
+.form-field { margin-bottom: 14px; }
+.form-field label { display: block; font-size: 0.68rem; font-weight: 700; color: var(--ink2); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 5px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+input, select, textarea { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 7px; padding: 8px 11px; font-size: 0.82rem; font-family: var(--sans); color: var(--ink); outline: none; transition: border-color 0.15s; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,95,199,0.1); }
+textarea { resize: vertical; min-height: 80px; }
+.tag-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-pick { padding: 4px 10px; border-radius: 5px; border: 1.5px solid var(--border); background: transparent; font-size: 0.68rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.tag-pick:hover { border-color: var(--accent); }
+.tag-pick.active { border-color: transparent; }
+.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: var(--surface2); }
+
+/* Toast */
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--ink); color: white; padding: 10px 16px; border-radius: 9px; font-size: 0.78rem; box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 8px; z-index: 300; transform: translateY(60px); opacity: 0; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Top Nav -->
+<nav class="topnav">
+  <div class="nav-logo">
+    <div class="logo-icon">FB</div>
+    <div class="logo-text">FlowBoard</div>
+  </div>
+  <div class="nav-links">
+    <div class="nav-link" onclick="setNavActive(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>ホーム</div>
+    <div class="nav-link active" onclick="setNavActive(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>プロジェクト</div>
+    <div class="nav-link" onclick="setNavActive(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>レポート</div>
+    <div class="nav-link" onclick="setNavActive(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>チーム</div>
+  </div>
+  <div class="nav-right">
+    <div class="avatar-stack">
+      <div class="avatar" style="background:#5b5fc7" title="田中">田</div>
+      <div class="avatar" style="background:#0ea766" title="鈴木">鈴</div>
+      <div class="avatar" style="background:#d97706" title="佐藤">佐</div>
+      <div class="avatar" style="background:#7c3aed" title="山田">山</div>
+      <div class="avatar avatar-count">+3</div>
+    </div>
+    <button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+    <button class="btn btn-primary" onclick="openModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      タスク追加
+    </button>
+  </div>
+</nav>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg></div>
+    <div><div class="stat-val" id="statTotal">0</div><div class="stat-label">総タスク数</div></div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-item">
+    <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+    <div><div class="stat-val" id="statDone">0</div><div class="stat-label">完了</div></div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-item">
+    <div class="stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+    <div><div class="stat-val" id="statInProgress">0</div><div class="stat-label">進行中</div></div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-item">
+    <div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+    <div><div class="stat-val" id="statOverdue">0</div><div class="stat-label">期限超過</div></div>
+  </div>
+  <div class="stat-divider"></div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+    <div style="font-size:0.7rem;color:var(--ink3)">スプリント進捗</div>
+    <div style="width:160px;height:6px;background:var(--surface3);border-radius:99px;overflow:hidden">
+      <div id="sprintBar" style="height:100%;background:linear-gradient(90deg,var(--accent),#8b5cf6);border-radius:99px;transition:width 0.5s"></div>
+    </div>
+    <div style="font-size:0.72rem;font-weight:700;color:var(--accent)" id="sprintPct">0%</div>
+  </div>
+</div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">ナビゲーション</div>
+      <div class="sidebar-item active" onclick="setSideActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        カンバン
+      </div>
+      <div class="sidebar-item" onclick="setSideActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        リスト表示
+      </div>
+      <div class="sidebar-item" onclick="setSideActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+        ガントチャート
+      </div>
+      <div class="sidebar-item" onclick="setSideActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        レポート
+        <span class="item-count">New</span>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">プロジェクト</div>
+    </div>
+    <div class="project-list">
+      <div class="project-item active">
+        <div class="project-color" style="background:#5b5fc7"></div>
+        <div class="project-name">新規ECサイト開発</div>
+        <div class="project-count">24</div>
+      </div>
+      <div class="project-item">
+        <div class="project-color" style="background:#0ea766"></div>
+        <div class="project-name">基幹システム刷新</div>
+        <div class="project-count">18</div>
+      </div>
+      <div class="project-item">
+        <div class="project-color" style="background:#d97706"></div>
+        <div class="project-name">マーケティングサイト</div>
+        <div class="project-count">11</div>
+      </div>
+      <div class="project-item">
+        <div class="project-color" style="background:#7c3aed"></div>
+        <div class="project-name">モバイルアプリ v2</div>
+        <div class="project-count">31</div>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">マイタスク</div>
+      <div class="sidebar-item" onclick="setSideActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        今日のタスク
+        <span class="item-count">4</span>
+      </div>
+      <div class="sidebar-item" onclick="setSideActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        お気に入り
+        <span class="item-count">2</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Board -->
+  <div class="board-wrap">
+    <div class="board-header">
+      <div class="sprint-badge">
+        <div class="sprint-dot"></div>
+        Sprint 12
+      </div>
+      <div class="sprint-dates">5月1日 — 5月31日</div>
+      <div style="display:flex;gap:6px;margin-left:12px">
+        <div class="filter-chip active" onclick="this.classList.toggle('active')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          担当者
+        </div>
+        <div class="filter-chip" onclick="this.classList.toggle('active')">優先度</div>
+        <div class="filter-chip" onclick="this.classList.toggle('active')">ラベル</div>
+        <div class="filter-chip" onclick="this.classList.toggle('active')">期限</div>
+      </div>
+      <div class="progress-wrap">
+        <div class="sprint-progress"><div class="sprint-fill" id="headerSprintBar" style="width:52%"></div></div>
+        <div class="progress-label">52% 完了</div>
+      </div>
+    </div>
+
+    <div class="board" id="board">
+      <!-- Columns rendered by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📋 新しいタスクを追加</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>タスク名</label>
+        <input type="text" id="fTitle" placeholder="タスクのタイトルを入力">
+      </div>
+      <div class="form-field">
+        <label>説明</label>
+        <textarea id="fDesc" placeholder="詳細を入力（任意）"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>ステータス</label>
+          <select id="fStatus">
+            <option value="todo">To Do</option>
+            <option value="inprogress">進行中</option>
+            <option value="review">レビュー中</option>
+            <option value="done">完了</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>優先度</label>
+          <select id="fPriority">
+            <option value="high">高</option>
+            <option value="mid" selected>中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>担当者</label>
+          <select id="fAssignee">
+            <option>田中 健一</option>
+            <option>鈴木 花子</option>
+            <option>佐藤 誠</option>
+            <option>山田 美咲</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>期限</label>
+          <input type="date" id="fDue">
+        </div>
+      </div>
+      <div class="form-field">
+        <label>ラベル</label>
+        <div class="tag-picker">
+          <div class="tag-pick tag-feature" onclick="toggleTag(this,'feature')" style="border-color:var(--accent)">機能</div>
+          <div class="tag-pick tag-bug" onclick="toggleTag(this,'bug')">バグ</div>
+          <div class="tag-pick tag-design" onclick="toggleTag(this,'design')">デザイン</div>
+          <div class="tag-pick tag-frontend" onclick="toggleTag(this,'frontend')">フロントエンド</div>
+          <div class="tag-pick tag-backend" onclick="toggleTag(this,'backend')">バックエンド</div>
+          <div class="tag-pick tag-infra" onclick="toggleTag(this,'infra')">インフラ</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveTask()">タスクを追加</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const cols = [
+  { id: 'todo', name: 'To Do', colorClass: 'todo' },
+  { id: 'inprogress', name: '進行中', colorClass: 'inprogress' },
+  { id: 'review', name: 'レビュー中', colorClass: 'review' },
+  { id: 'done', name: '完了', colorClass: 'done' },
+];
+
+const avatarColors = ['#5b5fc7','#0ea766','#d97706','#7c3aed','#0284c7','#dc3545'];
+const members = [
+  { name:'田中', color:'#5b5fc7' },
+  { name:'鈴木', color:'#0ea766' },
+  { name:'佐藤', color:'#d97706' },
+  { name:'山田', color:'#7c3aed' },
+];
+
+let tasks = [
+  { id:1, title:'ログイン画面のUI実装', col:'inprogress', priority:'high', tags:['frontend','feature'], assignees:[0,1], due:'5/20', progress:65, comments:4, attachments:2, overdue:false },
+  { id:2, title:'商品詳細ページのレスポンシブ対応', col:'inprogress', priority:'mid', tags:['frontend','design'], assignees:[2], due:'5/22', progress:30, comments:2, attachments:0, overdue:false },
+  { id:3, title:'決済APIの統合テスト', col:'review', priority:'high', tags:['backend'], assignees:[1,3], due:'5/18', progress:90, comments:7, attachments:3, overdue:true },
+  { id:4, title:'データベース設計の見直し', col:'todo', priority:'mid', tags:['backend','infra'], assignees:[0], due:'5/28', progress:0, comments:1, attachments:1, overdue:false },
+  { id:5, title:'在庫管理モジュール開発', col:'todo', priority:'low', tags:['backend','feature'], assignees:[2,3], due:'5/30', progress:0, comments:0, attachments:0, overdue:false },
+  { id:6, title:'トップページのアニメーション修正', col:'done', priority:'low', tags:['frontend','bug'], assignees:[1], due:'5/15', progress:100, comments:3, attachments:0, overdue:false },
+  { id:7, title:'Dockerコンテナの最適化', col:'done', priority:'mid', tags:['infra'], assignees:[0,2], due:'5/14', progress:100, comments:5, attachments:2, overdue:false },
+  { id:8, title:'管理画面の権限設定実装', col:'inprogress', priority:'high', tags:['backend','feature'], assignees:[3], due:'5/19', progress:50, comments:2, attachments:1, overdue:false },
+  { id:9, title:'メール通知テンプレート作成', col:'todo', priority:'low', tags:['feature'], assignees:[1], due:'6/1', progress:0, comments:0, attachments:0, overdue:false },
+  { id:10, title:'パフォーマンス改善・画像最適化', col:'review', priority:'mid', tags:['frontend','infra'], assignees:[0,1,2], due:'5/17', progress:80, comments:6, attachments:4, overdue:true },
+];
+
+let dragId = null;
+let selectedTags = new Set(['feature']);
+
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  cols.forEach(col => {
+    const colTasks = tasks.filter(t => t.col === col.id);
+    const colEl = document.createElement('div');
+    colEl.className = 'col';
+    colEl.innerHTML = `
+      <div class="col-header ${col.colorClass}">
+        <div class="col-name">${col.name}</div>
+        <div class="col-count">${colTasks.length}</div>
+        <button class="col-add" onclick="quickAdd('${col.id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div class="col-body" id="col-${col.id}"
+        ondragover="dragOver(event,'${col.id}')"
+        ondragleave="dragLeave(event)"
+        ondrop="drop(event,'${col.id}')">
+        ${colTasks.map(renderCard).join('')}
+      </div>
+    `;
+    board.appendChild(colEl);
+  });
+
+  updateStats();
+}
+
+function renderCard(t) {
+  const priorityMap = { high: ['priority-high','↑ 高'], mid: ['priority-mid','→ 中'], low: ['priority-low','↓ 低'] };
+  const [priClass, priLabel] = priorityMap[t.priority] || priorityMap.mid;
+  const tagHtml = t.tags.map(tag => {
+    const names = { frontend:'フロントエンド', backend:'バックエンド', design:'デザイン', bug:'バグ', feature:'機能', infra:'インフラ' };
+    return `<span class="tag tag-${tag}">${names[tag]||tag}</span>`;
+  }).join('');
+  const assigneeHtml = t.assignees.map(i => {
+    const m = members[i];
+    return `<div class="assignee" style="background:${m.color}" title="${m.name}">${m.name}</div>`;
+  }).join('');
+
+  return `
+    <div class="task-card" id="task-${t.id}" draggable="true"
+      ondragstart="dragStart(event,${t.id})"
+      ondragend="dragEnd(event)">
+      <div class="card-top">
+        <div class="card-id">#${String(t.id).padStart(3,'0')}</div>
+        <div class="card-title">${t.title}</div>
+      </div>
+      ${tagHtml ? `<div class="card-tags">${tagHtml}</div>` : ''}
+      <div class="card-meta">
+        <div class="priority ${priClass}">${priLabel}</div>
+        <div class="due-date ${t.overdue?'overdue':''}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+          ${t.due}${t.overdue?' ⚠':''}
+        </div>
+      </div>
+      ${t.progress > 0 && t.progress < 100 ? `
+        <div class="card-progress">
+          <div class="progress-track"><div class="progress-fill" style="width:${t.progress}%"></div></div>
+          <div class="progress-text">${t.progress}%</div>
+        </div>
+      ` : ''}
+      <div class="card-footer">
+        <div class="card-assignees">${assigneeHtml}</div>
+        <div class="card-right">
+          ${t.comments ? `<div class="comment-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${t.comments}</div>` : ''}
+          ${t.attachments ? `<div class="attachment-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>${t.attachments}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updateStats() {
+  const total = tasks.length;
+  const done = tasks.filter(t => t.col === 'done').length;
+  const inProgress = tasks.filter(t => t.col === 'inprogress').length;
+  const overdue = tasks.filter(t => t.overdue).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statDone').textContent = done;
+  document.getElementById('statInProgress').textContent = inProgress;
+  document.getElementById('statOverdue').textContent = overdue;
+  document.getElementById('sprintBar').style.width = pct + '%';
+  document.getElementById('sprintPct').textContent = pct + '%';
+}
+
+// Drag and Drop
+function dragStart(e, id) {
+  dragId = id;
+  setTimeout(() => document.getElementById(`task-${id}`).classList.add('dragging'), 0);
+  e.dataTransfer.effectAllowed = 'move';
+}
+function dragEnd(e) {
+  if (dragId) document.getElementById(`task-${dragId}`)?.classList.remove('dragging');
+}
+function dragOver(e, colId) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function dragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function drop(e, colId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (dragId) {
+    const task = tasks.find(t => t.id === dragId);
+    if (task && task.col !== colId) {
+      task.col = colId;
+      if (colId === 'done') task.progress = 100;
+      render();
+      showToast(`✓ タスクを「${cols.find(c=>c.id===colId)?.name}」に移動しました`);
+    }
+    dragId = null;
+  }
+}
+
+// Modal
+let nextId = 11;
+function openModal() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('fDue').value = today;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModalOutside(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+
+function toggleTag(el, tag) {
+  el.classList.toggle('active');
+  if (el.classList.contains('active')) selectedTags.add(tag);
+  else selectedTags.delete(tag);
+}
+
+function quickAdd(colId) {
+  document.getElementById('fStatus').value = colId;
+  openModal();
+}
+
+function saveTask() {
+  const title = document.getElementById('fTitle').value.trim();
+  if (!title) { showToast('⚠ タスク名を入力してください'); return; }
+  const due = document.getElementById('fDue').value;
+  const dueStr = due ? new Date(due).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric'}).replace('/','/') : '未設定';
+  tasks.push({
+    id: nextId++,
+    title,
+    col: document.getElementById('fStatus').value,
+    priority: document.getElementById('fPriority').value,
+    tags: [...selectedTags],
+    assignees: [0],
+    due: dueStr,
+    progress: 0,
+    comments: 0,
+    attachments: 0,
+    overdue: false,
+  });
+  render();
+  closeModal();
+  document.getElementById('fTitle').value = '';
+  showToast('✓ タスクを追加しました');
+}
+
+function setNavActive(el) { document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active')); el.classList.add('active'); }
+function setSideActive(el) { document.querySelectorAll('.sidebar-item').forEach(n => n.classList.remove('active')); el.classList.add('active'); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+render();
+</script>
+</body>
+</html>

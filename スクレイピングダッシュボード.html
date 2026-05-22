@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScrapeBoard — データ収集・分析ダッシュボード</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2128;
+  --surface3: #252d3a;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #e6edf3;
+  --text2: #8b949e;
+  --text3: #484f58;
+  --accent: #58a6ff;
+  --accent-soft: rgba(88,166,255,0.1);
+  --green: #3fb950;
+  --green-soft: rgba(63,185,80,0.1);
+  --amber: #d29922;
+  --amber-soft: rgba(210,153,34,0.1);
+  --red: #f85149;
+  --red-soft: rgba(248,81,73,0.1);
+  --purple: #bc8cff;
+  --sans: 'Inter','Noto Sans JP',sans-serif;
+  --mono: 'JetBrains Mono',monospace;
+  --shadow: 0 8px 32px rgba(0,0,0,0.4);
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+/* Header */
+.header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 28px; height: 28px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.logo-icon svg { width: 15px; height: 15px; color: white; }
+.logo-text { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; border: none; font-family: var(--sans); transition: all 0.15s; }
+.btn svg { width: 12px; height: 12px; }
+.btn-primary { background: var(--accent); color: #0d1117; }
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+.btn-ghost:hover { background: var(--surface2); }
+.status-badge { display: flex; align-items: center; gap: 6px; background: var(--green-soft); border: 1px solid rgba(63,185,80,0.3); color: var(--green); font-size: 0.68rem; font-weight: 700; padding: 4px 10px; border-radius: 99px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s ease infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+/* Layout */
+.layout { display: grid; grid-template-columns: 280px 1fr; height: calc(100vh - 52px); overflow: hidden; }
+
+/* Sidebar */
+.sidebar { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+
+.sidebar-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.sidebar-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+
+.task-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer; transition: all 0.15s; margin-bottom: 3px; border: 1px solid transparent; }
+.task-item:hover { background: var(--surface2); }
+.task-item.active { background: var(--accent-soft); border-color: rgba(88,166,255,0.3); }
+.task-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+.task-name { font-size: 0.78rem; font-weight: 500; color: var(--text); }
+.task-item.active .task-name { color: var(--accent); }
+.task-info { font-size: 0.65rem; color: var(--text3); margin-top: 1px; }
+.task-status { margin-left: auto; flex-shrink: 0; }
+.dot-running { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 1.5s ease infinite; }
+.dot-idle { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
+
+/* Schedule */
+.schedule-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; }
+.schedule-item:last-child { border-bottom: none; }
+.schedule-name { color: var(--text2); }
+.schedule-time { font-family: var(--mono); color: var(--text3); font-size: 0.68rem; }
+.schedule-active { color: var(--green); font-weight: 600; }
+
+/* Main */
+.main { overflow-y: auto; }
+.main::-webkit-scrollbar { width: 4px; }
+.main::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+.content { padding: 20px; }
+
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px; }
+.stat-card { background: var(--surface); border-radius: var(--radius); padding: 16px; border: 1px solid var(--border); }
+.stat-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+.stat-icon svg { width: 14px; height: 14px; }
+.stat-icon.blue { background: var(--accent-soft); color: var(--accent); }
+.stat-icon.green { background: var(--green-soft); color: var(--green); }
+.stat-icon.amber { background: var(--amber-soft); color: var(--amber); }
+.stat-icon.purple { background: rgba(188,140,255,0.1); color: var(--purple); }
+.stat-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text); line-height: 1; margin-bottom: 4px; font-family: var(--mono); }
+.stat-label { font-size: 0.72rem; color: var(--text2); }
+.stat-change { font-size: 0.68rem; margin-top: 6px; }
+.stat-change.up { color: var(--green); }
+
+/* Grid */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+/* Card */
+.card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+.card-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+.card-sub { font-size: 0.68rem; color: var(--text3); margin-top: 1px; }
+.card-action { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: var(--accent); cursor: pointer; }
+.card-action svg { width: 12px; height: 12px; }
+
+/* Data table */
+table { width: 100%; border-collapse: collapse; }
+th { padding: 8px 14px; text-align: left; font-size: 0.63rem; font-weight: 700; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; background: var(--surface2); border-bottom: 1px solid var(--border); }
+td { padding: 11px 14px; font-size: 0.78rem; color: var(--text); border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { transition: background 0.12s; cursor: pointer; }
+tbody tr:hover { background: var(--surface2); }
+.mono { font-family: var(--mono); font-size: 0.74rem; }
+.price-up { color: var(--red); font-weight: 700; }
+.price-down { color: var(--green); font-weight: 700; }
+.price-same { color: var(--text3); }
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; }
+.badge-high { background: var(--red-soft); color: var(--red); }
+.badge-mid { background: var(--amber-soft); color: var(--amber); }
+.badge-low { background: var(--green-soft); color: var(--green); }
+.rank-badge { width: 22px; height: 22px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; }
+.rank-1 { background: #ffd700; color: #333; }
+.rank-2 { background: #c0c0c0; color: #333; }
+.rank-3 { background: #cd7f32; color: #fff; }
+.rank-other { background: var(--surface3); color: var(--text3); }
+
+/* Mini chart */
+.mini-chart { display: flex; align-items: flex-end; gap: 3px; height: 32px; }
+.bar { border-radius: 2px 2px 0 0; min-width: 8px; transition: opacity 0.2s; cursor: pointer; }
+.bar:hover { opacity: 0.7; }
+
+/* Progress */
+.progress-wrap { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.progress-item {}
+.progress-header { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 5px; }
+.progress-label { color: var(--text2); }
+.progress-val { font-family: var(--mono); color: var(--text); font-weight: 600; }
+.progress-bar { height: 4px; background: var(--surface3); border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 99px; }
+
+/* Log */
+.log-wrap { padding: 12px 16px; font-family: var(--mono); font-size: 0.68rem; max-height: 200px; overflow-y: auto; }
+.log-wrap::-webkit-scrollbar { width: 3px; }
+.log-wrap::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+.log-line { padding: 3px 0; display: flex; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.log-time { color: var(--text3); flex-shrink: 0; }
+.log-url { color: var(--accent); }
+.log-status { flex-shrink: 0; }
+.log-status.ok { color: var(--green); }
+.log-status.err { color: var(--red); }
+.log-size { color: var(--text3); flex-shrink: 0; }
+
+/* Running indicator */
+.running-bar { height: 2px; background: var(--surface3); border-radius: 99px; overflow: hidden; margin: 0 16px 0; }
+.running-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 99px; animation: slide 1.5s ease-in-out infinite; }
+@keyframes slide { 0% { margin-left: 0; width: 30%; } 50% { margin-left: 70%; width: 30%; } 100% { margin-left: 0; width: 30%; } }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div>
+    <div class="logo-text">ScrapeBoard — データ収集・分析</div>
+  </div>
+  <div class="header-right">
+    <div class="status-badge"><div class="status-dot"></div>収集中 3件稼働</div>
+    <button class="btn btn-ghost" onclick="showToast('スケジュール設定を開きます')">スケジュール</button>
+    <button class="btn btn-primary" onclick="addTask()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      タスク追加
+    </button>
+  </div>
+</header>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">収集タスク</div>
+
+      <div class="task-item active" onclick="selectTask(this,'competitor')">
+        <div class="task-icon" style="background:rgba(88,166,255,0.1)">🏪</div>
+        <div>
+          <div class="task-name">競合価格監視</div>
+          <div class="task-info">5サイト / 1時間ごと</div>
+        </div>
+        <div class="task-status"><div class="dot-running"></div></div>
+      </div>
+
+      <div class="task-item" onclick="selectTask(this,'jobs')">
+        <div class="task-icon" style="background:rgba(63,185,80,0.1)">💼</div>
+        <div>
+          <div class="task-name">求人情報収集</div>
+          <div class="task-info">Indeed / 毎朝8時</div>
+        </div>
+        <div class="task-status"><div class="dot-running"></div></div>
+      </div>
+
+      <div class="task-item" onclick="selectTask(this,'reviews')">
+        <div class="task-icon" style="background:rgba(210,153,34,0.1)">⭐</div>
+        <div>
+          <div class="task-name">レビュー・口コミ収集</div>
+          <div class="task-info">Google/食べログ / 毎日</div>
+        </div>
+        <div class="task-status"><div class="dot-running"></div></div>
+      </div>
+
+      <div class="task-item" onclick="selectTask(this,'news')">
+        <div class="task-icon" style="background:rgba(188,140,255,0.1)">📰</div>
+        <div>
+          <div class="task-name">業界ニュース収集</div>
+          <div class="task-info">RSS / 30分ごと</div>
+        </div>
+        <div class="task-status"><div class="dot-idle"></div></div>
+      </div>
+
+      <div class="task-item" onclick="selectTask(this,'stock')">
+        <div class="task-icon" style="background:rgba(248,81,73,0.1)">📦</div>
+        <div>
+          <div class="task-name">EC在庫監視</div>
+          <div class="task-info">Amazon/楽天 / 15分ごと</div>
+        </div>
+        <div class="task-status"><div class="dot-idle"></div></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">スケジュール</div>
+      <div class="schedule-item">
+        <span class="schedule-name">競合価格監視</span>
+        <span class="schedule-time schedule-active">稼働中</span>
+      </div>
+      <div class="schedule-item">
+        <span class="schedule-name">求人情報収集</span>
+        <span class="schedule-time schedule-active">稼働中</span>
+      </div>
+      <div class="schedule-item">
+        <span class="schedule-name">レビュー収集</span>
+        <span class="schedule-time schedule-active">稼働中</span>
+      </div>
+      <div class="schedule-item">
+        <span class="schedule-name">業界ニュース</span>
+        <span class="schedule-time">次回 16:30</span>
+      </div>
+      <div class="schedule-item">
+        <span class="schedule-name">EC在庫監視</span>
+        <span class="schedule-time">次回 16:15</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">出力設定</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.75rem;color:var(--text2);cursor:pointer"><input type="checkbox" checked style="accent-color:var(--accent)"> Google スプレッドシート</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.75rem;color:var(--text2);cursor:pointer"><input type="checkbox" checked style="accent-color:var(--accent)"> CSV自動ダウンロード</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.75rem;color:var(--text2);cursor:pointer"><input type="checkbox" style="accent-color:var(--accent)"> Slack通知</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.75rem;color:var(--text2);cursor:pointer"><input type="checkbox" style="accent-color:var(--accent)"> メール通知</label>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="content">
+
+      <!-- Running bar -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:0.7rem;color:var(--text3);margin-bottom:6px">競合価格監視 — 収集中 (47/82件)</div>
+        <div class="running-bar"><div class="running-fill"></div></div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div>
+          <div class="stat-value">12,840</div>
+          <div class="stat-label">今月収集件数</div>
+          <div class="stat-change up">↑ 今日 +284件</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="stat-value">99.2%</div>
+          <div class="stat-label">収集成功率</div>
+          <div class="stat-change up">↑ 安定稼働中</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+          <div class="stat-value">23</div>
+          <div class="stat-label">価格変動アラート</div>
+          <div class="stat-change up">今日 +5件</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+          <div class="stat-value">1.2s</div>
+          <div class="stat-label">平均収集時間</div>
+          <div class="stat-change up">↑ 最適化済み</div>
+        </div>
+      </div>
+
+      <!-- Competitor prices -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">競合価格比較</div>
+              <div class="card-sub">更新: 16:02（1時間前）</div>
+            </div>
+            <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.68rem" onclick="runScrape()">今すぐ更新</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>順位</th>
+                <th>サイト</th>
+                <th>価格</th>
+                <th>前回比</th>
+                <th>在庫</th>
+              </tr>
+            </thead>
+            <tbody id="priceTable"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">価格推移グラフ</div>
+              <div class="card-sub">直近7日間</div>
+            </div>
+            <div style="display:flex;gap:8px;font-size:0.68rem">
+              <span style="color:var(--accent)">■ 自社</span>
+              <span style="color:var(--red)">■ 競合A</span>
+              <span style="color:var(--green)">■ 競合B</span>
+            </div>
+          </div>
+          <div style="padding:16px 20px">
+            <div style="display:flex;align-items:flex-end;gap:10px;height:140px" id="trendChart"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px">
+              <span style="font-size:0.62rem;color:var(--text3)">5/9</span>
+              <span style="font-size:0.62rem;color:var(--text3)">5/10</span>
+              <span style="font-size:0.62rem;color:var(--text3)">5/11</span>
+              <span style="font-size:0.62rem;color:var(--text3)">5/12</span>
+              <span style="font-size:0.62rem;color:var(--text3)">5/13</span>
+              <span style="font-size:0.62rem;color:var(--text3)">5/14</span>
+              <span style="font-size:0.62rem;color:var(--text3)">5/15</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Jobs & Reviews -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">求人情報収集結果</div><div class="card-sub">今日取得 284件</div></div>
+            <div class="card-action" onclick="showToast('CSVをダウンロードしました')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>CSV出力</div>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-label">エンジニア系</span><span class="progress-val">142件</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:50%;background:var(--accent)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-label">営業・マーケ</span><span class="progress-val">68件</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:24%;background:var(--green)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-label">デザイナー</span><span class="progress-val">42件</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:15%;background:var(--purple)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header"><span class="progress-label">管理・バックオフィス</span><span class="progress-val">32件</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:11%;background:var(--amber)"></div></div>
+            </div>
+          </div>
+          <div style="padding:10px 16px;border-top:1px solid var(--border)">
+            <table>
+              <thead><tr><th>職種</th><th>会社名</th><th>年収</th><th>難易度</th></tr></thead>
+              <tbody>
+                <tr><td>Webエンジニア</td><td style="font-size:0.72rem;color:var(--text2)">株式会社ABC</td><td class="mono">600〜900万</td><td><span class="badge badge-high">高</span></td></tr>
+                <tr><td>データアナリスト</td><td style="font-size:0.72rem;color:var(--text2)">XYZ Corp</td><td class="mono">500〜700万</td><td><span class="badge badge-mid">中</span></td></tr>
+                <tr><td>PM</td><td style="font-size:0.72rem;color:var(--text2)">テックA社</td><td class="mono">700〜1000万</td><td><span class="badge badge-high">高</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">収集実行ログ</div><div class="card-sub">リアルタイム</div></div>
+            <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.68rem" onclick="clearLog()">クリア</button>
+          </div>
+          <div class="log-wrap" id="logWrap"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// Competitor data
+const competitors = [
+  { rank:1, site:'自社サイト', price:12800, prev:12800, stock:'○ 在庫あり', isOwn:true },
+  { rank:2, site:'競合A (Amazon)', price:13200, prev:12900, stock:'○ 在庫あり' },
+  { rank:3, site:'競合B (楽天)', price:12600, prev:12800, stock:'△ 残り3点' },
+  { rank:4, site:'競合C', price:14800, prev:14800, stock:'○ 在庫あり' },
+  { rank:5, site:'競合D', price:11900, prev:12400, stock:'× 在庫切れ' },
+];
+
+const trendData = [
+  { own:[85,87,88,86,87,88,88], compA:[90,89,92,90,91,92,92], compB:[88,86,88,87,87,87,86] }
+];
+
+function renderPriceTable() {
+  document.getElementById('priceTable').innerHTML = competitors.map(c => {
+    const diff = c.price - c.prev;
+    const diffStr = diff === 0 ? '<span class="price-same">−</span>' : diff > 0 ? `<span class="price-up">▲¥${diff.toLocaleString()}</span>` : `<span class="price-down">▼¥${Math.abs(diff).toLocaleString()}</span>`;
+    const rankClass = c.rank <= 3 ? `rank-${c.rank}` : 'rank-other';
+    const stockColor = c.stock.startsWith('○') ? 'var(--green)' : c.stock.startsWith('△') ? 'var(--amber)' : 'var(--red)';
+    return `<tr style="${c.isOwn?'background:rgba(88,166,255,0.05);':''}" >
+      <td><span class="rank-badge ${rankClass}">${c.rank}</span></td>
+      <td style="font-size:0.78rem;font-weight:${c.isOwn?'700':'400'};color:${c.isOwn?'var(--accent)':'var(--text)'}">${c.site}</td>
+      <td class="mono">¥${c.price.toLocaleString()}</td>
+      <td>${diffStr}</td>
+      <td style="font-size:0.7rem;color:${stockColor}">${c.stock}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderTrendChart() {
+  const max = 100;
+  const days = trendData[0];
+  const chart = document.getElementById('trendChart');
+  chart.innerHTML = days.own.map((v,i) => `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;justify-content:flex-end">
+      <div class="bar" style="width:100%;height:${(days.compA[i]/max)*130}px;background:var(--red);opacity:0.7" title="競合A: ¥${(days.compA[i]*150).toLocaleString()}"></div>
+      <div class="bar" style="width:100%;height:${(days.compB[i]/max)*130}px;background:var(--green);opacity:0.7" title="競合B: ¥${(days.compB[i]*150).toLocaleString()}"></div>
+      <div class="bar" style="width:100%;height:${(v/max)*130}px;background:var(--accent)" title="自社: ¥${(v*150).toLocaleString()}"></div>
+    </div>
+  `).join('');
+}
+
+// Log
+const logUrls = [
+  'amazon.co.jp/products/B0...','rakuten.co.jp/item/...','yahoo-shopping.jp/...','mercari.com/item/...','yodobashi.com/product/...',
+  'indeed.com/jobs/engineer...','biz.indeed.com/...','tabelog.com/...','google.com/maps/...','hotpepper.jp/...',
+];
+let logCount = 0;
+function addLogLine() {
+  const log = document.getElementById('logWrap');
+  const url = logUrls[logCount % logUrls.length];
+  const ok = Math.random() > 0.05;
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const size = (Math.random() * 200 + 20).toFixed(0) + 'KB';
+  const el = document.createElement('div');
+  el.className = 'log-line';
+  el.innerHTML = `<span class="log-time">${time}</span><span class="log-url" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${url}</span><span class="log-status ${ok?'ok':'err'}">${ok?'200':'429'}</span><span class="log-size">${size}</span>`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  if (log.children.length > 50) log.removeChild(log.children[0]);
+  logCount++;
+}
+
+function clearLog() { document.getElementById('logWrap').innerHTML = ''; }
+function selectTask(el, task) { document.querySelectorAll('.task-item').forEach(t => t.classList.remove('active')); el.classList.add('active'); }
+function addTask() { showToast('タスク追加ダイアログを開きます'); }
+function runScrape() { showToast('手動更新を開始しました'); addLogLine(); }
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#161b22;color:#e6edf3;border:1px solid rgba(255,255,255,0.1);padding:10px 16px;border-radius:9px;font-size:0.78rem;z-index:999;transform:translateY(60px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);font-family:var(--sans)'; document.body.appendChild(t); }
+  t.textContent = '✓ ' + msg;
+  t.style.transform = 'translateY(0)'; t.style.opacity = '1';
+  setTimeout(() => { t.style.transform = 'translateY(60px)'; t.style.opacity = '0'; }, 2500);
+}
+
+renderPriceTable();
+renderTrendChart();
+setInterval(addLogLine, 1200);
+for (let i = 0; i < 8; i++) setTimeout(addLogLine, i * 100);
+</script>
+</body>
+</html>

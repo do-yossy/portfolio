@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CareFlow — 介護施設管理システム</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --surface2: #f0f4f9;
+  --border: #dde4ee;
+  --ink: #1a2540;
+  --ink2: #5a6a8a;
+  --ink3: #b0baca;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --green: #059669;
+  --green-soft: #ecfdf5;
+  --amber: #d97706;
+  --amber-soft: #fffbeb;
+  --red: #dc2626;
+  --red-soft: #fef2f2;
+  --purple: #7c3aed;
+  --purple-soft: #f5f3ff;
+  --teal: #0891b2;
+  --teal-soft: #ecfeff;
+  --sans: 'Inter','Noto Sans JP',sans-serif;
+  --mono: 'JetBrains Mono',monospace;
+  --shadow: 0 4px 20px rgba(26,37,64,0.07);
+  --radius: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--sans); background: var(--bg); color: var(--ink); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+/* Header */
+.header { background: var(--accent); padding: 0 22px; height: 54px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(37,99,235,0.3); }
+.header-logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 32px; height: 32px; background: rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+.logo-text { font-size: 0.95rem; font-weight: 700; color: white; }
+.logo-text span { opacity: 0.7; font-weight: 400; margin-left: 4px; font-size: 0.8rem; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.header-time { font-family: var(--mono); font-size: 0.88rem; color: rgba(255,255,255,0.9); font-weight: 700; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 7px; font-size: 0.75rem; font-weight: 600; cursor: pointer; border: none; font-family: var(--sans); transition: all 0.15s; }
+.btn-white { background: white; color: var(--accent); }
+.btn-white:hover { background: rgba(255,255,255,0.9); }
+.btn-ghost-w { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
+.btn-ghost-w:hover { background: rgba(255,255,255,0.25); }
+
+/* Layout */
+.layout { display: flex; height: calc(100vh - 54px); overflow: hidden; }
+
+/* Sidebar */
+.sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.sidebar-nav { padding: 10px 10px; flex: 1; }
+.nav-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink3); padding: 0 7px; margin: 12px 0 5px; }
+.nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 9px; border-radius: 7px; cursor: pointer; color: var(--ink2); font-size: 0.8rem; transition: all 0.15s; margin-bottom: 2px; }
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+.nav-item:hover { background: var(--surface2); color: var(--ink); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav-count { margin-left: auto; font-size: 0.62rem; background: var(--surface2); color: var(--ink3); padding: 1px 6px; border-radius: 99px; }
+.nav-item.active .nav-count { background: rgba(37,99,235,0.1); color: var(--accent); }
+
+.sidebar-footer { padding: 12px; border-top: 1px solid var(--border); }
+.staff-card { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; background: var(--surface2); }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; color: white; flex-shrink: 0; }
+.staff-name { font-size: 0.78rem; font-weight: 600; }
+.staff-role { font-size: 0.62rem; color: var(--ink3); }
+
+/* Main */
+.main { flex: 1; overflow-y: auto; }
+.main::-webkit-scrollbar { width: 4px; }
+.main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.content { padding: 20px; }
+
+/* Alert banner */
+.alert-banner { background: var(--amber-soft); border: 1px solid rgba(217,119,6,0.3); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+.alert-banner svg { width: 16px; height: 16px; color: var(--amber); flex-shrink: 0; }
+.alert-text { font-size: 0.78rem; color: var(--amber); font-weight: 500; }
+.alert-link { margin-left: auto; font-size: 0.72rem; color: var(--accent); cursor: pointer; }
+
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 18px; }
+.stat-card { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; border: 1px solid var(--border); box-shadow: var(--shadow); position: relative; overflow: hidden; transition: transform 0.2s; }
+.stat-card:hover { transform: translateY(-2px); }
+.stat-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.stat-card.blue::before { background: var(--accent); }
+.stat-card.green::before { background: var(--green); }
+.stat-card.amber::before { background: var(--amber); }
+.stat-card.red::before { background: var(--red); }
+.stat-card.purple::before { background: var(--purple); }
+.stat-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+.stat-icon svg { width: 15px; height: 15px; }
+.stat-icon.blue { background: var(--accent-soft); color: var(--accent); }
+.stat-icon.green { background: var(--green-soft); color: var(--green); }
+.stat-icon.amber { background: var(--amber-soft); color: var(--amber); }
+.stat-icon.red { background: var(--red-soft); color: var(--red); }
+.stat-icon.purple { background: var(--purple-soft); color: var(--purple); }
+.stat-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); line-height: 1; }
+.stat-label { font-size: 0.7rem; color: var(--ink2); margin-top: 3px; }
+.stat-sub { font-size: 0.65rem; color: var(--ink3); margin-top: 4px; }
+
+/* Grid */
+.grid-main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+.grid-left { display: flex; flex-direction: column; gap: 14px; }
+
+/* Card */
+.card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
+.card-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
+.card-sub { font-size: 0.7rem; color: var(--ink3); margin-top: 1px; }
+.card-btn { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; font-size: 0.7rem; color: var(--ink2); cursor: pointer; transition: all 0.15s; font-family: var(--sans); }
+.card-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* Resident table */
+table { width: 100%; border-collapse: collapse; }
+th { padding: 8px 14px; text-align: left; font-size: 0.63rem; font-weight: 700; color: var(--ink3); letter-spacing: 0.1em; text-transform: uppercase; background: var(--surface2); border-bottom: 1px solid var(--border); }
+td { padding: 11px 14px; font-size: 0.78rem; color: var(--ink); border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { transition: background 0.12s; cursor: pointer; }
+tbody tr:hover { background: var(--surface2); }
+
+.resident-cell { display: flex; align-items: center; gap: 8px; }
+.resident-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: white; flex-shrink: 0; }
+.resident-name { font-weight: 600; font-size: 0.8rem; }
+.resident-room { font-size: 0.65rem; color: var(--ink3); margin-top: 1px; }
+
+.badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 99px; font-size: 0.65rem; font-weight: 600; }
+.badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+.badge-good { background: var(--green-soft); color: var(--green); }
+.badge-good .badge-dot { background: var(--green); }
+.badge-watch { background: var(--amber-soft); color: var(--amber); }
+.badge-watch .badge-dot { background: var(--amber); animation: pulse2 1.5s ease infinite; }
+@keyframes pulse2 { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+.badge-care { background: var(--red-soft); color: var(--red); }
+.badge-care .badge-dot { background: var(--red); animation: pulse2 1s ease infinite; }
+.badge-visit { background: var(--purple-soft); color: var(--purple); }
+.badge-visit .badge-dot { background: var(--purple); }
+
+.action-btn { padding: 3px 9px; border-radius: 5px; border: 1px solid var(--border); background: transparent; font-size: 0.68rem; color: var(--ink2); cursor: pointer; font-family: var(--sans); transition: all 0.12s; margin-right: 3px; }
+.action-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* Right panel */
+.right-panel { display: flex; flex-direction: column; gap: 14px; }
+
+/* Schedule */
+.schedule-list { padding: 0; }
+.schedule-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.schedule-item:last-child { border-bottom: none; }
+.sched-time { font-family: var(--mono); font-size: 0.68rem; color: var(--ink3); min-width: 38px; padding-top: 1px; }
+.sched-bar { width: 3px; border-radius: 99px; flex-shrink: 0; align-self: stretch; min-height: 32px; }
+.sched-name { font-size: 0.78rem; font-weight: 600; color: var(--ink); }
+.sched-detail { font-size: 0.68rem; color: var(--ink3); margin-top: 1px; }
+.sched-badge { font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-top: 3px; display: inline-block; }
+
+/* Vitals */
+.vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px; }
+.vital-card { background: var(--surface2); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border); }
+.vital-label { font-size: 0.62rem; color: var(--ink3); letter-spacing: 0.05em; margin-bottom: 3px; }
+.vital-val { font-family: var(--mono); font-size: 1.1rem; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; }
+.vital-unit { font-size: 0.65rem; color: var(--ink3); margin-left: 2px; font-weight: 400; }
+.vital-status { font-size: 0.62rem; font-weight: 700; margin-top: 3px; }
+.vital-status.ok { color: var(--green); }
+.vital-status.warn { color: var(--amber); }
+
+/* Medication */
+.med-list { padding: 12px 14px; }
+.med-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.med-item:last-child { border-bottom: none; }
+.med-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+.med-name { font-size: 0.77rem; font-weight: 500; color: var(--ink); flex: 1; }
+.med-time { font-size: 0.68rem; color: var(--ink3); }
+.med-check { width: 20px; height: 20px; border-radius: 5px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
+.med-check.done { background: var(--green); border-color: var(--green); color: white; font-size: 0.7rem; }
+.med-check:hover:not(.done) { border-color: var(--green); }
+
+/* Emergency modal */
+.emergency-btn { width: 100%; padding: 12px; background: var(--red); color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; font-family: var(--sans); transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 0; }
+.emergency-btn:hover { background: #b91c1c; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,0.3); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-logo">
+    <div class="logo-icon">🏥</div>
+    <div class="logo-text">CareFlow<span>介護施設管理システム</span></div>
+  </div>
+  <div class="header-right">
+    <div class="header-time" id="headerTime">16:30</div>
+    <button class="btn btn-ghost-w" onclick="showToast('レポートを出力しています...')">📊 日次レポート</button>
+    <button class="btn btn-white" onclick="openRecord()">+ 記録入力</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <nav class="sidebar-nav">
+      <div class="nav-label">メイン</div>
+      <div class="nav-item active" onclick="setActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        ダッシュボード
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        入居者管理
+        <span class="nav-count">24</span>
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        バイタル記録
+        <span class="nav-count">要確認 2</span>
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        服薬管理
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        スケジュール
+      </div>
+      <div class="nav-label">記録</div>
+      <div class="nav-item" onclick="setActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        介護記録
+      </div>
+      <div class="nav-item" onclick="setActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        家族連絡
+      </div>
+      <div class="nav-label">管理</div>
+      <div class="nav-item" onclick="setActive(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        統計・レポート
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="staff-card">
+        <div class="avatar">田</div>
+        <div>
+          <div class="staff-name">田中 看護師</div>
+          <div class="staff-role">日勤 16:00まで</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="content">
+
+      <!-- Alert -->
+      <div class="alert-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="alert-text">⚠️ 山田 花子様 の血圧が高値です（152/94）。担当医への報告をご確認ください。</div>
+        <div class="alert-link" onclick="showToast('報告済みとしてマークしました')">確認済みにする →</div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+          <div class="stat-value">24</div>
+          <div class="stat-label">入居者数</div>
+          <div class="stat-sub">定員 30名</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="stat-value">18</div>
+          <div class="stat-label">状態良好</div>
+          <div class="stat-sub">75%</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+          <div class="stat-value">4</div>
+          <div class="stat-label">経過観察中</div>
+          <div class="stat-sub">要注意</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+          <div class="stat-value">2</div>
+          <div class="stat-label">要対応</div>
+          <div class="stat-sub">バイタル異常</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+          <div class="stat-value">8</div>
+          <div class="stat-label">本日の面会</div>
+          <div class="stat-sub">3名 来訪中</div>
+        </div>
+      </div>
+
+      <!-- Main grid -->
+      <div class="grid-main">
+        <div class="grid-left">
+
+          <!-- Resident list -->
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">入居者一覧</div><div class="card-sub">24名 / 本日確認済み 21名</div></div>
+              <div style="display:flex;gap:6px">
+                <div style="display:flex;gap:4px">
+                  <span style="background:var(--green-soft);color:var(--green);padding:3px 8px;border-radius:5px;font-size:0.65rem;font-weight:700;cursor:pointer">良好</span>
+                  <span style="background:var(--amber-soft);color:var(--amber);padding:3px 8px;border-radius:5px;font-size:0.65rem;font-weight:700;cursor:pointer">注意</span>
+                  <span style="background:var(--red-soft);color:var(--red);padding:3px 8px;border-radius:5px;font-size:0.65rem;font-weight:700;cursor:pointer">要対応</span>
+                </div>
+                <button class="card-btn" onclick="addResident()">+ 入居者追加</button>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>入居者</th>
+                  <th>年齢</th>
+                  <th>介護度</th>
+                  <th>血圧</th>
+                  <th>体温</th>
+                  <th>状態</th>
+                  <th>担当</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="residentTable"></tbody>
+            </table>
+          </div>
+
+          <!-- Today's records -->
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">本日の介護記録</div><div class="card-sub">直近10件</div></div>
+              <button class="card-btn" onclick="addRecord()">+ 記録追加</button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>時刻</th><th>入居者</th><th>ケア内容</th><th>担当者</th><th>メモ</th></tr>
+              </thead>
+              <tbody id="recordTable"></tbody>
+            </table>
+          </div>
+
+        </div>
+
+        <!-- Right panel -->
+        <div class="right-panel">
+
+          <!-- Today schedule -->
+          <div class="card">
+            <div class="card-header"><div class="card-title">本日のスケジュール</div></div>
+            <div class="schedule-list">
+              <div class="schedule-item">
+                <div class="sched-time">09:00</div>
+                <div class="sched-bar" style="background:var(--green)"></div>
+                <div><div class="sched-name">朝食・服薬介助</div><div class="sched-detail">全員 — 完了</div><span class="sched-badge" style="background:var(--green-soft);color:var(--green)">完了</span></div>
+              </div>
+              <div class="schedule-item">
+                <div class="sched-time">10:30</div>
+                <div class="sched-bar" style="background:var(--accent)"></div>
+                <div><div class="sched-name">バイタル測定</div><div class="sched-detail">全員 — 田中看護師</div><span class="sched-badge" style="background:var(--green-soft);color:var(--green)">完了</span></div>
+              </div>
+              <div class="schedule-item">
+                <div class="sched-time">13:00</div>
+                <div class="sched-bar" style="background:var(--amber)"></div>
+                <div><div class="sched-name">入浴介助</div><div class="sched-detail">山田様・鈴木様 — 進行中</div><span class="sched-badge" style="background:var(--amber-soft);color:var(--amber)">進行中</span></div>
+              </div>
+              <div class="schedule-item">
+                <div class="sched-time">15:00</div>
+                <div class="sched-bar" style="background:var(--purple)"></div>
+                <div><div class="sched-name">リハビリ訓練</div><div class="sched-detail">田中様・高橋様</div><span class="sched-badge" style="background:var(--purple-soft);color:var(--purple)">予定</span></div>
+              </div>
+              <div class="schedule-item">
+                <div class="sched-time">17:30</div>
+                <div class="sched-bar" style="background:var(--accent)"></div>
+                <div><div class="sched-name">夕食・服薬介助</div><div class="sched-detail">全員</div><span class="sched-badge" style="background:var(--surface2);color:var(--ink3)">未定</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vitals summary -->
+          <div class="card">
+            <div class="card-header"><div class="card-title">バイタルサマリー</div><div style="font-size:0.68rem;color:var(--ink3)">山田 花子様</div></div>
+            <div class="vitals-grid">
+              <div class="vital-card">
+                <div class="vital-label">血圧</div>
+                <div class="vital-val">152<span class="vital-unit">/94</span></div>
+                <div class="vital-status warn">⚠️ 高値</div>
+              </div>
+              <div class="vital-card">
+                <div class="vital-label">体温</div>
+                <div class="vital-val">36.8<span class="vital-unit">℃</span></div>
+                <div class="vital-status ok">✓ 正常</div>
+              </div>
+              <div class="vital-card">
+                <div class="vital-label">SpO2</div>
+                <div class="vital-val">97<span class="vital-unit">%</span></div>
+                <div class="vital-status ok">✓ 正常</div>
+              </div>
+              <div class="vital-card">
+                <div class="vital-label">脈拍</div>
+                <div class="vital-val">78<span class="vital-unit">bpm</span></div>
+                <div class="vital-status ok">✓ 正常</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Medication -->
+          <div class="card">
+            <div class="card-header"><div class="card-title">服薬チェック</div><div style="font-size:0.68rem;color:var(--ink3)">本日 15:00</div></div>
+            <div class="med-list" id="medList"></div>
+            <button class="emergency-btn" onclick="emergency()">🚨 緊急連絡</button>
+            <div style="height:12px"></div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:16px;padding:24px;width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+    <div style="font-size:0.95rem;font-weight:700;margin-bottom:16px">介護記録を追加</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label style="font-size:0.68rem;font-weight:700;color:var(--ink2);letter-spacing:0.1em;text-transform:uppercase;display:block;margin-bottom:5px">入居者</label><select style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--sans);font-size:0.83rem;color:var(--ink);background:var(--surface);outline:none"><option>山田 花子</option><option>鈴木 一郎</option><option>佐藤 美咲</option></select></div>
+      <div><label style="font-size:0.68rem;font-weight:700;color:var(--ink2);letter-spacing:0.1em;text-transform:uppercase;display:block;margin-bottom:5px">ケア内容</label><select style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--sans);font-size:0.83rem;color:var(--ink);background:var(--surface);outline:none"><option>食事介助</option><option>入浴介助</option><option>バイタル測定</option><option>服薬介助</option><option>排泄介助</option><option>リハビリ</option></select></div>
+      <div><label style="font-size:0.68rem;font-weight:700;color:var(--ink2);letter-spacing:0.1em;text-transform:uppercase;display:block;margin-bottom:5px">メモ</label><textarea style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--sans);font-size:0.82rem;color:var(--ink);background:var(--surface);outline:none;resize:none;min-height:70px" placeholder="気になることがあれば記録してください..."></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button onclick="closeModal()" style="padding:8px 16px;border-radius:7px;border:1px solid var(--border);background:transparent;font-family:var(--sans);font-size:0.8rem;cursor:pointer;color:var(--ink2)">キャンセル</button>
+      <button onclick="saveRecord()" style="padding:8px 20px;border-radius:7px;border:none;background:var(--accent);color:white;font-family:var(--sans);font-size:0.8rem;font-weight:700;cursor:pointer">保存する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Residents
+const residents = [
+  { name:'山田 花子', room:'101', age:82, care:3, bp:'152/94', temp:'36.8', status:'watch', staff:'田中', avatar:'#ef4444' },
+  { name:'鈴木 一郎', room:'102', age:78, care:2, bp:'118/72', temp:'36.5', status:'good', staff:'佐藤', avatar:'#3b82f6' },
+  { name:'佐藤 美咲', room:'103', age:85, care:4, bp:'130/85', temp:'36.9', status:'care', staff:'田中', avatar:'#8b5cf6' },
+  { name:'高橋 誠', room:'104', age:76, care:1, bp:'122/78', temp:'36.4', status:'good', staff:'山田', avatar:'#10b981' },
+  { name:'伊藤 春子', room:'105', age:80, care:2, bp:'135/82', temp:'36.7', status:'good', staff:'佐藤', avatar:'#f59e0b' },
+  { name:'渡辺 太郎', room:'106', age:88, care:5, bp:'145/90', temp:'37.2', status:'watch', staff:'田中', avatar:'#ec4899' },
+  { name:'中村 よし', room:'107', age:74, care:1, bp:'120/76', temp:'36.3', status:'visit', staff:'山田', avatar:'#06b6d4' },
+  { name:'小林 みゆき', room:'108', age:81, care:3, bp:'128/80', temp:'36.6', status:'good', staff:'佐藤', avatar:'#84cc16' },
+];
+
+const statusBadge = {
+  good: '<span class="badge badge-good"><span class="badge-dot"></span>良好</span>',
+  watch: '<span class="badge badge-watch"><span class="badge-dot"></span>経過観察</span>',
+  care: '<span class="badge badge-care"><span class="badge-dot"></span>要対応</span>',
+  visit: '<span class="badge badge-visit"><span class="badge-dot"></span>面会中</span>',
+};
+
+function renderResidents() {
+  document.getElementById('residentTable').innerHTML = residents.map(r => `
+    <tr>
+      <td><div class="resident-cell">
+        <div class="resident-avatar" style="background:${r.avatar}">${r.name[0]}</div>
+        <div><div class="resident-name">${r.name}</div><div class="resident-room">${r.room}号室</div></div>
+      </div></td>
+      <td>${r.age}歳</td>
+      <td style="font-family:var(--mono);font-size:0.75rem">要介護 ${r.care}</td>
+      <td style="font-family:var(--mono);font-size:0.75rem;color:${r.bp.split('/')[0]>140?'var(--red)':'var(--ink)'};font-weight:${r.bp.split('/')[0]>140?'700':'400'}">${r.bp}</td>
+      <td style="font-family:var(--mono);font-size:0.75rem;color:${parseFloat(r.temp)>=37?'var(--amber)':'var(--ink)'}">${r.temp}℃</td>
+      <td>${statusBadge[r.status]}</td>
+      <td style="font-size:0.75rem;color:var(--ink2)">${r.staff}</td>
+      <td>
+        <button class="action-btn" onclick="showRecord('${r.name}')">記録</button>
+        <button class="action-btn" onclick="showToast('${r.name}様のバイタル詳細を開きます')">詳細</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+const records = [
+  { time:'15:45', name:'佐藤 美咲', care:'排泄介助', staff:'田中', memo:'異常なし' },
+  { time:'15:20', name:'山田 花子', care:'バイタル測定', staff:'田中', memo:'血圧高値 要報告' },
+  { time:'14:50', name:'鈴木 一郎', care:'リハビリ', staff:'山田', memo:'30分 良好' },
+  { time:'14:30', name:'高橋 誠', care:'食事介助', staff:'佐藤', memo:'完食 良好' },
+  { time:'13:10', name:'渡辺 太郎', care:'入浴介助', staff:'田中', memo:'体調良好' },
+  { time:'12:30', name:'伊藤 春子', care:'昼食介助', staff:'山田', memo:'7割摂取' },
+];
+
+function renderRecords() {
+  document.getElementById('recordTable').innerHTML = records.map(r => `
+    <tr>
+      <td style="font-family:var(--mono);font-size:0.73rem;color:var(--ink3)">${r.time}</td>
+      <td style="font-weight:600;font-size:0.78rem">${r.name}</td>
+      <td><span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:4px;font-size:0.68rem;font-weight:600">${r.care}</span></td>
+      <td style="font-size:0.75rem;color:var(--ink2)">${r.staff}</td>
+      <td style="font-size:0.75rem;color:${r.memo.includes('要')?'var(--red)':'var(--ink3)'}">${r.memo}</td>
+    </tr>
+  `).join('');
+}
+
+const medications = [
+  { emoji:'💊', name:'降圧薬（アムロジピン）', time:'15:00', done: false },
+  { emoji:'💊', name:'血液サラサラ薬', time:'15:00', done: true },
+  { emoji:'💉', name:'インスリン注射', time:'15:00', done: false },
+  { emoji:'💊', name:'胃薬（オメプラゾール）', time:'15:00', done: true },
+];
+
+function renderMeds() {
+  document.getElementById('medList').innerHTML = medications.map((m,i) => `
+    <div class="med-item">
+      <div class="med-icon" style="background:${m.done?'var(--green-soft)':'var(--surface2)'}">${m.emoji}</div>
+      <div style="flex:1"><div class="med-name" style="text-decoration:${m.done?'line-through':'none'};opacity:${m.done?0.5:1}">${m.name}</div><div class="med-time">${m.time}</div></div>
+      <div class="med-check ${m.done?'done':''}" onclick="toggleMed(${i})">${m.done?'✓':''}</div>
+    </div>
+  `).join('');
+}
+
+function toggleMed(i) { medications[i].done = !medications[i].done; renderMeds(); if (medications[i].done) showToast('服薬確認しました'); }
+
+function setActive(el) { document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); el.classList.add('active'); }
+function showRecord(name) { showToast(`${name}様の介護記録を開きます`); }
+function addResident() { showToast('入居者追加フォームを開きます'); }
+function addRecord() { openModal(); }
+function openRecord() { openModal(); }
+function openModal() { document.getElementById('modal').style.display = 'flex'; }
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+function saveRecord() { closeModal(); showToast('介護記録を保存しました'); }
+function emergency() {
+  if (confirm('緊急連絡を送信しますか？\n対象: 担当医・家族・管理者')) { showToast('🚨 緊急連絡を送信しました'); }
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('headerTime').textContent = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#1a2540;color:white;padding:10px 16px;border-radius:9px;font-size:0.78rem;z-index:999;transform:translateY(60px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);font-family:var(--sans)'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.style.transform = 'translateY(0)'; t.style.opacity = '1';
+  setTimeout(() => { t.style.transform = 'translateY(60px)'; t.style.opacity = '0'; }, 3000);
+}
+
+document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+renderResidents();
+renderRecords();
+renderMeds();
+</script>
+</body>
+</html>

@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InvoiceFlow — 請求書自動発行ツール</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface2: #f8f9fc;
+  --border: #e8eaf0;
+  --ink: #16192c;
+  --ink2: #5a607f;
+  --ink3: #a0a5bc;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --accent-dark: #1d4ed8;
+  --green: #059669;
+  --green-soft: #ecfdf5;
+  --amber: #d97706;
+  --amber-soft: #fffbeb;
+  --red: #dc2626;
+  --red-soft: #fef2f2;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow: 0 4px 20px rgba(0,0,0,0.07);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.1);
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.app { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px;
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 50;
+}
+.sidebar-logo {
+  padding: 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-icon {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.logo-icon svg { width: 16px; height: 16px; color: white; }
+.logo-text { font-weight: 700; font-size: 1rem; color: white; }
+.logo-sub { font-size: 0.6rem; color: rgba(255,255,255,0.35); letter-spacing: 0.1em; margin-top: 1px; }
+
+.sidebar-nav { padding: 12px 10px; flex: 1; }
+.nav-label { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.28); padding: 0 8px; margin: 12px 0 6px; }
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: 7px;
+  cursor: pointer; color: rgba(255,255,255,0.5);
+  font-size: 0.84rem; font-weight: 400;
+  transition: all 0.2s; margin-bottom: 2px;
+}
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+.nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+.nav-item.active { background: var(--accent); color: white; font-weight: 500; }
+.nav-badge {
+  margin-left: auto; background: var(--red); color: white;
+  font-size: 0.62rem; font-weight: 700; padding: 1px 6px;
+  border-radius: 99px;
+}
+
+.sidebar-footer {
+  padding: 12px 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.user-card { display: flex; align-items: center; gap: 9px; padding: 6px 8px; }
+.avatar { width: 30px; height: 30px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; color: white; flex-shrink: 0; }
+.user-name { font-size: 0.8rem; font-weight: 500; color: white; }
+.user-role { font-size: 0.67rem; color: rgba(255,255,255,0.35); }
+
+/* ── Main ── */
+.main { margin-left: 220px; flex: 1; display: flex; flex-direction: column; }
+
+/* ── Topbar ── */
+.topbar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 24px; height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 40;
+}
+.page-title { font-size: 0.95rem; font-weight: 600; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--radius-sm);
+  font-size: 0.8rem; font-weight: 500; cursor: pointer;
+  border: none; transition: all 0.2s; font-family: inherit;
+}
+.btn svg { width: 13px; height: 13px; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+.btn-ghost { background: transparent; color: var(--ink2); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface2); }
+.btn-green { background: var(--green); color: white; }
+.btn-green:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+
+/* ── Content ── */
+.content { padding: 24px; flex: 1; }
+
+/* ── Stats ── */
+.stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 22px; }
+.stat-card {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 18px; border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm); transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.stat-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.stat-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.stat-icon svg { width: 16px; height: 16px; }
+.stat-icon.blue { background: var(--accent-soft); color: var(--accent); }
+.stat-icon.green { background: var(--green-soft); color: var(--green); }
+.stat-icon.amber { background: var(--amber-soft); color: var(--amber); }
+.stat-icon.red { background: var(--red-soft); color: var(--red); }
+.stat-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+.stat-label { font-size: 0.75rem; color: var(--ink2); margin-top: 3px; }
+.stat-change { font-size: 0.7rem; margin-top: 8px; }
+.stat-change.up { color: var(--green); }
+.stat-change.down { color: var(--red); }
+
+/* ── Two column ── */
+.two-col { display: grid; grid-template-columns: 1fr 400px; gap: 18px; }
+
+/* ── Card ── */
+.card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-sm); overflow: hidden; }
+.card-header { padding: 16px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 0.88rem; font-weight: 600; }
+.card-sub { font-size: 0.72rem; color: var(--ink3); margin-top: 1px; }
+
+/* ── Invoice Form ── */
+.invoice-form { padding: 20px; }
+.form-section { margin-bottom: 22px; }
+.form-section-title {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--ink3); margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.form-grid { display: grid; gap: 12px; }
+.form-grid.col2 { grid-template-columns: 1fr 1fr; }
+.form-grid.col3 { grid-template-columns: 1fr 1fr 1fr; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field.full { grid-column: 1/-1; }
+label { font-size: 0.72rem; font-weight: 600; color: var(--ink2); }
+input, select, textarea {
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px 11px; font-size: 0.83rem; font-family: inherit;
+  color: var(--ink); background: var(--surface); outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+input::placeholder { color: var(--ink3); }
+
+/* ── Line Items ── */
+.line-items-table { width: 100%; }
+.line-items-header {
+  display: grid; grid-template-columns: 1fr 80px 100px 100px 36px;
+  gap: 8px; padding: 8px 0;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink3);
+  border-bottom: 1px solid var(--border); margin-bottom: 6px;
+}
+.line-item {
+  display: grid; grid-template-columns: 1fr 80px 100px 100px 36px;
+  gap: 8px; margin-bottom: 8px; align-items: center;
+}
+.line-item input { padding: 7px 10px; font-size: 0.82rem; }
+.line-total {
+  font-family: 'DM Mono', monospace; font-size: 0.82rem;
+  color: var(--ink); background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 7px 10px; text-align: right;
+}
+.del-btn {
+  width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; color: var(--ink3);
+  transition: all 0.15s; flex-shrink: 0;
+}
+.del-btn:hover { background: var(--red-soft); color: var(--red); border-color: var(--red); }
+.del-btn svg { width: 13px; height: 13px; }
+.add-row-btn {
+  display: flex; align-items: center; gap: 6px; padding: 8px 0;
+  font-size: 0.78rem; color: var(--accent); cursor: pointer;
+  border: none; background: transparent; font-family: inherit;
+  transition: gap 0.2s;
+}
+.add-row-btn:hover { gap: 9px; }
+.add-row-btn svg { width: 14px; height: 14px; }
+
+/* Totals */
+.totals-box { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px 16px; margin-top: 16px; }
+.total-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 0.83rem; }
+.total-row.divider { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 10px; }
+.total-row .label { color: var(--ink2); }
+.total-row .value { font-family: 'DM Mono', monospace; color: var(--ink); }
+.total-row.grand { }
+.total-row.grand .label { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
+.total-row.grand .value { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
+
+.form-actions { display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border); background: var(--surface2); }
+
+/* ── Preview ── */
+.preview-wrap { display: flex; flex-direction: column; gap: 14px; }
+.preview-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+.invoice-preview { padding: 24px; }
+.inv-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 3px solid var(--accent); }
+.inv-company { font-weight: 700; font-size: 1rem; color: var(--ink); margin-bottom: 4px; }
+.inv-company-detail { font-size: 0.75rem; color: var(--ink2); line-height: 1.7; }
+.inv-badge {
+  font-family: 'DM Mono', monospace; font-size: 0.65rem;
+  letter-spacing: 0.15em; color: var(--accent); background: var(--accent-soft);
+  padding: 3px 10px; border-radius: 4px; margin-bottom: 6px; display: inline-block;
+}
+.inv-number { font-size: 1.2rem; font-weight: 700; color: var(--ink); }
+.inv-date { font-size: 0.72rem; color: var(--ink2); margin-top: 3px; }
+
+.inv-to { margin-bottom: 18px; }
+.inv-to-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink3); margin-bottom: 5px; }
+.inv-to-name { font-size: 0.92rem; font-weight: 600; color: var(--ink); }
+.inv-to-detail { font-size: 0.75rem; color: var(--ink2); line-height: 1.7; }
+
+.inv-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 0.8rem; }
+.inv-table th { padding: 7px 10px; background: var(--surface2); font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); text-align: left; border-bottom: 1px solid var(--border); }
+.inv-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: middle; }
+.inv-table tr:last-child td { border-bottom: none; }
+.inv-table .num { text-align: right; font-family: 'DM Mono', monospace; }
+
+.inv-totals { margin-left: auto; width: 220px; }
+.inv-total-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.8rem; }
+.inv-total-row .lbl { color: var(--ink2); }
+.inv-total-row .val { font-family: 'DM Mono', monospace; }
+.inv-total-row.grand { border-top: 2px solid var(--ink); margin-top: 6px; padding-top: 8px; }
+.inv-total-row.grand .lbl { font-weight: 700; color: var(--ink); }
+.inv-total-row.grand .val { font-weight: 700; color: var(--accent); font-size: 1rem; }
+
+.inv-note { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 0.75rem; color: var(--ink2); line-height: 1.8; }
+.inv-note strong { color: var(--ink); }
+
+/* ── History ── */
+.history-list { padding: 0; }
+.history-item {
+  display: grid; grid-template-columns: 1fr auto;
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+  align-items: center; transition: background 0.15s; cursor: pointer;
+}
+.history-item:last-child { border-bottom: none; }
+.history-item:hover { background: var(--surface2); }
+.history-num { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--ink3); margin-bottom: 3px; }
+.history-client { font-size: 0.83rem; font-weight: 500; color: var(--ink); }
+.history-date { font-size: 0.72rem; color: var(--ink3); margin-top: 2px; }
+.history-right { text-align: right; }
+.history-amount { font-family: 'DM Mono', monospace; font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 99px; font-size: 0.68rem; font-weight: 600;
+  margin-top: 4px;
+}
+.badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+.badge-paid { background: var(--green-soft); color: var(--green); }
+.badge-paid .badge-dot { background: var(--green); }
+.badge-pending { background: var(--amber-soft); color: var(--amber); }
+.badge-pending .badge-dot { background: var(--amber); }
+.badge-draft { background: var(--surface2); color: var(--ink3); border: 1px solid var(--border); }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--ink); color: white; padding: 11px 16px;
+  border-radius: 10px; font-size: 0.82rem; box-shadow: var(--shadow-lg);
+  display: flex; align-items: center; gap: 8px; z-index: 200;
+  transform: translateY(70px); opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-icon { color: var(--green); }
+
+/* Print styles */
+@media print {
+  .sidebar, .main > .topbar, .form-actions, .preview-wrap > .card:last-child { display: none !important; }
+  .main { margin-left: 0 !important; }
+  .two-col { grid-template-columns: 1fr !important; }
+  .invoice-preview { padding: 0 !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">InvoiceFlow</div>
+      <div class="logo-sub">請求書管理</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">メイン</div>
+    <div class="nav-item active" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      ダッシュボード
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      請求書一覧
+      <span class="nav-badge">2</span>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      取引先管理
+    </div>
+    <div class="nav-label">管理</div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      レポート
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      設定
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="avatar">田</div>
+      <div>
+        <div class="user-name">田中 健一</div>
+        <div class="user-role">管理者</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="page-title">請求書作成</div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm" onclick="showToast('下書きを保存しました')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        下書き保存
+      </button>
+      <button class="btn btn-green btn-sm" onclick="printInvoice()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        印刷・PDF
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        </div>
+        <div class="stat-value">48</div>
+        <div class="stat-label">今月の発行数</div>
+        <div class="stat-change up">↑ 12件 先月比</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        </div>
+        <div class="stat-value">¥2.4M</div>
+        <div class="stat-label">入金済み合計</div>
+        <div class="stat-change up">↑ 18% 先月比</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+        </div>
+        <div class="stat-value">¥680k</div>
+        <div class="stat-label">入金待ち</div>
+        <div class="stat-change down">2件 未入金</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+        </div>
+        <div class="stat-value">23</div>
+        <div class="stat-label">取引先数</div>
+        <div class="stat-change up">↑ 3社 先月比</div>
+      </div>
+    </div>
+
+    <!-- Two col -->
+    <div class="two-col">
+
+      <!-- Form -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">新規請求書作成</div>
+            <div class="card-sub">入力内容がリアルタイムでプレビューに反映されます</div>
+          </div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--ink3);" id="invNumDisplay">INV-2026-048</div>
+        </div>
+        <div class="invoice-form">
+
+          <!-- 請求先 -->
+          <div class="form-section">
+            <div class="form-section-title">請求先情報</div>
+            <div class="form-grid col2">
+              <div class="field">
+                <label>会社名・氏名</label>
+                <input type="text" id="clientName" placeholder="株式会社〇〇" oninput="updatePreview()">
+              </div>
+              <div class="field">
+                <label>担当者名</label>
+                <input type="text" id="clientContact" placeholder="山田 太郎 様" oninput="updatePreview()">
+              </div>
+              <div class="field full">
+                <label>住所</label>
+                <input type="text" id="clientAddress" placeholder="東京都〇〇区〇〇1-2-3" oninput="updatePreview()">
+              </div>
+            </div>
+          </div>
+
+          <!-- 請求情報 -->
+          <div class="form-section">
+            <div class="form-section-title">請求情報</div>
+            <div class="form-grid col3">
+              <div class="field">
+                <label>発行日</label>
+                <input type="date" id="issueDate" oninput="updatePreview()">
+              </div>
+              <div class="field">
+                <label>支払期限</label>
+                <input type="date" id="dueDate" oninput="updatePreview()">
+              </div>
+              <div class="field">
+                <label>消費税率</label>
+                <select id="taxRate" onchange="calcTotals()">
+                  <option value="10">10%</option>
+                  <option value="8">8%（軽減）</option>
+                  <option value="0">0%</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 明細 -->
+          <div class="form-section">
+            <div class="form-section-title">明細</div>
+            <div class="line-items-table">
+              <div class="line-items-header">
+                <span>品目・内容</span>
+                <span style="text-align:center">数量</span>
+                <span style="text-align:right">単価</span>
+                <span style="text-align:right">金額</span>
+                <span></span>
+              </div>
+              <div id="lineItems"></div>
+            </div>
+            <button class="add-row-btn" onclick="addRow()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+              明細を追加
+            </button>
+            <div class="totals-box" id="totalsBox">
+              <div class="total-row"><span class="label">小計</span><span class="value" id="subtotalDisp">¥0</span></div>
+              <div class="total-row"><span class="label">消費税（10%）</span><span class="value" id="taxDisp">¥0</span></div>
+              <div class="total-row divider grand"><span class="label">合計金額</span><span class="value" id="totalDisp">¥0</span></div>
+            </div>
+          </div>
+
+          <!-- 備考 -->
+          <div class="form-section">
+            <div class="form-section-title">備考・振込先</div>
+            <div class="form-grid">
+              <div class="field">
+                <label>振込先</label>
+                <input type="text" id="bankInfo" placeholder="〇〇銀行 〇〇支店 普通 1234567" oninput="updatePreview()">
+              </div>
+              <div class="field">
+                <label>備考</label>
+                <input type="text" id="notes" placeholder="お支払いは期限内にお願いいたします。" oninput="updatePreview()">
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="resetForm()">リセット</button>
+          <button class="btn btn-ghost" onclick="showToast('下書きを保存しました')">下書き保存</button>
+          <button class="btn btn-primary" onclick="sendInvoice()" style="margin-left:auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            発行・送信
+          </button>
+        </div>
+      </div>
+
+      <!-- Right -->
+      <div class="preview-wrap">
+
+        <!-- Preview -->
+        <div class="preview-card">
+          <div class="card-header">
+            <div class="card-title">プレビュー</div>
+            <button class="btn btn-ghost btn-sm" onclick="printInvoice()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              印刷
+            </button>
+          </div>
+          <div class="invoice-preview" id="invoicePreview">
+            <div class="inv-header">
+              <div>
+                <div class="inv-company">田中 Web制作事務所</div>
+                <div class="inv-company-detail">
+                  東京都渋谷区〇〇1-2-3<br>
+                  TEL: 03-1234-5678<br>
+                  tanaka@example.com
+                </div>
+              </div>
+              <div style="text-align:right">
+                <div class="inv-badge">INVOICE</div>
+                <div class="inv-number" id="prevInvNum">INV-2026-048</div>
+                <div class="inv-date">発行日：<span id="prevIssueDate">—</span></div>
+                <div class="inv-date">支払期限：<span id="prevDueDate">—</span></div>
+              </div>
+            </div>
+            <div class="inv-to">
+              <div class="inv-to-label">請求先</div>
+              <div class="inv-to-name" id="prevClientName">—</div>
+              <div class="inv-to-detail" id="prevClientDetail">—</div>
+            </div>
+            <table class="inv-table">
+              <thead>
+                <tr>
+                  <th>品目・内容</th>
+                  <th class="num">数量</th>
+                  <th class="num">単価</th>
+                  <th class="num">金額</th>
+                </tr>
+              </thead>
+              <tbody id="prevLineItems"></tbody>
+            </table>
+            <div class="inv-totals">
+              <div class="inv-total-row"><span class="lbl">小計</span><span class="val" id="prevSubtotal">¥0</span></div>
+              <div class="inv-total-row"><span class="lbl" id="prevTaxLabel">消費税（10%）</span><span class="val" id="prevTax">¥0</span></div>
+              <div class="inv-total-row grand"><span class="lbl">合計金額</span><span class="val" id="prevTotal">¥0</span></div>
+            </div>
+            <div class="inv-note" id="prevNote"></div>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">発行履歴</div>
+          </div>
+          <div class="history-list">
+            <div class="history-item">
+              <div>
+                <div class="history-num">INV-2026-047</div>
+                <div class="history-client">株式会社ABC</div>
+                <div class="history-date">2026/05/01</div>
+              </div>
+              <div class="history-right">
+                <div class="history-amount">¥330,000</div>
+                <div><span class="badge badge-paid"><span class="badge-dot"></span>入金済み</span></div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div>
+                <div class="history-num">INV-2026-046</div>
+                <div class="history-client">山田商事</div>
+                <div class="history-date">2026/04/28</div>
+              </div>
+              <div class="history-right">
+                <div class="history-amount">¥220,000</div>
+                <div><span class="badge badge-pending"><span class="badge-dot"></span>入金待ち</span></div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div>
+                <div class="history-num">INV-2026-045</div>
+                <div class="history-client">鈴木デザイン</div>
+                <div class="history-date">2026/04/20</div>
+              </div>
+              <div class="history-right">
+                <div class="history-amount">¥165,000</div>
+                <div><span class="badge badge-paid"><span class="badge-dot"></span>入金済み</span></div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div>
+                <div class="history-num">INV-2026-044</div>
+                <div class="history-client">佐藤商店</div>
+                <div class="history-date">2026/04/15</div>
+              </div>
+              <div class="history-right">
+                <div class="history-amount">¥88,000</div>
+                <div><span class="badge badge-draft">下書き</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <span class="toast-icon">✓</span>
+  <span id="toastMsg">保存しました</span>
+</div>
+
+<script>
+// ── State ──
+let rows = [];
+let invCounter = 48;
+
+function fmt(n) {
+  return '¥' + Math.round(n).toLocaleString('ja-JP');
+}
+
+// ── Init ──
+function init() {
+  const today = new Date();
+  const due = new Date(today);
+  due.setMonth(due.getMonth() + 1);
+  due.setDate(0);
+
+  document.getElementById('issueDate').value = today.toISOString().split('T')[0];
+  document.getElementById('dueDate').value = due.toISOString().split('T')[0];
+
+  addRow('Webサイト制作（LP）', 1, 120000);
+  addRow('月額保守・管理', 1, 20000);
+  addRow('', 1, 0);
+  updatePreview();
+}
+
+// ── Rows ──
+function addRow(name='', qty=1, price=0) {
+  const id = Date.now() + Math.random();
+  rows.push({ id, name, qty, price });
+  renderRows();
+  calcTotals();
+}
+
+function renderRows() {
+  const container = document.getElementById('lineItems');
+  container.innerHTML = rows.map((r,i) => `
+    <div class="line-item" id="row-${r.id}">
+      <input type="text" placeholder="品目・サービス内容" value="${r.name}" oninput="updateRow(${r.id},'name',this.value)">
+      <input type="number" placeholder="1" value="${r.qty || ''}" min="1" style="text-align:center" oninput="updateRow(${r.id},'qty',this.value)">
+      <input type="number" placeholder="0" value="${r.price || ''}" min="0" style="text-align:right" oninput="updateRow(${r.id},'price',this.value)">
+      <div class="line-total">${fmt((r.qty||0)*(r.price||0))}</div>
+      <button class="del-btn" onclick="delRow(${r.id})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function updateRow(id, field, val) {
+  const row = rows.find(r => r.id === id);
+  if (!row) return;
+  if (field === 'qty' || field === 'price') row[field] = parseFloat(val) || 0;
+  else row[field] = val;
+  const totalEl = document.querySelector(`#row-${id} .line-total`);
+  if (totalEl) totalEl.textContent = fmt((row.qty||0)*(row.price||0));
+  calcTotals();
+  updatePreview();
+}
+
+function delRow(id) {
+  rows = rows.filter(r => r.id !== id);
+  renderRows();
+  calcTotals();
+  updatePreview();
+}
+
+// ── Calc ──
+function calcTotals() {
+  const subtotal = rows.reduce((s, r) => s + (r.qty||0)*(r.price||0), 0);
+  const taxRate = parseInt(document.getElementById('taxRate').value) / 100;
+  const tax = subtotal * taxRate;
+  const total = subtotal + tax;
+
+  document.getElementById('subtotalDisp').textContent = fmt(subtotal);
+  document.getElementById('taxDisp').textContent = fmt(tax);
+  document.getElementById('totalDisp').textContent = fmt(total);
+
+  const taxLabel = document.getElementById('taxRate').value;
+  document.getElementById('totalsBox').querySelector('.total-row:nth-child(2) .label').textContent = `消費税（${taxLabel}%）`;
+
+  updatePreview();
+}
+
+// ── Preview ──
+function updatePreview() {
+  const clientName = document.getElementById('clientName').value || '—';
+  const clientContact = document.getElementById('clientContact').value;
+  const clientAddress = document.getElementById('clientAddress').value;
+  const issueDate = document.getElementById('issueDate').value;
+  const dueDate = document.getElementById('dueDate').value;
+  const bankInfo = document.getElementById('bankInfo').value;
+  const notes = document.getElementById('notes').value;
+  const taxRate = parseInt(document.getElementById('taxRate').value);
+
+  document.getElementById('prevClientName').textContent = clientName;
+  document.getElementById('prevClientDetail').innerHTML = [clientContact, clientAddress].filter(Boolean).join('<br>') || '—';
+  document.getElementById('prevIssueDate').textContent = issueDate ? issueDate.replace(/-/g,'/') : '—';
+  document.getElementById('prevDueDate').textContent = dueDate ? dueDate.replace(/-/g,'/') : '—';
+
+  // Line items
+  const tbody = document.getElementById('prevLineItems');
+  tbody.innerHTML = rows.filter(r => r.name || r.price).map(r => `
+    <tr>
+      <td>${r.name || '—'}</td>
+      <td class="num">${r.qty || 0}</td>
+      <td class="num">${fmt(r.price || 0)}</td>
+      <td class="num">${fmt((r.qty||0)*(r.price||0))}</td>
+    </tr>
+  `).join('');
+
+  // Totals
+  const subtotal = rows.reduce((s, r) => s + (r.qty||0)*(r.price||0), 0);
+  const tax = subtotal * (taxRate / 100);
+  const total = subtotal + tax;
+  document.getElementById('prevSubtotal').textContent = fmt(subtotal);
+  document.getElementById('prevTax').textContent = fmt(tax);
+  document.getElementById('prevTotal').textContent = fmt(total);
+  document.getElementById('prevTaxLabel').textContent = `消費税（${taxRate}%）`;
+
+  // Note
+  const noteEl = document.getElementById('prevNote');
+  const noteParts = [];
+  if (bankInfo) noteParts.push(`<strong>お振込先：</strong>${bankInfo}`);
+  if (notes) noteParts.push(notes);
+  noteEl.innerHTML = noteParts.join('<br>');
+}
+
+// ── Actions ──
+function sendInvoice() {
+  const name = document.getElementById('clientName').value;
+  if (!name) { showToast('請求先を入力してください'); return; }
+  invCounter++;
+  showToast(`${name} 宛に請求書を発行しました`);
+}
+
+function resetForm() {
+  ['clientName','clientContact','clientAddress','bankInfo','notes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  rows = [];
+  addRow('', 1, 0);
+  calcTotals();
+  updatePreview();
+}
+
+function printInvoice() {
+  window.print();
+}
+
+function setActive(el) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+init();
+</script>
+</body>
+</html>

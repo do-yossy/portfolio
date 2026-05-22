@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TimeFlow — 勤怠管理システム</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface2: #f8f9fd;
+  --border: #e6e9f4;
+  --ink: #111827;
+  --ink2: #6b7280;
+  --ink3: #9ca3af;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+  --accent-dark: #4338ca;
+  --green: #059669;
+  --green-soft: #ecfdf5;
+  --amber: #d97706;
+  --amber-soft: #fffbeb;
+  --red: #dc2626;
+  --red-soft: #fef2f2;
+  --blue: #2563eb;
+  --blue-soft: #eff6ff;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow: 0 4px 20px rgba(0,0,0,0.07);
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 230px;
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 50;
+}
+.sidebar-logo {
+  padding: 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-icon {
+  width: 34px; height: 34px;
+  background: var(--accent);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.logo-icon svg { width: 18px; height: 18px; color: white; }
+.logo-text { font-weight: 700; font-size: 1rem; color: white; letter-spacing: -0.01em; }
+.logo-sub { font-size: 0.6rem; color: rgba(255,255,255,0.3); letter-spacing: 0.1em; margin-top: 1px; }
+
+.sidebar-nav { padding: 14px 10px; flex: 1; overflow-y: auto; }
+.nav-label { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.25); padding: 0 8px; margin: 14px 0 5px; }
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: 8px;
+  cursor: pointer; color: rgba(255,255,255,0.5);
+  font-size: 0.84rem; transition: all 0.2s; margin-bottom: 2px;
+}
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+.nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+.nav-item.active { background: var(--accent); color: white; font-weight: 500; }
+.nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 99px; }
+
+.sidebar-footer { padding: 14px 10px; border-top: 1px solid rgba(255,255,255,0.06); }
+.user-card { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+.user-card:hover { background: rgba(255,255,255,0.05); }
+.avatar { width: 32px; height: 32px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.72rem; color: white; flex-shrink: 0; }
+.user-name { font-size: 0.82rem; font-weight: 500; color: white; }
+.user-role { font-size: 0.68rem; color: rgba(255,255,255,0.35); }
+
+/* ── Main ── */
+.main { margin-left: 230px; flex: 1; display: flex; flex-direction: column; }
+
+/* ── Topbar ── */
+.topbar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 26px; height: 58px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 40;
+  box-shadow: var(--shadow-sm);
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.page-title { font-size: 0.95rem; font-weight: 600; }
+.page-date { font-size: 0.78rem; color: var(--ink3); padding: 4px 10px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--border); font-family: 'DM Mono', monospace; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--radius-sm);
+  font-size: 0.8rem; font-weight: 500; cursor: pointer;
+  border: none; transition: all 0.2s; font-family: inherit;
+}
+.btn svg { width: 13px; height: 13px; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79,70,229,0.3); }
+.btn-ghost { background: transparent; color: var(--ink2); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface2); }
+.btn-green { background: var(--green); color: white; }
+.btn-green:hover { opacity: 0.9; }
+.btn-red { background: var(--red); color: white; }
+.btn-red:hover { opacity: 0.9; }
+
+/* ── Content ── */
+.content { padding: 24px; flex: 1; }
+
+/* ── Clock Card ── */
+.clock-card {
+  background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+  border-radius: var(--radius);
+  padding: 28px;
+  color: white;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(79,70,229,0.3);
+}
+.clock-card::before {
+  content: "";
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 200px; height: 200px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 50%;
+}
+.clock-card::after {
+  content: "";
+  position: absolute;
+  bottom: -80px; right: 60px;
+  width: 250px; height: 250px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 50%;
+}
+.clock-inner { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2rem; }
+.clock-left {}
+.clock-greeting { font-size: 0.78rem; color: rgba(255,255,255,0.7); letter-spacing: 0.1em; margin-bottom: 4px; }
+.clock-name { font-size: 1.2rem; font-weight: 700; margin-bottom: 1.2rem; }
+.clock-time { font-family: 'DM Mono', monospace; font-size: 3rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; }
+.clock-date-str { font-size: 0.82rem; color: rgba(255,255,255,0.7); }
+.clock-actions { display: flex; gap: 10px; margin-top: 1.5rem; }
+.clock-btn {
+  padding: 10px 22px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.clock-btn svg { width: 14px; height: 14px; }
+.clock-btn-in { background: white; color: var(--accent); }
+.clock-btn-in:hover { background: rgba(255,255,255,0.9); transform: translateY(-1px); }
+.clock-btn-out { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
+.clock-btn-out:hover { background: rgba(255,255,255,0.2); }
+.clock-btn-break { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); }
+.clock-btn-break:hover { background: rgba(255,255,255,0.15); }
+
+.clock-right { text-align: center; }
+.today-status { display: flex; flex-direction: column; gap: 12px; }
+.status-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 16px; text-align: left; min-width: 140px; }
+.status-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+.status-value { font-family: 'DM Mono', monospace; font-size: 1.1rem; font-weight: 700; color: white; }
+.status-sub { font-size: 0.68rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
+
+/* ── Stats ── */
+.stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 18px; border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm); transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.stat-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.stat-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.stat-icon svg { width: 16px; height: 16px; }
+.stat-icon.indigo { background: var(--accent-soft); color: var(--accent); }
+.stat-icon.green { background: var(--green-soft); color: var(--green); }
+.stat-icon.amber { background: var(--amber-soft); color: var(--amber); }
+.stat-icon.red { background: var(--red-soft); color: var(--red); }
+.stat-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); line-height: 1; }
+.stat-label { font-size: 0.75rem; color: var(--ink2); margin-top: 4px; }
+.stat-change { font-size: 0.7rem; margin-top: 8px; }
+.stat-change.up { color: var(--green); }
+.stat-change.down { color: var(--red); }
+.stat-change.neutral { color: var(--ink3); }
+
+/* ── Grid ── */
+.content-grid { display: grid; grid-template-columns: 1fr 300px; gap: 18px; }
+
+/* ── Card ── */
+.card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-sm); overflow: hidden; }
+.card-header { padding: 16px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 0.88rem; font-weight: 600; }
+.card-sub { font-size: 0.72rem; color: var(--ink3); margin-top: 1px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 3px; }
+.tab { padding: 5px 12px; border-radius: 6px; font-size: 0.77rem; cursor: pointer; color: var(--ink2); border: none; background: transparent; font-family: inherit; transition: all 0.15s; }
+.tab.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.tab:hover:not(.active) { background: var(--surface2); }
+
+/* ── Table ── */
+table { width: 100%; border-collapse: collapse; }
+thead tr { border-bottom: 1px solid var(--border); }
+th { padding: 10px 16px; text-align: left; font-size: 0.68rem; font-weight: 600; color: var(--ink3); letter-spacing: 0.1em; text-transform: uppercase; background: var(--surface2); }
+td { padding: 13px 16px; font-size: 0.83rem; color: var(--ink); border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { transition: background 0.15s; cursor: pointer; }
+tbody tr:hover { background: var(--surface2); }
+
+.emp-cell { display: flex; align-items: center; gap: 10px; }
+.avatar-sm { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; flex-shrink: 0; }
+.emp-name { font-weight: 500; }
+.emp-dept { font-size: 0.72rem; color: var(--ink3); }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; font-size: 0.7rem; font-weight: 600; }
+.badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+.badge-working { background: var(--green-soft); color: var(--green); }
+.badge-working .badge-dot { background: var(--green); animation: blink 1.5s ease infinite; }
+.badge-break { background: var(--amber-soft); color: var(--amber); }
+.badge-break .badge-dot { background: var(--amber); }
+.badge-out { background: var(--surface2); color: var(--ink3); border: 1px solid var(--border); }
+.badge-absent { background: var(--red-soft); color: var(--red); }
+.badge-absent .badge-dot { background: var(--red); }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.time-cell { font-family: 'DM Mono', monospace; font-size: 0.82rem; }
+.overtime { color: var(--red); font-weight: 600; }
+
+/* ── Right Panel ── */
+.panel-stack { display: flex; flex-direction: column; gap: 16px; }
+
+/* Calendar */
+.mini-cal { padding: 16px; }
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cal-title { font-size: 0.85rem; font-weight: 600; }
+.cal-nav { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink2); font-size: 0.75rem; transition: all 0.15s; }
+.cal-nav:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+.cal-day-name { text-align: center; font-size: 0.62rem; font-weight: 600; color: var(--ink3); padding: 4px 0; letter-spacing: 0.05em; }
+.cal-day { text-align: center; padding: 5px 2px; border-radius: 6px; font-size: 0.77rem; cursor: pointer; color: var(--ink2); transition: all 0.15s; position: relative; }
+.cal-day:hover { background: var(--surface2); }
+.cal-day.today { background: var(--accent); color: white; font-weight: 700; }
+.cal-day.has-event::after { content: ""; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.cal-day.today::after { background: white; }
+.cal-day.holiday { color: var(--red); }
+.cal-day.other { color: var(--ink3); opacity: 0.4; }
+
+/* Alerts */
+.alert-list { padding: 0; }
+.alert-item { display: flex; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: flex-start; }
+.alert-item:last-child { border-bottom: none; }
+.alert-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.alert-icon svg { width: 13px; height: 13px; }
+.alert-icon.amber { background: var(--amber-soft); color: var(--amber); }
+.alert-icon.red { background: var(--red-soft); color: var(--red); }
+.alert-icon.blue { background: var(--blue-soft); color: var(--blue); }
+.alert-title { font-size: 0.8rem; font-weight: 500; color: var(--ink); }
+.alert-sub { font-size: 0.72rem; color: var(--ink3); margin-top: 1px; }
+
+/* Summary */
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px; }
+.sum-item { background: var(--surface2); border-radius: var(--radius-sm); padding: 12px; border: 1px solid var(--border); }
+.sum-val { font-size: 1.2rem; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+.sum-lbl { font-size: 0.68rem; color: var(--ink3); margin-top: 2px; }
+
+/* Progress bar */
+.progress-wrap { padding: 16px; }
+.progress-item { margin-bottom: 14px; }
+.progress-item:last-child { margin-bottom: 0; }
+.progress-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.78rem; }
+.progress-label { color: var(--ink2); }
+.progress-val { font-weight: 600; color: var(--ink); font-family: 'DM Mono', monospace; }
+.progress-bar { height: 6px; background: var(--surface2); border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
+.progress-fill { height: 100%; border-radius: 99px; transition: width 1s ease; }
+.progress-fill.indigo { background: var(--accent); }
+.progress-fill.green { background: var(--green); }
+.progress-fill.amber { background: var(--amber); }
+.progress-fill.red { background: var(--red); }
+
+/* Toast */
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--ink); color: white; padding: 11px 16px; border-radius: 10px; font-size: 0.82rem; box-shadow: var(--shadow); display: flex; align-items: center; gap: 8px; z-index: 200; transform: translateY(70px); opacity: 0; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-icon { color: var(--green); }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.25s; backdrop-filter: blur(4px); }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--surface); border-radius: 18px; width: 100%; max-width: 420px; box-shadow: var(--shadow); transform: translateY(20px) scale(0.97); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); overflow: hidden; }
+.modal-overlay.open .modal { transform: translateY(0) scale(1); }
+.modal-header { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-title { font-size: 0.95rem; font-weight: 600; }
+.modal-close { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink2); transition: all 0.15s; }
+.modal-close:hover { background: var(--red-soft); color: var(--red); border-color: var(--red); }
+.modal-body { padding: 22px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+label { font-size: 0.72rem; font-weight: 600; color: var(--ink2); }
+input, select, textarea { border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 9px 11px; font-size: 0.83rem; font-family: inherit; color: var(--ink); background: var(--surface); outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: var(--surface2); }
+
+/* Pagination */
+.pagination { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--surface2); }
+.page-info { font-size: 0.76rem; color: var(--ink3); }
+.page-btns { display: flex; gap: 3px; }
+.page-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.76rem; color: var(--ink2); transition: all 0.15s; }
+.page-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+.page-btn:hover:not(.active) { background: var(--accent-soft); color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">TimeFlow</div>
+      <div class="logo-sub">勤怠管理システム</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">メイン</div>
+    <div class="nav-item active" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      ダッシュボード
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      打刻管理
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      勤務表
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      従業員管理
+      <span class="nav-badge">2</span>
+    </div>
+    <div class="nav-label">申請</div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      休暇申請
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      残業申請
+    </div>
+    <div class="nav-label">分析</div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      レポート
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      設定
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="avatar">田</div>
+      <div>
+        <div class="user-name">田中 健一</div>
+        <div class="user-role">管理者</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-title">ダッシュボード</div>
+      <div class="page-date" id="topbarDate"></div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost" onclick="openModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        申請する
+      </button>
+      <button class="btn btn-primary" onclick="exportCSV()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        CSV出力
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Clock -->
+    <div class="clock-card">
+      <div class="clock-inner">
+        <div class="clock-left">
+          <div class="clock-greeting">おはようございます</div>
+          <div class="clock-name">田中 健一 さん</div>
+          <div class="clock-time" id="clockTime">--:--:--</div>
+          <div class="clock-date-str" id="clockDate"></div>
+          <div class="clock-actions">
+            <button class="clock-btn clock-btn-in" onclick="clockIn()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+              出勤
+            </button>
+            <button class="clock-btn clock-btn-break" onclick="clockBreak()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+              休憩
+            </button>
+            <button class="clock-btn clock-btn-out" onclick="clockOut()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              退勤
+            </button>
+          </div>
+        </div>
+        <div class="clock-right">
+          <div class="today-status">
+            <div class="status-item">
+              <div class="status-label">出勤時刻</div>
+              <div class="status-value" id="clockInTime">09:02</div>
+              <div class="status-sub">本日</div>
+            </div>
+            <div class="status-item">
+              <div class="status-label">勤務時間</div>
+              <div class="status-value" id="workHours">07:32</div>
+              <div class="status-sub">経過時間</div>
+            </div>
+            <div class="status-item">
+              <div class="status-label">ステータス</div>
+              <div class="status-value" style="font-size:0.85rem">🟢 勤務中</div>
+              <div class="status-sub">休憩なし</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-icon indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+        </div>
+        <div class="stat-value">42</div>
+        <div class="stat-label">従業員数</div>
+        <div class="stat-change neutral">全体 42名</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        </div>
+        <div class="stat-value">38</div>
+        <div class="stat-label">本日出勤</div>
+        <div class="stat-change up">出勤率 90.5%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+        </div>
+        <div class="stat-value">12</div>
+        <div class="stat-label">残業申請（今月）</div>
+        <div class="stat-change down">↑ 3件 先月比</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+        </div>
+        <div class="stat-value">4</div>
+        <div class="stat-label">欠勤・遅刻</div>
+        <div class="stat-change down">↑ 1件 先月比</div>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <div class="content-grid">
+
+      <!-- Table -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">本日の勤怠状況</div>
+            <div class="card-sub">2026年5月15日（金）</div>
+          </div>
+          <div class="tabs">
+            <button class="tab active" onclick="filterTab(this,'all')">全員</button>
+            <button class="tab" onclick="filterTab(this,'working')">勤務中</button>
+            <button class="tab" onclick="filterTab(this,'break')">休憩中</button>
+            <button class="tab" onclick="filterTab(this,'out')">退勤済み</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>従業員</th>
+              <th>出勤</th>
+              <th>退勤</th>
+              <th>勤務時間</th>
+              <th>残業</th>
+              <th>ステータス</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div class="pagination">
+          <div class="page-info">1-10 / 38件</div>
+          <div class="page-btns">
+            <button class="page-btn">‹</button>
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">3</button>
+            <button class="page-btn">4</button>
+            <button class="page-btn">›</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right -->
+      <div class="panel-stack">
+
+        <!-- Calendar -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">カレンダー</div></div>
+          <div class="mini-cal">
+            <div class="cal-header">
+              <button class="cal-nav" onclick="prevMonth()">‹</button>
+              <div class="cal-title" id="calTitle"></div>
+              <button class="cal-nav" onclick="nextMonth()">›</button>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">アラート</div></div>
+          <div class="alert-list">
+            <div class="alert-item">
+              <div class="alert-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+              <div>
+                <div class="alert-title">残業上限超過の恐れ</div>
+                <div class="alert-sub">山田 花子 — 今月 42時間</div>
+              </div>
+            </div>
+            <div class="alert-item">
+              <div class="alert-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+              <div>
+                <div class="alert-title">打刻漏れあり</div>
+                <div class="alert-sub">鈴木 一郎 — 5/13 退勤未打刻</div>
+              </div>
+            </div>
+            <div class="alert-item">
+              <div class="alert-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+              <div>
+                <div class="alert-title">休暇申請 承認待ち</div>
+                <div class="alert-sub">佐藤 美咲 — 5/20〜5/22</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monthly summary -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">今月のサマリー</div></div>
+          <div class="summary-grid">
+            <div class="sum-item"><div class="sum-val">168h</div><div class="sum-lbl">総勤務時間</div></div>
+            <div class="sum-item"><div class="sum-val">24h</div><div class="sum-lbl">総残業時間</div></div>
+            <div class="sum-item"><div class="sum-val">3日</div><div class="sum-lbl">有給取得数</div></div>
+            <div class="sum-item"><div class="sum-val">90%</div><div class="sum-lbl">出勤率</div></div>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-item">
+              <div class="progress-header">
+                <span class="progress-label">残業時間（月上限45h）</span>
+                <span class="progress-val">24h / 45h</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill indigo" style="width:53%"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header">
+                <span class="progress-label">有給消化率</span>
+                <span class="progress-val">3 / 20日</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill green" style="width:15%"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-header">
+                <span class="progress-label">出勤率</span>
+                <span class="progress-val">90.5%</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill amber" style="width:90%"></div></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">申請フォーム</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>申請種別</label>
+        <select id="reqType">
+          <option>有給休暇</option>
+          <option>残業申請</option>
+          <option>打刻修正</option>
+          <option>特別休暇</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>開始日</label>
+        <input type="date" id="reqStart">
+      </div>
+      <div class="form-field">
+        <label>終了日</label>
+        <input type="date" id="reqEnd">
+      </div>
+      <div class="form-field">
+        <label>理由・備考</label>
+        <textarea placeholder="申請理由を入力してください..." rows="3" id="reqNote"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="submitRequest()">申請する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <span class="toast-icon">✓</span>
+  <span id="toastMsg">操作が完了しました</span>
+</div>
+
+<script>
+// ── Clock ──
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clockTime').textContent = `${h}:${m}:${s}`;
+
+  const days = ['日','月','火','水','木','金','土'];
+  const dateStr = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日（${days[now.getDay()]}）`;
+  document.getElementById('clockDate').textContent = dateStr;
+  document.getElementById('topbarDate').textContent = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+function clockIn() { showToast('09:' + String(new Date().getMinutes()).padStart(2,'0') + ' 出勤打刻しました'); }
+function clockBreak() { showToast('休憩を開始しました'); }
+function clockOut() { showToast('退勤打刻しました。お疲れ様でした！'); }
+
+// ── Data ──
+const employees = [
+  { name:'山田 花子', dept:'営業部', avatarColor:'#6366f1', in:'08:55', out:'—', hours:'08:32', ot:'02:32', status:'working' },
+  { name:'鈴木 一郎', dept:'開発部', avatarColor:'#10b981', in:'09:02', out:'—', hours:'07:45', ot:'01:45', status:'working' },
+  { name:'佐藤 美咲', dept:'人事部', avatarColor:'#f59e0b', in:'09:15', out:'12:30', hours:'03:15', ot:'—', status:'break' },
+  { name:'高橋 誠', dept:'営業部', avatarColor:'#3b82f6', in:'09:00', out:'18:00', hours:'08:00', ot:'—', status:'out' },
+  { name:'伊藤 さくら', dept:'開発部', avatarColor:'#ec4899', in:'08:45', out:'—', hours:'08:52', ot:'02:52', status:'working' },
+  { name:'渡辺 太郎', dept:'総務部', avatarColor:'#6366f1', in:'09:30', out:'—', hours:'07:17', ot:'—', status:'working' },
+  { name:'中村 あい', dept:'開発部', avatarColor:'#10b981', in:'09:00', out:'18:30', hours:'08:30', ot:'00:30', status:'out' },
+  { name:'小林 健', dept:'営業部', avatarColor:'#f59e0b', in:'—', out:'—', hours:'—', ot:'—', status:'absent' },
+  { name:'加藤 みほ', dept:'人事部', avatarColor:'#3b82f6', in:'09:05', out:'—', hours:'07:42', ot:'—', status:'working' },
+  { name:'吉田 勇', dept:'総務部', avatarColor:'#ec4899', in:'09:00', out:'13:00', hours:'04:00', ot:'—', status:'break' },
+];
+
+const statusBadge = {
+  working: '<span class="badge badge-working"><span class="badge-dot"></span>勤務中</span>',
+  break:   '<span class="badge badge-break"><span class="badge-dot"></span>休憩中</span>',
+  out:     '<span class="badge badge-out"><span class="badge-dot"></span>退勤済み</span>',
+  absent:  '<span class="badge badge-absent"><span class="badge-dot"></span>欠勤</span>',
+};
+
+let currentFilter = 'all';
+
+function renderTable(data) {
+  document.getElementById('tableBody').innerHTML = data.map(e => `
+    <tr>
+      <td>
+        <div class="emp-cell">
+          <div class="avatar-sm" style="background:${e.avatarColor}20;color:${e.avatarColor}">${e.name.slice(0,2)}</div>
+          <div>
+            <div class="emp-name">${e.name}</div>
+            <div class="emp-dept">${e.dept}</div>
+          </div>
+        </div>
+      </td>
+      <td class="time-cell">${e.in}</td>
+      <td class="time-cell">${e.out}</td>
+      <td class="time-cell">${e.hours}</td>
+      <td class="time-cell ${e.ot !== '—' ? 'overtime' : ''}">${e.ot}</td>
+      <td>${statusBadge[e.status]}</td>
+    </tr>
+  `).join('');
+}
+
+function filterTab(el, type) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = type;
+  const data = type === 'all' ? employees : employees.filter(e => e.status === type);
+  renderTable(data);
+}
+
+// ── Calendar ──
+let calDate = new Date(2026, 4, 1);
+function renderCalendar() {
+  const y = calDate.getFullYear(), m = calDate.getMonth();
+  document.getElementById('calTitle').textContent = `${y}年${m+1}月`;
+  const grid = document.getElementById('calGrid');
+  const days = ['日','月','火','水','木','金','土'];
+  const firstDay = new Date(y, m, 1).getDay();
+  const lastDate = new Date(y, m+1, 0).getDate();
+  const today = new Date();
+  let html = days.map(d => `<div class="cal-day-name">${d}</div>`).join('');
+  for (let i = 0; i < firstDay; i++) {
+    const d = new Date(y, m, -firstDay+i+1).getDate();
+    html += `<div class="cal-day other">${d}</div>`;
+  }
+  for (let d = 1; d <= lastDate; d++) {
+    const isToday = y === today.getFullYear() && m === today.getMonth() && d === today.getDate();
+    const isSun = new Date(y, m, d).getDay() === 0;
+    const isSat = new Date(y, m, d).getDay() === 6;
+    const hasEvent = [1,5,8,12,15,19,22].includes(d);
+    html += `<div class="cal-day${isToday?' today':''}${isSun||isSat?' holiday':''}${hasEvent&&!isToday?' has-event':''}">${d}</div>`;
+  }
+  grid.innerHTML = html;
+}
+function prevMonth() { calDate.setMonth(calDate.getMonth()-1); renderCalendar(); }
+function nextMonth() { calDate.setMonth(calDate.getMonth()+1); renderCalendar(); }
+
+// ── Nav ──
+function setActive(el) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── Modal ──
+function openModal() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('reqStart').value = today;
+  document.getElementById('reqEnd').value = today;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModalOutside(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+function submitRequest() { closeModal(); showToast('申請を送信しました。承認をお待ちください。'); }
+
+// ── CSV ──
+function exportCSV() { showToast('CSVファイルをダウンロードしました'); }
+
+// ── Toast ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── Init ──
+renderTable(employees);
+renderCalendar();
+</script>
+</body>
+</html>
