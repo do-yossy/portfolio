@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web制作・開発 | LP・コーポレートサイト・業務ツール・AIアプリ — 修正無制限・短納期</title>
+<meta name="description" content="LP・コーポレートサイト・ECサイト・業務効率化ツール・スマホアプリ・AI活用ツールをオンライン完結で制作。修正回数無制限・短納期・仮払い100%で全国対応。¥50,000〜。">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080c18;--surface:#0f1220;--surface2:#161b2e;--surface3:#1c2238;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --accent:#5b6ef5;--accent2:#8b7cf8;--gold:#f0b429;--red:#e84545;--green:#22c55e;
+  --text:#dde3f5;--text2:#8892b0;--text3:#4a5070;
+  --ease:cubic-bezier(0.4,0,0.2,1);
+  --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans JP','Syne',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;-webkit-font-smoothing:antialiased;font-size:16px}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+.container{width:min(94%,1080px);margin:0 auto}
+
+/* ── FLOATING CTA ── */
+.float-cta{
+  position:fixed;bottom:28px;right:28px;z-index:9000;
+  display:flex;flex-direction:column;align-items:flex-end;gap:8px;
+}
+.float-btn{
+  display:inline-flex;align-items:center;gap:8px;padding:14px 24px;
+  background:var(--red);color:#fff;border-radius:99px;font-size:.88rem;font-weight:700;
+  letter-spacing:.04em;box-shadow:0 4px 24px rgba(232,69,69,.45);
+  transition:all .3s var(--ease);cursor:pointer;border:none;font-family:inherit;
+  animation:floatPulse 3s ease-in-out infinite;
+}
+.float-btn:hover{background:#d63030;transform:translateY(-3px);box-shadow:0 8px 32px rgba(232,69,69,.55)}
+@keyframes floatPulse{0%,100%{box-shadow:0 4px 24px rgba(232,69,69,.45)}50%{box-shadow:0 4px 32px rgba(232,69,69,.7)}}
+.float-note{font-size:.68rem;color:rgba(255,255,255,.6);text-align:right;padding-right:4px}
+
+/* ── NAV ── */
+.nav{
+  position:sticky;top:0;z-index:100;background:rgba(8,12,24,.92);
+  backdrop-filter:blur(16px);border-bottom:1px solid var(--border);
+}
+.nav-inner{
+  display:flex;align-items:center;justify-content:space-between;
+  height:62px;width:min(94%,1080px);margin:0 auto;
+}
+.nav-logo{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.05rem;letter-spacing:.04em}
+.nav-logo span{color:var(--accent)}
+.nav-links{display:flex;gap:0;list-style:none}
+.nav-links a{font-size:.8rem;padding:0 14px;height:62px;display:flex;align-items:center;color:var(--text2);transition:color .2s;white-space:nowrap}
+.nav-links a:hover{color:var(--accent2)}
+.nav-cta{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;background:var(--accent);color:#fff;border-radius:6px;font-size:.8rem;font-weight:700;letter-spacing:.04em;transition:all .25s;flex-shrink:0}
+.nav-cta:hover{background:#4a5ce0;transform:translateY(-1px)}
+
+/* ── HERO ── */
+.hero{
+  min-height:96vh;display:flex;align-items:center;position:relative;overflow:hidden;
+  padding:100px 0 80px;
+}
+.hero::before{content:'';position:absolute;top:-300px;left:-200px;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(91,110,245,.18) 0%,transparent 65%);pointer-events:none;animation:orb1 9s ease-in-out infinite}
+.hero::after{content:'';position:absolute;bottom:-200px;right:-150px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(139,124,248,.1) 0%,transparent 65%);pointer-events:none;animation:orb2 11s ease-in-out infinite}
+@keyframes orb1{0%,100%{transform:translate(0,0)}50%{transform:translate(50px,35px)}}
+@keyframes orb2{0%,100%{transform:translate(0,0)}50%{transform:translate(-35px,-25px)}}
+.hero-content{position:relative;z-index:1}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:5px 14px;background:rgba(91,110,245,.1);border:1px solid rgba(91,110,245,.3);border-radius:99px;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent2);margin-bottom:1.8rem;opacity:0;animation:fadeUp .8s var(--ease) .15s forwards}
+.hero-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hero h1{font-family:'Syne','Montserrat',sans-serif;font-size:clamp(2.4rem,6.5vw,5rem);font-weight:800;line-height:1.08;letter-spacing:-.03em;margin-bottom:1.4rem;opacity:0;animation:fadeUp .9s var(--ease) .3s forwards}
+.hero h1 .gr{background:linear-gradient(135deg,var(--accent),var(--accent2),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-lead{font-size:1rem;color:var(--text2);max-width:500px;margin-bottom:1.2rem;line-height:1.9;opacity:0;animation:fadeUp .9s var(--ease) .45s forwards}
+.hero-price-hint{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.25);border-radius:6px;font-size:.82rem;color:var(--gold);margin-bottom:2rem;opacity:0;animation:fadeUp .9s var(--ease) .55s forwards}
+.hero-btns{display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:3rem;opacity:0;animation:fadeUp .9s var(--ease) .65s forwards}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:15px 30px;background:var(--accent);color:#fff;border-radius:8px;font-size:.9rem;font-weight:700;letter-spacing:.04em;transition:all .3s var(--ease)}
+.btn-primary:hover{background:#4a5ce0;transform:translateY(-2px);box-shadow:0 8px 28px rgba(91,110,245,.4)}
+.btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:15px 28px;background:transparent;color:var(--text2);border:1px solid var(--border2);border-radius:8px;font-size:.9rem;font-weight:500;transition:all .3s}
+.btn-ghost:hover{border-color:var(--accent2);color:var(--accent2)}
+.hero-stats{display:flex;gap:2.5rem;padding-top:2.5rem;border-top:1px solid var(--border);opacity:0;animation:fadeUp .9s var(--ease) .8s forwards;flex-wrap:wrap}
+.stat-n{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.9rem;letter-spacing:-.03em;background:linear-gradient(135deg,var(--text),var(--text2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+.stat-l{font-size:.68rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-top:3px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── SECTIONS COMMON ── */
+.section{padding:clamp(4.5rem,9vw,7rem) 0}
+.section-light{background:#fff;color:#1a1a2e}
+.section-light .section-eyebrow{color:var(--accent)}
+.section-light .section-title{color:#1a1a2e}
+.section-light .section-sub{color:#4a5070}
+.section-gray{background:#f8f9fc;color:#1a1a2e}
+.section-gray .section-eyebrow{color:var(--accent)}
+.section-gray .section-title{color:#1a1a2e}
+.section-gray .section-sub{color:#4a5070}
+.section-eyebrow{font-size:.68rem;letter-spacing:.3em;text-transform:uppercase;color:var(--accent2);margin-bottom:1rem;display:flex;align-items:center;gap:.8rem}
+.section-eyebrow::before{content:'';width:22px;height:1px;background:currentColor}
+.section-title{font-family:'Syne',sans-serif;font-size:clamp(1.7rem,3.5vw,2.7rem);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin-bottom:.8rem}
+.section-sub{font-size:.92rem;color:var(--text2);max-width:480px;line-height:1.95}
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.reveal.visible{opacity:1;transform:none}
+
+/* ── SERVICES ── */
+.services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;margin-top:3rem}
+.service-card{background:#fff;border:1.5px solid #e8ecf4;border-radius:var(--radius);padding:2rem 1.6rem;transition:all .3s;position:relative;overflow:hidden}
+.service-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(to right,var(--accent),var(--accent2));transform:scaleX(0);transform-origin:left;transition:transform .3s}
+.service-card:hover{border-color:var(--accent);transform:translateY(-5px);box-shadow:0 16px 40px rgba(91,110,245,.12)}
+.service-card:hover::after{transform:scaleX(1)}
+.service-icon{font-size:2rem;margin-bottom:1rem}
+.service-cat{font-size:.68rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.service-name{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;color:#1a1a2e;margin-bottom:.5rem}
+.service-desc{font-size:.8rem;color:#5a6070;line-height:1.85;margin-bottom:1.2rem}
+.service-price{font-family:'Montserrat',sans-serif;font-weight:700;font-size:1.3rem;color:#1a1a2e}
+.service-price small{font-size:.9rem;font-weight:400;color:#8892b0}
+.service-period{font-size:.7rem;color:#8892b0;margin-bottom:1.2rem}
+.service-cta{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:700;color:var(--accent);letter-spacing:.04em;transition:gap .25s}
+.service-card:hover .service-cta{gap:8px}
+.service-cta::after{content:'→'}
+.service-badge{position:absolute;top:14px;right:14px;padding:3px 10px;background:linear-gradient(135deg,var(--gold),#e8a000);color:#fff;border-radius:99px;font-size:.65rem;font-weight:700;letter-spacing:.06em}
+
+/* ── PORTFOLIO ── */
+.works-filter{display:flex;gap:.5rem;flex-wrap:wrap;margin:2rem 0 1.5rem}
+.filter-btn{padding:7px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:99px;font-size:.75rem;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .25s;letter-spacing:.04em}
+.filter-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+.filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.works-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5px;background:var(--border);border:1px solid var(--border)}
+.work-card{background:var(--bg);padding:1.8rem 1.6rem;cursor:pointer;transition:background .35s;position:relative;overflow:hidden}
+.work-card:hover{background:var(--surface)}
+.work-card::after{content:'デモを見る →';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(91,110,245,.9);color:#fff;padding:8px 18px;border-radius:6px;font-size:.72rem;letter-spacing:.06em;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .25s;z-index:10;font-weight:700}
+.work-card:hover::after{opacity:1}
+.work-num{font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;color:var(--text3);margin-bottom:1rem}
+.work-preview{aspect-ratio:16/9;border-radius:6px;overflow:hidden;margin-bottom:1.2rem;border:1px solid var(--border);position:relative}
+.work-preview-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;transition:transform .5s}
+.work-card:hover .work-preview-inner{transform:scale(1.07)}
+.work-preview-label{position:absolute;bottom:0;left:0;right:0;padding:6px 10px;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.6);text-align:center}
+.work-cat{display:inline-flex;padding:2px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:99px;font-size:.62rem;color:var(--text2);margin-bottom:.6rem;letter-spacing:.05em}
+.work-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:.35rem}
+.work-desc{font-size:.75rem;color:var(--text2);line-height:1.8;margin-bottom:.9rem}
+.work-tags{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1rem}
+.work-tag{padding:2px 7px;background:rgba(91,110,245,.08);border:1px solid rgba(91,110,245,.2);border-radius:4px;font-size:.6rem;color:var(--accent2)}
+.work-footer{display:flex;align-items:center;justify-content:space-between}
+.work-price{font-size:.72rem;color:var(--text2)}
+.work-price strong{color:var(--gold);font-size:.85rem}
+.work-link{font-size:.7rem;color:var(--accent2);font-weight:700;display:flex;align-items:center;gap:4px;transition:gap .25s}
+.work-card:hover .work-link{gap:7px}
+/* Preview colors */
+.p-cafe{background:linear-gradient(135deg,#3d2817,#6b4423,#c9a961)}
+.p-law{background:linear-gradient(135deg,#0d1b2e,#1e3050,#b8962e)}
+.p-shopapp{background:linear-gradient(135deg,#1a0533,#2d0f5c,#7c3aed)}
+.p-ec{background:linear-gradient(135deg,#1a1a1a,#2d2d2d,#c4a882)}
+.p-reserve{background:linear-gradient(135deg,#0f1117,#1a1d27,#4f8ef7)}
+.p-invoice{background:linear-gradient(135deg,#16192c,#1a1d27,#2563eb)}
+.p-time{background:linear-gradient(135deg,#0a1a1a,#0d2a2a,#0d9488)}
+.p-stock{background:linear-gradient(135deg,#0a1f0a,#0f2e0f,#16a34a)}
+.p-aitext{background:linear-gradient(135deg,#1a0a2e,#2d1460,#a855f7)}
+.p-aiint{background:linear-gradient(135deg,#0f1728,#182440,#3b82f6)}
+.p-excel{background:linear-gradient(135deg,#0a1a0a,#163016,#217346)}
+.p-line{background:linear-gradient(135deg,#0a1a0a,#0d2a10,#06c755)}
+.p-scrape{background:linear-gradient(135deg,#1a150a,#2e2010,#d97706)}
+.p-care{background:linear-gradient(135deg,#0a0f1a,#0d1a33,#1d6fa4)}
+.p-req{background:linear-gradient(135deg,#0f0f1a,#1a1a2e,#6366f1)}
+
+/* ── MODAL ── */
+.modal-ov{position:fixed;inset:0;z-index:99999;background:rgba(4,6,16,.92);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;padding:14px;opacity:0;pointer-events:none;transition:opacity .3s var(--ease)}
+.modal-ov.open{opacity:1;pointer-events:all}
+.modal-win{width:100%;max-width:1200px;height:88vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transform:scale(.95) translateY(18px);transition:transform .3s var(--ease);box-shadow:0 48px 100px rgba(0,0,0,.7)}
+.modal-ov.open .modal-win{transform:scale(1) translateY(0)}
+.modal-bar{display:flex;align-items:center;gap:.7rem;padding:0 1rem;height:44px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-dots{display:flex;gap:5px}
+.m-dot{width:11px;height:11px;border-radius:50%}
+.m-red{background:#ff5f57;cursor:pointer}
+.m-red:hover{filter:brightness(1.2)}
+.m-yel{background:#febc2e}
+.m-grn{background:#28c840}
+.modal-url{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:4px 10px;font-size:.68rem;color:var(--text3);display:flex;align-items:center;gap:6px;overflow:hidden;min-width:0}
+.modal-url-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-acts{display:flex;gap:.4rem;flex-shrink:0}
+.modal-mbtn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:5px;font-size:.68rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:inherit;transition:all .2s;white-space:nowrap}
+.modal-mbtn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.modal-mbtn.close-b{color:#ef4444;border-color:rgba(239,68,68,.3)}
+.modal-mbtn.close-b:hover{background:#ef4444;color:#fff;border-color:#ef4444}
+.modal-frame-wrap{flex:1;position:relative}
+.modal-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;background:var(--surface)}
+.m-spin{width:26px;height:26px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.modal-iframe{width:100%;height:100%;border:none;display:block}
+
+/* ── GUARANTEE ── */
+.guarantee{background:var(--surface)}
+.guarantee-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:3rem}
+.guarantee-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:2rem 1.8rem;text-align:center;transition:border-color .3s}
+.guarantee-card:hover{border-color:var(--accent2)}
+.guarantee-icon{font-size:2.4rem;margin-bottom:1rem}
+.guarantee-title{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:.6rem}
+.guarantee-desc{font-size:.82rem;color:var(--text2);line-height:1.9}
+.guarantee-cta{text-align:center;margin-top:2.5rem}
+
+/* ── PRICING ── */
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;margin-top:3rem}
+.price-card{background:#fff;border:1.5px solid #e8ecf4;border-radius:var(--radius);padding:2rem 1.6rem;position:relative;transition:all .3s}
+.price-card.featured{border-color:var(--accent);box-shadow:0 8px 32px rgba(91,110,245,.15);transform:translateY(-4px)}
+.price-card.featured::before{content:'人気 No.1';position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:.68rem;font-weight:700;padding:4px 14px;border-radius:99px;letter-spacing:.08em;white-space:nowrap}
+.price-plan{font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8892b0;margin-bottom:.7rem}
+.price-amount{font-family:'Montserrat',sans-serif;font-weight:800;font-size:2.2rem;color:#1a1a2e;letter-spacing:-.03em;margin-bottom:.3rem}
+.price-amount small{font-size:1rem;font-weight:500;color:#8892b0}
+.price-period{font-size:.75rem;color:#8892b0;margin-bottom:1.2rem;padding-bottom:1.2rem;border-bottom:1px solid #e8ecf4}
+.price-features{list-style:none;display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.5rem}
+.price-features li{font-size:.82rem;color:#4a5070;display:flex;align-items:flex-start;gap:8px}
+.price-features li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.price-cta-btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .25s;letter-spacing:.04em}
+.price-cta-btn:hover{background:#4a5ce0;transform:translateY(-1px)}
+.price-card:not(.featured) .price-cta-btn{background:#f3f4f9;color:var(--accent)}
+.price-card:not(.featured) .price-cta-btn:hover{background:var(--accent);color:#fff}
+.pricing-note{text-align:center;font-size:.8rem;color:#8892b0;margin-top:2rem}
+.pricing-note a{color:var(--accent)}
+
+/* ── PROCESS ── */
+.process-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:3.5rem;position:relative}
+.process-grid::before{content:'';position:absolute;top:26px;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,rgba(91,110,245,.3) 20%,rgba(91,110,245,.3) 80%,transparent)}
+.process-item{text-align:center;padding:0 .6rem;position:relative}
+.process-dot{width:52px;height:52px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;position:relative;z-index:1;font-family:'Montserrat',sans-serif;font-weight:800;font-size:1rem;color:#fff;transition:all .3s}
+.process-item:hover .process-dot{transform:scale(1.1);box-shadow:0 4px 20px rgba(91,110,245,.4)}
+.process-step{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);margin-bottom:.3rem}
+.process-name{font-size:.82rem;font-weight:700;color:#1a1a2e;margin-bottom:.3rem}
+.process-detail{font-size:.72rem;color:#5a6070;line-height:1.7}
+.process-time{display:inline-block;margin-top:.5rem;font-size:.65rem;font-weight:700;color:var(--accent);background:rgba(91,110,245,.1);padding:2px 8px;border-radius:99px}
+
+/* ── FAQ ── */
+.faq-list{max-width:740px;margin:3rem auto 0}
+.faq-item{border-bottom:1px solid #e8ecf4}
+.faq-q{padding:1.2rem 0;font-weight:700;font-size:.95rem;cursor:pointer;display:flex;align-items:center;gap:12px;color:#1a1a2e;user-select:none;transition:color .2s}
+.faq-q:hover{color:var(--accent)}
+.faq-q-icon{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;transition:transform .3s}
+.faq-item.open .faq-q-icon{transform:rotate(45deg);background:var(--red)}
+.faq-a{font-size:.87rem;color:#4a5070;line-height:2;padding:0 0 1.2rem 38px;display:none}
+.faq-item.open .faq-a{display:block}
+
+/* ── FINAL CTA ── */
+.final-cta{background:var(--surface);position:relative;overflow:hidden}
+.final-cta::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:800px;height:400px;background:radial-gradient(ellipse,rgba(91,110,245,.12) 0%,transparent 65%);pointer-events:none}
+.final-cta-inner{text-align:center;position:relative;z-index:1;padding:5rem 0}
+.final-cta-label{font-size:.68rem;letter-spacing:.3em;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:1rem}
+.final-cta-title{font-family:'Syne',sans-serif;font-size:clamp(1.9rem,4.5vw,3.2rem);font-weight:800;letter-spacing:-.025em;color:var(--text);margin-bottom:.8rem}
+.final-cta-title .red{color:var(--red)}
+.final-cta-sub{font-size:.95rem;color:var(--text2);max-width:460px;margin:0 auto 2.5rem;line-height:1.95}
+.cta-platforms{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem}
+.cta-platform-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.88rem;font-weight:700;letter-spacing:.04em;transition:all .3s}
+.cta-platform-btn:hover{border-color:var(--accent2);color:var(--accent2);transform:translateY(-2px)}
+.cta-platform-btn.main{background:var(--accent);border-color:var(--accent);color:#fff}
+.cta-platform-btn.main:hover{background:#4a5ce0;border-color:#4a5ce0}
+.cta-note{font-size:.75rem;color:var(--text3);text-align:center}
+
+/* ── FOOTER ── */
+footer{background:#060810;border-top:1px solid var(--border);padding:3.5rem 0 2rem}
+.footer-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:4rem;margin-bottom:3rem}
+.footer-brand-name{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.1rem;margin-bottom:.7rem}
+.footer-brand-name span{color:var(--accent)}
+.footer-brand-desc{font-size:.78rem;color:var(--text3);line-height:1.95}
+.footer-col h4{font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:1rem;padding-bottom:.6rem;border-bottom:1px solid var(--border)}
+.footer-col ul{list-style:none;display:flex;flex-direction:column;gap:.55rem}
+.footer-col a{font-size:.78rem;color:var(--text3);transition:color .2s}
+.footer-col a:hover{color:var(--text)}
+.footer-bottom{border-top:1px solid var(--border);padding-top:1.5rem;display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:var(--text3);flex-wrap:wrap;gap:.5rem}
+
+/* ── RESPONSIVE ── */
+@media(max-width:960px){
+  .services-grid{grid-template-columns:1fr 1fr}
+  .works-grid{grid-template-columns:1fr 1fr}
+  .guarantee-grid{grid-template-columns:1fr}
+  .pricing-grid{grid-template-columns:1fr}
+  .price-card.featured{transform:none}
+  .process-grid{grid-template-columns:1fr 1fr;gap:2rem}
+  .process-grid::before{display:none}
+  .footer-grid{grid-template-columns:1fr;gap:2rem}
+  .nav-links{display:none}
+  .hero-stats{gap:1.5rem}
+}
+@media(max-width:600px){
+  .services-grid{grid-template-columns:1fr}
+  .works-grid{grid-template-columns:1fr}
+  .hero-btns{flex-direction:column}
+  .cta-platforms{flex-direction:column;align-items:center}
+  .float-cta{bottom:16px;right:16px}
+  .float-btn{padding:12px 20px;font-size:.82rem}
+}
+</style>
+</head>
+<body>
+
+<!-- ━━━ FLOATING CTA ━━━ -->
+<div class="float-cta">
+  <div class="float-note">無料・24時間以内に返信</div>
+  <!-- ↓ クラウドワークスまたはランサーズのプロフィールURLに変更してください -->
+  <a href="https://crowdworks.jp/" target="_blank" rel="noopener" class="float-btn">
+    💬 今すぐ無料相談
+  </a>
+</div>
+
+<!-- ━━━ MODAL ━━━ -->
+<div id="workModal" class="modal-ov" role="dialog">
+  <div class="modal-win">
+    <div class="modal-bar">
+      <div class="modal-dots">
+        <div class="m-dot m-red" onclick="closeModal()" title="閉じる"></div>
+        <div class="m-dot m-yel"></div>
+        <div class="m-dot m-grn"></div>
+      </div>
+      <div class="modal-url">
+        <span id="modalTitle" class="modal-url-txt">読み込み中...</span>
+      </div>
+      <div class="modal-acts">
+        <button class="modal-mbtn" onclick="openNewTab()">↗ 新しいタブで開く</button>
+        <button class="modal-mbtn close-b" onclick="closeModal()">✕ 閉じる</button>
+      </div>
+    </div>
+    <div class="modal-frame-wrap">
+      <div id="mLoading" class="modal-loading">
+        <div class="m-spin"></div>
+        <p style="font-size:.72rem;color:var(--text3);letter-spacing:.06em">読み込み中...</p>
+      </div>
+      <iframe id="modalIframe" class="modal-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" style="display:none"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━ NAV ━━━ -->
+<header class="nav" id="navbar">
+  <div class="nav-inner">
+    <div class="nav-logo">Social<span>.</span>Quality</div>
+    <nav>
+      <ul class="nav-links">
+        <li><a href="#services">サービス</a></li>
+        <li><a href="#works">制作実績</a></li>
+        <li><a href="#pricing">料金</a></li>
+        <li><a href="#faq">よくある質問</a></li>
+      </ul>
+    </nav>
+    <!-- ↓ クラウドワークスまたはランサーズのプロフィールURLに変更してください -->
+    <a href="https://crowdworks.jp/" target="_blank" rel="noopener" class="nav-cta">💬 無料相談する</a>
+  </div>
+</header>
+
+<!-- ━━━ HERO ━━━ -->
+<section class="hero">
+  <div class="container hero-content">
+    <div class="hero-eyebrow"><span class="hero-dot"></span>Web制作 · ツール開発 · アプリ · AI活用</div>
+    <h1>
+      修正無制限・短納期で<br>
+      <span class="gr">理想の制作物を届ける。</span>
+    </h1>
+    <p class="hero-lead">LP・コーポレートサイト・ECサイト・業務効率化ツール・スマホアプリ・AI活用プロダクトまで。ヒアリングから納品まで完全オンライン完結。全国対応。</p>
+    <div class="hero-price-hint">💰 LP制作 ¥50,000〜 ／ 見積もり・相談は無料</div>
+    <div class="hero-btns">
+      <!-- ↓ プロフィールURLに変更してください -->
+      <a href="https://crowdworks.jp/" target="_blank" rel="noopener" class="btn-primary">クラウドワークスで相談 →</a>
+      <a href="https://www.lancers.jp/" target="_blank" rel="noopener" class="btn-ghost">ランサーズで相談</a>
+    </div>
+    <div class="hero-stats">
+      <div><div class="stat-n">修正∞</div><div class="stat-l">修正回数無制限</div></div>
+      <div><div class="stat-n">24h</div><div class="stat-l">返信対応</div></div>
+      <div><div class="stat-n">100%</div><div class="stat-l">オンライン完結</div></div>
+      <div><div class="stat-n">仮払い</div><div class="stat-l">安心取引</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ SERVICES ━━━ -->
+<section class="section section-light" id="services">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-eyebrow">Services</div>
+      <h2 class="section-title">対応できるサービス</h2>
+      <p class="section-sub">ご要望に合わせて最適なプランをご提案します。すべて修正回数無制限・見積もり無料です。</p>
+    </div>
+    <div class="services-grid reveal">
+
+      <div class="service-card">
+        <div class="service-icon">🌐</div>
+        <div class="service-cat">Web Design</div>
+        <div class="service-name">LP・Webサイト制作</div>
+        <p class="service-desc">LP・コーポレートサイト・採用サイト・ECサイトまで。スマホ対応・SEO対策・お問い合わせフォーム標準装備。</p>
+        <div class="service-price">¥50,000<small>〜</small></div>
+        <div class="service-period">LP：約1週間 / サイト：約2〜4週間</div>
+        <div class="service-cta">詳しく見る</div>
+      </div>
+
+      <div class="service-card">
+        <div class="service-badge">人気</div>
+        <div class="service-icon">⚙️</div>
+        <div class="service-cat">System Dev</div>
+        <div class="service-name">業務効率化ツール開発</div>
+        <p class="service-desc">予約管理・請求書・在庫・勤怠など、手作業をデジタル化。管理画面・CSV出力・自動計算まで対応。</p>
+        <div class="service-price">¥200,000<small>〜</small></div>
+        <div class="service-period">納期：要相談（通常3〜6週間）</div>
+        <div class="service-cta">詳しく見る</div>
+      </div>
+
+      <div class="service-card">
+        <div class="service-icon">📱</div>
+        <div class="service-cat">App Dev</div>
+        <div class="service-name">スマホアプリ開発</div>
+        <p class="service-desc">iOS・Android両対応。ログイン・決済・プッシュ通知・管理画面まで含む本格アプリ開発。</p>
+        <div class="service-price">¥400,000<small>〜</small></div>
+        <div class="service-period">納期：要相談</div>
+        <div class="service-cta">詳しく見る</div>
+      </div>
+
+      <div class="service-card">
+        <div class="service-icon">🤖</div>
+        <div class="service-cat">AI Development</div>
+        <div class="service-name">AI活用ツール開発</div>
+        <p class="service-desc">ChatGPT・Claude APIを使った文章添削・自動応答・業務自動化ツールなど企業向けAIプロダクト。</p>
+        <div class="service-price">¥500,000<small>〜</small></div>
+        <div class="service-period">納期：要相談</div>
+        <div class="service-cta">詳しく見る</div>
+      </div>
+
+      <div class="service-card">
+        <div class="service-icon">💬</div>
+        <div class="service-cat">LINE / SNS</div>
+        <div class="service-name">LINE公式アカウント構築</div>
+        <p class="service-desc">リッチメニュー・ステップ配信・チャットボット・自動応答・分析ダッシュボードまで一括対応。</p>
+        <div class="service-price">¥50,000<small>〜</small></div>
+        <div class="service-period">納期：約1〜2週間</div>
+        <div class="service-cta">詳しく見る</div>
+      </div>
+
+      <div class="service-card">
+        <div class="service-icon">🔧</div>
+        <div class="service-cat">Maintenance</div>
+        <div class="service-name">月額保守・運用サポート</div>
+        <p class="service-desc">コンテンツ更新・セキュリティ監視・バックアップ・アクセス解析レポートまで。継続的なサポート。</p>
+        <div class="service-price">¥10,000<small>/月〜</small></div>
+        <div class="service-period">ライト / スタンダード / プレミアム</div>
+        <div class="service-cta">詳しく見る</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ PORTFOLIO ━━━ -->
+<section class="section" id="works">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-eyebrow">Portfolio</div>
+      <h2 class="section-title">制作実績</h2>
+      <p class="section-sub">実際に制作したデモをそのまま動かして確認できます。クリックしてお試しください。</p>
+      <div class="works-filter" id="worksFilter">
+        <button class="filter-btn active" data-f="all">すべて</button>
+        <button class="filter-btn" data-f="web">Web制作</button>
+        <button class="filter-btn" data-f="system">システム</button>
+        <button class="filter-btn" data-f="app">アプリ</button>
+        <button class="filter-btn" data-f="ai">AI活用</button>
+      </div>
+    </div>
+    <div class="works-grid reveal" id="worksGrid">
+      <div class="work-card" data-c="web" onclick="openWork('./カフェLP.html','カフェ向けLP — Café Lumière')">
+        <div class="work-num">01 — LP制作</div>
+        <div class="work-preview"><div class="work-preview-inner p-cafe">☕</div><div class="work-preview-label">Café Lumière — LP</div></div>
+        <div class="work-cat">ランディングページ</div>
+        <div class="work-title">カフェ向けLP</div>
+        <div class="work-desc">高級感あるカフェ向け1ページサイト。メニュー・ギャラリー・問い合わせフォーム含む。</div>
+        <div class="work-tags"><span class="work-tag">HTML/CSS</span><span class="work-tag">JavaScript</span><span class="work-tag">アニメーション</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥50,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="web" onclick="openWork('./法律事務所コーポレートサイト.html','法律事務所コーポレートサイト')">
+        <div class="work-num">02 — コーポレートサイト</div>
+        <div class="work-preview"><div class="work-preview-inner p-law">⚖️</div><div class="work-preview-label">法律事務所 — コーポレートサイト</div></div>
+        <div class="work-cat">コーポレートサイト</div>
+        <div class="work-title">法律事務所サイト</div>
+        <div class="work-desc">信頼感・高級感のある士業向けサイト。業務案内・弁護士紹介・無料相談フォーム付き。</div>
+        <div class="work-tags"><span class="work-tag">マルチページ</span><span class="work-tag">フォーム</span><span class="work-tag">レスポンシブ</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥120,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="app" onclick="openWork('./ECショッピングアプリ.html','ECショッピングアプリ')">
+        <div class="work-num">03 — スマホアプリ</div>
+        <div class="work-preview"><div class="work-preview-inner p-shopapp">📱</div><div class="work-preview-label">ShopApp — ECアプリ</div></div>
+        <div class="work-cat">スマホアプリ</div>
+        <div class="work-title">ECショッピングアプリ</div>
+        <div class="work-desc">iOS/Android対応ECアプリ。カート・フラッシュセール・決済・お気に入り機能実装。</div>
+        <div class="work-tags"><span class="work-tag">iOS/Android</span><span class="work-tag">カート</span><span class="work-tag">決済</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥400,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="web" onclick="openWork('./ECサイト.html','アパレルECサイト — NOIR')">
+        <div class="work-num">04 — ECサイト</div>
+        <div class="work-preview"><div class="work-preview-inner p-ec">🛍️</div><div class="work-preview-label">NOIR — アパレルEC</div></div>
+        <div class="work-cat">ECサイト</div>
+        <div class="work-title">アパレルECサイト</div>
+        <div class="work-desc">商品一覧・フィルター・カートサイドバー・ルックブックを備えたプレミアムEC。</div>
+        <div class="work-tags"><span class="work-tag">カート機能</span><span class="work-tag">フィルター</span><span class="work-tag">ルックブック</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥300,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="system" onclick="openWork('./予約管理ツール.html','予約管理システム — ReserveFlow')">
+        <div class="work-num">05 — システム開発</div>
+        <div class="work-preview"><div class="work-preview-inner p-reserve">📅</div><div class="work-preview-label">ReserveFlow — 予約管理</div></div>
+        <div class="work-cat">業務効率化ツール</div>
+        <div class="work-title">予約管理システム</div>
+        <div class="work-desc">ダッシュボード・カレンダー・統計機能付き予約管理。サロン・クリニック向け。</div>
+        <div class="work-tags"><span class="work-tag">ダッシュボード</span><span class="work-tag">カレンダー</span><span class="work-tag">統計</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥200,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="system" onclick="openWork('./請求書発行ツール.html','請求書発行ツール — InvoiceFlow')">
+        <div class="work-num">06 — ツール開発</div>
+        <div class="work-preview"><div class="work-preview-inner p-invoice">🧾</div><div class="work-preview-label">InvoiceFlow — 請求書</div></div>
+        <div class="work-cat">業務効率化ツール</div>
+        <div class="work-title">請求書発行ツール</div>
+        <div class="work-desc">リアルタイムプレビュー・消費税自動計算・PDF出力・発行履歴管理機能付き。</div>
+        <div class="work-tags"><span class="work-tag">PDF出力</span><span class="work-tag">自動計算</span><span class="work-tag">履歴管理</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥200,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="system" onclick="openWork('./勤怠管理システム.html','勤怠管理システム — TimeFlow')">
+        <div class="work-num">07 — システム開発</div>
+        <div class="work-preview"><div class="work-preview-inner p-time">🕐</div><div class="work-preview-label">TimeFlow — 勤怠管理</div></div>
+        <div class="work-cat">業務効率化ツール</div>
+        <div class="work-title">勤怠管理システム</div>
+        <div class="work-desc">出退勤打刻・残業管理・休暇申請・CSV出力まで対応した法人向け勤怠管理。</div>
+        <div class="work-tags"><span class="work-tag">打刻管理</span><span class="work-tag">CSV出力</span><span class="work-tag">月次集計</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥300,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="system" onclick="openWork('./在庫管理ツール.html','在庫管理システム — StockFlow')">
+        <div class="work-num">08 — システム開発</div>
+        <div class="work-preview"><div class="work-preview-inner p-stock">📦</div><div class="work-preview-label">StockFlow — 在庫管理</div></div>
+        <div class="work-cat">業務効率化ツール</div>
+        <div class="work-title">在庫管理システム</div>
+        <div class="work-desc">在庫アラート・入出庫管理・カテゴリ別グラフ・CSV出力対応。在庫切れを即通知。</div>
+        <div class="work-tags"><span class="work-tag">在庫アラート</span><span class="work-tag">グラフ</span><span class="work-tag">CSV</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥300,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="ai" onclick="openWork('./AI添削ツール.html','AI文章添削ツール — TextPro')">
+        <div class="work-num">09 — AI活用ツール</div>
+        <div class="work-preview"><div class="work-preview-inner p-aitext">✍️</div><div class="work-preview-label">TextPro — AI文章添削</div></div>
+        <div class="work-cat">🤖 AI活用ツール</div>
+        <div class="work-title">AI文章添削ツール</div>
+        <div class="work-desc">Claude AI活用の文章添削。スコアリング・指摘・修正文自動生成。企業向け業務ツール。</div>
+        <div class="work-tags"><span class="work-tag">Claude API</span><span class="work-tag">スコアリング</span><span class="work-tag">自動添削</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥500,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="ai" onclick="openWork('./AI面接ツール.html','AI面接練習ツール')">
+        <div class="work-num">10 — AI活用ツール</div>
+        <div class="work-preview"><div class="work-preview-inner p-aiint">🎤</div><div class="work-preview-label">AI面接練習ツール</div></div>
+        <div class="work-cat">🤖 AI活用ツール</div>
+        <div class="work-title">AI面接練習ツール</div>
+        <div class="work-desc">AIが面接官役を担うインタラクティブな面接練習。回答フィードバックと改善提案を自動生成。</div>
+        <div class="work-tags"><span class="work-tag">Claude API</span><span class="work-tag">採点機能</span><span class="work-tag">フィードバック</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥500,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="system" onclick="openWork('./Excel自動化ツール.html','Excel業務自動化ツール')">
+        <div class="work-num">11 — 業務自動化</div>
+        <div class="work-preview"><div class="work-preview-inner p-excel">📊</div><div class="work-preview-label">AutoExcel — 業務自動化</div></div>
+        <div class="work-cat">業務効率化ツール</div>
+        <div class="work-title">Excel業務自動化ツール</div>
+        <div class="work-desc">マクロ実行・自動集計・PDF出力。売上集計・請求書・在庫アラートなど5種搭載。</div>
+        <div class="work-tags"><span class="work-tag">マクロ</span><span class="work-tag">PDF出力</span><span class="work-tag">自動集計</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥30,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="web" onclick="openWork('./LINE公式アカウント構築.html','LINE公式アカウント構築')">
+        <div class="work-num">12 — LINE構築</div>
+        <div class="work-preview"><div class="work-preview-inner p-line">💬</div><div class="work-preview-label">LINE公式 — 構築ダッシュボード</div></div>
+        <div class="work-cat">LINE公式アカウント</div>
+        <div class="work-title">LINE公式アカウント構築</div>
+        <div class="work-desc">リッチメニュー・ステップ配信・自動応答・一斉配信・分析ダッシュボード完備。</div>
+        <div class="work-tags"><span class="work-tag">LINE API</span><span class="work-tag">チャットボット</span><span class="work-tag">ステップ配信</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥50,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="system" onclick="openWork('./スクレイピングダッシュボード.html','スクレイピング・データ収集ダッシュボード')">
+        <div class="work-num">13 — データ収集</div>
+        <div class="work-preview"><div class="work-preview-inner p-scrape">🔍</div><div class="work-preview-label">ScrapeBoard — データ収集</div></div>
+        <div class="work-cat">業務効率化ツール</div>
+        <div class="work-title">スクレイピングダッシュボード</div>
+        <div class="work-desc">競合価格監視・求人・レビュー収集。価格推移グラフ・アラート・CSV対応。</div>
+        <div class="work-tags"><span class="work-tag">データ収集</span><span class="work-tag">価格監視</span><span class="work-tag">グラフ</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥30,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="system" onclick="openWork('./介護施設管理システム.html','介護施設管理システム — CareFlow')">
+        <div class="work-num">14 — 業種特化</div>
+        <div class="work-preview"><div class="work-preview-inner p-care">🏥</div><div class="work-preview-label">CareFlow — 介護施設管理</div></div>
+        <div class="work-cat">業種特化システム</div>
+        <div class="work-title">介護施設管理システム</div>
+        <div class="work-desc">入居者管理・バイタル記録・服薬チェック・介護記録・スケジュール管理まで。</div>
+        <div class="work-tags"><span class="work-tag">バイタル管理</span><span class="work-tag">服薬チェック</span><span class="work-tag">スケジュール</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥500,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+      <div class="work-card" data-c="system" onclick="openWork('./要件定義ツール.html','要件定義管理ツール — RequireFlow')">
+        <div class="work-num">15 — 社内業務</div>
+        <div class="work-preview"><div class="work-preview-inner p-req">📋</div><div class="work-preview-label">RequireFlow — 要件定義</div></div>
+        <div class="work-cat">社内業務ツール</div>
+        <div class="work-title">要件定義管理ツール</div>
+        <div class="work-desc">MoSCoW優先度・受入条件・ステータス管理・コメント機能。進捗率を自動計算。</div>
+        <div class="work-tags"><span class="work-tag">MoSCoW</span><span class="work-tag">進捗管理</span><span class="work-tag">コメント</span></div>
+        <div class="work-footer"><div class="work-price">参考 <strong>¥300,000〜</strong></div><div class="work-link">デモ<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ GUARANTEE ━━━ -->
+<section class="section guarantee" id="guarantee">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-eyebrow" style="justify-content:center">Guarantee</div>
+      <h2 class="section-title">安心してご依頼いただける3つの理由</h2>
+    </div>
+    <div class="guarantee-grid reveal">
+      <div class="guarantee-card">
+        <div class="guarantee-icon">🔄</div>
+        <div class="guarantee-title">修正回数無制限</div>
+        <p class="guarantee-desc">「思っていたのと違う」「やっぱり変えたい」を何度でも無料で対応します。完成まで遠慮なくご要望をお伝えください。</p>
+      </div>
+      <div class="guarantee-card">
+        <div class="guarantee-icon">🔒</div>
+        <div class="guarantee-title">仮払い100%で安心取引</div>
+        <p class="guarantee-desc">クラウドワークス・ランサーズの仮払い制度を活用。プラットフォームが代金を保護するため、初めての方でも安心してご依頼いただけます。</p>
+      </div>
+      <div class="guarantee-card">
+        <div class="guarantee-icon">💬</div>
+        <div class="guarantee-title">24時間以内に返信</div>
+        <p class="guarantee-desc">新規のお問い合わせは24時間以内、制作中の連絡は48時間以内に必ず返信します。連絡が取れなくなることはありません。</p>
+      </div>
+    </div>
+    <div class="guarantee-cta reveal">
+      <a href="https://crowdworks.jp/" target="_blank" rel="noopener" class="btn-primary" style="display:inline-flex">まずは無料でご相談 →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ PROCESS ━━━ -->
+<section class="section section-light" id="process">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-eyebrow" style="justify-content:center">Flow</div>
+      <h2 class="section-title">ご依頼の流れ</h2>
+      <p class="section-sub" style="margin:0 auto">すべてオンライン完結。対面不要でどこからでもご依頼いただけます。</p>
+    </div>
+    <div class="process-grid reveal">
+      <div class="process-item">
+        <div class="process-dot">1</div>
+        <div class="process-step">Step 01</div>
+        <div class="process-name">ご相談・問い合わせ</div>
+        <p class="process-detail">メッセージでご連絡ください。</p>
+        <span class="process-time">24時間以内返信</span>
+      </div>
+      <div class="process-item">
+        <div class="process-dot">2</div>
+        <div class="process-step">Step 02</div>
+        <div class="process-name">ヒアリング</div>
+        <p class="process-detail">要件・デザイン・予算・納期を確認します。</p>
+        <span class="process-time">テキストのみでOK</span>
+      </div>
+      <div class="process-item">
+        <div class="process-dot">3</div>
+        <div class="process-step">Step 03</div>
+        <div class="process-name">お見積もり・ご契約</div>
+        <p class="process-detail">見積もり提示後、承認で仮払い完了。</p>
+        <span class="process-time">見積もり無料</span>
+      </div>
+      <div class="process-item">
+        <div class="process-dot">4</div>
+        <div class="process-step">Step 04</div>
+        <div class="process-name">制作・修正対応</div>
+        <p class="process-detail">制作開始。修正は回数無制限で対応。</p>
+        <span class="process-time">LP：最短1週間</span>
+      </div>
+      <div class="process-item">
+        <div class="process-dot">5</div>
+        <div class="process-step">Step 05</div>
+        <div class="process-name">納品・仮払い解放</div>
+        <p class="process-detail">最終確認後に納品・取引完了。</p>
+        <span class="process-time">確認後に即納品</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ PRICING ━━━ -->
+<section class="section section-gray" id="pricing">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-eyebrow" style="justify-content:center">Pricing</div>
+      <h2 class="section-title">料金プラン</h2>
+      <p class="section-sub" style="margin:0 auto">全プラン修正回数無制限・見積もり無料。ご要望に応じて柔軟にカスタマイズ可能です。</p>
+    </div>
+    <div class="pricing-grid reveal">
+      <div class="price-card">
+        <div class="price-plan">Lite</div>
+        <div class="price-amount">¥50,000<small>〜</small></div>
+        <div class="price-period">ライトプラン — LP・1ページサイト / 約1週間</div>
+        <ul class="price-features">
+          <li>LP・1ページサイト</li>
+          <li>スマホ対応（レスポンシブ）</li>
+          <li>SSL設定</li>
+          <li>お問い合わせフォーム</li>
+          <li>修正回数無制限</li>
+        </ul>
+        <button class="price-cta-btn" onclick="window.open('https://crowdworks.jp/','_blank')">この価格で相談する</button>
+      </div>
+      <div class="price-card featured">
+        <div class="price-plan">Standard</div>
+        <div class="price-amount">¥120,000<small>〜</small></div>
+        <div class="price-period">スタンダードプラン — 5〜10ページ / 約2週間</div>
+        <ul class="price-features">
+          <li>5〜10ページのWebサイト</li>
+          <li>スマホ対応・SSL設定</li>
+          <li>お問い合わせフォーム</li>
+          <li>Google Analytics設定</li>
+          <li>修正回数無制限</li>
+        </ul>
+        <button class="price-cta-btn" onclick="window.open('https://crowdworks.jp/','_blank')">この価格で相談する</button>
+      </div>
+      <div class="price-card">
+        <div class="price-plan">Premium</div>
+        <div class="price-amount">¥250,000<small>〜</small></div>
+        <div class="price-period">プレミアムプラン — コーポレート・CMS / 約3〜4週間</div>
+        <ul class="price-features">
+          <li>ページ数無制限</li>
+          <li>CMS導入（WordPress等）</li>
+          <li>SEO基本対策</li>
+          <li>スマホ対応・SSL</li>
+          <li>修正回数無制限</li>
+        </ul>
+        <button class="price-cta-btn" onclick="window.open('https://crowdworks.jp/','_blank')">この価格で相談する</button>
+      </div>
+    </div>
+    <p class="pricing-note">システム開発（¥200,000〜）・スマホアプリ（¥400,000〜）・AI活用ツール（¥500,000〜）の詳細は<a href="#services">サービス一覧</a>をご覧ください。<br>月額保守プランはライト¥10,000〜・スタンダード¥20,000〜・プレミアム¥40,000〜/月。</p>
+  </div>
+</section>
+
+<!-- ━━━ FAQ ━━━ -->
+<section class="section section-light" id="faq">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-eyebrow" style="justify-content:center">FAQ</div>
+      <h2 class="section-title">よくある質問</h2>
+    </div>
+    <div class="faq-list reveal">
+      <div class="faq-item">
+        <div class="faq-q"><div class="faq-q-icon">+</div>修正回数無制限とはどういう意味ですか？</div>
+        <div class="faq-a">納品前の修正は何度でも無料で対応します。「デザインを変えたい」「文章を修正したい」「レイアウトを変更したい」などのご要望を回数制限なくお受けします。ただし、当初の仕様から大きく変わる要件追加（機能の大幅追加など）は別途お見積もりとなる場合があります。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><div class="faq-q-icon">+</div>仮払いとはどういう仕組みですか？</div>
+        <div class="faq-a">クラウドワークス・ランサーズなどのプラットフォームを通じた「仮払い」方式でご契約いただきます。プラットフォームがお客様のお支払いを一時保管し、納品・承認後にのみ受注者に支払いが解放されます。トラブル時はプラットフォームが仲裁するため、双方に安心・安全な取引が可能です。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><div class="faq-q-icon">+</div>制作実績がありますが、イメージに合わなかったらどうしますか？</div>
+        <div class="faq-a">まず詳しくヒアリングを行い、参考サイトや希望のデザインイメージを共有していただきます。初稿提出後にご意見をいただき、修正を繰り返して理想の形に近づけます。「思っていたのと違う」がなくなるまで何度でも対応します。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><div class="faq-q-icon">+</div>画像や文章の素材がない場合でも大丈夫ですか？</div>
+        <div class="faq-a">可能な限りご準備いただくとより良い仕上がりになりますが、フリー素材（Unsplashなど）や仮テキストでの対応も可能です。文章ライティング（別途料金）も承ります。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><div class="faq-q-icon">+</div>納期はどのくらいかかりますか？</div>
+        <div class="faq-a">LPなら最短1週間、5〜10ページのサイトなら約2週間、コーポレートサイトなら2〜4週間が目安です。システム開発・アプリ・AIツールは要件によって異なるため、ヒアリング後にお伝えします。急ぎのご依頼もお気軽にご相談ください。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><div class="faq-q-icon">+</div>納品後のサポートはありますか？</div>
+        <div class="faq-a">納品後7日以内のバグ・不具合修正は無料で対応します。継続的なサポートが必要な場合は、月額保守プラン（¥10,000〜/月）をご利用ください。コンテンツ更新・セキュリティ監視・バックアップ・アクセス解析レポートなどをご提供しています。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ FINAL CTA ━━━ -->
+<section class="section final-cta">
+  <div class="container">
+    <div class="final-cta-inner reveal">
+      <span class="final-cta-label">CONTACT</span>
+      <h2 class="final-cta-title">まずは<span class="red">無料で相談</span>から。</h2>
+      <p class="final-cta-sub">ヒアリング・お見積もりは完全無料。「こんなもの作れる？」「いくらかかる？」など、どんな小さな相談も歓迎します。24時間以内に必ず返信します。</p>
+      <div class="cta-platforms">
+        <!-- ↓ ご自身のプロフィールURLに変更してください -->
+        <a href="https://crowdworks.jp/" target="_blank" rel="noopener" class="cta-platform-btn main">💼 クラウドワークスで相談</a>
+        <a href="https://www.lancers.jp/" target="_blank" rel="noopener" class="cta-platform-btn">🖥 ランサーズで相談</a>
+      </div>
+      <p class="cta-note">見積もり無料・修正回数無制限・仮払いで安心取引</p>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━ FOOTER ━━━ -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand-name">Social<span>.</span>Quality</div>
+        <p class="footer-brand-desc">LP・コーポレートサイト・ECサイト・業務効率化ツール・スマホアプリ・AI活用ツールをオンライン完結で制作。修正回数無制限・短納期・全国対応。</p>
+      </div>
+      <div class="footer-col">
+        <h4>サービス</h4>
+        <ul>
+          <li><a href="#services">LP・Webサイト制作</a></li>
+          <li><a href="#services">業務効率化ツール開発</a></li>
+          <li><a href="#services">スマホアプリ開発</a></li>
+          <li><a href="#services">AI活用ツール開発</a></li>
+          <li><a href="#services">LINE公式アカウント構築</a></li>
+          <li><a href="#services">月額保守・運用</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>リンク</h4>
+        <ul>
+          <li><a href="#works">制作実績</a></li>
+          <li><a href="#pricing">料金プラン</a></li>
+          <li><a href="#process">ご依頼の流れ</a></li>
+          <li><a href="#faq">よくある質問</a></li>
+          <!-- ↓ プロフィールURLに変更してください -->
+          <li><a href="https://crowdworks.jp/" target="_blank" rel="noopener">クラウドワークス</a></li>
+          <li><a href="https://www.lancers.jp/" target="_blank" rel="noopener">ランサーズ</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 Social Quality — All Rights Reserved.</p>
+      <p>修正無制限 · 短納期 · 全国対応 · 仮払い安心取引</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ── REVEAL ── */
+const ro = new IntersectionObserver(es=>{
+  es.forEach((e,i)=>{
+    if(e.isIntersecting){setTimeout(()=>e.target.classList.add('visible'),i*80);ro.unobserve(e.target)}
+  });
+},{threshold:.08,rootMargin:'0px 0px -50px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
+
+/* ── FILTER ── */
+document.querySelectorAll('.filter-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    const f=b.dataset.f;
+    document.querySelectorAll('.work-card').forEach(c=>{
+      c.style.display=(f==='all'||c.dataset.c===f)?'':'none';
+    });
+  });
+});
+
+/* ── MODAL ── */
+const modal=document.getElementById('workModal');
+const iframe=document.getElementById('modalIframe');
+const loading=document.getElementById('mLoading');
+const titleEl=document.getElementById('modalTitle');
+let curSrc='';
+function openWork(src,title){
+  curSrc=src; titleEl.textContent=title;
+  loading.style.display='flex'; iframe.style.display='none'; iframe.src='';
+  modal.classList.add('open'); document.body.style.overflow='hidden';
+  setTimeout(()=>{
+    iframe.src=src;
+    iframe.onload=()=>{loading.style.display='none';iframe.style.display='block'};
+  },60);
+}
+function closeModal(){
+  modal.classList.remove('open'); document.body.style.overflow='';
+  setTimeout(()=>{iframe.src='';iframe.style.display='none';loading.style.display='flex'},350);
+}
+function openNewTab(){if(curSrc)window.open(curSrc,'_blank')}
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))closeModal()});
+
+/* ── FAQ ── */
+document.querySelectorAll('.faq-q').forEach(q=>{
+  q.addEventListener('click',()=>{
+    const item=q.parentElement;
+    item.classList.toggle('open');
+  });
+});
+
+/* ── SCROLL REVEAL ── */
+window.addEventListener('scroll',()=>{
+  document.getElementById('navbar').style.boxShadow=
+    window.scrollY>30?'0 2px 20px rgba(0,0,0,.3)':'none';
+},{passive:true});
+</script>
+</body>
+</html>
