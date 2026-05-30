@@ -290,7 +290,10 @@ function adminJobsPage(jobs) {
   const content = `
 <div class="header-row">
   <h2>求人管理</h2>
-  <button class="btn btn-primary" onclick="showJobModal(null)">＋ 求人を登録する</button>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-secondary" onclick="openBulkModal()" style="background:#7c3aed;color:#fff;border-color:#7c3aed">✨ AI一括生成</button>
+    <button class="btn btn-primary" onclick="showJobModal(null)">＋ 求人を登録する</button>
+  </div>
 </div>
 <div class="card">
   <div class="table-wrap">
@@ -303,7 +306,8 @@ function adminJobsPage(jobs) {
     </table>
   </div>
 </div>
-${jobModalHTML()}`;
+${jobModalHTML()}
+${bulkModalHTML()}`;
   return adminLayout('求人管理', content, 'jobs');
 }
 
@@ -367,6 +371,83 @@ function jobModalHTML() {
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="hideJobModal()">キャンセル</button>
       <button class="btn btn-primary" onclick="saveJob()">保存する</button>
+    </div>
+  </div>
+</div>`;
+}
+
+function bulkModalHTML() {
+  const jobTypes = [
+    '看護師・准看護師', '介護士・ケアワーカー', '調理師・キッチンスタッフ',
+    '事務・受付スタッフ', '営業（個人向け）', '営業（法人向け）',
+    'Webエンジニア（フロントエンド）', 'Webエンジニア（バックエンド）',
+    '保育士・幼稚園教諭', 'ドライバー・配送',
+  ];
+  const locations = [
+    { label: '東京・新宿',  value: '東京都新宿区' },
+    { label: '東京・品川',  value: '東京都品川区' },
+    { label: '東京・渋谷',  value: '東京都渋谷区' },
+    { label: '東京・豊島',  value: '東京都豊島区' },
+    { label: '大阪・中央',  value: '大阪府大阪市中央区' },
+    { label: '大阪・北区',  value: '大阪府大阪市北区' },
+    { label: '大阪・阿倍野', value: '大阪府大阪市阿倍野区' },
+    { label: '大阪・西区',  value: '大阪府大阪市西区' },
+  ];
+  const typeChecks = jobTypes.map(t =>
+    `<label class="bulk-check"><input type="checkbox" name="bulk-type" value="${esc(t)}"> ${esc(t)}</label>`
+  ).join('');
+  const locChecks = locations.map(l =>
+    `<label class="bulk-check"><input type="checkbox" name="bulk-loc" value="${esc(l.value)}"> ${esc(l.label)}</label>`
+  ).join('');
+
+  return `
+<div id="bulk-modal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <h3>✨ AI一括求人生成</h3>
+    <p class="text-muted text-sm" style="margin:4px 0 16px">選択した職種×勤務地の組み合わせ分の求人原稿をAIが自動生成します。<br>生成後は「求人管理」で内容確認・公開できます。</p>
+
+    <div id="bulk-form">
+      <div class="form-group">
+        <label style="font-weight:600;margin-bottom:8px;display:block">職種（複数選択可）
+          <span style="font-weight:400;margin-left:8px">
+            <a href="#" onclick="toggleAllBulkType(true);return false" style="font-size:12px">全選択</a> /
+            <a href="#" onclick="toggleAllBulkType(false);return false" style="font-size:12px">全解除</a>
+          </span>
+        </label>
+        <div class="bulk-checks">${typeChecks}</div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label style="font-weight:600;margin-bottom:8px;display:block">勤務地（複数選択可）
+          <span style="font-weight:400;margin-left:8px">
+            <a href="#" onclick="toggleAllBulkLoc(true);return false" style="font-size:12px">全選択</a> /
+            <a href="#" onclick="toggleAllBulkLoc(false);return false" style="font-size:12px">全解除</a>
+          </span>
+        </label>
+        <div class="bulk-checks">${locChecks}</div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label style="font-weight:600">雇用形態</label>
+        <select id="bulk-emp-type" class="form-input" style="max-width:200px;margin-top:6px">
+          <option value="正社員">正社員</option>
+          <option value="パート・アルバイト">パート・アルバイト</option>
+          <option value="契約社員">契約社員</option>
+        </select>
+      </div>
+      <div id="bulk-count-preview" class="text-sm" style="margin-top:8px;color:#7c3aed;font-weight:600"></div>
+      <div class="modal-footer" style="margin-top:16px">
+        <button class="btn btn-ghost" onclick="closeBulkModal()">キャンセル</button>
+        <button class="btn btn-primary" id="btn-bulk-gen" onclick="startBulkGenerate()" style="background:#7c3aed;border-color:#7c3aed">✨ 生成開始</button>
+      </div>
+    </div>
+
+    <div id="bulk-progress" style="display:none">
+      <div id="bulk-progress-bar-wrap" style="background:#f1f3f4;border-radius:4px;height:8px;margin-bottom:12px">
+        <div id="bulk-progress-bar" style="background:#7c3aed;height:8px;border-radius:4px;width:0%;transition:width .3s"></div>
+      </div>
+      <div id="bulk-log" style="max-height:300px;overflow-y:auto;font-size:12px;font-family:monospace;background:#f8f9fa;border-radius:4px;padding:10px;line-height:1.8"></div>
+      <div class="modal-footer" style="margin-top:16px">
+        <button class="btn btn-primary" id="btn-bulk-done" onclick="closeBulkModal();location.reload()" style="display:none">完了 — 求人管理を更新</button>
+      </div>
     </div>
   </div>
 </div>`;

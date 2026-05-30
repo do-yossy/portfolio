@@ -373,6 +373,117 @@ async function generateWithAI() {
   }
 }
 
+// ── AI Bulk Generate ──
+function openBulkModal() {
+  const modal = document.getElementById('bulk-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  updateBulkCount();
+  document.querySelectorAll('[name="bulk-type"],[name="bulk-loc"]').forEach(cb => {
+    cb.addEventListener('change', updateBulkCount);
+  });
+}
+
+function closeBulkModal() {
+  const modal = document.getElementById('bulk-modal');
+  if (modal) modal.classList.add('hidden');
+  // reset
+  const form = document.getElementById('bulk-form');
+  const prog = document.getElementById('bulk-progress');
+  const btn  = document.getElementById('btn-bulk-gen');
+  if (form) form.style.display = '';
+  if (prog) prog.style.display = 'none';
+  if (btn)  { btn.disabled = false; btn.textContent = '✨ 生成開始'; }
+  const done = document.getElementById('btn-bulk-done');
+  if (done) done.style.display = 'none';
+  const log  = document.getElementById('bulk-log');
+  if (log)  log.innerHTML = '';
+}
+
+function toggleAllBulkType(on) {
+  document.querySelectorAll('[name="bulk-type"]').forEach(cb => { cb.checked = on; });
+  updateBulkCount();
+}
+
+function toggleAllBulkLoc(on) {
+  document.querySelectorAll('[name="bulk-loc"]').forEach(cb => { cb.checked = on; });
+  updateBulkCount();
+}
+
+function updateBulkCount() {
+  const types = [...document.querySelectorAll('[name="bulk-type"]:checked')].length;
+  const locs  = [...document.querySelectorAll('[name="bulk-loc"]:checked')].length;
+  const preview = document.getElementById('bulk-count-preview');
+  if (preview) {
+    const count = types * locs;
+    preview.textContent = count > 0
+      ? `→ ${types}職種 × ${locs}勤務地 = ${count}件の求人を生成します（約${count}分）`
+      : '職種と勤務地を選択してください';
+  }
+}
+
+function startBulkGenerate() {
+  const types = [...document.querySelectorAll('[name="bulk-type"]:checked')].map(cb => cb.value);
+  const locs  = [...document.querySelectorAll('[name="bulk-loc"]:checked')].map(cb => cb.value);
+  const emp   = document.getElementById('bulk-emp-type')?.value || '正社員';
+
+  if (!types.length || !locs.length) {
+    toast('職種と勤務地を選択してください', 'error');
+    return;
+  }
+
+  const form = document.getElementById('bulk-form');
+  const prog = document.getElementById('bulk-progress');
+  const btn  = document.getElementById('btn-bulk-gen');
+  const log  = document.getElementById('bulk-log');
+  const bar  = document.getElementById('bulk-progress-bar');
+
+  form.style.display = 'none';
+  prog.style.display = '';
+  btn.disabled = true;
+
+  const params = new URLSearchParams({
+    types: types.join(','),
+    locations: locs.join(','),
+    employmentType: emp,
+  });
+
+  const es = new EventSource(`/api/generate/bulk?${params}`);
+  const total = types.length * locs.length;
+
+  es.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    const line = document.createElement('div');
+    const color = d.type === 'success' ? '#137333' : d.type === 'error' ? '#b91c1c' : d.type === 'warn' ? '#92400e' : '#444';
+    line.style.color = color;
+    line.textContent = d.message;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+
+    if (d.current && d.total) {
+      bar.style.width = Math.round((d.current / d.total) * 100) + '%';
+    }
+
+    if (d.done) {
+      es.close();
+      bar.style.width = '100%';
+      const doneBtn = document.getElementById('btn-bulk-done');
+      if (doneBtn) doneBtn.style.display = '';
+      if (d.success) toast(`✅ ${d.count}件の求人を生成しました！`, 'success');
+    }
+  };
+
+  es.onerror = () => {
+    es.close();
+    const line = document.createElement('div');
+    line.style.color = '#b91c1c';
+    line.textContent = '❌ 接続が切断されました';
+    log.appendChild(line);
+    const doneBtn = document.getElementById('btn-bulk-done');
+    if (doneBtn) doneBtn.style.display = '';
+  };
+}
+
 // ── Init ──
 document.addEventListener('DOMContentLoaded', () => {
   // VPN polling

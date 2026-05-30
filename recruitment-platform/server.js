@@ -454,6 +454,103 @@ ${jobUrls}
     return;
   }
 
+  // ── API: AI Bulk Job Generate (SSE) ──
+  if (pathname === '/api/generate/bulk' && method === 'GET') {
+    sseInit(res);
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      sseSend(res, { message: 'ANTHROPIC_API_KEY が設定されていません', type: 'error', done: true, success: false });
+      res.end(); return;
+    }
+
+    const types     = (query.types     || '').split(',').map(s => s.trim()).filter(Boolean);
+    const locations = (query.locations || '').split(',').map(s => s.trim()).filter(Boolean);
+    const empType   = query.employmentType || '正社員';
+
+    if (!types.length || !locations.length) {
+      sseSend(res, { message: '職種と勤務地を1つ以上選択してください', type: 'error', done: true, success: false });
+      res.end(); return;
+    }
+
+    const salaryMap = {
+      '看護師・准看護師':              '月給28万円〜40万円',
+      '介護士・ケアワーカー':          '月給22万円〜30万円',
+      '調理師・キッチンスタッフ':      '月給22万円〜30万円',
+      '事務・受付スタッフ':            '月給20万円〜27万円',
+      '営業（個人向け）':              '月給25万円〜45万円（インセンティブあり）',
+      '営業（法人向け）':              '月給28万円〜50万円（インセンティブあり）',
+      'Webエンジニア（フロントエンド）': '月給30万円〜55万円',
+      'Webエンジニア（バックエンド）':  '月給35万円〜60万円',
+      '保育士・幼稚園教諭':            '月給22万円〜28万円',
+      'ドライバー・配送':              '月給25万円〜35万円',
+    };
+
+    const system = `あなたは採用広告のコピーライターです。指定された職種・勤務地・雇用形態の求人情報をJSON形式で生成してください。
+必ず以下のJSON形式のみを返してください（マークダウンやコードブロックは不要）：
+{"title":"求人タイトル","description":"仕事内容","tags":["タグ1","タグ2","タグ3","タグ4"]}
+
+titleは「具体的な職種名 勤務地エリア名」の形式で魅力的に。
+descriptionは以下の構成で300〜500文字：
+◆仕事内容（主な業務を3〜5点の箇条書き）
+◆職場環境（職場の特徴・魅力）
+◆こんな方歓迎（求める人物像）
+tagsは求職者が検索しそうなキーワードを4〜5個。`;
+
+    const combos = [];
+    for (const t of types) for (const l of locations) combos.push({ t, l });
+    const total = combos.length;
+
+    sseSend(res, { message: `✨ ${total}件の求人原稿を生成します...`, type: 'info', total });
+
+    let successCount = 0;
+    let aborted = false;
+    req.on('close', () => { aborted = true; });
+
+    (async () => {
+      for (let i = 0; i < combos.length; i++) {
+        if (aborted) break;
+        const { t, l } = combos[i];
+        const salary   = salaryMap[t] || '月給22万円〜35万円';
+        const shortLoc = l.replace('東京都', '東京・').replace('大阪府大阪市', '大阪・').replace(/区$/, '').replace(/市$/, '');
+
+        sseSend(res, { message: `[${i+1}/${total}] ${t} × ${shortLoc} を生成中...`, type: 'info', current: i + 1, total });
+
+        try {
+          const userMsg = `職種: ${t}\n勤務地: ${l}\n雇用形態: ${empType}\n給与: ${salary}`;
+          const raw  = await callClaude(system, userMsg);
+          const json = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim());
+
+          await Jobs.create({
+            title: json.title || `${t} ${shortLoc}`,
+            location: l,
+            salary,
+            jobType: t,
+            employmentType: empType,
+            description: json.description || '',
+            tags: json.tags || [],
+            isPublished: false,
+          });
+          successCount++;
+          sseSend(res, { message: `✅ 保存: ${json.title}`, type: 'success', current: i + 1, total });
+        } catch (e) {
+          sseSend(res, { message: `⚠️ ${t}×${shortLoc} 失敗: ${e.message}`, type: 'warn', current: i + 1, total });
+        }
+      }
+
+      await Logs.create('bulk_generate', 'success', `AI一括生成: ${successCount}/${total}件`);
+      notify(`AI一括生成完了: ${successCount}件の求人を下書き保存しました`).catch(() => {});
+      sseSend(res, {
+        message: `✅ 完了！ ${successCount}件の求人を下書き保存しました。求人管理から確認・公開してください。`,
+        type: 'success', done: true, success: true, count: successCount,
+      });
+      res.end();
+    })().catch(e => {
+      sseSend(res, { message: `❌ エラー: ${e.message}`, type: 'error', done: true, success: false });
+      res.end();
+    });
+    return;
+  }
+
   // ── Auth guard: all /admin routes except /admin/login ──
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
     if (!requireAuth(req, res)) return;

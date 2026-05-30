@@ -575,3 +575,9 @@ select.s-select { width: auto; padding: 4px 8px; font-size: 12px; border-radius:
 .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
 .empty-state p { font-size: 14px; }
 hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ── Bulk Generate Modal ── */
+.bulk-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.bulk-check  { display: flex; align-items: center; gap: 5px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 20px; padding: 4px 10px; font-size: 13px; cursor: pointer; transition: background .1s; }
+.bulk-check:has(input:checked) { background: #ede9fe; border-color: #7c3aed; color: #5b21b6; }
+.bulk-check input { margin: 0; accent-color: #7c3aed; }
