@@ -45,7 +45,9 @@ ${content}
 </html>`;
 }
 
-function publicLayout(title, content, { description = '', jsonld = '' } = {}) {
+function publicLayout(title, content, { description = '', jsonld = '', canonical = '' } = {}) {
+  const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+  const canonicalUrl = canonical || siteUrl + '/jobs';
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -53,7 +55,12 @@ function publicLayout(title, content, { description = '', jsonld = '' } = {}) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
 ${description ? `<meta name="description" content="${esc(description)}">` : ''}
+<link rel="canonical" href="${canonicalUrl}">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="ja_JP">
 <meta property="og:title" content="${esc(title)}">
+<meta property="og:url" content="${canonicalUrl}">
+${description ? `<meta property="og:description" content="${esc(description)}">` : ''}
 ${jsonld}
 <link rel="stylesheet" href="/styles.css">
 </head>
@@ -90,7 +97,27 @@ function nl2br(str) {
 }
 
 // ── Admin Dashboard ──
-function dashboardPage({ stats, lastPost }) {
+function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [] }) {
+  // BAN risk helper
+  function banLevel(count, warn, danger) {
+    if (count >= danger) return 'ban-danger';
+    if (count >= warn)   return 'ban-warn';
+    return 'ban-safe';
+  }
+  const kb = banRisk.kyujinbox || 0;
+  const st = banRisk.stanby    || 0;
+  const wp = banRisk.weeklyPosts || 0;
+
+  const maxMedia = mediaBreakdown.length > 0 ? Math.max(...mediaBreakdown.map(m => m.count)) : 1;
+  const mediaBars = mediaBreakdown.slice(0, 6).map(({ media, count }) => {
+    const pct = Math.round((count / maxMedia) * 100);
+    return `<div class="media-bar-row">
+      <span class="media-bar-label">${esc(media)}</span>
+      <div class="media-bar-track"><div class="media-bar-fill" style="width:${pct}%"></div></div>
+      <span class="media-bar-count">${count}</span>
+    </div>`;
+  }).join('');
+
   const content = `
 <div class="header-row">
   <div>
@@ -120,6 +147,46 @@ function dashboardPage({ stats, lastPost }) {
   <div class="card card-sm">
     <div class="card-title">最終投稿</div>
     <div class="card-value" style="font-size:14px;padding-top:8px">${lastPost ? lastPost.slice(0,10) : '未実施'}</div>
+  </div>
+</div>
+
+<div class="grid-2 gap-24 mb-24">
+  <div class="card">
+    <div class="action-section-title" style="margin-bottom:14px">⚠️ 媒体BANリスク</div>
+    <div class="ban-risk-grid">
+      <div class="ban-item ${banLevel(kb, 12, 16)}">
+        <div class="ban-item-label">求人ボックス</div>
+        <div class="ban-item-count">${kb}<span>/20件</span></div>
+        <div class="ban-item-bar"><div style="width:${Math.min(100, Math.round(kb/20*100))}%"></div></div>
+        <div class="ban-item-status">${kb >= 16 ? '🔴 危険域' : kb >= 12 ? '🟡 注意域' : '🟢 安全域'}</div>
+      </div>
+      <div class="ban-item ${banLevel(st, 28, 32)}">
+        <div class="ban-item-label">スタンバイ</div>
+        <div class="ban-item-count">${st}<span>/32件</span></div>
+        <div class="ban-item-bar"><div style="width:${Math.min(100, Math.round(st/32*100))}%"></div></div>
+        <div class="ban-item-status">${st >= 32 ? '🔴 危険域' : st >= 28 ? '🟡 注意域' : '🟢 安全域'}</div>
+      </div>
+      <div class="ban-item ${banLevel(wp, 2, 3)}">
+        <div class="ban-item-label">今週の投稿回数</div>
+        <div class="ban-item-count">${wp}<span>回/週</span></div>
+        <div class="ban-item-bar"><div style="width:${Math.min(100, Math.round(wp/3*100))}%"></div></div>
+        <div class="ban-item-status">${wp >= 3 ? '🔴 過多' : wp >= 2 ? '🟡 注意' : '🟢 問題なし'}</div>
+      </div>
+      <div class="ban-item ban-info">
+        <div class="ban-item-label" style="font-size:11px;line-height:1.5">
+          ・求人ボックス: 1日1〜2件まで<br>
+          ・削除再投稿: 月1回のみ<br>
+          ・スタンバイ: XML更新週1〜2回
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="action-section-title" style="margin-bottom:14px">📊 媒体別応募数</div>
+    ${mediaBreakdown.length === 0
+      ? '<p class="text-muted text-sm">応募者データがありません</p>'
+      : `<div class="media-bars">${mediaBars}</div>`}
   </div>
 </div>
 
@@ -267,8 +334,14 @@ function jobModalHTML() {
       </div>
     </div>
     <div class="form-group">
-      <label>仕事内容<span class="req">*</span></label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <label style="margin:0">仕事内容<span class="req">*</span></label>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-ai-gen" onclick="generateWithAI()">
+          ✨ AIで原稿を生成
+        </button>
+      </div>
       <textarea id="jf-description" rows="6" placeholder="仕事内容を入力してください"></textarea>
+      <div id="ai-gen-status" class="text-sm text-muted mt-8" style="display:none"></div>
     </div>
     <div class="form-group checkbox-row">
       <input type="checkbox" id="jf-published">
@@ -517,9 +590,11 @@ function jobDetailPage(job) {
   </div>
 </div>`;
 
+  const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
   return publicLayout(`${esc(job.title)} | 求人詳細`, content, {
     description: `${job.location}・${job.salary}・${job.employment_type}。${job.description.slice(0, 100)}`,
-    jsonld
+    jsonld,
+    canonical: `${siteUrl}/jobs/${job.id}`
   });
 }
 
