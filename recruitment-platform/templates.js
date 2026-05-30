@@ -7,6 +7,7 @@ function adminLayout(title, content, active = 'dashboard') {
     { href: '/admin/applicants', icon: '👥', label: '応募者管理', key: 'applicants' },
     { href: '/admin/analytics', icon: '📈', label: '分析・レポート', key: 'analytics' },
     { href: '/admin/logs', icon: '📋', label: '投稿ログ', key: 'logs' },
+    { href: '/admin/indeed', icon: '🔎', label: 'Indeed求人検索', key: 'indeed' },
     { href: '/jobs', icon: '🌐', label: '求人サイトを見る', key: 'site' },
   ].map(n => `<a href="${n.href}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
 
@@ -25,7 +26,7 @@ function adminLayout(title, content, active = 'dashboard') {
     <span>管理画面</span>
   </div>
   <nav>${nav}</nav>
-  <div class="sidebar-footer">v1.0 MVP</div>
+  <div class="sidebar-footer"><a href="/admin/logout" style="color:var(--text-muted);font-size:12px;text-decoration:none">🚪 ログアウト</a></div>
 </aside>
 <main class="main-content">
 ${content}
@@ -764,4 +765,98 @@ function adminAnalyticsPage({ daily, media, status, topJobs, weekly }) {
   return adminLayout('分析・レポート', content, 'analytics');
 }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, jobsListPage, jobDetailPage, esc };
+// ── Login page ──
+function loginPage(error = '') {
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ログイン | 採用管理</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+.login-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:40px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo h1{font-size:20px;font-weight:700;color:var(--primary);margin:0 0 4px}
+.login-logo p{font-size:12px;color:var(--text-muted)}
+.login-error{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:13px;padding:10px 14px;border-radius:6px;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>SEO採用プラットフォーム</h1>
+      <p>管理画面へのログイン</p>
+    </div>
+    ${error ? `<div class="login-error">⚠️ ${esc(error)}</div>` : ''}
+    <form method="POST" action="/admin/login">
+      <div class="form-group">
+        <label class="form-label">ユーザー名</label>
+        <input class="form-input" type="text" name="username" autocomplete="username" required autofocus>
+      </div>
+      <div class="form-group">
+        <label class="form-label">パスワード</label>
+        <input class="form-input" type="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-primary w-full mt-16" type="submit" style="width:100%;justify-content:center">ログイン</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+// ── Indeed search result ──
+function indeedSearchPage(results, q, l) {
+  const rows = (results?.results || []).map(j => `
+    <tr>
+      <td><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.title)}</a></td>
+      <td>${esc(j.company)}</td>
+      <td>${esc(j.location)}</td>
+      <td>${esc(j.date)}</td>
+      <td><a href="${esc(j.url)}" target="_blank" class="btn btn-ghost" style="padding:4px 10px;font-size:12px">詳細</a></td>
+    </tr>`).join('');
+
+  const content = `
+    <div class="page-header"><h2>Indeed 求人検索</h2></div>
+    <div class="card">
+      <form method="GET" action="/admin/indeed" class="form-row" style="align-items:flex-end">
+        <div class="form-group" style="flex:2;margin:0">
+          <label class="form-label">キーワード</label>
+          <input class="form-input" name="q" value="${esc(q)}" placeholder="介護 東京" required>
+        </div>
+        <div class="form-group" style="flex:1;margin:0">
+          <label class="form-label">勤務地</label>
+          <input class="form-input" name="l" value="${esc(l)}" placeholder="東京都">
+        </div>
+        <button class="btn btn-primary" type="submit">検索</button>
+      </form>
+    </div>
+    ${!indeedApiConfigured() ? `
+    <div class="card" style="border-color:#fde68a;background:#fefce8">
+      <p style="color:#92400e;font-size:13px">
+        ⚠️ <strong>Indeed Publisher IDが未設定です。</strong><br>
+        <a href="https://ads.indeed.com/jobroll/xmlfeed" target="_blank">Indeed Publisher</a> に登録後、
+        環境変数 <code>INDEED_PUBLISHER_ID</code> を設定してください。
+      </p>
+    </div>` : ''}
+    ${results ? `
+    <div class="card">
+      <div class="card-title">検索結果（${results.total}件中 ${results.results.length}件表示）</div>
+      ${rows ? `
+      <table class="table">
+        <thead><tr><th>タイトル</th><th>会社名</th><th>勤務地</th><th>掲載日</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>` : '<p class="empty-state">検索結果がありませんでした。</p>'}
+    </div>` : ''}`;
+
+  return adminLayout('Indeed求人検索', content, 'indeed');
+}
+
+function indeedApiConfigured() {
+  return !!process.env.INDEED_PUBLISHER_ID;
+}
+
+module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, indeedSearchPage, jobsListPage, jobDetailPage, esc };
