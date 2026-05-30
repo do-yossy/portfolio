@@ -921,6 +921,83 @@ ${jobUrls}
     return;
   }
 
+  if (pathname === '/api/post/indeed' && method === 'GET') {
+    sseInit(res);
+
+    sseSend(res, { message: 'VPN接続を確認しています...', type: 'info' });
+    const vpnOk = await checkVPN();
+    if (!vpnOk) {
+      sseSend(res, { message: '❌ VPN未接続です。処理を中止します。', type: 'error', done: true, success: false });
+      await Logs.create('indeed_post', 'error', 'VPN未接続');
+      res.end();
+      return;
+    }
+
+    const indeedJobs = await Jobs.findAll(true);
+    if (indeedJobs.length === 0) {
+      sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
+      res.end();
+      return;
+    }
+
+    const indeedScriptPath = path.join(SCRIPTS_DIR, 'indeed_poster.py');
+    if (!fs.existsSync(indeedScriptPath)) {
+      sseSend(res, { message: '⚠️ 掲載スクリプトが見つかりません（scripts/indeed_poster.py）', type: 'warn' });
+      sseSend(res, { message: 'デモモード: 掲載シミュレーションを実行します...', type: 'info' });
+      const target = indeedJobs[0];
+      sseSend(res, { message: '🔑 Indeed 掲載管理画面にログイン中...', type: 'info' });
+      await new Promise(r => setTimeout(r, 800));
+      sseSend(res, { message: `📝 「${target.title}」を掲載中...`, type: 'info' });
+      await new Promise(r => setTimeout(r, 1200));
+      sseSend(res, { message: `✅ 「${target.title}」を掲載しました`, type: 'success' });
+      await Logs.create('indeed_post', 'success', `Indeed掲載（デモ）: ${target.title}`);
+      sseSend(res, { message: '✅ 完了: 1件掲載しました（デモモード）', type: 'success', done: true, success: true });
+      res.end();
+      return;
+    }
+
+    const indeedJobsJson = JSON.stringify(indeedJobs.slice(0, 2)); // max 2 per day
+    const indeedProc = spawn('python3', [indeedScriptPath], {
+      env: { ...process.env },
+      stdin: 'pipe'
+    });
+    indeedProc.stdin.write(indeedJobsJson);
+    indeedProc.stdin.end();
+
+    indeedProc.stdout.on('data', data => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try {
+          const obj = JSON.parse(line);
+          sseSend(res, { message: obj.message, type: obj.level || 'info' });
+        } catch {
+          sseSend(res, { message: line, type: 'info' });
+        }
+      }
+    });
+
+    indeedProc.stderr.on('data', data => {
+      sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
+    });
+
+    indeedProc.on('close', async code => {
+      const ok = code === 0;
+      const msg = ok ? '✅ Indeed掲載完了' : `❌ Indeed掲載失敗(exit ${code})`;
+      await Logs.create('indeed_post', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
+      sseSend(res, {
+        message: ok ? '✅ Indeed への掲載が完了しました' : `❌ 掲載が失敗しました（コード: ${code}）`,
+        type: ok ? 'success' : 'error',
+        done: true,
+        success: ok
+      });
+      res.end();
+    });
+
+    req.on('close', () => { try { indeedProc.kill(); } catch {} });
+    return;
+  }
+
   // ── 404 ──
   if (pathname.startsWith('/api/')) {
     sendError(res, 404, 'Not Found');

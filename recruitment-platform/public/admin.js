@@ -185,6 +185,20 @@ function startPostStanby() {
   );
 }
 
+// ── Indeed Post ──
+function startPostIndeed() {
+  confirmAction(
+    'Indeed に求人を掲載します。\nVPN接続を確認してから実行してください。\n実行しますか？',
+    async () => {
+      const vpnOk = await refreshVpn();
+      if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
+      runSSE('/api/post/indeed', 'progress-indeed-post', 'btn-post-indeed', d => {
+        toast(d.message, d.success ? 'success' : 'error');
+      });
+    }
+  );
+}
+
 // ── CSV Import ──
 function triggerCSVImport() {
   document.getElementById('csv-file-input').click();
