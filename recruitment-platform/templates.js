@@ -517,16 +517,32 @@ function jobDetailPage(job) {
     ? `<div class="job-body"><h2>よくある質問</h2>${faq.map(f => `<p><strong>Q. ${esc(f.q)}</strong></p><p>A. ${esc(f.a)}</p>`).join('<br>')}</div>`
     : '';
 
-  const jsonld = `<script type="application/ld+json">${JSON.stringify({
+  const salaryParsed = parseSalary(job.salary);
+  const salarySchema = salaryParsed ? {
+    "@type": "MonetaryAmount",
+    "currency": "JPY",
+    "value": {
+      "@type": "QuantitativeValue",
+      ...(salaryParsed.min   ? { "minValue": salaryParsed.min }   : {}),
+      ...(salaryParsed.max   ? { "maxValue": salaryParsed.max }   : {}),
+      "unitText": salaryParsed.unitText
+    }
+  } : undefined;
+
+  const jsonldObj = {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
     "title": job.title,
     "description": job.description,
-    "identifier": { "@type": "PropertyValue", "name": "recruitment-platform", "value": job.id },
-    "datePosted": (job.published_at || job.created_at || '').slice(0,10),
-    "validThrough": job.expires_at ? job.expires_at.slice(0,10) : "",
+    "identifier": { "@type": "PropertyValue", "name": process.env.COMPANY_NAME || "採用企業", "value": job.id },
+    "datePosted": (job.published_at || job.created_at || '').slice(0, 10),
+    ...(job.expires_at ? { "validThrough": job.expires_at.slice(0, 10) } : {}),
     "employmentType": mapEmploymentType(job.employment_type),
-    "hiringOrganization": { "@type": "Organization", "name": "採用企業" },
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": process.env.COMPANY_NAME || "採用企業",
+      ...(process.env.SITE_URL ? { "sameAs": process.env.SITE_URL } : {})
+    },
     "jobLocation": {
       "@type": "Place",
       "address": {
@@ -535,15 +551,10 @@ function jobDetailPage(job) {
         "addressCountry": "JP"
       }
     },
-    "baseSalary": {
-      "@type": "MonetaryAmount",
-      "currency": "JPY",
-      "value": {
-        "@type": "QuantitativeValue",
-        "unitText": "MONTH"
-      }
-    }
-  }, null, 2)}<\/script>`;
+    ...(salarySchema ? { "baseSalary": salarySchema } : {})
+  };
+
+  const jsonld = `<script type="application/ld+json">${JSON.stringify(jsonldObj, null, 2)}<\/script>`;
 
   const content = `
 <div class="pub-main">
@@ -621,6 +632,42 @@ function jobDetailPage(job) {
 function mapEmploymentType(t) {
   const m = { '正社員': 'FULL_TIME', 'パート・アルバイト': 'PART_TIME', '契約社員': 'CONTRACTOR', '派遣社員': 'TEMPORARY', '業務委託': 'OTHER' };
   return m[t] || 'OTHER';
+}
+
+// Parse Japanese salary string → { min, max, unitText }
+// Examples: "月給25万円〜30万円" → {min:250000, max:300000, unitText:"MONTH"}
+//           "時給1,200円" → {min:1200, unitText:"HOUR"}
+//           "年収400万円〜600万円" → {min:4000000, max:6000000, unitText:"YEAR"}
+function parseSalary(salary) {
+  if (!salary) return null;
+  const s = salary.replace(/,/g, '').replace(/，/g, '');
+  let unitText = 'MONTH';
+  if (/時給|時間/.test(s))  unitText = 'HOUR';
+  if (/日給|日当/.test(s))  unitText = 'DAY';
+  if (/年収|年俸/.test(s))  unitText = 'YEAR';
+
+  // Multiplier: 万 = 10000
+  const toNum = str => {
+    const m = str.match(/([\d.]+)万/);
+    if (m) return Math.round(parseFloat(m[1]) * 10000);
+    const n = str.match(/[\d]+/);
+    return n ? parseInt(n[0], 10) : null;
+  };
+
+  // Range: "23万円〜30万円" / "25万〜30万" / "1,200円〜1,600円"
+  // Allow any non-digit chars between the number and the range delimiter
+  const range = s.match(/([\d.]+万?[\d]*)\D*[〜～〜~]\D*([\d.]+万?[\d]*)/);
+  if (range) {
+    const min = toNum(range[1]);
+    const max = toNum(range[2]);
+    if (min && max) return { min, max, unitText };
+  }
+
+  // Single value
+  const single = toNum(s);
+  if (single) return { min: single, unitText };
+
+  return null;
 }
 
 // ── SVG Line Chart helper ──────────────────────────────────────
