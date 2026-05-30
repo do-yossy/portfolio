@@ -8,7 +8,7 @@ const url = require('url');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const { Jobs, Applicants, Applications, Logs, Analytics } = require('./db');
+const { Jobs, Applicants, Applications, Logs, Analytics } = require('./db-factory');
 const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize');
 const { notify } = require('./lib/notify');
 const T = require('./templates');
@@ -208,10 +208,10 @@ async function checkVPN() {
 }
 
 // Duplicate check
-function checkDuplicate(data) {
+async function checkDuplicate(data) {
   const nPhone = normalizePhone(data.phone);
   const nEmail  = normalizeEmail(data.email);
-  return Applicants.findDuplicate(nPhone, nEmail);
+  return await Applicants.findDuplicate(nPhone, nEmail);
 }
 
 // ── Claude API ──────────────────────────────────────────────
@@ -256,9 +256,8 @@ async function callClaude(systemPrompt, userMessage) {
 
 // ── Dashboard stats helpers ─────────────────────────────────
 
-function computeDashboardStats() {
-  const { db } = require('./db');
-  const allJobs = Jobs.findAll();
+async function computeDashboardStats() {
+  const allJobs = await Jobs.findAll();
 
   // BAN risk: count published jobs per media
   const kyujinboxJobs = allJobs.filter(j => j.is_published && JSON.parse(j.target_media || '[]').includes('求人ボックス')).length;
@@ -267,13 +266,13 @@ function computeDashboardStats() {
   const publishedTotal = allJobs.filter(j => j.is_published).length;
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const recentLogs = Logs.findAll(200);
+  const recentLogs = await Logs.findAll(200);
   const weeklyPosts = recentLogs.filter(l =>
     l.action === 'kyujinbox_post' && l.status === 'success' && (l.created_at || '').slice(0, 10) >= weekAgo
   ).length;
 
   // Media breakdown
-  const allApplicants = Applicants.findAll();
+  const allApplicants = await Applicants.findAll();
   const mediaMap = {};
   for (const a of allApplicants) {
     const m = a.source_media || 'その他';
@@ -314,7 +313,7 @@ const server = http.createServer(async (req, res) => {
   // ── Public: Jobs list ──
   if (pathname === '/jobs' && method === 'GET') {
     const search = query.q || '';
-    let jobs = Jobs.findAll(true);
+    let jobs = await Jobs.findAll(true);
     if (search) {
       const s = search.toLowerCase();
       jobs = jobs.filter(j =>
@@ -331,7 +330,7 @@ const server = http.createServer(async (req, res) => {
   // ── Public: Job detail ──
   const jobDetailMatch = pathname.match(/^\/jobs\/([^/]+)$/);
   if (jobDetailMatch && method === 'GET') {
-    const job = Jobs.findById(jobDetailMatch[1]);
+    const job = await Jobs.findById(jobDetailMatch[1]);
     if (!job || !job.is_published) { send(res, 404, '<h1>求人が見つかりません</h1>'); return; }
     send(res, 200, T.jobDetailPage(job));
     return;
@@ -343,8 +342,8 @@ const server = http.createServer(async (req, res) => {
     if (!body.name || !body.phone || !body.email) {
       sendError(res, 400, '氏名・電話・メールは必須です'); return;
     }
-    const dupId = checkDuplicate(body);
-    const applicant = Applicants.create({
+    const dupId = await checkDuplicate(body);
+    const applicant = await Applicants.create({
       ...body,
       isDuplicate: !!dupId,
       duplicateOfId: dupId,
@@ -352,8 +351,8 @@ const server = http.createServer(async (req, res) => {
       sourceMedia: body.sourceMedia || 'direct'
     });
     if (body.jobId) {
-      const job = Jobs.findById(body.jobId);
-      Applications.create({
+      const job = await Jobs.findById(body.jobId);
+      await Applications.create({
         applicantId: applicant.id,
         jobId: body.jobId,
         jobTitle: job ? job.title : body.jobTitle || '',
@@ -367,7 +366,7 @@ const server = http.createServer(async (req, res) => {
   // ── SEO: sitemap.xml ──
   if (pathname === '/sitemap.xml' && method === 'GET') {
     const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
-    const jobs = Jobs.findAll(true);
+    const jobs = await Jobs.findAll(true);
     const today = new Date().toISOString().slice(0, 10);
     const jobUrls = jobs.map(j => `  <url>
     <loc>${siteUrl}/jobs/${j.id}</loc>
@@ -426,43 +425,43 @@ ${jobUrls}
   // ── Admin: Dashboard ──
   if (pathname === '/admin' && method === 'GET') {
     const stats = {
-      jobs: Jobs.count(),
-      today: Applicants.todayCount(),
-      duplicates: Applicants.duplicateCount()
+      jobs: await Jobs.count(),
+      today: await Applicants.todayCount(),
+      duplicates: await Applicants.duplicateCount()
     };
-    const { banRisk, mediaBreakdown } = computeDashboardStats();
-    send(res, 200, T.dashboardPage({ stats, lastPost: Logs.lastPostTime(), banRisk, mediaBreakdown }));
+    const { banRisk, mediaBreakdown } = await computeDashboardStats();
+    send(res, 200, T.dashboardPage({ stats, lastPost: await Logs.lastPostTime(), banRisk, mediaBreakdown }));
     return;
   }
 
   // ── Admin: Jobs page ──
   if (pathname === '/admin/jobs' && method === 'GET') {
-    send(res, 200, T.adminJobsPage(Jobs.findAll()));
+    send(res, 200, T.adminJobsPage(await Jobs.findAll()));
     return;
   }
 
   // ── Admin: Applicants page ──
   if (pathname === '/admin/applicants' && method === 'GET') {
     const filter = query.status || 'all';
-    const applicants = Applicants.findAll({ status: filter, search: query.search });
+    const applicants = await Applicants.findAll({ status: filter, search: query.search });
     send(res, 200, T.adminApplicantsPage(applicants, filter));
     return;
   }
 
   // ── Admin: Logs page ──
   if (pathname === '/admin/logs' && method === 'GET') {
-    send(res, 200, T.adminLogsPage(Logs.findAll()));
+    send(res, 200, T.adminLogsPage(await Logs.findAll()));
     return;
   }
 
   // ── Admin: Analytics page ──
   if (pathname === '/admin/analytics' && method === 'GET') {
     const data = {
-      daily:   Analytics.dailyApplications(30),
-      media:   Analytics.mediaBreakdown(),
-      status:  Analytics.statusDistribution(),
-      topJobs: Analytics.topJobs(10),
-      weekly:  Analytics.weeklySummary()
+      daily:   await Analytics.dailyApplications(30),
+      media:   await Analytics.mediaBreakdown(),
+      status:  await Analytics.statusDistribution(),
+      topJobs: await Analytics.topJobs(10),
+      weekly:  await Analytics.weeklySummary()
     };
     send(res, 200, T.adminAnalyticsPage(data));
     return;
@@ -471,43 +470,43 @@ ${jobUrls}
   // ── API: Analytics JSON ──
   if (pathname === '/api/analytics' && method === 'GET') {
     sendJSON(res, 200, {
-      daily:   Analytics.dailyApplications(30),
-      media:   Analytics.mediaBreakdown(),
-      status:  Analytics.statusDistribution(),
-      topJobs: Analytics.topJobs(10),
-      weekly:  Analytics.weeklySummary()
+      daily:   await Analytics.dailyApplications(30),
+      media:   await Analytics.mediaBreakdown(),
+      status:  await Analytics.statusDistribution(),
+      topJobs: await Analytics.topJobs(10),
+      weekly:  await Analytics.weeklySummary()
     });
     return;
   }
 
   // ── API: Jobs CRUD ──
   if (pathname === '/api/jobs' && method === 'GET') {
-    sendJSON(res, 200, Jobs.findAll());
+    sendJSON(res, 200, await Jobs.findAll());
     return;
   }
   if (pathname === '/api/jobs' && method === 'POST') {
     const body = await parseJSON(req);
     if (!body.title) { sendError(res, 400, 'タイトルは必須です'); return; }
-    sendJSON(res, 201, Jobs.create(body));
+    sendJSON(res, 201, await Jobs.create(body));
     return;
   }
   const jobMatch = pathname.match(/^\/api\/jobs\/([^/]+)$/);
   if (jobMatch) {
     const id = jobMatch[1];
     if (method === 'GET') {
-      const j = Jobs.findById(id);
+      const j = await Jobs.findById(id);
       if (!j) { sendError(res, 404, '求人が見つかりません'); return; }
       sendJSON(res, 200, j);
       return;
     }
     if (method === 'PUT') {
       const body = await parseJSON(req);
-      const j = Jobs.update(id, body);
+      const j = await Jobs.update(id, body);
       sendJSON(res, 200, j);
       return;
     }
     if (method === 'DELETE') {
-      Jobs.delete(id);
+      await Jobs.delete(id);
       sendJSON(res, 200, { ok: true });
       return;
     }
@@ -515,7 +514,7 @@ ${jobUrls}
 
   // ── API: Applicants ──
   if (pathname === '/api/applicants' && method === 'GET') {
-    sendJSON(res, 200, Applicants.findAll());
+    sendJSON(res, 200, await Applicants.findAll());
     return;
   }
   const appMatch = pathname.match(/^\/api\/applicants\/([^/]+)$/);
@@ -523,11 +522,11 @@ ${jobUrls}
     const id = appMatch[1];
     if (method === 'PUT') {
       const body = await parseJSON(req);
-      sendJSON(res, 200, Applicants.update(id, body));
+      sendJSON(res, 200, await Applicants.update(id, body));
       return;
     }
     if (method === 'GET') {
-      const a = Applicants.findById(id);
+      const a = await Applicants.findById(id);
       if (!a) { sendError(res, 404, '応募者が見つかりません'); return; }
       sendJSON(res, 200, a);
       return;
@@ -536,17 +535,17 @@ ${jobUrls}
 
   // ── API: XML Feed ──
   if (pathname === '/api/feed/kyujinbox' && method === 'GET') {
-    const jobs = Jobs.findAll(true);
+    const jobs = await Jobs.findAll(true);
     const xml = generateKyujinboxXML(jobs);
-    Logs.create('xml_generate', 'success', `求人ボックスXML生成: ${jobs.length}件`);
+    await Logs.create('xml_generate', 'success', `求人ボックスXML生成: ${jobs.length}件`);
     res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': 'attachment; filename="kyujinbox-feed.xml"' });
     res.end(xml);
     return;
   }
   if (pathname === '/api/feed/stanby' && method === 'GET') {
-    const jobs = Jobs.findAll(true);
+    const jobs = await Jobs.findAll(true);
     const xml = generateStanbyXML(jobs);
-    Logs.create('xml_generate', 'success', `スタンバイXML生成: ${jobs.length}件`);
+    await Logs.create('xml_generate', 'success', `スタンバイXML生成: ${jobs.length}件`);
     res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': 'attachment; filename="stanby-feed.xml"' });
     res.end(xml);
     return;
@@ -573,8 +572,8 @@ ${jobUrls}
     for (const row of rows) {
       const mapped = mapCSVRow(row);
       if (!mapped.name || (!mapped.phone && !mapped.email)) continue;
-      const dupId = checkDuplicate(mapped);
-      Applicants.create({
+      const dupId = await checkDuplicate(mapped);
+      await Applicants.create({
         ...mapped,
         isDuplicate: !!dupId,
         duplicateOfId: dupId,
@@ -582,14 +581,14 @@ ${jobUrls}
       });
       if (dupId) duplicates++; else imported++;
     }
-    Logs.create('csv_import', 'success', `CSV取込: ${imported}件新規, ${duplicates}件重複`);
+    await Logs.create('csv_import', 'success', `CSV取込: ${imported}件新規, ${duplicates}件重複`);
     sendJSON(res, 200, { ok: true, imported, duplicates, total: imported + duplicates });
     return;
   }
 
   // ── API: CSV Export ──
   if (pathname === '/api/export/csv' && method === 'GET') {
-    const applicants = Applicants.findAll();
+    const applicants = await Applicants.findAll();
     const csv = generateCSV(applicants);
     res.writeHead(200, {
       'Content-Type': 'text/csv; charset=utf-8',
@@ -609,13 +608,13 @@ ${jobUrls}
   // ── API: Indeed Scrape (SSE) ──
   if (pathname === '/api/scrape/indeed' && method === 'GET') {
     sseInit(res);
-    const logId = Logs.create('indeed_scrape', 'running', '開始');
+    const logId = await Logs.create('indeed_scrape', 'running', '開始');
 
     sseSend(res, { message: 'VPN接続を確認しています...', type: 'info' });
     const vpnOk = await checkVPN();
     if (!vpnOk) {
       sseSend(res, { message: '❌ VPN未接続です。処理を中止します。', type: 'error', done: true, success: false });
-      Logs.create('indeed_scrape', 'error', 'VPN未接続');
+      await Logs.create('indeed_scrape', 'error', 'VPN未接続');
       res.end();
       return;
     }
@@ -632,13 +631,13 @@ ${jobUrls}
       ];
       let count = 0;
       for (const s of samples) {
-        const dup = checkDuplicate(s);
-        Applicants.create({ ...s, isDuplicate: !!dup, duplicateOfId: dup, status: dup ? '重複' : '新規' });
+        const dup = await checkDuplicate(s);
+        await Applicants.create({ ...s, isDuplicate: !!dup, duplicateOfId: dup, status: dup ? '重複' : '新規' });
         count++;
         sseSend(res, { message: `✅ 取得: ${s.name}（${s.phone}）`, type: 'success' });
         await new Promise(r => setTimeout(r, 300));
       }
-      Logs.create('indeed_scrape', 'success', `Indeed取込完了（デモ）: ${count}件`);
+      await Logs.create('indeed_scrape', 'success', `Indeed取込完了（デモ）: ${count}件`);
       sseSend(res, { message: `✅ 完了: ${count}件取得しました（デモモード）`, type: 'success', done: true, success: true });
       res.end();
       return;
@@ -650,7 +649,7 @@ ${jobUrls}
     const proc = spawn('python3', [scriptPath], { env });
     let count = 0;
 
-    proc.stdout.on('data', data => {
+    proc.stdout.on('data', async data => {
       const lines = data.toString().split('\n').filter(l => l.trim());
       for (const line of lines) {
         try {
@@ -658,8 +657,8 @@ ${jobUrls}
           if (obj.type === 'progress') {
             sseSend(res, { message: obj.message, type: obj.level || 'info' });
           } else if (obj.type === 'applicant') {
-            const dup = checkDuplicate(obj.data);
-            Applicants.create({ ...obj.data, sourceMedia: 'Indeed', isDuplicate: !!dup, duplicateOfId: dup, status: dup ? '重複' : '新規' });
+            const dup = await checkDuplicate(obj.data);
+            await Applicants.create({ ...obj.data, sourceMedia: 'Indeed', isDuplicate: !!dup, duplicateOfId: dup, status: dup ? '重複' : '新規' });
             count++;
             sseSend(res, { message: `✅ 取得: ${obj.data.name}（${obj.data.phone}）`, type: 'success' });
           }
@@ -673,10 +672,10 @@ ${jobUrls}
       sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
     });
 
-    proc.on('close', code => {
+    proc.on('close', async code => {
       const ok = code === 0;
       const msg = ok ? `✅ Indeed取込完了: ${count}件取得` : `❌ Indeed取込失敗（コード: ${code}）`;
-      Logs.create('indeed_scrape', ok ? 'success' : 'error', msg);
+      await Logs.create('indeed_scrape', ok ? 'success' : 'error', msg);
       notify(msg, { emoji: ok ? ':white_check_mark:' : ':x:' }).catch(() => {});
       sseSend(res, {
         message: ok ? `✅ 完了: ${count}件取得しました` : `❌ スクレイピングが失敗しました（終了コード: ${code}）`,
@@ -699,12 +698,12 @@ ${jobUrls}
     const vpnOk = await checkVPN();
     if (!vpnOk) {
       sseSend(res, { message: '❌ VPN未接続です。処理を中止します。', type: 'error', done: true, success: false });
-      Logs.create('kyujinbox_post', 'error', 'VPN未接続');
+      await Logs.create('kyujinbox_post', 'error', 'VPN未接続');
       res.end();
       return;
     }
 
-    const jobs = Jobs.findAll(true);
+    const jobs = await Jobs.findAll(true);
     if (jobs.length === 0) {
       sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
       res.end();
@@ -721,7 +720,7 @@ ${jobUrls}
       sseSend(res, { message: `📝 「${target.title}」を投稿中...`, type: 'info' });
       await new Promise(r => setTimeout(r, 1200));
       sseSend(res, { message: `✅ 「${target.title}」を投稿しました`, type: 'success' });
-      Logs.create('kyujinbox_post', 'success', `求人ボックス投稿（デモ）: ${target.title}`);
+      await Logs.create('kyujinbox_post', 'success', `求人ボックス投稿（デモ）: ${target.title}`);
       sseSend(res, { message: `✅ 完了: 1件投稿しました（デモモード）`, type: 'success', done: true, success: true });
       res.end();
       return;
@@ -751,10 +750,10 @@ ${jobUrls}
       sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
     });
 
-    proc.on('close', code => {
+    proc.on('close', async code => {
       const ok = code === 0;
       const msg = ok ? '✅ 求人ボックス投稿完了' : `❌ 求人ボックス投稿失敗(exit ${code})`;
-      Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
+      await Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
       notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
       sseSend(res, {
         message: ok ? '✅ 求人ボックスへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
@@ -776,12 +775,12 @@ ${jobUrls}
     const vpnOk = await checkVPN();
     if (!vpnOk) {
       sseSend(res, { message: '❌ VPN未接続です。処理を中止します。', type: 'error', done: true, success: false });
-      Logs.create('stanby_post', 'error', 'VPN未接続');
+      await Logs.create('stanby_post', 'error', 'VPN未接続');
       res.end();
       return;
     }
 
-    const jobs = Jobs.findAll(true);
+    const jobs = await Jobs.findAll(true);
     if (jobs.length === 0) {
       sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
       res.end();
@@ -798,7 +797,7 @@ ${jobUrls}
       sseSend(res, { message: `📝 「${target.title}」を投稿中...`, type: 'info' });
       await new Promise(r => setTimeout(r, 1200));
       sseSend(res, { message: `✅ 「${target.title}」を投稿しました`, type: 'success' });
-      Logs.create('stanby_post', 'success', `スタンバイ投稿（デモ）: ${target.title}`);
+      await Logs.create('stanby_post', 'success', `スタンバイ投稿（デモ）: ${target.title}`);
       sseSend(res, { message: `✅ 完了: 1件投稿しました（デモモード）`, type: 'success', done: true, success: true });
       res.end();
       return;
@@ -828,10 +827,10 @@ ${jobUrls}
       sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
     });
 
-    stanbyProc.on('close', code => {
+    stanbyProc.on('close', async code => {
       const ok = code === 0;
       const msg = ok ? '✅ スタンバイ投稿完了' : `❌ スタンバイ投稿失敗(exit ${code})`;
-      Logs.create('stanby_post', ok ? 'success' : 'error', msg);
+      await Logs.create('stanby_post', ok ? 'success' : 'error', msg);
       notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
       sseSend(res, {
         message: ok ? '✅ スタンバイへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
