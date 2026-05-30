@@ -13,7 +13,6 @@ const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize')
 const { notify } = require('./lib/notify');
 const { requireAuth, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
 const { sendApplicationThanks, sendNewApplicantAlert } = require('./lib/mailer');
-const indeedApi = require('./lib/indeed-api');
 const T = require('./templates');
 
 const PORT     = process.env.PORT || 3000;
@@ -492,43 +491,6 @@ ${jobUrls}
     return;
   }
 
-  // ── Admin: Indeed search page ──
-  if (pathname === '/admin/indeed' && method === 'GET') {
-    const q = query.q || '';
-    const l = query.l || '';
-    let results = null;
-    if (q && indeedApi.isConfigured()) {
-      try {
-        results = await indeedApi.searchJobs({ q, l, limit: 25 });
-      } catch (e) {
-        results = { error: e.message, results: [], total: 0 };
-      }
-    }
-    send(res, 200, T.indeedSearchPage(results, q, l));
-    return;
-  }
-
-  // ── API: Indeed search JSON ──
-  if (pathname === '/api/indeed/search' && method === 'GET') {
-    if (!indeedApi.isConfigured()) {
-      sendError(res, 503, 'INDEED_PUBLISHER_ID が設定されていません');
-      return;
-    }
-    try {
-      const results = await indeedApi.searchJobs({
-        q:     query.q || '',
-        l:     query.l || '',
-        limit: Math.min(parseInt(query.limit || '25', 10), 25),
-        start: parseInt(query.start || '0', 10),
-        sort:  query.sort || 'relevance',
-        jt:    query.jt,
-      });
-      sendJSON(res, 200, results);
-    } catch (e) {
-      sendError(res, 500, e.message);
-    }
-    return;
-  }
 
   // ── Admin: Analytics page ──
   if (pathname === '/admin/analytics' && method === 'GET') {
