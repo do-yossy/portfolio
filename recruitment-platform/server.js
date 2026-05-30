@@ -8,8 +8,9 @@ const url = require('url');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const { Jobs, Applicants, Applications, Logs } = require('./db');
+const { Jobs, Applicants, Applications, Logs, Analytics } = require('./db');
 const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize');
+const { notify } = require('./lib/notify');
 const T = require('./templates');
 
 const PORT = process.env.PORT || 3000;
@@ -454,6 +455,31 @@ ${jobUrls}
     return;
   }
 
+  // ── Admin: Analytics page ──
+  if (pathname === '/admin/analytics' && method === 'GET') {
+    const data = {
+      daily:   Analytics.dailyApplications(30),
+      media:   Analytics.mediaBreakdown(),
+      status:  Analytics.statusDistribution(),
+      topJobs: Analytics.topJobs(10),
+      weekly:  Analytics.weeklySummary()
+    };
+    send(res, 200, T.adminAnalyticsPage(data));
+    return;
+  }
+
+  // ── API: Analytics JSON ──
+  if (pathname === '/api/analytics' && method === 'GET') {
+    sendJSON(res, 200, {
+      daily:   Analytics.dailyApplications(30),
+      media:   Analytics.mediaBreakdown(),
+      status:  Analytics.statusDistribution(),
+      topJobs: Analytics.topJobs(10),
+      weekly:  Analytics.weeklySummary()
+    });
+    return;
+  }
+
   // ── API: Jobs CRUD ──
   if (pathname === '/api/jobs' && method === 'GET') {
     sendJSON(res, 200, Jobs.findAll());
@@ -649,7 +675,9 @@ ${jobUrls}
 
     proc.on('close', code => {
       const ok = code === 0;
-      Logs.create('indeed_scrape', ok ? 'success' : 'error', `${ok ? '完了' : '失敗'}: ${count}件取得`);
+      const msg = ok ? `✅ Indeed取込完了: ${count}件取得` : `❌ Indeed取込失敗（コード: ${code}）`;
+      Logs.create('indeed_scrape', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':white_check_mark:' : ':x:' }).catch(() => {});
       sseSend(res, {
         message: ok ? `✅ 完了: ${count}件取得しました` : `❌ スクレイピングが失敗しました（終了コード: ${code}）`,
         type: ok ? 'success' : 'error',
@@ -725,7 +753,9 @@ ${jobUrls}
 
     proc.on('close', code => {
       const ok = code === 0;
-      Logs.create('kyujinbox_post', ok ? 'success' : 'error', ok ? '求人ボックス投稿完了' : `投稿失敗(exit ${code})`);
+      const msg = ok ? '✅ 求人ボックス投稿完了' : `❌ 求人ボックス投稿失敗(exit ${code})`;
+      Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
       sseSend(res, {
         message: ok ? '✅ 求人ボックスへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
         type: ok ? 'success' : 'error',
