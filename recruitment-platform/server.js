@@ -11,9 +11,12 @@ const { spawn } = require('child_process');
 const { Jobs, Applicants, Applications, Logs, Analytics } = require('./db-factory');
 const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize');
 const { notify } = require('./lib/notify');
+const { requireAuth, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
+const { sendApplicationThanks, sendNewApplicantAlert } = require('./lib/mailer');
+const indeedApi = require('./lib/indeed-api');
 const T = require('./templates');
 
-const PORT = process.env.PORT || 3000;
+const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
 
@@ -310,6 +313,31 @@ const server = http.createServer(async (req, res) => {
   // ── Root redirect ──
   if (pathname === '/') { res.writeHead(302, { Location: '/jobs' }); res.end(); return; }
 
+  // ── Admin login ──
+  if (pathname === '/admin/login' && method === 'GET') {
+    send(res, 200, T.loginPage());
+    return;
+  }
+  if (pathname === '/admin/login' && method === 'POST') {
+    const body = await readBody(req);
+    const params = new URLSearchParams(body.toString());
+    const token = login(params.get('username') || '', params.get('password') || '');
+    if (token) {
+      res.writeHead(302, { 'Set-Cookie': sessionCookie(token), Location: '/admin' });
+      res.end();
+    } else {
+      send(res, 401, T.loginPage('ユーザー名またはパスワードが正しくありません'));
+    }
+    return;
+  }
+  if (pathname === '/admin/logout') {
+    const cookies = parseCookies(req);
+    destroySession(cookies.get('admin_session') || '');
+    res.writeHead(302, { 'Set-Cookie': sessionCookie('', true), Location: '/admin/login' });
+    res.end();
+    return;
+  }
+
   // ── Public: Jobs list ──
   if (pathname === '/jobs' && method === 'GET') {
     const search = query.q || '';
@@ -350,15 +378,20 @@ const server = http.createServer(async (req, res) => {
       status: dupId ? '重複' : '新規',
       sourceMedia: body.sourceMedia || 'direct'
     });
+    let jobTitle = body.jobTitle || '';
     if (body.jobId) {
       const job = await Jobs.findById(body.jobId);
+      jobTitle = job ? job.title : jobTitle;
       await Applications.create({
         applicantId: applicant.id,
         jobId: body.jobId,
-        jobTitle: job ? job.title : body.jobTitle || '',
+        jobTitle,
         sourceMedia: 'direct'
       });
     }
+    // Fire-and-forget email notifications (don't block response)
+    sendApplicationThanks(applicant, jobTitle).catch(() => {});
+    sendNewApplicantAlert({ ...applicant, sourceMedia: applicant.source_media }, jobTitle).catch(() => {});
     sendJSON(res, 201, { ok: true, id: applicant.id, isDuplicate: !!dupId });
     return;
   }
@@ -422,6 +455,11 @@ ${jobUrls}
     return;
   }
 
+  // ── Auth guard: all /admin routes except /admin/login ──
+  if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
+    if (!requireAuth(req, res)) return;
+  }
+
   // ── Admin: Dashboard ──
   if (pathname === '/admin' && method === 'GET') {
     const stats = {
@@ -451,6 +489,44 @@ ${jobUrls}
   // ── Admin: Logs page ──
   if (pathname === '/admin/logs' && method === 'GET') {
     send(res, 200, T.adminLogsPage(await Logs.findAll()));
+    return;
+  }
+
+  // ── Admin: Indeed search page ──
+  if (pathname === '/admin/indeed' && method === 'GET') {
+    const q = query.q || '';
+    const l = query.l || '';
+    let results = null;
+    if (q && indeedApi.isConfigured()) {
+      try {
+        results = await indeedApi.searchJobs({ q, l, limit: 25 });
+      } catch (e) {
+        results = { error: e.message, results: [], total: 0 };
+      }
+    }
+    send(res, 200, T.indeedSearchPage(results, q, l));
+    return;
+  }
+
+  // ── API: Indeed search JSON ──
+  if (pathname === '/api/indeed/search' && method === 'GET') {
+    if (!indeedApi.isConfigured()) {
+      sendError(res, 503, 'INDEED_PUBLISHER_ID が設定されていません');
+      return;
+    }
+    try {
+      const results = await indeedApi.searchJobs({
+        q:     query.q || '',
+        l:     query.l || '',
+        limit: Math.min(parseInt(query.limit || '25', 10), 25),
+        start: parseInt(query.start || '0', 10),
+        sort:  query.sort || 'relevance',
+        jt:    query.jt,
+      });
+      sendJSON(res, 200, results);
+    } catch (e) {
+      sendError(res, 500, e.message);
+    }
     return;
   }
 
