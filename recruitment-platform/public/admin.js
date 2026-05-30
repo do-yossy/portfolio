@@ -171,6 +171,20 @@ function startPostKyujinbox() {
   );
 }
 
+// ── Stanby Post ──
+function startPostStanby() {
+  confirmAction(
+    'スタンバイに求人を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？',
+    async () => {
+      const vpnOk = await refreshVpn();
+      if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
+      runSSE('/api/post/stanby', 'progress-stanby', 'btn-post-stanby', d => {
+        toast(d.message, d.success ? 'success' : 'error');
+      });
+    }
+  );
+}
+
 // ── CSV Import ──
 function triggerCSVImport() {
   document.getElementById('csv-file-input').click();
@@ -303,6 +317,45 @@ async function submitApply(e) {
   } catch {
     if (btn) { btn.disabled = false; btn.textContent = '応募する'; }
     toast('送信に失敗しました。再度お試しください。', 'error');
+  }
+}
+
+// ── AI Rewrite ──
+async function generateWithAI() {
+  const btn    = document.getElementById('btn-ai-gen');
+  const status = document.getElementById('ai-gen-status');
+  const desc   = document.getElementById('jf-description');
+  if (!btn || !desc) return;
+
+  const title       = document.getElementById('jf-title')?.value;
+  const location    = document.getElementById('jf-location')?.value;
+  const salary      = document.getElementById('jf-salary')?.value;
+  const jobType     = document.getElementById('jf-type')?.value;
+  const employment  = document.getElementById('jf-employment')?.value;
+
+  if (!title) { toast('タイトルを入力してから生成してください', 'error'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 生成中...';
+  if (status) { status.style.display = 'block'; status.textContent = '✨ AIが原稿を生成しています...'; }
+
+  try {
+    const r = await fetch('/api/ai/rewrite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, location, salary, jobType, employmentType: employment, existingDescription: desc.value })
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || '生成失敗');
+    desc.value = d.text;
+    if (status) { status.textContent = '✅ 原稿を生成しました。内容を確認・修正してください。'; }
+    toast('AI原稿を生成しました', 'success');
+  } catch (e) {
+    if (status) { status.textContent = `❌ ${e.message}`; }
+    toast('AI生成に失敗: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ AIで原稿を生成';
   }
 }
 

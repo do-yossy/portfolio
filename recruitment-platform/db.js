@@ -288,4 +288,76 @@ const Logs = {
   }
 };
 
-module.exports = { db, Jobs, Applicants, Applications, Logs, generateId };
+// ── Analytics ────────────────────────────────────────────────
+const Analytics = {
+  // Application count per day for last N days
+  dailyApplications(days = 30) {
+    const rows = [];
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const r = db.prepare(`SELECT COUNT(*) as c FROM applicants WHERE created_at >= ? AND created_at < ?`)
+        .get(dateStr + 'T00:00:00Z', dateStr + 'T23:59:59Z');
+      rows.push({ date: dateStr, count: r.c });
+    }
+    return rows;
+  },
+
+  // Applicants by media with dup count
+  mediaBreakdown() {
+    return db.prepare(`
+      SELECT source_media as media,
+             COUNT(*) as total,
+             SUM(is_duplicate) as duplicates,
+             COUNT(*) - SUM(is_duplicate) as unique_count
+      FROM applicants
+      GROUP BY source_media
+      ORDER BY total DESC
+    `).all();
+  },
+
+  // Status distribution
+  statusDistribution() {
+    return db.prepare(`
+      SELECT status, COUNT(*) as count
+      FROM applicants
+      GROUP BY status
+      ORDER BY count DESC
+    `).all();
+  },
+
+  // Top jobs by application count
+  topJobs(limit = 10) {
+    return db.prepare(`
+      SELECT j.id, j.title, j.location, j.job_type, j.is_published,
+             COUNT(ap.id) as app_count
+      FROM jobs j
+      LEFT JOIN applications ap ON j.id = ap.job_id
+      GROUP BY j.id
+      ORDER BY app_count DESC
+      LIMIT ?
+    `).all(limit);
+  },
+
+  // Weekly summary (this week vs last week)
+  weeklySummary() {
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - now.getDay() + 1);
+    monday.setHours(0, 0, 0, 0);
+    const lastMonday = new Date(monday);
+    lastMonday.setDate(lastMonday.getDate() - 7);
+
+    const thisWeek = db.prepare(`SELECT COUNT(*) as c FROM applicants WHERE created_at >= ?`).get(monday.toISOString()).c;
+    const lastWeek = db.prepare(`SELECT COUNT(*) as c FROM applicants WHERE created_at >= ? AND created_at < ?`).get(lastMonday.toISOString(), monday.toISOString()).c;
+    const dupRate = (() => {
+      const r = db.prepare(`SELECT COUNT(*) as total, SUM(is_duplicate) as dups FROM applicants`).get();
+      return r.total > 0 ? Math.round((r.dups / r.total) * 100) : 0;
+    })();
+    return { thisWeek, lastWeek, weekOnWeek: lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : null, dupRate };
+  }
+};
+
+module.exports = { db, Jobs, Applicants, Applications, Logs, Analytics, generateId };

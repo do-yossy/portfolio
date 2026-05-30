@@ -1,14 +1,16 @@
 'use strict';
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const { Jobs, Applicants, Applications, Logs } = require('./db');
+const { Jobs, Applicants, Applications, Logs, Analytics } = require('./db');
 const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize');
+const { notify } = require('./lib/notify');
 const T = require('./templates');
 
 const PORT = process.env.PORT || 3000;
@@ -212,6 +214,81 @@ function checkDuplicate(data) {
   return Applicants.findDuplicate(nPhone, nEmail);
 }
 
+// ── Claude API ──────────────────────────────────────────────
+
+async function callClaude(systemPrompt, userMessage) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY が設定されていません');
+  const body = JSON.stringify({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 2048,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }]
+  });
+  return new Promise((resolve, reject) => {
+    const req2 = https.request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, r => {
+      let d = '';
+      r.on('data', c => d += c);
+      r.on('end', () => {
+        try {
+          const obj = JSON.parse(d);
+          if (obj.error) reject(new Error(obj.error.message || 'API error'));
+          else resolve(obj.content[0].text);
+        } catch { reject(new Error('Invalid response: ' + d.slice(0, 200))); }
+      });
+    });
+    req2.setTimeout(30000, () => { req2.destroy(); reject(new Error('タイムアウト（30秒）')); });
+    req2.on('error', reject);
+    req2.write(body);
+    req2.end();
+  });
+}
+
+// ── Dashboard stats helpers ─────────────────────────────────
+
+function computeDashboardStats() {
+  const { db } = require('./db');
+  const allJobs = Jobs.findAll();
+
+  // BAN risk: count published jobs per media
+  const kyujinboxJobs = allJobs.filter(j => j.is_published && JSON.parse(j.target_media || '[]').includes('求人ボックス')).length;
+  const stanbyJobs    = allJobs.filter(j => j.is_published && JSON.parse(j.target_media || '[]').includes('スタンバイ')).length;
+  // published jobs with no media target → count all published for fallback display
+  const publishedTotal = allJobs.filter(j => j.is_published).length;
+
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const recentLogs = Logs.findAll(200);
+  const weeklyPosts = recentLogs.filter(l =>
+    l.action === 'kyujinbox_post' && l.status === 'success' && (l.created_at || '').slice(0, 10) >= weekAgo
+  ).length;
+
+  // Media breakdown
+  const allApplicants = Applicants.findAll();
+  const mediaMap = {};
+  for (const a of allApplicants) {
+    const m = a.source_media || 'その他';
+    mediaMap[m] = (mediaMap[m] || 0) + 1;
+  }
+  const mediaBreakdown = Object.entries(mediaMap)
+    .sort((a, b) => b[1] - a[1])
+    .map(([media, count]) => ({ media, count }));
+
+  return {
+    banRisk: { kyujinbox: kyujinboxJobs || publishedTotal, stanby: stanbyJobs, weeklyPosts },
+    mediaBreakdown
+  };
+}
+
 // ── Router ─────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -287,6 +364,65 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── SEO: sitemap.xml ──
+  if (pathname === '/sitemap.xml' && method === 'GET') {
+    const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
+    const jobs = Jobs.findAll(true);
+    const today = new Date().toISOString().slice(0, 10);
+    const jobUrls = jobs.map(j => `  <url>
+    <loc>${siteUrl}/jobs/${j.id}</loc>
+    <lastmod>${(j.updated_at || j.created_at || today).slice(0, 10)}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`).join('\n');
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${siteUrl}/jobs</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+${jobUrls}
+</urlset>`;
+    res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+    res.end(xml);
+    return;
+  }
+
+  // ── SEO: robots.txt ──
+  if (pathname === '/robots.txt' && method === 'GET') {
+    const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(`User-agent: *\nAllow: /jobs\nAllow: /jobs/\nDisallow: /admin\nDisallow: /api/\n\nSitemap: ${siteUrl}/sitemap.xml\n`);
+    return;
+  }
+
+  // ── API: AI Rewrite ──
+  if (pathname === '/api/ai/rewrite' && method === 'POST') {
+    const body = await parseJSON(req);
+    const { title, location, salary, jobType, employmentType, existingDescription } = body;
+    if (!title) { sendError(res, 400, 'タイトルは必須です'); return; }
+
+    const system = `あなたは採用広告のコピーライターです。求職者の心に響く求人原稿を日本語で作成します。
+以下の構成で書いてください：
+◆仕事内容（主な業務を3〜5点の箇条書き）
+◆職場環境（雰囲気・設備・特徴）
+◆こんな方歓迎（求める人物像・スキル）
+
+読みやすく具体的に、求職者が応募したくなる文章を300〜500文字で書いてください。`;
+
+    const userMsg = `【職種】${jobType || 'その他'} / 【雇用形態】${employmentType || '正社員'}\n【タイトル】${title}\n【勤務地】${location || ''}\n【給与】${salary || ''}${existingDescription ? `\n【既存原稿（参考）】\n${existingDescription}` : ''}`;
+
+    try {
+      const text = await callClaude(system, userMsg);
+      sendJSON(res, 200, { ok: true, text });
+    } catch (e) {
+      sendError(res, 500, `AI生成に失敗しました: ${e.message}`);
+    }
+    return;
+  }
+
   // ── Admin: Dashboard ──
   if (pathname === '/admin' && method === 'GET') {
     const stats = {
@@ -294,7 +430,8 @@ const server = http.createServer(async (req, res) => {
       today: Applicants.todayCount(),
       duplicates: Applicants.duplicateCount()
     };
-    send(res, 200, T.dashboardPage({ stats, lastPost: Logs.lastPostTime() }));
+    const { banRisk, mediaBreakdown } = computeDashboardStats();
+    send(res, 200, T.dashboardPage({ stats, lastPost: Logs.lastPostTime(), banRisk, mediaBreakdown }));
     return;
   }
 
@@ -315,6 +452,31 @@ const server = http.createServer(async (req, res) => {
   // ── Admin: Logs page ──
   if (pathname === '/admin/logs' && method === 'GET') {
     send(res, 200, T.adminLogsPage(Logs.findAll()));
+    return;
+  }
+
+  // ── Admin: Analytics page ──
+  if (pathname === '/admin/analytics' && method === 'GET') {
+    const data = {
+      daily:   Analytics.dailyApplications(30),
+      media:   Analytics.mediaBreakdown(),
+      status:  Analytics.statusDistribution(),
+      topJobs: Analytics.topJobs(10),
+      weekly:  Analytics.weeklySummary()
+    };
+    send(res, 200, T.adminAnalyticsPage(data));
+    return;
+  }
+
+  // ── API: Analytics JSON ──
+  if (pathname === '/api/analytics' && method === 'GET') {
+    sendJSON(res, 200, {
+      daily:   Analytics.dailyApplications(30),
+      media:   Analytics.mediaBreakdown(),
+      status:  Analytics.statusDistribution(),
+      topJobs: Analytics.topJobs(10),
+      weekly:  Analytics.weeklySummary()
+    });
     return;
   }
 
@@ -513,7 +675,9 @@ const server = http.createServer(async (req, res) => {
 
     proc.on('close', code => {
       const ok = code === 0;
-      Logs.create('indeed_scrape', ok ? 'success' : 'error', `${ok ? '完了' : '失敗'}: ${count}件取得`);
+      const msg = ok ? `✅ Indeed取込完了: ${count}件取得` : `❌ Indeed取込失敗（コード: ${code}）`;
+      Logs.create('indeed_scrape', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':white_check_mark:' : ':x:' }).catch(() => {});
       sseSend(res, {
         message: ok ? `✅ 完了: ${count}件取得しました` : `❌ スクレイピングが失敗しました（終了コード: ${code}）`,
         type: ok ? 'success' : 'error',
@@ -589,7 +753,9 @@ const server = http.createServer(async (req, res) => {
 
     proc.on('close', code => {
       const ok = code === 0;
-      Logs.create('kyujinbox_post', ok ? 'success' : 'error', ok ? '求人ボックス投稿完了' : `投稿失敗(exit ${code})`);
+      const msg = ok ? '✅ 求人ボックス投稿完了' : `❌ 求人ボックス投稿失敗(exit ${code})`;
+      Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
       sseSend(res, {
         message: ok ? '✅ 求人ボックスへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
         type: ok ? 'success' : 'error',
@@ -600,6 +766,83 @@ const server = http.createServer(async (req, res) => {
     });
 
     req.on('close', () => { try { proc.kill(); } catch {} });
+    return;
+  }
+
+  if (pathname === '/api/post/stanby' && method === 'GET') {
+    sseInit(res);
+
+    sseSend(res, { message: 'VPN接続を確認しています...', type: 'info' });
+    const vpnOk = await checkVPN();
+    if (!vpnOk) {
+      sseSend(res, { message: '❌ VPN未接続です。処理を中止します。', type: 'error', done: true, success: false });
+      Logs.create('stanby_post', 'error', 'VPN未接続');
+      res.end();
+      return;
+    }
+
+    const jobs = Jobs.findAll(true);
+    if (jobs.length === 0) {
+      sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
+      res.end();
+      return;
+    }
+
+    const scriptPath = path.join(SCRIPTS_DIR, 'stanby_poster.py');
+    if (!fs.existsSync(scriptPath)) {
+      sseSend(res, { message: '⚠️ 投稿スクリプトが見つかりません（scripts/stanby_poster.py）', type: 'warn' });
+      sseSend(res, { message: 'デモモード: 投稿シミュレーションを実行します...', type: 'info' });
+      const target = jobs[0];
+      sseSend(res, { message: `🔑 スタンバイにログイン中...`, type: 'info' });
+      await new Promise(r => setTimeout(r, 800));
+      sseSend(res, { message: `📝 「${target.title}」を投稿中...`, type: 'info' });
+      await new Promise(r => setTimeout(r, 1200));
+      sseSend(res, { message: `✅ 「${target.title}」を投稿しました`, type: 'success' });
+      Logs.create('stanby_post', 'success', `スタンバイ投稿（デモ）: ${target.title}`);
+      sseSend(res, { message: `✅ 完了: 1件投稿しました（デモモード）`, type: 'success', done: true, success: true });
+      res.end();
+      return;
+    }
+
+    const stanbyJobsJson = JSON.stringify(jobs.slice(0, 3)); // max 3 per run
+    const stanbyProc = spawn('python3', [scriptPath], {
+      env: { ...process.env },
+      stdin: 'pipe'
+    });
+    stanbyProc.stdin.write(stanbyJobsJson);
+    stanbyProc.stdin.end();
+
+    stanbyProc.stdout.on('data', data => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try {
+          const obj = JSON.parse(line);
+          sseSend(res, { message: obj.message, type: obj.level || 'info' });
+        } catch {
+          sseSend(res, { message: line, type: 'info' });
+        }
+      }
+    });
+
+    stanbyProc.stderr.on('data', data => {
+      sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
+    });
+
+    stanbyProc.on('close', code => {
+      const ok = code === 0;
+      const msg = ok ? '✅ スタンバイ投稿完了' : `❌ スタンバイ投稿失敗(exit ${code})`;
+      Logs.create('stanby_post', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
+      sseSend(res, {
+        message: ok ? '✅ スタンバイへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
+        type: ok ? 'success' : 'error',
+        done: true,
+        success: ok
+      });
+      res.end();
+    });
+
+    req.on('close', () => { try { stanbyProc.kill(); } catch {} });
     return;
   }
 
