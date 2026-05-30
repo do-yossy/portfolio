@@ -28,6 +28,7 @@ db.exec(`
     employment_type TEXT NOT NULL,
     description TEXT NOT NULL,
     tags TEXT DEFAULT '[]',
+    catchcopy TEXT DEFAULT '',
     image_url TEXT DEFAULT '',
     faq TEXT DEFAULT '[]',
     is_published INTEGER DEFAULT 0,
@@ -83,6 +84,9 @@ function generateId() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 20);
 }
 
+// Migration: add columns added after initial schema
+try { db.exec('ALTER TABLE jobs ADD COLUMN catchcopy TEXT DEFAULT ""'); } catch {}
+
 function now() {
   return new Date().toISOString();
 }
@@ -102,8 +106,8 @@ const Jobs = {
     const id = generateId();
     const ts = now();
     db.prepare(`
-      INSERT INTO jobs (id, title, location, salary, job_type, employment_type, description, tags, image_url, faq, is_published, target_media, published_at, expires_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO jobs (id, title, location, salary, job_type, employment_type, description, tags, catchcopy, image_url, faq, is_published, target_media, published_at, expires_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       data.title, data.location, data.salary,
@@ -111,6 +115,7 @@ const Jobs = {
       data.employmentType || data.employment_type || '',
       data.description,
       JSON.stringify(data.tags || []),
+      data.catchcopy || '',
       data.imageUrl || data.image_url || '',
       JSON.stringify(data.faq || []),
       data.isPublished || data.is_published ? 1 : 0,
@@ -129,7 +134,8 @@ const Jobs = {
       title: 'title', location: 'location', salary: 'salary',
       jobType: 'job_type', job_type: 'job_type',
       employmentType: 'employment_type', employment_type: 'employment_type',
-      description: 'description', imageUrl: 'image_url', image_url: 'image_url',
+      description: 'description', catchcopy: 'catchcopy',
+      imageUrl: 'image_url', image_url: 'image_url',
       isPublished: 'is_published', is_published: 'is_published',
       targetMedia: 'target_media', target_media: 'target_media',
       publishedAt: 'published_at', expiresAt: 'expires_at'

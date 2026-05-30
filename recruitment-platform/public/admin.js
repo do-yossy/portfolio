@@ -254,6 +254,7 @@ function showJobModal(job) {
   document.getElementById('jf-salary').value      = job ? job.salary : '';
   document.getElementById('jf-type').value        = job ? job.job_type : '';
   document.getElementById('jf-employment').value  = job ? job.employment_type : '';
+  document.getElementById('jf-catchcopy').value   = job ? (job.catchcopy || '') : '';
   document.getElementById('jf-description').value = job ? job.description : '';
   document.getElementById('jf-tags').value        = job ? (JSON.parse(job.tags || '[]')).join(', ') : '';
   document.getElementById('jf-published').checked = job ? !!job.is_published : false;
@@ -275,6 +276,7 @@ async function saveJob() {
     salary:         document.getElementById('jf-salary').value,
     jobType:        document.getElementById('jf-type').value,
     employmentType: document.getElementById('jf-employment').value,
+    catchcopy:      document.getElementById('jf-catchcopy')?.value || '',
     description:    document.getElementById('jf-description').value,
     tags,
     isPublished:    document.getElementById('jf-published').checked

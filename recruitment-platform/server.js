@@ -123,24 +123,73 @@ function sseSend(res, data) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
+// ── Location normalizer: strip 丁目/番地/号 and beyond ──
+function normLocation(loc) {
+  return (loc || '')
+    .replace(/[0-9０-９]+丁目.*$/, '')
+    .replace(/[0-9０-９]+番地.*$/, '')
+    .replace(/[0-9０-９]+-[0-9０-９].*$/, '')
+    .trim();
+}
+
+// ── Salary parser: extract min/max numbers and type for media XML ──
+function parseSalaryNums(salary) {
+  const s = (salary || '').replace(/,/g, '').replace(/，/g, '');
+  let type = 'monthly';
+  if (/時給|時間/.test(s)) type = 'hourly';
+  if (/日給|日当/.test(s)) type = 'daily';
+  if (/年収|年俸/.test(s)) type = 'yearly';
+  const toNum = str => {
+    const m = str.match(/([\d.]+)万/);
+    if (m) return Math.round(parseFloat(m[1]) * 10000);
+    const n = str.match(/[\d]+/);
+    return n ? parseInt(n[0], 10) : null;
+  };
+  const range = s.match(/([\d.]+万?[\d]*)\D*[〜～〜~]\D*([\d.]+万?[\d]*)/);
+  if (range) {
+    const min = toNum(range[1]); const max = toNum(range[2]);
+    if (min && max) return { min, max, type };
+  }
+  const single = toNum(s);
+  return single ? { min: single, type } : { type };
+}
+
+// Kyujinbox salary-type label
+function kyujinboxSalaryType(type) {
+  return { hourly: '時給', daily: '日給', yearly: '年収' }[type] || '月給';
+}
+
 // XML generator
 function generateKyujinboxXML(jobs) {
+  const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
+  const company = process.env.COMPANY_NAME || '採用企業';
+  const today   = new Date().toISOString().slice(0, 10);
+
   const items = jobs.map(j => {
-    const tags = JSON.parse(j.tags || '[]');
+    const sal    = parseSalaryNums(j.salary);
+    const salType = kyujinboxSalaryType(sal.type);
+    const loc    = normLocation(j.location);
+    const catch_ = j.catchcopy || JSON.parse(j.tags || '[]').slice(0, 2).join('・') || j.employment_type;
+    const pubDate = (j.published_at || j.created_at || today).slice(0, 10);
+    const endDate = j.expires_at ? j.expires_at.slice(0, 10) : '';
     return `  <job>
-    <job-id>${j.id}</job-id>
+    <job-id><![CDATA[${j.id}]]></job-id>
     <job-title><![CDATA[${j.title}]]></job-title>
-    <job-catch><![CDATA[${tags.slice(0,2).join('・') || j.employment_type}]]></job-catch>
-    <job-url>http://localhost:${PORT}/jobs/${j.id}</job-url>
-    <job-category>${j.job_type}</job-category>
-    <job-type>${j.employment_type}</job-type>
-    <job-salary><![CDATA[${j.salary}]]></job-salary>
-    <job-address><![CDATA[${j.location}]]></job-address>
+    <job-catch><![CDATA[${catch_}]]></job-catch>
+    <job-url>${siteUrl}/jobs/${j.id}</job-url>
+    <company-name><![CDATA[${company}]]></company-name>
+    <job-category><![CDATA[${j.job_type}]]></job-category>
+    <job-type><![CDATA[${j.employment_type}]]></job-type>
+    <salary-type>${salType}</salary-type>
+    <salary-lower>${sal.min || ''}</salary-lower>
+    <salary-upper>${sal.max || ''}</salary-upper>
+    <job-address><![CDATA[${loc}]]></job-address>
     <job-description><![CDATA[${j.description}]]></job-description>
-    <pub-date>${(j.published_at || j.created_at || new Date().toISOString()).slice(0,10)}</pub-date>
-    <end-date>${j.expires_at ? j.expires_at.slice(0,10) : ''}</end-date>
+    <pub-date>${pubDate}</pub-date>
+    <end-date>${endDate}</end-date>
   </job>`;
   }).join('\n');
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <jobs>
 ${items}
@@ -148,16 +197,35 @@ ${items}
 }
 
 function generateStanbyXML(jobs) {
-  const items = jobs.map(j => `  <item>
+  const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
+  const company = process.env.COMPANY_NAME || '採用企業';
+
+  const items = jobs.map(j => {
+    const sal    = parseSalaryNums(j.salary);
+    const salTypeMap = { hourly: 'hourly', daily: 'daily', yearly: 'yearly', monthly: 'monthly' };
+    const loc    = normLocation(j.location);
+    const pref   = loc.match(/^(東京都|大阪府|神奈川県|愛知県|福岡県|北海道|[^\s]{2,4}[都道府県])/)?.[1] || loc;
+    const catch_ = j.catchcopy || '';
+    const desc   = j.description.slice(0, 500);
+    const updated = (j.updated_at || j.created_at || new Date().toISOString()).slice(0, 10);
+    return `  <item>
     <title><![CDATA[${j.title}]]></title>
-    <url>http://localhost:${PORT}/jobs/${j.id}</url>
+    <url>${siteUrl}/jobs/${j.id}</url>
+    <company><![CDATA[${company}]]></company>
+    <catch><![CDATA[${catch_}]]></catch>
     <salary><![CDATA[${j.salary}]]></salary>
-    <location><![CDATA[${j.location}]]></location>
-    <job_type>${j.employment_type}</job_type>
-    <occupation>${j.job_type}</occupation>
-    <description><![CDATA[${j.description.slice(0,500)}]]></description>
-    <updated>${(j.updated_at || j.created_at || new Date().toISOString()).slice(0,10)}</updated>
-  </item>`).join('\n');
+    <salary-min>${sal.min || ''}</salary-min>
+    <salary-max>${sal.max || ''}</salary-max>
+    <salary-type>${salTypeMap[sal.type] || 'monthly'}</salary-type>
+    <prefecture><![CDATA[${pref}]]></prefecture>
+    <location><![CDATA[${loc}]]></location>
+    <job_type><![CDATA[${j.employment_type}]]></job_type>
+    <occupation><![CDATA[${j.job_type}]]></occupation>
+    <description><![CDATA[${desc}]]></description>
+    <updated>${updated}</updated>
+  </item>`;
+  }).join('\n');
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <items>
 ${items}
@@ -486,15 +554,21 @@ ${jobUrls}
     };
 
     const system = `あなたは採用広告のコピーライターです。指定された職種・勤務地・雇用形態の求人情報をJSON形式で生成してください。
-必ず以下のJSON形式のみを返してください（マークダウンやコードブロックは不要）：
-{"title":"求人タイトル","description":"仕事内容","tags":["タグ1","タグ2","タグ3","タグ4"]}
+必ず以下のJSON形式のみを返してください（マークダウン・コードブロック不要）：
+{"title":"求人タイトル","catchcopy":"キャッチコピー","description":"仕事内容","tags":["タグ1","タグ2","タグ3","タグ4"]}
 
-titleは「具体的な職種名 勤務地エリア名」の形式で魅力的に。
-descriptionは以下の構成で300〜500文字：
-◆仕事内容（主な業務を3〜5点の箇条書き）
-◆職場環境（職場の特徴・魅力）
-◆こんな方歓迎（求める人物像）
-tagsは求職者が検索しそうなキーワードを4〜5個。`;
+title: 「具体的な職種名 勤務地エリア名」の形式。例「介護士（正社員）東京・新宿」
+catchcopy: 求職者の目を引く短いコピー20〜35文字。例「未経験OK！研修充実で安心スタート」
+description: 以下の構成で400〜600文字：
+◆仕事内容
+（主な業務を3〜5点の箇条書き）
+
+◆職場環境
+（職場の雰囲気・設備・福利厚生）
+
+◆こんな方歓迎
+（求める人物像・必要スキル・歓迎条件）
+tags: Googleしごと検索・求人媒体で求職者が検索するキーワードを4〜5個。`;
 
     const combos = [];
     for (const t of types) for (const l of locations) combos.push({ t, l });
@@ -521,14 +595,15 @@ tagsは求職者が検索しそうなキーワードを4〜5個。`;
           const json = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim());
 
           await Jobs.create({
-            title: json.title || `${t} ${shortLoc}`,
-            location: l,
+            title:          json.title       || `${t} ${shortLoc}`,
+            catchcopy:      json.catchcopy   || '',
+            location:       normLocation(l),
             salary,
-            jobType: t,
+            jobType:        t,
             employmentType: empType,
-            description: json.description || '',
-            tags: json.tags || [],
-            isPublished: false,
+            description:    json.description || '',
+            tags:           json.tags        || [],
+            isPublished:    false,
           });
           successCount++;
           sseSend(res, { message: `✅ 保存: ${json.title}`, type: 'success', current: i + 1, total });
@@ -622,6 +697,7 @@ tagsは求職者が検索しそうなキーワードを4〜5個。`;
   if (pathname === '/api/jobs' && method === 'POST') {
     const body = await parseJSON(req);
     if (!body.title) { sendError(res, 400, 'タイトルは必須です'); return; }
+    if (body.location) body.location = normLocation(body.location);
     sendJSON(res, 201, await Jobs.create(body));
     return;
   }
@@ -636,6 +712,7 @@ tagsは求職者が検索しそうなキーワードを4〜5個。`;
     }
     if (method === 'PUT') {
       const body = await parseJSON(req);
+      if (body.location) body.location = normLocation(body.location);
       const j = await Jobs.update(id, body);
       sendJSON(res, 200, j);
       return;

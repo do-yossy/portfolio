@@ -355,6 +355,10 @@ function jobModalHTML() {
       </div>
     </div>
     <div class="form-group">
+      <label>キャッチコピー <span class="text-muted text-sm">（求人ボックス・スタンバイ用・25〜35文字）</span></label>
+      <input type="text" id="jf-catchcopy" placeholder="例: 未経験歓迎！研修充実で安心スタート" maxlength="50">
+    </div>
+    <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
         <label style="margin:0">仕事内容<span class="req">*</span></label>
         <button type="button" class="btn btn-ghost btn-sm" id="btn-ai-gen" onclick="generateWithAI()">
