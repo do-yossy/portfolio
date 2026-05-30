@@ -769,6 +769,83 @@ ${jobUrls}
     return;
   }
 
+  if (pathname === '/api/post/stanby' && method === 'GET') {
+    sseInit(res);
+
+    sseSend(res, { message: 'VPN接続を確認しています...', type: 'info' });
+    const vpnOk = await checkVPN();
+    if (!vpnOk) {
+      sseSend(res, { message: '❌ VPN未接続です。処理を中止します。', type: 'error', done: true, success: false });
+      Logs.create('stanby_post', 'error', 'VPN未接続');
+      res.end();
+      return;
+    }
+
+    const jobs = Jobs.findAll(true);
+    if (jobs.length === 0) {
+      sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
+      res.end();
+      return;
+    }
+
+    const scriptPath = path.join(SCRIPTS_DIR, 'stanby_poster.py');
+    if (!fs.existsSync(scriptPath)) {
+      sseSend(res, { message: '⚠️ 投稿スクリプトが見つかりません（scripts/stanby_poster.py）', type: 'warn' });
+      sseSend(res, { message: 'デモモード: 投稿シミュレーションを実行します...', type: 'info' });
+      const target = jobs[0];
+      sseSend(res, { message: `🔑 スタンバイにログイン中...`, type: 'info' });
+      await new Promise(r => setTimeout(r, 800));
+      sseSend(res, { message: `📝 「${target.title}」を投稿中...`, type: 'info' });
+      await new Promise(r => setTimeout(r, 1200));
+      sseSend(res, { message: `✅ 「${target.title}」を投稿しました`, type: 'success' });
+      Logs.create('stanby_post', 'success', `スタンバイ投稿（デモ）: ${target.title}`);
+      sseSend(res, { message: `✅ 完了: 1件投稿しました（デモモード）`, type: 'success', done: true, success: true });
+      res.end();
+      return;
+    }
+
+    const stanbyJobsJson = JSON.stringify(jobs.slice(0, 3)); // max 3 per run
+    const stanbyProc = spawn('python3', [scriptPath], {
+      env: { ...process.env },
+      stdin: 'pipe'
+    });
+    stanbyProc.stdin.write(stanbyJobsJson);
+    stanbyProc.stdin.end();
+
+    stanbyProc.stdout.on('data', data => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try {
+          const obj = JSON.parse(line);
+          sseSend(res, { message: obj.message, type: obj.level || 'info' });
+        } catch {
+          sseSend(res, { message: line, type: 'info' });
+        }
+      }
+    });
+
+    stanbyProc.stderr.on('data', data => {
+      sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
+    });
+
+    stanbyProc.on('close', code => {
+      const ok = code === 0;
+      const msg = ok ? '✅ スタンバイ投稿完了' : `❌ スタンバイ投稿失敗(exit ${code})`;
+      Logs.create('stanby_post', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
+      sseSend(res, {
+        message: ok ? '✅ スタンバイへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
+        type: ok ? 'success' : 'error',
+        done: true,
+        success: ok
+      });
+      res.end();
+    });
+
+    req.on('close', () => { try { stanbyProc.kill(); } catch {} });
+    return;
+  }
+
   // ── 404 ──
   if (pathname.startsWith('/api/')) {
     sendError(res, 404, 'Not Found');

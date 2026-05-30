@@ -171,6 +171,20 @@ function startPostKyujinbox() {
   );
 }
 
+// ── Stanby Post ──
+function startPostStanby() {
+  confirmAction(
+    'スタンバイに求人を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？',
+    async () => {
+      const vpnOk = await refreshVpn();
+      if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
+      runSSE('/api/post/stanby', 'progress-stanby', 'btn-post-stanby', d => {
+        toast(d.message, d.success ? 'success' : 'error');
+      });
+    }
+  );
+}
+
 // ── CSV Import ──
 function triggerCSVImport() {
   document.getElementById('csv-file-input').click();

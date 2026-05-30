@@ -210,12 +210,20 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [] }) {
         <button id="btn-xml-kyujinbox" class="btn btn-ghost" onclick="downloadXML('kyujinbox')">
           ⬇ XMLフィードを生成する（求人ボックス）
         </button>
+      </div>
+      <div id="progress-kyujinbox-wrap" class="progress-wrap hidden">
+        <div id="progress-kyujinbox" class="progress-box"></div>
+      </div>
+      <div class="btn-group mt-8">
+        <button id="btn-post-stanby" class="btn btn-warning" onclick="startPostStanby()">
+          🚀 スタンバイに投稿する
+        </button>
         <button id="btn-xml-stanby" class="btn btn-ghost" onclick="downloadXML('stanby')">
           ⬇ XMLフィードを生成する（スタンバイ）
         </button>
       </div>
-      <div id="progress-kyujinbox-wrap" class="progress-wrap hidden">
-        <div id="progress-kyujinbox" class="progress-box"></div>
+      <div id="progress-stanby-wrap" class="progress-wrap hidden">
+        <div id="progress-stanby" class="progress-box"></div>
       </div>
     </div>
   </div>
@@ -418,6 +426,7 @@ function adminApplicantsPage(applicants, filter = 'all') {
 function adminLogsPage(logs) {
   const actionLabel = {
     kyujinbox_post: '求人ボックス投稿',
+    stanby_post: 'スタンバイ投稿',
     indeed_scrape: 'Indeedスクレイピング',
     xml_generate: 'XML生成',
     csv_import: 'CSVインポート'
