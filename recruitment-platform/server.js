@@ -329,12 +329,34 @@ async function callClaude(systemPrompt, userMessage) {
 
 async function computeDashboardStats() {
   const allJobs = await Jobs.findAll();
+  const today   = new Date().toISOString().slice(0, 10);
 
-  // BAN risk: count published jobs per media
-  const kyujinboxJobs = allJobs.filter(j => j.is_published && JSON.parse(j.target_media || '[]').includes('求人ボックス')).length;
-  const stanbyJobs    = allJobs.filter(j => j.is_published && JSON.parse(j.target_media || '[]').includes('スタンバイ')).length;
-  // published jobs with no media target → count all published for fallback display
+  const parseMedia = j => JSON.parse(j.target_media || '[]');
+
+  // Published count per media (active)
+  const kyujinboxJobs  = allJobs.filter(j => j.is_published && parseMedia(j).includes('求人ボックス')).length;
+  const stanbyJobs     = allJobs.filter(j => j.is_published && parseMedia(j).includes('スタンバイ')).length;
   const publishedTotal = allJobs.filter(j => j.is_published).length;
+
+  // Today's published count per media (for daily task tracker)
+  const todayKyujinbox = allJobs.filter(j => {
+    if (!j.is_published || !parseMedia(j).includes('求人ボックス')) return false;
+    const pub = (j.published_at || j.updated_at || '').slice(0, 10);
+    return pub === today;
+  }).length;
+  const todayStanby = allJobs.filter(j => {
+    if (!j.is_published || !parseMedia(j).includes('スタンバイ')) return false;
+    const pub = (j.published_at || j.updated_at || '').slice(0, 10);
+    return pub === today;
+  }).length;
+
+  // Indeed repost: published Indeed jobs older than 3 days
+  const indeedThreshold = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const indeedRepostCount = allJobs.filter(j => {
+    if (!j.is_published || !parseMedia(j).includes('Indeed')) return false;
+    const posted = j.published_at || j.created_at;
+    return !posted || posted < indeedThreshold;
+  }).length;
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const recentLogs = await Logs.findAll(200);
@@ -342,7 +364,7 @@ async function computeDashboardStats() {
     l.action === 'kyujinbox_post' && l.status === 'success' && (l.created_at || '').slice(0, 10) >= weekAgo
   ).length;
 
-  // Media breakdown
+  // Media breakdown from applicants
   const allApplicants = await Applicants.findAll();
   const mediaMap = {};
   for (const a of allApplicants) {
@@ -355,7 +377,10 @@ async function computeDashboardStats() {
 
   return {
     banRisk: { kyujinbox: kyujinboxJobs || publishedTotal, stanby: stanbyJobs, weeklyPosts },
-    mediaBreakdown
+    mediaBreakdown,
+    todayKyujinbox,
+    todayStanby,
+    indeedRepostCount,
   };
 }
 
@@ -648,8 +673,12 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       today: await Applicants.todayCount(),
       duplicates: await Applicants.duplicateCount()
     };
-    const { banRisk, mediaBreakdown } = await computeDashboardStats();
-    send(res, 200, T.dashboardPage({ stats, lastPost: await Logs.lastPostTime(), banRisk, mediaBreakdown }));
+    const { banRisk, mediaBreakdown, todayKyujinbox, todayStanby, indeedRepostCount } = await computeDashboardStats();
+    const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
+    send(res, 200, T.dashboardPage({
+      stats, lastPost: await Logs.lastPostTime(), banRisk, mediaBreakdown,
+      todayKyujinbox, todayStanby, indeedRepostCount, siteUrl,
+    }));
     return;
   }
 
@@ -1160,6 +1189,26 @@ server.listen(PORT, () => {
   console.log(`\n🚀 採用プラットフォーム起動中`);
   console.log(`   管理画面: http://localhost:${PORT}/admin`);
   console.log(`   求人サイト: http://localhost:${PORT}/jobs\n`);
+
+  // Auto-expire jobs on startup
+  try {
+    const n = Jobs.expireOld();
+    if (n > 0) {
+      Logs.create('auto_expire', 'success', `起動時に期限切れ求人を自動非公開: ${n}件`);
+      console.log(`[auto-expire] ${n}件の求人を非公開にしました`);
+    }
+  } catch (e) { console.error('[auto-expire] startup error:', e.message); }
+
+  // Hourly auto-expire
+  setInterval(() => {
+    try {
+      const n = Jobs.expireOld();
+      if (n > 0) {
+        Logs.create('auto_expire', 'success', `定期チェック: 期限切れ求人を自動非公開 ${n}件`);
+        console.log(`[auto-expire] ${n}件の求人を非公開にしました`);
+      }
+    } catch (e) { console.error('[auto-expire] interval error:', e.message); }
+  }, 60 * 60 * 1000);
 });
 
 server.on('error', err => {

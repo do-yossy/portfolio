@@ -128,6 +128,19 @@ const Jobs = {
   },
   update(id, data) {
     const ts = now();
+
+    // Auto-set published_at and expires_at (30 days) on first publish
+    const isPublishing = data.isPublished === true || data.is_published === 1 || data.is_published === true;
+    if (isPublishing) {
+      const existing = db.prepare(`SELECT published_at, expires_at FROM jobs WHERE id = ?`).get(id);
+      if (existing && !existing.published_at && data.publishedAt === undefined && data.published_at === undefined) {
+        data = { ...data, publishedAt: ts };
+      }
+      if (existing && !existing.expires_at && data.expiresAt === undefined && data.expires_at === undefined) {
+        data = { ...data, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() };
+      }
+    }
+
     const fields = [];
     const vals = [];
     const map = {
@@ -166,7 +179,32 @@ const Jobs = {
   },
   count() {
     return db.prepare(`SELECT COUNT(*) as c FROM jobs WHERE is_published = 1`).get().c;
-  }
+  },
+  expireOld() {
+    const ts = now();
+    const result = db.prepare(`
+      UPDATE jobs SET is_published = 0, updated_at = ?
+      WHERE is_published = 1 AND expires_at IS NOT NULL AND expires_at < ?
+    `).run(ts, ts);
+    return result.changes;
+  },
+  todayCountByMedia(media) {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = db.prepare(`
+      SELECT * FROM jobs WHERE is_published = 1
+      AND (published_at >= ? OR (published_at IS NULL AND updated_at >= ?))
+    `).all(today + 'T00:00:00Z', today + 'T00:00:00Z');
+    return rows.filter(j => JSON.parse(j.target_media || '[]').includes(media)).length;
+  },
+  indeedNeedsRepost(days = 3) {
+    const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const rows = db.prepare(`SELECT * FROM jobs WHERE is_published = 1`).all();
+    return rows.filter(j => {
+      if (!JSON.parse(j.target_media || '[]').includes('Indeed')) return false;
+      const postedAt = j.published_at || j.created_at;
+      return !postedAt || postedAt < threshold;
+    });
+  },
 };
 
 // --- Applicants ---

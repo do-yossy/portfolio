@@ -101,6 +101,15 @@ function runSSE(url, boxId, btnId, onDone) {
 }
 
 // ── XML Download ──
+function copyFeedUrl(type) {
+  const el = document.getElementById('feed-url-' + type);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+    const label = type === 'kyujinbox' ? '求人ボックス' : 'スタンバイ';
+    toast(`${label}のXMLフィードURLをコピーしました`, 'success');
+  }).catch(() => toast('コピーに失敗しました', 'error'));
+}
+
 async function downloadXML(type) {
   const btn = document.getElementById('btn-xml-' + type);
   const label = type === 'kyujinbox' ? '求人ボックス' : 'スタンバイ';

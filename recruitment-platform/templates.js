@@ -104,7 +104,7 @@ function nl2br(str) {
 }
 
 // ── Admin Dashboard ──
-function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [] }) {
+function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], todayKyujinbox = 0, todayStanby = 0, indeedRepostCount = 0, siteUrl = '' }) {
   // BAN risk helper
   function banLevel(count, warn, danger) {
     if (count >= danger) return 'ban-danger';
@@ -154,6 +154,34 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [] }) {
   <div class="card card-sm">
     <div class="card-title">最終投稿</div>
     <div class="card-value" style="font-size:14px;padding-top:8px">${lastPost ? lastPost.slice(0,10) : '未実施'}</div>
+  </div>
+</div>
+
+<div class="card mb-24">
+  <div class="action-section-title" style="margin-bottom:16px">📅 今日の作業 <span class="text-muted text-sm" style="font-weight:400">（目標: 1日50件応募）</span></div>
+  <div class="daily-tasks">
+    ${[
+      { label: '求人ボックス（目標25件/日）', done: todayKyujinbox, target: 25, alert: false },
+      { label: 'スタンバイ（目標25件/日）',   done: todayStanby,    target: 25, alert: false },
+      { label: 'Indeed 再掲載（3日ごと）',    done: indeedRepostCount, target: 1, alert: indeedRepostCount > 0 },
+    ].map(({ label, done, target, alert }) => {
+      const pct  = Math.min(100, Math.round(done / target * 100));
+      const isDone = !alert && done >= target;
+      const remain = alert
+        ? (done > 0 ? `🔴 ${done}件が再掲載期限超過` : '✅ 全件OK')
+        : isDone ? '✅ 完了' : `あと${target - done}件`;
+      return `<div class="daily-task${alert && done > 0 ? ' daily-task-alert' : ''}">
+        <div class="daily-task-label">${label}</div>
+        <div class="daily-task-progress">
+          <div class="daily-task-bar-wrap"><div class="daily-task-bar${alert && done > 0 ? ' bar-alert' : ''}" style="width:${pct}%"></div></div>
+          <span class="daily-task-count">${done}${target > 1 ? '/' + target + '件' : '件'}</span>
+        </div>
+        <div class="daily-task-remain ${isDone || (alert && done === 0) ? 'task-done' : alert ? 'task-alert-text' : ''}">${remain}</div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="margin-top:14px;font-size:13px;color:#64748b">
+    ✨ <a href="/admin/jobs" style="color:#7c3aed">求人管理</a> でAI一括生成 → 媒体を選択して公開すると件数が更新されます
   </div>
 </div>
 
@@ -208,33 +236,29 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [] }) {
     </div>
 
     <div class="action-section mt-16">
-      <div class="action-section-title">📡 媒体運用</div>
-      <div class="btn-group">
-        <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox()">
-          🚀 求人ボックスに投稿する
-        </button>
-        <button id="btn-xml-kyujinbox" class="btn btn-ghost" onclick="downloadXML('kyujinbox')">
-          ⬇ XMLフィードを生成する（求人ボックス）
-        </button>
+      <div class="action-section-title">📡 XMLフィード連携</div>
+      <p class="text-sm text-muted" style="margin:4px 0 10px">各媒体の管理画面でこのURLを「XMLフィード登録」すると自動で求人が更新されます</p>
+
+      <div class="feed-url-row">
+        <span class="feed-url-label">求人ボックス</span>
+        <code class="feed-url-code" id="feed-url-kyujinbox">${siteUrl}/api/feed/kyujinbox</code>
+        <button class="btn btn-ghost btn-sm" onclick="copyFeedUrl('kyujinbox')">コピー</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadXML('kyujinbox')">DL</button>
       </div>
-      <div id="progress-kyujinbox-wrap" class="progress-wrap hidden">
-        <div id="progress-kyujinbox" class="progress-box"></div>
+
+      <div class="feed-url-row mt-8">
+        <span class="feed-url-label">スタンバイ</span>
+        <code class="feed-url-code" id="feed-url-stanby">${siteUrl}/api/feed/stanby</code>
+        <button class="btn btn-ghost btn-sm" onclick="copyFeedUrl('stanby')">コピー</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadXML('stanby')">DL</button>
       </div>
-      <div class="btn-group mt-8">
-        <button id="btn-post-stanby" class="btn btn-warning" onclick="startPostStanby()">
-          🚀 スタンバイに投稿する
-        </button>
-        <button id="btn-xml-stanby" class="btn btn-ghost" onclick="downloadXML('stanby')">
-          ⬇ XMLフィードを生成する（スタンバイ）
-        </button>
-      </div>
-      <div id="progress-stanby-wrap" class="progress-wrap hidden">
-        <div id="progress-stanby" class="progress-box"></div>
-      </div>
-      <div class="btn-group mt-8">
-        <button id="btn-post-indeed" class="btn btn-warning" onclick="startPostIndeed()">
+
+      <div class="action-section-title mt-16" style="font-size:13px">Indeed（手動掲載）</div>
+      <div class="btn-group mt-6">
+        <button id="btn-post-indeed" class="btn btn-warning btn-sm" onclick="startPostIndeed()">
           🚀 Indeed に掲載する
         </button>
+        ${indeedRepostCount > 0 ? `<span class="badge" style="background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:20px;font-size:12px">🔴 ${indeedRepostCount}件が再掲載期限（3日）超過</span>` : ''}
       </div>
       <div id="progress-indeed-post-wrap" class="progress-wrap hidden">
         <div id="progress-indeed-post" class="progress-box"></div>

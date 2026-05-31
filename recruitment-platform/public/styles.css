@@ -591,6 +591,25 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .pub-footer-inner a { color: var(--text-muted); text-decoration: none; }
 .pub-footer-inner a:hover { color: var(--primary); text-decoration: underline; }
 
+/* ── Daily Task Tracker ── */
+.daily-tasks { display: flex; flex-direction: column; gap: 12px; }
+.daily-task { display: grid; grid-template-columns: 180px 1fr 130px; align-items: center; gap: 12px; padding: 10px 12px; background: #f8f9fa; border-radius: 8px; }
+.daily-task-alert { background: #fff5f5; border: 1px solid #fecaca; }
+.daily-task-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.daily-task-progress { display: flex; align-items: center; gap: 10px; }
+.daily-task-bar-wrap { flex: 1; background: #e2e8f0; border-radius: 4px; height: 8px; overflow: hidden; }
+.daily-task-bar { background: #7c3aed; height: 8px; border-radius: 4px; transition: width .4s; }
+.daily-task-bar.bar-alert { background: #ef4444; }
+.daily-task-count { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; min-width: 56px; text-align: right; }
+.daily-task-remain { font-size: 12px; font-weight: 600; text-align: right; }
+.task-done { color: #16a34a; }
+.task-alert-text { color: #dc2626; }
+
+/* ── XML Feed URL ── */
+.feed-url-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.feed-url-label { font-size: 12px; font-weight: 700; color: var(--text-muted); min-width: 80px; }
+.feed-url-code { font-size: 11px; background: #f1f3f4; border: 1px solid #e0e0e0; border-radius: 6px; padding: 5px 10px; color: #374151; font-family: monospace; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ── Privacy Policy ── */
 .privacy-section { margin-bottom: 32px; }
 .privacy-section h2 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid var(--primary); }
