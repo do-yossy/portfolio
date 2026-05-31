@@ -48,23 +48,53 @@ function buildMime(from, to, subject, text, html) {
 
 function smtpSend(host, port, useSSL, user, pass, from, to, rawMessage) {
   return new Promise((resolve, reject) => {
-    const dataLines = rawMessage.split('\r\n');
-
-    // Encode message for DATA command (dot-stuffing)
-    const body = dataLines
+    const dotStuffed = rawMessage.split('\r\n')
       .map(l => (l === '.' ? '..' : l))
       .join('\r\n') + '\r\n.';
 
     let socket;
     let buf = '';
-    const cmd = [];
-    let step = 0;
+    // States: banner → ehlo → [starttls → starttls_ok → ehlo2 →] auth → user → pass → mailfrom → rcpt → data → body → quit → done
+    const STATES = useSSL
+      ? ['banner', 'ehlo', 'auth', 'user', 'pass', 'mailfrom', 'rcpt', 'data', 'body', 'quit', 'done']
+      : ['banner', 'ehlo', 'starttls', 'starttls_ok', 'ehlo2', 'auth', 'user', 'pass', 'mailfrom', 'rcpt', 'data', 'body', 'quit', 'done'];
+    let si = 0;
 
-    function send(line) {
-      socket.write(line + '\r\n');
+    function send(line) { socket.write(line + '\r\n'); }
+
+    function advance() {
+      si++;
+      const state = STATES[si];
+      switch (state) {
+        case 'ehlo':
+        case 'ehlo2':    send('EHLO localhost'); break;
+        case 'starttls': send('STARTTLS'); break;
+        case 'starttls_ok': {
+          // upgrade to TLS
+          si++; // skip ehlo2; next advance() will land on auth
+          const plain = socket;
+          plain.removeAllListeners('data');
+          socket = tls.connect({ socket: plain, host, rejectUnauthorized: false }, () => {
+            socket.on('data', onData);
+            socket.on('error', reject);
+            socket.setTimeout(20000, () => { socket.destroy(); reject(new Error('SMTP timeout')); });
+            send('EHLO localhost');
+          });
+          return;
+        }
+        case 'auth':     send('AUTH LOGIN'); break;
+        case 'user':     send(encodeBase64(user)); break;
+        case 'pass':     send(encodeBase64(pass)); break;
+        case 'mailfrom': send(`MAIL FROM:<${from}>`); break;
+        case 'rcpt':     send(`RCPT TO:<${to}>`); break;
+        case 'data':     send('DATA'); break;
+        case 'body':     send(dotStuffed + '\r\n'); break;
+        case 'quit':     send('QUIT'); break;
+        case 'done':     socket.destroy(); resolve({ ok: true }); break;
+      }
     }
 
-    function next(data) {
+    function onData(data) {
       buf += data.toString();
       const lines = buf.split('\r\n');
       buf = lines.pop();
@@ -73,19 +103,7 @@ function smtpSend(host, port, useSSL, user, pass, from, to, rawMessage) {
         const code = parseInt(line.slice(0, 3), 10);
         if (code >= 400) { socket.destroy(); reject(new Error(`SMTP error: ${line}`)); return; }
         if (line[3] === '-') continue; // multi-line, wait for last
-
-        switch (step++) {
-          case 0: send(`EHLO localhost`); break;
-          case 1: send(`AUTH LOGIN`); break;
-          case 2: send(encodeBase64(user)); break;
-          case 3: send(encodeBase64(pass)); break;
-          case 4: send(`MAIL FROM:<${from}>`); break;
-          case 5: send(`RCPT TO:<${to}>`); break;
-          case 6: send(`DATA`); break;
-          case 7: send(body + '\r\n'); break;
-          case 8: send(`QUIT`); break;
-          case 9: socket.destroy(); resolve({ ok: true }); break;
-        }
+        advance();
       }
     }
 
@@ -94,9 +112,9 @@ function smtpSend(host, port, useSSL, user, pass, from, to, rawMessage) {
     } else {
       socket = net.connect({ host, port }, () => {});
     }
-    socket.on('data', next);
+    socket.on('data', onData);
     socket.on('error', reject);
-    socket.setTimeout(15000, () => { socket.destroy(); reject(new Error('SMTP timeout')); });
+    socket.setTimeout(20000, () => { socket.destroy(); reject(new Error('SMTP timeout')); });
   });
 }
 

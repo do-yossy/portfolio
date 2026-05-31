@@ -19,6 +19,7 @@ const { privacyPolicyPage } = T;
 const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
+const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
 
 // ── Utilities ──────────────────────────────────────────────
 
@@ -897,7 +898,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     // Run real Python script
     sseSend(res, { message: '🔑 Indeedにログイン中...', type: 'info' });
     const env = { ...process.env };
-    const proc = spawn('python3', [scriptPath], { env });
+    const proc = spawn(PYTHON_CMD, [scriptPath], { env });
     let count = 0;
 
     proc.stdout.on('data', async data => {
@@ -983,7 +984,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
 
     const jobsJson = JSON.stringify(kbJobs.slice(0, batchSize));
-    const proc = spawn('python3', [scriptPath], {
+    const proc = spawn(PYTHON_CMD, [scriptPath], {
       env: { ...process.env, KYUJINBOX_BATCH_SIZE: String(batchSize) },
       stdin: 'pipe'
     });
@@ -1062,7 +1063,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
 
     const stanbyJobsJson = JSON.stringify(jobs.slice(0, 3)); // max 3 per run
-    const stanbyProc = spawn('python3', [scriptPath], {
+    const stanbyProc = spawn(PYTHON_CMD, [scriptPath], {
       env: { ...process.env },
       stdin: 'pipe'
     });
@@ -1139,7 +1140,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
 
     const indeedJobsJson = JSON.stringify(indeedJobs.slice(0, 2)); // max 2 per day
-    const indeedProc = spawn('python3', [indeedScriptPath], {
+    const indeedProc = spawn(PYTHON_CMD, [indeedScriptPath], {
       env: { ...process.env },
       stdin: 'pipe'
     });
