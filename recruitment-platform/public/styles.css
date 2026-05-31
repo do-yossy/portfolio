@@ -581,3 +581,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .bulk-check  { display: flex; align-items: center; gap: 5px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 20px; padding: 4px 10px; font-size: 13px; cursor: pointer; transition: background .1s; }
 .bulk-check:has(input:checked) { background: #ede9fe; border-color: #7c3aed; color: #5b21b6; }
 .bulk-check input { margin: 0; accent-color: #7c3aed; }
+
+/* ── Public Footer ── */
+.pub-footer { background: #f8f9fa; border-top: 1px solid var(--border); margin-top: 60px; padding: 20px 0; }
+.pub-footer-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-muted); flex-wrap: wrap; gap: 8px; }
+.pub-footer-inner a { color: var(--text-muted); text-decoration: none; }
+.pub-footer-inner a:hover { color: var(--primary); text-decoration: underline; }
+
+/* ── Privacy Policy ── */
+.privacy-section { margin-bottom: 32px; }
+.privacy-section h2 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid var(--primary); }
+.privacy-section p { font-size: 14px; color: #3c4043; line-height: 1.8; margin-bottom: 8px; }
+.privacy-section ul { padding-left: 20px; margin: 8px 0; }
+.privacy-section ul li { font-size: 14px; color: #3c4043; line-height: 1.8; }

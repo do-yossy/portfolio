@@ -77,6 +77,12 @@ ${jsonld}
 <main>
 ${content}
 </main>
+<footer class="pub-footer">
+  <div class="pub-footer-inner">
+    <span>${esc(process.env.COMPANY_NAME || '採用企業')}</span>
+    <a href="/privacy">プライバシーポリシー</a>
+  </div>
+</footer>
 <div id="toast-container"></div>
 <script src="/admin.js"></script>
 </body>
@@ -948,4 +954,95 @@ function loginPage(error = '') {
 </html>`;
 }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, esc };
+// ── Privacy Policy ──
+function privacyPolicyPage() {
+  const company  = process.env.COMPANY_NAME || '採用企業';
+  const adminEmail = process.env.ADMIN_EMAIL || '';
+  const siteUrl  = process.env.SITE_URL || '';
+  const today    = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const content = `
+<div class="pub-main" style="max-width:800px;margin:0 auto;padding:40px 24px">
+  <h1 style="font-size:24px;font-weight:700;margin-bottom:8px">プライバシーポリシー</h1>
+  <p style="font-size:13px;color:#70757a;margin-bottom:40px">制定日：${today}</p>
+
+  <div class="privacy-section">
+    <h2>1. 事業者情報</h2>
+    <p>${esc(company)}（以下「当社」）は、当採用サイト（以下「本サイト」）において取得する個人情報の取り扱いについて、以下のとおりプライバシーポリシーを定めます。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>2. 収集する個人情報の種類</h2>
+    <p>本サイトでは、求人への応募時に以下の個人情報を収集します。</p>
+    <ul>
+      <li>氏名</li>
+      <li>電話番号</li>
+      <li>メールアドレス</li>
+      <li>年齢（任意）</li>
+      <li>住所（任意）</li>
+      <li>志望動機・メッセージ（任意）</li>
+      <li>応募した求人情報・応募日時</li>
+    </ul>
+  </div>
+
+  <div class="privacy-section">
+    <h2>3. 個人情報の利用目的</h2>
+    <p>収集した個人情報は、以下の目的にのみ利用します。</p>
+    <ul>
+      <li>採用選考の実施および選考結果のご連絡</li>
+      <li>採用担当者からのご連絡・面談の調整</li>
+      <li>採用管理業務の遂行</li>
+      <li>重複応募の確認および応募履歴の管理</li>
+    </ul>
+    <p>上記以外の目的で個人情報を利用することはありません。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>4. 個人情報の第三者提供</h2>
+    <p>当社は、以下の場合を除き、ご本人の同意なく第三者に個人情報を提供しません。</p>
+    <ul>
+      <li>法令に基づく場合</li>
+      <li>人の生命・身体または財産の保護のために必要な場合</li>
+      <li>公衆衛生の向上または児童の健全な育成の推進のために特に必要な場合</li>
+    </ul>
+  </div>
+
+  <div class="privacy-section">
+    <h2>5. 個人情報の管理</h2>
+    <p>当社は、個人情報の漏洩・滅失・毀損を防止するため、適切なセキュリティ対策を実施します。個人情報へのアクセスは採用担当者に限定し、不要になった個人情報は速やかに削除します。</p>
+    <p>個人情報の保管期間は、選考終了後<strong>6ヶ月以内</strong>とします。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>6. 個人情報の開示・訂正・削除について</h2>
+    <p>ご本人から個人情報の開示・訂正・削除のご要望があった場合は、本人確認のうえ、合理的な期間内に対応いたします。下記のお問い合わせ先までご連絡ください。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>7. Cookie（クッキー）について</h2>
+    <p>本サイトは管理画面のセッション管理のみにCookieを使用します。求職者向けの求人一覧・求人詳細ページではCookieを使用しておらず、トラッキングも行いません。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>8. プライバシーポリシーの変更</h2>
+    <p>当社は、法令の変更や事業内容の変化に応じて、本ポリシーを改定することがあります。改定後のポリシーは本ページに掲載した時点で効力を生じます。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>9. お問い合わせ先</h2>
+    <p>個人情報の取り扱いに関するお問い合わせは、以下までご連絡ください。</p>
+    <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-top:8px">
+      <p><strong>${esc(company)}</strong><br>
+      個人情報保護担当窓口<br>
+      ${adminEmail ? `メール：<a href="mailto:${esc(adminEmail)}" style="color:var(--primary)">${esc(adminEmail)}</a>` : 'メール：採用担当までお問い合わせください'}</p>
+    </div>
+  </div>
+</div>`;
+
+  return publicLayout('プライバシーポリシー | 採用サイト', content, {
+    description: `${company}の採用サイトにおける個人情報の取り扱いについて説明します。`,
+    canonical: `${siteUrl}/privacy`,
+  });
+}
+
+module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, privacyPolicyPage, esc };

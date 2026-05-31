@@ -14,6 +14,7 @@ const { notify } = require('./lib/notify');
 const { requireAuth, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
 const { sendApplicationThanks, sendNewApplicantAlert } = require('./lib/mailer');
 const T = require('./templates');
+const { privacyPolicyPage } = T;
 
 const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -402,6 +403,12 @@ const server = http.createServer(async (req, res) => {
     destroySession(cookies.get('admin_session') || '');
     res.writeHead(302, { 'Set-Cookie': sessionCookie('', true), Location: '/admin/login' });
     res.end();
+    return;
+  }
+
+  // ── Public: Privacy Policy ──
+  if (pathname === '/privacy' && method === 'GET') {
+    send(res, 200, privacyPolicyPage());
     return;
   }
 
