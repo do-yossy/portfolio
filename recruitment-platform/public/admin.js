@@ -168,12 +168,13 @@ function startScrapeIndeed() {
 
 // ── Kyujinbox Post ──
 function startPostKyujinbox() {
+  const batchSize = document.getElementById('kb-batch-size')?.value || '5';
   confirmAction(
-    '求人ボックスに求人を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？',
+    `求人ボックスに${batchSize}件を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？`,
     async () => {
       const vpnOk = await refreshVpn();
       if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
-      runSSE('/api/post/kyujinbox', 'progress-kyujinbox', 'btn-post-kyujinbox', d => {
+      runSSE(`/api/post/kyujinbox?limit=${batchSize}`, 'progress-kyujinbox', 'btn-post-kyujinbox', d => {
         toast(d.message, d.success ? 'success' : 'error');
       });
     }

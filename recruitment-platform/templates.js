@@ -236,32 +236,49 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
     </div>
 
     <div class="action-section mt-16">
-      <div class="action-section-title">📡 XMLフィード連携</div>
-      <p class="text-sm text-muted" style="margin:4px 0 10px">各媒体の管理画面でこのURLを「XMLフィード登録」すると自動で求人が更新されます</p>
+      <div class="action-section-title">📡 媒体運用</div>
 
-      <div class="feed-url-row">
-        <span class="feed-url-label">求人ボックス</span>
-        <code class="feed-url-code" id="feed-url-kyujinbox">${siteUrl}/api/feed/kyujinbox</code>
-        <button class="btn btn-ghost btn-sm" onclick="copyFeedUrl('kyujinbox')">コピー</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadXML('kyujinbox')">DL</button>
+      <div class="media-op-section">
+        <div class="media-op-label">求人ボックス <span class="text-muted text-sm">（スクレイピング投稿・VPN必須）</span></div>
+        <div class="btn-group" style="align-items:center">
+          <label style="font-size:12px;color:#64748b;white-space:nowrap">1回の投稿数:</label>
+          <select id="kb-batch-size" class="form-input" style="width:70px;padding:4px 8px;font-size:13px">
+            <option value="3">3件</option>
+            <option value="5" selected>5件</option>
+            <option value="8">8件</option>
+            <option value="10">10件</option>
+          </select>
+          <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox()">
+            🚀 求人ボックスに投稿する
+          </button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">目標25件/日 → 5件 × 5回（数時間おきに実行）</div>
+        <div id="progress-kyujinbox-wrap" class="progress-wrap hidden">
+          <div id="progress-kyujinbox" class="progress-box"></div>
+        </div>
       </div>
 
-      <div class="feed-url-row mt-8">
-        <span class="feed-url-label">スタンバイ</span>
-        <code class="feed-url-code" id="feed-url-stanby">${siteUrl}/api/feed/stanby</code>
-        <button class="btn btn-ghost btn-sm" onclick="copyFeedUrl('stanby')">コピー</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadXML('stanby')">DL</button>
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">スタンバイ <span class="text-muted text-sm">（XMLフィード自動連携）</span></div>
+        <div class="feed-url-row">
+          <code class="feed-url-code" id="feed-url-stanby">${siteUrl}/api/feed/stanby</code>
+          <button class="btn btn-ghost btn-sm" onclick="copyFeedUrl('stanby')">コピー</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadXML('stanby')">DL</button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">このURLをスタンバイ管理画面の「XMLフィード」に登録してください</div>
       </div>
 
-      <div class="action-section-title mt-16" style="font-size:13px">Indeed（手動掲載）</div>
-      <div class="btn-group mt-6">
-        <button id="btn-post-indeed" class="btn btn-warning btn-sm" onclick="startPostIndeed()">
-          🚀 Indeed に掲載する
-        </button>
-        ${indeedRepostCount > 0 ? `<span class="badge" style="background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:20px;font-size:12px">🔴 ${indeedRepostCount}件が再掲載期限（3日）超過</span>` : ''}
-      </div>
-      <div id="progress-indeed-post-wrap" class="progress-wrap hidden">
-        <div id="progress-indeed-post" class="progress-box"></div>
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">Indeed <span class="text-muted text-sm">（手動掲載・3日ごとに再掲載）</span></div>
+        <div class="btn-group">
+          <button id="btn-post-indeed" class="btn btn-warning btn-sm" onclick="startPostIndeed()">
+            🚀 Indeed に掲載する
+          </button>
+          ${indeedRepostCount > 0 ? `<span class="badge" style="background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:20px;font-size:12px">🔴 ${indeedRepostCount}件が再掲載期限超過</span>` : '<span style="font-size:12px;color:#16a34a">✅ 全件OK</span>'}
+        </div>
+        <div id="progress-indeed-post-wrap" class="progress-wrap hidden">
+          <div id="progress-indeed-post" class="progress-box"></div>
+        </div>
       </div>
     </div>
   </div>

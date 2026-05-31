@@ -954,8 +954,13 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       return;
     }
 
-    const jobs = await Jobs.findAll(true);
-    if (jobs.length === 0) {
+    const batchSize = Math.min(parseInt(query.limit || '5', 10), 10);
+    const allJobs   = await Jobs.findAll(true);
+    // 求人ボックス媒体が割り当てられた求人を優先、なければ全公開求人
+    let kbJobs = allJobs.filter(j => JSON.parse(j.target_media || '[]').includes('求人ボックス'));
+    if (kbJobs.length === 0) kbJobs = allJobs;
+
+    if (kbJobs.length === 0) {
       sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
       res.end();
       return;
@@ -965,7 +970,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     if (!fs.existsSync(scriptPath)) {
       sseSend(res, { message: '⚠️ 投稿スクリプトが見つかりません（scripts/kyujinbox_poster.py）', type: 'warn' });
       sseSend(res, { message: 'デモモード: 投稿シミュレーションを実行します...', type: 'info' });
-      const target = jobs[0];
+      const target = kbJobs[0];
       sseSend(res, { message: `🔑 求人ボックスにログイン中...`, type: 'info' });
       await new Promise(r => setTimeout(r, 800));
       sseSend(res, { message: `📝 「${target.title}」を投稿中...`, type: 'info' });
@@ -977,13 +982,15 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       return;
     }
 
-    const jobsJson = JSON.stringify(jobs.slice(0, 2)); // max 2 per day
+    const jobsJson = JSON.stringify(kbJobs.slice(0, batchSize));
     const proc = spawn('python3', [scriptPath], {
-      env: { ...process.env },
+      env: { ...process.env, KYUJINBOX_BATCH_SIZE: String(batchSize) },
       stdin: 'pipe'
     });
     proc.stdin.write(jobsJson);
     proc.stdin.end();
+
+    sseSend(res, { message: `📋 求人ボックス向け求人 ${Math.min(batchSize, kbJobs.length)}件を投稿します...`, type: 'info' });
 
     proc.stdout.on('data', data => {
       const lines = data.toString().split('\n').filter(l => l.trim());

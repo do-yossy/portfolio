@@ -610,6 +610,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .feed-url-label { font-size: 12px; font-weight: 700; color: var(--text-muted); min-width: 80px; }
 .feed-url-code { font-size: 11px; background: #f1f3f4; border: 1px solid #e0e0e0; border-radius: 6px; padding: 5px 10px; color: #374151; font-family: monospace; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ── Media Operation Section ── */
+.media-op-section { padding: 10px 0; border-bottom: 1px solid #f1f3f4; }
+.media-op-section:last-child { border-bottom: none; }
+.media-op-label { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+
 /* ── Privacy Policy ── */
 .privacy-section { margin-bottom: 32px; }
 .privacy-section h2 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid var(--primary); }
