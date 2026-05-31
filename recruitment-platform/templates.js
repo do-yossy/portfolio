@@ -374,7 +374,17 @@ function jobModalHTML() {
       <textarea id="jf-description" rows="6" placeholder="仕事内容を入力してください"></textarea>
       <div id="ai-gen-status" class="text-sm text-muted mt-8" style="display:none"></div>
     </div>
-    <div class="form-group checkbox-row">
+    <div class="form-group" style="margin-top:4px">
+      <label style="font-weight:600;display:block;margin-bottom:8px">配信媒体 <span class="text-muted text-sm" style="font-weight:400">（1媒体のみ・重複掲載を防ぎます）</span></label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <label class="media-radio-label"><input type="radio" name="jf-media" value=""> なし</label>
+        <label class="media-radio-label"><input type="radio" name="jf-media" value="求人ボックス"> 求人ボックス</label>
+        <label class="media-radio-label"><input type="radio" name="jf-media" value="スタンバイ"> スタンバイ</label>
+        <label class="media-radio-label"><input type="radio" name="jf-media" value="Indeed"> Indeed</label>
+      </div>
+      <p class="text-sm text-muted" style="margin-top:4px">Googleしごと検索は公開求人に自動掲載されます</p>
+    </div>
+    <div class="form-group checkbox-row" style="margin-top:4px">
       <input type="checkbox" id="jf-published">
       <label for="jf-published">すぐに公開する</label>
     </div>
@@ -442,6 +452,15 @@ function bulkModalHTML() {
           <option value="パート・アルバイト">パート・アルバイト</option>
           <option value="契約社員">契約社員</option>
         </select>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label style="font-weight:600;margin-bottom:8px;display:block">配信媒体 <span class="text-muted text-sm" style="font-weight:400">（均等に割り当てます）</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <label class="bulk-check"><input type="checkbox" name="bulk-media" value="求人ボックス" checked onchange="updateBulkCount()"> 求人ボックス</label>
+          <label class="bulk-check"><input type="checkbox" name="bulk-media" value="スタンバイ" checked onchange="updateBulkCount()"> スタンバイ</label>
+          <label class="bulk-check"><input type="checkbox" name="bulk-media" value="Indeed" onchange="updateBulkCount()"> Indeed</label>
+        </div>
+        <p class="text-sm text-muted" style="margin-top:4px">各媒体への重複掲載を防ぐため、求人を均等に振り分けます</p>
       </div>
       <div id="bulk-count-preview" class="text-sm" style="margin-top:8px;color:#7c3aed;font-weight:600"></div>
       <div class="modal-footer" style="margin-top:16px">

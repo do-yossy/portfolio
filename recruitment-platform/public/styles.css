@@ -581,6 +581,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .bulk-check  { display: flex; align-items: center; gap: 5px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 20px; padding: 4px 10px; font-size: 13px; cursor: pointer; transition: background .1s; }
 .bulk-check:has(input:checked) { background: #ede9fe; border-color: #7c3aed; color: #5b21b6; }
 .bulk-check input { margin: 0; accent-color: #7c3aed; }
+.media-radio-label { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1.5px solid #e2e8f0; border-radius: 20px; cursor: pointer; font-size: 13px; transition: border-color .15s, background .15s; }
+.media-radio-label:has(input:checked) { border-color: #7c3aed; background: #f5f3ff; color: #5b21b6; font-weight: 600; }
+.media-radio-label input { margin: 0; accent-color: #7c3aed; }
 
 /* ── Public Footer ── */
 .pub-footer { background: #f8f9fa; border-top: 1px solid var(--border); margin-top: 60px; padding: 20px 0; }

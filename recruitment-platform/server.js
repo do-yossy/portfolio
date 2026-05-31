@@ -538,9 +538,10 @@ ${jobUrls}
       res.end(); return;
     }
 
-    const types     = (query.types     || '').split(',').map(s => s.trim()).filter(Boolean);
-    const locations = (query.locations || '').split(',').map(s => s.trim()).filter(Boolean);
-    const empType   = query.employmentType || '正社員';
+    const types      = (query.types     || '').split(',').map(s => s.trim()).filter(Boolean);
+    const locations  = (query.locations || '').split(',').map(s => s.trim()).filter(Boolean);
+    const empType    = query.employmentType || '正社員';
+    const mediaList  = (query.media || '').split(',').map(s => s.trim()).filter(Boolean);
 
     if (!types.length || !locations.length) {
       sseSend(res, { message: '職種と勤務地を1つ以上選択してください', type: 'error', done: true, success: false });
@@ -601,6 +602,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
           const raw  = await callClaude(system, userMsg);
           const json = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim());
 
+          const assignedMedia = mediaList.length > 0 ? [mediaList[i % mediaList.length]] : [];
           await Jobs.create({
             title:          json.title       || `${t} ${shortLoc}`,
             catchcopy:      json.catchcopy   || '',
@@ -610,6 +612,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
             employmentType: empType,
             description:    json.description || '',
             tags:           json.tags        || [],
+            targetMedia:    assignedMedia,
             isPublished:    false,
           });
           successCount++;

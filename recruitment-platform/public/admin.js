@@ -258,6 +258,8 @@ function showJobModal(job) {
   document.getElementById('jf-description').value = job ? job.description : '';
   document.getElementById('jf-tags').value        = job ? (JSON.parse(job.tags || '[]')).join(', ') : '';
   document.getElementById('jf-published').checked = job ? !!job.is_published : false;
+  const existingMedia = job ? (JSON.parse(job.target_media || '[]')[0] || '') : '';
+  document.querySelectorAll('[name="jf-media"]').forEach(r => { r.checked = r.value === existingMedia; });
   m.classList.remove('hidden');
 }
 
@@ -279,7 +281,8 @@ async function saveJob() {
     catchcopy:      document.getElementById('jf-catchcopy')?.value || '',
     description:    document.getElementById('jf-description').value,
     tags,
-    isPublished:    document.getElementById('jf-published').checked
+    isPublished:    document.getElementById('jf-published').checked,
+    targetMedia:    (() => { const r = document.querySelector('[name="jf-media"]:checked'); return r && r.value ? [r.value] : []; })(),
   };
   const url    = id ? `/api/jobs/${id}` : '/api/jobs';
   const method = id ? 'PUT' : 'POST';
@@ -413,15 +416,21 @@ function toggleAllBulkLoc(on) {
 }
 
 function updateBulkCount() {
-  const types = [...document.querySelectorAll('[name="bulk-type"]:checked')].length;
-  const locs  = [...document.querySelectorAll('[name="bulk-loc"]:checked')].length;
+  const types  = [...document.querySelectorAll('[name="bulk-type"]:checked')].length;
+  const locs   = [...document.querySelectorAll('[name="bulk-loc"]:checked')].length;
+  const medias = [...document.querySelectorAll('[name="bulk-media"]:checked')].map(cb => cb.value);
   const preview = document.getElementById('bulk-count-preview');
-  if (preview) {
-    const count = types * locs;
-    preview.textContent = count > 0
-      ? `→ ${types}職種 × ${locs}勤務地 = ${count}件の求人を生成します（約${count}分）`
-      : '職種と勤務地を選択してください';
+  if (!preview) return;
+  const total = types * locs;
+  if (!total) { preview.textContent = '職種と勤務地を選択してください'; return; }
+  if (!medias.length) {
+    preview.textContent = `${types}職種 × ${locs}勤務地 = ${total}件（媒体未割当）`;
+    return;
   }
+  const base = Math.floor(total / medias.length);
+  const rem  = total % medias.length;
+  const dist = medias.map((m, i) => `${m}: ${base + (i < rem ? 1 : 0)}件`).join(' / ');
+  preview.textContent = `${types}職種 × ${locs}勤務地 = ${total}件 → ${dist}`;
 }
 
 function startBulkGenerate() {
@@ -444,10 +453,12 @@ function startBulkGenerate() {
   prog.style.display = '';
   btn.disabled = true;
 
+  const medias = [...document.querySelectorAll('[name="bulk-media"]:checked')].map(cb => cb.value);
   const params = new URLSearchParams({
     types: types.join(','),
     locations: locs.join(','),
     employmentType: emp,
+    media: medias.join(','),
   });
 
   const es = new EventSource(`/api/generate/bulk?${params}`);
