@@ -59,6 +59,30 @@ a { color: inherit; text-decoration: none; }
   display: block;
 }
 
+/* ── Company tabs ── */
+.co-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.co-tab {
+  flex: 1;
+  text-align: center;
+  padding: 6px 4px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(255,255,255,.05);
+  transition: all .15s;
+  cursor: pointer;
+}
+.co-tab:hover { background: rgba(255,255,255,.1); color: #e2e8f0; }
+.co-tab-active {
+  background: var(--co-color, #7c3aed);
+  color: #fff;
+}
 .sidebar nav { padding: 10px 8px; flex: 1; }
 
 .sidebar nav a {

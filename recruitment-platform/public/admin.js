@@ -154,22 +154,24 @@ async function downloadXML(type) {
 }
 
 // ── CSV Export ──
-async function exportCSV() {
+async function exportCSV(company) {
   const btn = document.getElementById('btn-csv-export');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 出力中...'; }
   try {
-    const r = await fetch('/api/export/csv');
+    const param = company ? `?company=${encodeURIComponent(company)}` : '';
+    const r = await fetch('/api/export/csv' + param);
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ca-list-${new Date().toISOString().slice(0,10)}.csv`;
+    const label = company === 'all' ? 'all' : (company || 'list');
+    a.download = `ca-list-${label}-${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
-    toast('CA対応リストをダウンロードしました', 'success');
+    toast(company === 'all' ? '全社合算CSVをダウンロードしました' : 'CA対応リストをダウンロードしました', 'success');
   } catch {
     toast('CSV出力に失敗しました', 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'CA対応リストをCSV出力する'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '📤 この会社のCSV出力'; }
   }
 }
 

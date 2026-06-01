@@ -88,15 +88,25 @@ function generateId() {
 // Migration: add columns added after initial schema
 try { db.exec('ALTER TABLE jobs ADD COLUMN catchcopy TEXT DEFAULT ""'); } catch {}
 
+// Migration: add company column
+try { db.exec(`ALTER TABLE jobs ADD COLUMN company TEXT NOT NULL DEFAULT 'sq'`); } catch {}
+try { db.exec(`ALTER TABLE applicants ADD COLUMN company TEXT NOT NULL DEFAULT 'sq'`); } catch {}
+
 function now() {
   return new Date().toISOString();
 }
 
 // --- Jobs ---
 const Jobs = {
-  findAll(onlyPublished = false) {
+  findAll({ onlyPublished = false, company = null } = {}) {
     if (onlyPublished) {
+      if (company !== null && company !== 'all') {
+        return db.prepare(`SELECT * FROM jobs WHERE is_published = 1 AND company = ? ORDER BY created_at DESC`).all(company);
+      }
       return db.prepare(`SELECT * FROM jobs WHERE is_published = 1 ORDER BY created_at DESC`).all();
+    }
+    if (company !== null && company !== 'all') {
+      return db.prepare(`SELECT * FROM jobs WHERE company = ? ORDER BY created_at DESC`).all(company);
     }
     return db.prepare(`SELECT * FROM jobs ORDER BY created_at DESC`).all();
   },
@@ -107,8 +117,8 @@ const Jobs = {
     const id = generateId();
     const ts = now();
     db.prepare(`
-      INSERT INTO jobs (id, title, location, salary, job_type, employment_type, description, tags, catchcopy, image_url, faq, is_published, target_media, published_at, expires_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO jobs (id, title, location, salary, job_type, employment_type, description, tags, catchcopy, image_url, faq, is_published, target_media, published_at, expires_at, company, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       data.title, data.location, data.salary,
@@ -123,6 +133,7 @@ const Jobs = {
       JSON.stringify(data.targetMedia || data.target_media || []),
       data.publishedAt || data.published_at || null,
       data.expiresAt || data.expires_at || null,
+      data.company || 'sq',
       ts, ts
     );
     return Jobs.findById(id);
@@ -169,6 +180,10 @@ const Jobs = {
       fields.push('faq = ?');
       vals.push(JSON.stringify(data.faq));
     }
+    if (data.company !== undefined) {
+      fields.push('company = COALESCE(?, company)');
+      vals.push(data.company || null);
+    }
     if (fields.length === 0) return Jobs.findById(id);
     fields.push('updated_at = ?');
     vals.push(ts, id);
@@ -178,7 +193,10 @@ const Jobs = {
   delete(id) {
     db.prepare(`DELETE FROM jobs WHERE id = ?`).run(id);
   },
-  count() {
+  count({ company = null } = {}) {
+    if (company && company !== 'all') {
+      return db.prepare(`SELECT COUNT(*) as c FROM jobs WHERE is_published = 1 AND company = ?`).get(company).c;
+    }
     return db.prepare(`SELECT COUNT(*) as c FROM jobs WHERE is_published = 1`).get().c;
   },
   expireOld() {
@@ -210,13 +228,14 @@ const Jobs = {
 
 // --- Applicants ---
 const Applicants = {
-  findAll({ status, media, search } = {}) {
+  findAll({ status, media, search, company = null } = {}) {
     let q = `SELECT a.*, GROUP_CONCAT(ap.job_title, ', ') as job_titles FROM applicants a LEFT JOIN applications ap ON a.id = ap.applicant_id`;
     const conds = [];
     const vals = [];
     if (status && status !== 'all') { conds.push(`a.status = ?`); vals.push(status); }
     if (media) { conds.push(`a.source_media = ?`); vals.push(media); }
     if (search) { conds.push(`(a.name LIKE ? OR a.phone LIKE ? OR a.email LIKE ?)`); vals.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+    if (company !== null && company !== 'all') { conds.push(`a.company = ?`); vals.push(company); }
     if (conds.length) q += ' WHERE ' + conds.join(' AND ');
     q += ' GROUP BY a.id ORDER BY a.created_at DESC';
     return db.prepare(q).all(...vals);
@@ -231,8 +250,8 @@ const Applicants = {
     const nPhone = normalizePhone(data.phone);
     const nEmail = normalizeEmail(data.email);
     db.prepare(`
-      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, data.name, data.phone, data.email,
       data.age ? parseInt(data.age) : null,
@@ -243,7 +262,9 @@ const Applicants = {
       data.isDuplicate || data.is_duplicate ? 1 : 0,
       data.duplicateOfId || data.duplicate_of_id || null,
       data.notes || '',
-      nPhone, nEmail, ts, ts
+      nPhone, nEmail,
+      data.company || 'sq',
+      ts, ts
     );
     return Applicants.findById(id);
   },
@@ -277,11 +298,17 @@ const Applicants = {
     }
     return null;
   },
-  todayCount() {
+  todayCount({ company = null } = {}) {
     const today = new Date().toISOString().slice(0, 10);
+    if (company && company !== 'all') {
+      return db.prepare(`SELECT COUNT(*) as c FROM applicants WHERE created_at >= ? AND company = ?`).get(today + 'T00:00:00Z', company).c;
+    }
     return db.prepare(`SELECT COUNT(*) as c FROM applicants WHERE created_at >= ?`).get(today + 'T00:00:00Z').c;
   },
-  duplicateCount() {
+  duplicateCount({ company = null } = {}) {
+    if (company && company !== 'all') {
+      return db.prepare(`SELECT COUNT(*) as c FROM applicants WHERE is_duplicate = 1 AND company = ?`).get(company).c;
+    }
     return db.prepare(`SELECT COUNT(*) as c FROM applicants WHERE is_duplicate = 1`).get().c;
   }
 };

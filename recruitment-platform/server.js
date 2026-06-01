@@ -253,15 +253,22 @@ ${items}
 }
 
 // CSV export
-function generateCSV(applicants) {
-  const headers = ['氏名','電話番号','メールアドレス','年齢','住所','応募媒体','応募日時','ステータス','応募求人','重複フラグ'];
+function generateCSV(applicants, includeCompany = false) {
+  const headers = includeCompany
+    ? ['会社','氏名','電話番号','メールアドレス','年齢','住所','応募媒体','応募日時','ステータス','応募求人','重複フラグ']
+    : ['氏名','電話番号','メールアドレス','年齢','住所','応募媒体','応募日時','ステータス','応募求人','重複フラグ'];
+  const COMPANY_LABELS = { sq: '株式会社Social Quality', lt: '株式会社Life Tailor' };
   const rows = applicants
-    .filter(a => !a.is_duplicate) // exclude duplicates for CA list
-    .map(a => [
-      a.name, a.phone, a.email, a.age||'', a.address||'',
-      a.source_media, (a.applied_at||'').slice(0,16).replace('T',' '),
-      a.status, a.job_titles||'', a.is_duplicate ? '重複' : ''
-    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+    .filter(a => !a.is_duplicate)
+    .map(a => {
+      const base = [
+        a.name, a.phone, a.email, a.age||'', a.address||'',
+        a.source_media, (a.applied_at||'').slice(0,16).replace('T',' '),
+        a.status, a.job_titles||'', a.is_duplicate ? '重複' : ''
+      ];
+      const row = includeCompany ? [COMPANY_LABELS[a.company] || a.company || '', ...base] : base;
+      return row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
   return [headers.join(','), ...rows].join('\n');
 }
 
@@ -402,8 +409,8 @@ async function callClaude(systemPrompt, userMessage) {
 
 // ── Dashboard stats helpers ─────────────────────────────────
 
-async function computeDashboardStats() {
-  const allJobs = await Jobs.findAll();
+async function computeDashboardStats(company = null) {
+  const allJobs = await Jobs.findAll({ company });
   const today   = new Date().toISOString().slice(0, 10);
 
   const parseMedia = j => JSON.parse(j.target_media || '[]');
@@ -440,7 +447,7 @@ async function computeDashboardStats() {
   ).length;
 
   // Media breakdown from applicants
-  const allApplicants = await Applicants.findAll();
+  const allApplicants = await Applicants.findAll({ company });
   const mediaMap = {};
   for (const a of allApplicants) {
     const m = a.source_media || 'その他';
@@ -741,42 +748,44 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     if (!requireAuth(req, res)) return;
   }
 
+  // Company context: ?co=sq (default) or ?co=lt
+  const co = (query.co === 'lt') ? 'lt' : 'sq';
+
   // ── Admin: Dashboard ──
   if (pathname === '/admin' && method === 'GET') {
     const stats = {
-      jobs: await Jobs.count(),
-      today: await Applicants.todayCount(),
-      duplicates: await Applicants.duplicateCount()
+      jobs: await Jobs.count({ company: co }),
+      today: await Applicants.todayCount({ company: co }),
+      duplicates: await Applicants.duplicateCount({ company: co })
     };
-    const { banRisk, mediaBreakdown, todayKyujinbox, todayStanby, indeedRepostCount } = await computeDashboardStats();
+    const { banRisk, mediaBreakdown, todayKyujinbox, todayStanby, indeedRepostCount } = await computeDashboardStats(co);
     const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
     send(res, 200, T.dashboardPage({
       stats, lastPost: await Logs.lastPostTime(), banRisk, mediaBreakdown,
-      todayKyujinbox, todayStanby, indeedRepostCount, siteUrl,
+      todayKyujinbox, todayStanby, indeedRepostCount, siteUrl, co,
     }));
     return;
   }
 
   // ── Admin: Jobs page ──
   if (pathname === '/admin/jobs' && method === 'GET') {
-    send(res, 200, T.adminJobsPage(await Jobs.findAll()));
+    send(res, 200, T.adminJobsPage(await Jobs.findAll({ company: co }), co));
     return;
   }
 
   // ── Admin: Applicants page ──
   if (pathname === '/admin/applicants' && method === 'GET') {
     const filter = query.status || 'all';
-    const applicants = await Applicants.findAll({ status: filter, search: query.search });
-    send(res, 200, T.adminApplicantsPage(applicants, filter));
+    const applicants = await Applicants.findAll({ status: filter, search: query.search, company: co });
+    send(res, 200, T.adminApplicantsPage(applicants, filter, co));
     return;
   }
 
   // ── Admin: Logs page ──
   if (pathname === '/admin/logs' && method === 'GET') {
-    send(res, 200, T.adminLogsPage(await Logs.findAll()));
+    send(res, 200, T.adminLogsPage(await Logs.findAll(), co));
     return;
   }
-
 
   // ── Admin: Analytics page ──
   if (pathname === '/admin/analytics' && method === 'GET') {
@@ -785,7 +794,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       media:   await Analytics.mediaBreakdown(),
       status:  await Analytics.statusDistribution(),
       topJobs: await Analytics.topJobs(10),
-      weekly:  await Analytics.weeklySummary()
+      weekly:  await Analytics.weeklySummary(),
+      co,
     };
     send(res, 200, T.adminAnalyticsPage(data));
     return;
@@ -805,13 +815,15 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── API: Jobs CRUD ──
   if (pathname === '/api/jobs' && method === 'GET') {
-    sendJSON(res, 200, await Jobs.findAll());
+    const company = query.company || null;
+    sendJSON(res, 200, await Jobs.findAll({ company }));
     return;
   }
   if (pathname === '/api/jobs' && method === 'POST') {
     const body = await parseJSON(req);
     if (!body.title) { sendError(res, 400, 'タイトルは必須です'); return; }
     if (body.location) body.location = normLocation(body.location);
+    if (!body.company) body.company = co;
     sendJSON(res, 201, await Jobs.create(body));
     return;
   }
@@ -840,7 +852,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── API: Applicants ──
   if (pathname === '/api/applicants' && method === 'GET') {
-    sendJSON(res, 200, await Applicants.findAll());
+    const company = query.company || null;
+    sendJSON(res, 200, await Applicants.findAll({ company }));
     return;
   }
   const appMatch = pathname.match(/^\/api\/applicants\/([^/]+)$/);
@@ -914,11 +927,21 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── API: CSV Export ──
   if (pathname === '/api/export/csv' && method === 'GET') {
-    const applicants = await Applicants.findAll();
-    const csv = generateCSV(applicants);
+    const exportCo = query.company || co;
+    let applicants, includeCompany;
+    if (exportCo === 'all') {
+      // 全会社合算 (両社のデータをマージ)
+      applicants = await Applicants.findAll({ company: null });
+      includeCompany = true;
+    } else {
+      applicants = await Applicants.findAll({ company: exportCo });
+      includeCompany = false;
+    }
+    const csv = generateCSV(applicants, includeCompany);
+    const label = exportCo === 'all' ? 'all' : exportCo;
     res.writeHead(200, {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="ca-list-${new Date().toISOString().slice(0,10)}.csv"`
+      'Content-Disposition': `attachment; filename="ca-list-${label}-${new Date().toISOString().slice(0,10)}.csv"`
     });
     res.end('﻿' + csv); // BOM for Excel
     return;

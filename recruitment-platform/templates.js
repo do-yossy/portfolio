@@ -1,6 +1,12 @@
 'use strict';
 
-function adminLayout(title, content, active = 'dashboard') {
+const COMPANIES = {
+  sq: { label: 'Social Quality', full: '株式会社Social Quality', color: '#7c3aed' },
+  lt: { label: 'Life Tailor',    full: '株式会社Life Tailor',    color: '#0891b2' },
+};
+
+function adminLayout(title, content, active = 'dashboard', co = 'sq') {
+  const company = COMPANIES[co] || COMPANIES.sq;
   const nav = [
     { href: '/admin', icon: '🏠', label: 'ダッシュボード', key: 'dashboard' },
     { href: '/admin/jobs', icon: '💼', label: '求人管理', key: 'jobs' },
@@ -8,22 +14,27 @@ function adminLayout(title, content, active = 'dashboard') {
     { href: '/admin/analytics', icon: '📈', label: '分析・レポート', key: 'analytics' },
     { href: '/admin/logs', icon: '📋', label: '投稿ログ', key: 'logs' },
     { href: '/jobs', icon: '🌐', label: '求人サイトを見る', key: 'site' },
-  ].map(n => `<a href="${n.href}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
+  ].map(n => `<a href="${n.href}?co=${co}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
+
+  const companyTabs = Object.entries(COMPANIES).map(([key, c]) =>
+    `<a href="?co=${key}" class="co-tab${co === key ? ' co-tab-active' : ''}" data-co="${key}" style="${co === key ? `--co-color:${c.color}` : ''}">${c.label}</a>`
+  ).join('');
 
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} | 採用管理</title>
+<title>${title} | ${company.label} 採用管理</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="admin-layout">
 <aside class="sidebar">
-  <div class="sidebar-logo">
-    <h1>SEO採用<br>プラットフォーム</h1>
-    <span>管理画面</span>
+  <div class="sidebar-logo" style="border-bottom:2px solid ${company.color}20">
+    <h1 style="font-size:13px;line-height:1.4">${company.full}</h1>
+    <span>採用管理システム</span>
   </div>
+  <div class="co-tabs">${companyTabs}</div>
   <nav>${nav}</nav>
   <div class="sidebar-footer"><a href="/admin/logout" style="color:var(--text-muted);font-size:12px;text-decoration:none">🚪 ログアウト</a></div>
 </aside>
@@ -104,7 +115,7 @@ function nl2br(str) {
 }
 
 // ── Admin Dashboard ──
-function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], todayKyujinbox = 0, todayStanby = 0, indeedRepostCount = 0, siteUrl = '' }) {
+function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], todayKyujinbox = 0, todayStanby = 0, indeedRepostCount = 0, siteUrl = '', co = 'sq' }) {
   // BAN risk helper
   function banLevel(count, warn, danger) {
     if (count >= danger) return 'ban-danger';
@@ -308,11 +319,11 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
 
 ${jobModalHTML()}
 `;
-  return adminLayout('ダッシュボード', content, 'dashboard');
+  return adminLayout('ダッシュボード', content, 'dashboard', co);
 }
 
 // ── Admin Jobs ──
-function adminJobsPage(jobs) {
+function adminJobsPage(jobs, co = 'sq') {
   const rows = jobs.length === 0
     ? `<tr><td colspan="7" class="empty-state"><p>求人が登録されていません</p></td></tr>`
     : jobs.map(j => {
@@ -355,7 +366,7 @@ function adminJobsPage(jobs) {
 </div>
 ${jobModalHTML()}
 ${bulkModalHTML()}`;
-  return adminLayout('求人管理', content, 'jobs');
+  return adminLayout('求人管理', content, 'jobs', co);
 }
 
 function jobModalHTML() {
@@ -524,10 +535,10 @@ function bulkModalHTML() {
 }
 
 // ── Admin Applicants ──
-function adminApplicantsPage(applicants, filter = 'all') {
+function adminApplicantsPage(applicants, filter = 'all', co = 'sq') {
   const statusList = ['all','新規','未対応','架電済','面談済','紹介済','NG','重複'];
   const chips = statusList.map(s =>
-    `<span class="filter-chip ${s === filter ? 'active' : ''}" onclick="location.href='/admin/applicants?status=${s}'">${s === 'all' ? 'すべて' : s}</span>`
+    `<span class="filter-chip ${s === filter ? 'active' : ''}" onclick="location.href='/admin/applicants?status=${s}&co=${co}'">${s === 'all' ? 'すべて' : s}</span>`
   ).join('');
 
   const rows = applicants.length === 0
@@ -558,7 +569,8 @@ function adminApplicantsPage(applicants, filter = 'all') {
   <div class="btn-group">
     <button id="btn-import" class="btn btn-ghost" onclick="triggerCSVImport()">📂 CSVをインポート</button>
     <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVFile(this)">
-    <button id="btn-csv-export" class="btn btn-ghost" onclick="exportCSV()">📤 CA対応リスト出力</button>
+    <button id="btn-csv-export" class="btn btn-ghost" onclick="exportCSV('${co}')">📤 この会社のCSV出力</button>
+    <button class="btn btn-primary" onclick="exportCSV('all')" title="Social Quality + Life Tailor を合算してCSV出力">📊 全社合算CSV出力</button>
   </div>
 </div>
 <div id="drop-zone" class="drop-zone mb-16" onclick="triggerCSVImport()">
@@ -578,11 +590,11 @@ function adminApplicantsPage(applicants, filter = 'all') {
     </table>
   </div>
 </div>`;
-  return adminLayout('応募者管理', content, 'applicants');
+  return adminLayout('応募者管理', content, 'applicants', co);
 }
 
 // ── Admin Logs ──
-function adminLogsPage(logs) {
+function adminLogsPage(logs, co = 'sq') {
   const actionLabel = {
     kyujinbox_post: '求人ボックス投稿',
     stanby_post: 'スタンバイ投稿',
@@ -613,7 +625,7 @@ function adminLogsPage(logs) {
     </table>
   </div>
 </div>`;
-  return adminLayout('投稿ログ', content, 'logs');
+  return adminLayout('投稿ログ', content, 'logs', co);
 }
 
 // ── Public Jobs List ──
@@ -863,7 +875,7 @@ function svgLineChart(data, { width = 560, height = 160, color = '#2563eb' } = {
 }
 
 // ── Admin Analytics ────────────────────────────────────────────
-function adminAnalyticsPage({ daily, media, status, topJobs, weekly }) {
+function adminAnalyticsPage({ daily, media, status, topJobs, weekly, co = 'sq' }) {
   const totalApps = daily.reduce((s, d) => s + d.count, 0);
   const wow = weekly.weekOnWeek !== null
     ? `<span style="color:${weekly.weekOnWeek >= 0 ? 'var(--success)' : 'var(--error)'}">${weekly.weekOnWeek >= 0 ? '↑' : '↓'}${Math.abs(weekly.weekOnWeek)}%</span>`
@@ -968,7 +980,7 @@ function adminAnalyticsPage({ daily, media, status, topJobs, weekly }) {
   </div>
 </div>`;
 
-  return adminLayout('分析・レポート', content, 'analytics');
+  return adminLayout('分析・レポート', content, 'analytics', co);
 }
 
 // ── Login page ──
