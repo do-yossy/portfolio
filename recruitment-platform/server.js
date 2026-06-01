@@ -287,14 +287,50 @@ function findVpncmd() {
   return null;
 }
 
+// vpncmd出力から接続状態を判定
+function isVpnConnectedFromOutput(out) {
+  if (!out) return false;
+  // SoftEther AccountList の各行: "Account Name  | Session Status | ..."
+  // ステータスは英語: Connected / Connecting / Offline / Not Connected
+  // 日本語: 接続完了 / 接続中 / 未接続
+  const lines = out.split(/\r?\n/);
+  for (const line of lines) {
+    if (/connected|接続完了|接続中/i.test(line) && !/not.connected|未接続|offline/i.test(line)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// アカウント名リストを出力から抽出
+function parseAccountNames(out) {
+  const names = [];
+  const lines = out.split(/\r?\n/);
+  for (const line of lines) {
+    // 典型的な行: "| VPN              | Connected     |"
+    // または:    "VPN              | Connected     | ..."
+    const m = line.match(/^\|?\s*([A-Za-z0-9_\-\.@\s]+?)\s*\|/);
+    if (m) {
+      const name = m[1].trim();
+      if (name && name !== 'Account Name' && !name.startsWith('-') && !name.startsWith('=') && name.length > 0) {
+        names.push(name);
+      }
+    }
+  }
+  return [...new Set(names)];
+}
+
 // vpncmdでアカウント一覧を取得し、接続中のものがあるか確認
+// chcp 65001 でUTF-8強制（Windows Shift-JIS文字化け対策）
 function vpncmdAccountList(vpncmdPath) {
   return new Promise(resolve => {
-    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountList'], { shell: true });
-    let out = '';
-    proc.stdout.on('data', d => out += d.toString());
-    proc.stderr.on('data', d => out += d.toString());
-    proc.on('close', () => resolve(out));
+    const q = vpncmdPath.includes(' ') ? `"${vpncmdPath}"` : vpncmdPath;
+    const cmd = `chcp 65001 > nul 2>&1 && ${q} localhost /CLIENT /CMD AccountList`;
+    const proc = spawn('cmd', ['/c', cmd], { shell: false });
+    const chunks = [];
+    proc.stdout.on('data', d => chunks.push(d));
+    proc.stderr.on('data', d => chunks.push(d));
+    proc.on('close', () => resolve(Buffer.concat(chunks).toString('utf8')));
     proc.on('error', () => resolve(''));
     setTimeout(() => { try { proc.kill(); } catch {} resolve(''); }, 8000);
   });
@@ -309,10 +345,9 @@ async function checkVPN() {
   if (vpncmdPath) {
     // SoftEther の接続状態をアカウントリストで確認（IPアドレス不問）
     const out = await vpncmdAccountList(vpncmdPath);
-    // AccountList 出力に "Session Status" が含まれ、"Connected" があれば接続中
-    const connected = /session status.*connected|セッション状態.*接続/i.test(out)
-      || out.includes('Connected\r') || out.includes('Connected\n')
-      || /\|\s*Connected\s*\|/i.test(out);
+    // "Connected" はSoftEtherの英語ステータス文字列
+    // "接続完了" は日本語表示時
+    const connected = isVpnConnectedFromOutput(out);
     vpnCache = { connected, ts: Date.now() };
     return connected;
   }
@@ -346,7 +381,7 @@ async function checkVPN() {
   }
 }
 
-// SoftEther VPN 接続（アカウント名不問 or 指定）
+// SoftEther VPN 接続（アカウント名自動検出）
 async function vpnConnect() {
   const vpncmdPath = findVpncmd();
   if (!vpncmdPath) {
@@ -355,36 +390,30 @@ async function vpnConnect() {
 
   const out = await vpncmdAccountList(vpncmdPath);
 
-  // アカウント名を一覧から全部抽出
-  const accounts = [];
-  for (const line of out.split(/\r?\n/)) {
-    // "Account Name   | VPN"  or  "VPN              | ..."
-    const m = line.match(/^\|\s*([^\|]+?)\s*\|\s*(Connected|Connecting|Offline|接続完了|切断|未接続)/i);
-    if (m) accounts.push({ name: m[1].trim(), status: m[2].trim() });
-  }
-
-  // すでに接続中があれば成功扱い
-  const alreadyConnected = accounts.find(a => /connected|接続完了/i.test(a.status));
-  if (alreadyConnected) {
+  // すでに接続中なら即成功
+  if (isVpnConnectedFromOutput(out)) {
     vpnCache = { connected: true, ts: Date.now() };
-    return { ok: true, message: `${alreadyConnected.name} は接続済みです` };
+    return { ok: true, message: 'すでにVPN接続中です' };
   }
 
-  // 特定アカウント指定 or 最初のアカウントに接続
-  const targetName = process.env.VPNCMD_ACCOUNT || (accounts[0] && accounts[0].name);
+  // アカウント名を取得（環境変数優先 → 自動検出）
+  const names = parseAccountNames(out);
+  const targetName = process.env.VPNCMD_ACCOUNT || names[0];
   if (!targetName) {
-    // アカウントが解析できなかった場合は生テキストを返す
-    const raw = out.slice(0, 400);
-    return { ok: false, error: `接続先アカウントが見つかりません。VPNCMD_ACCOUNT を .env に設定してください。\n\nvpncmd出力:\n${raw}` };
+    return { ok: false, error: `接続先アカウントが見つかりません。\nvpncmd出力（先頭）:\n${out.slice(0, 500)}` };
   }
 
+  // chcp 65001 でUTF-8強制してAccountConnect実行
   return await new Promise(resolve => {
-    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountConnect', targetName], { shell: true });
-    let res2 = '';
-    proc.stdout.on('data', d => res2 += d.toString());
-    proc.stderr.on('data', d => res2 += d.toString());
+    const q = vpncmdPath.includes(' ') ? `"${vpncmdPath}"` : vpncmdPath;
+    const cmd = `chcp 65001 > nul 2>&1 && ${q} localhost /CLIENT /CMD AccountConnect "${targetName}"`;
+    const proc = spawn('cmd', ['/c', cmd], { shell: false });
+    const chunks = [];
+    proc.stdout.on('data', d => chunks.push(d));
+    proc.stderr.on('data', d => chunks.push(d));
     proc.on('close', code => {
-      vpnCache = { connected: false, ts: 0 }; // キャッシュリセット → 次回再確認
+      const res2 = Buffer.concat(chunks).toString('utf8');
+      vpnCache = { connected: false, ts: 0 };
       if (code === 0 || /command completed/i.test(res2)) {
         resolve({ ok: true, message: `${targetName} への接続を開始しました（数秒後に確認）` });
       } else {
