@@ -24,6 +24,31 @@ def human_type(page, selector, text):
         page.keyboard.type(char)
         time.sleep(random.uniform(0.03, 0.12))
 
+def find_post_url(page):
+    """ダッシュボードからリンクを探して求人投稿URLを特定する"""
+    # よく使われるURLパターンを試す
+    candidates = [
+        "https://secure.kyujinbox.com/post/new",
+        "https://secure.kyujinbox.com/jobs/new",
+        "https://secure.kyujinbox.com/job/new",
+        "https://secure.kyujinbox.com/recruit/new",
+        "https://secure.kyujinbox.com/offers/new",
+    ]
+    # ページ上のリンクから求人投稿リンクを探す
+    try:
+        links = page.query_selector_all('a[href]')
+        for link in links:
+            href = link.get_attribute('href') or ''
+            text = (link.inner_text() or '').strip()
+            if any(kw in text for kw in ['新規', '登録', '投稿', '掲載', '追加']) and any(kw in href for kw in ['new', 'post', 'job', 'offer', 'recruit']):
+                if href.startswith('http'):
+                    return href
+                elif href.startswith('/'):
+                    return f"https://secure.kyujinbox.com{href}"
+    except Exception:
+        pass
+    return candidates[0]  # フォールバック
+
 def main():
     try:
         jobs_json = sys.stdin.read().strip()
@@ -108,6 +133,29 @@ def main():
             page.click('button[type="submit"]')
             rand_delay(3.0, 5.0)
 
+            # ログイン後のURLを確認
+            current_url = page.url
+            page_title = page.title()
+            progress(f"📍 ログイン後URL: {current_url}", "info")
+            progress(f"📄 ページタイトル: {page_title}", "info")
+
+            # ログイン失敗チェック（まだログインページにいる場合）
+            if 'login' in current_url.lower():
+                # エラーメッセージを探す
+                error_el = page.query_selector('.error, .alert, [class*="error"], [class*="alert"]')
+                if error_el:
+                    progress(f"❌ ログイン失敗: {error_el.inner_text()}", "error")
+                else:
+                    progress("❌ ログイン失敗: ログインページから移動できませんでした", "error")
+                browser.close()
+                sys.exit(1)
+
+            progress("✅ ログイン成功", "success")
+
+            # 求人投稿URLを特定
+            post_url = find_post_url(page)
+            progress(f"🔗 求人投稿ページ: {post_url}", "info")
+
             target_jobs = jobs[:batch]
             success_count = 0
 
@@ -116,8 +164,18 @@ def main():
                 rand_delay(1.5, 3.0)
 
                 try:
-                    page.goto("https://secure.kyujinbox.com/post/new", timeout=20000)
+                    page.goto(post_url, timeout=20000)
                     rand_delay(2.0, 4.0)
+
+                    # 現在のURLを確認（404やリダイレクトを検出）
+                    actual_url = page.url
+                    if actual_url != post_url:
+                        progress(f"⚠️ リダイレクト: {actual_url}", "warn")
+                        # ダッシュボードに戻った場合、再度リンクを探す
+                        post_url = find_post_url(page)
+                        if post_url != actual_url:
+                            page.goto(post_url, timeout=20000)
+                            rand_delay(2.0, 3.0)
 
                     human_type(page, 'input[name="title"], #job-title, [placeholder*="タイトル"]', job['title'])
                     rand_delay(0.5, 1.2)
@@ -149,10 +207,19 @@ def main():
 
                 except Exception as e:
                     progress(f"⚠️ 「{job['title']}」の投稿中にエラー: {str(e)}", "warn")
+                    # 現在のURLをデバッグ用に出力
+                    try:
+                        progress(f"   現在のURL: {page.url}", "warn")
+                    except Exception:
+                        pass
                     continue
 
         except Exception as e:
             progress(f"❌ ログインエラー: {str(e)}", "error")
+            try:
+                progress(f"   現在のURL: {page.url}", "error")
+            except Exception:
+                pass
             browser.close()
             sys.exit(1)
 
