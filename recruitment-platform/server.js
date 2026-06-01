@@ -989,6 +989,23 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
+  // ── API: VPN Debug (raw vpncmd output) ──
+  if (pathname === '/api/vpn/debug' && method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    const vpncmdPath = findVpncmd();
+    if (!vpncmdPath) {
+      sendJSON(res, 200, { vpncmdPath: null, error: 'vpncmd.exe が見つかりません', searchedPaths: [
+        process.env.VPNCMD_PATH,
+        'C:\\Program Files\\SoftEther VPN Client\\vpncmd.exe',
+        'C:\\Program Files (x86)\\SoftEther VPN Client\\vpncmd.exe',
+      ]});
+      return;
+    }
+    const raw = await vpncmdAccountList(vpncmdPath);
+    sendJSON(res, 200, { vpncmdPath, raw, lines: raw.split(/\r?\n/) });
+    return;
+  }
+
   // ── API: VPN Connect (SoftEther) ──
   if (pathname === '/api/vpn/connect' && method === 'POST') {
     const auth = requireAuth(req, res);
