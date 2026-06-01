@@ -143,6 +143,70 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000):
     except Exception:
         return False
 
+def click_submit_button(page):
+    """フォームの送信ボタンをクリック（複数の方法を試す）"""
+    # ページ末尾までスクロール
+    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    rand_delay(0.5, 1.0)
+
+    # デバッグ: ページ上のボタン一覧を表示
+    try:
+        buttons = page.query_selector_all('button, input[type="submit"]')
+        progress(f"  🔍 ボタン数: {len(buttons)}", "info")
+        for btn in buttons[:15]:
+            try:
+                tag = btn.evaluate('e => e.tagName.toLowerCase()')
+                typ = btn.get_attribute('type') or ''
+                cls = (btn.get_attribute('class') or '')[:50]
+                txt = (btn.inner_text() or '').strip()[:40]
+                progress(f"    [{tag}] type={typ} class={cls} text={txt}", "info")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 日本語テキストで試す
+    for label in ['登録', '保存', '投稿', '確認', '公開', '次へ', '送信', '掲載']:
+        for tag in ['button', 'a', 'input']:
+            try:
+                sel = f'{tag}:has-text("{label}")'
+                el = page.wait_for_selector(sel, timeout=2000)
+                if el and el.is_visible():
+                    el.scroll_into_view_if_needed()
+                    rand_delay(0.3, 0.6)
+                    el.click()
+                    progress(f"  ✅ ボタンクリック: {sel}", "info")
+                    return True
+            except Exception:
+                pass
+
+    # CSSクラス・タイプで試す
+    for sel in [
+        'button[type="submit"]', 'input[type="submit"]', '[type="submit"]',
+        '.btn-primary', '.btn-submit', '.submit-btn',
+        'form button:last-of-type', 'form button',
+    ]:
+        try:
+            el = page.wait_for_selector(sel, timeout=2000)
+            if el and el.is_visible():
+                el.scroll_into_view_if_needed()
+                rand_delay(0.3, 0.6)
+                el.click()
+                progress(f"  ✅ ボタンクリック: {sel}", "info")
+                return True
+        except Exception:
+            pass
+
+    # 最終手段: JS で form.submit()
+    try:
+        page.evaluate("document.querySelector('form').submit()")
+        progress("  ✅ JavaScript form.submit() を実行", "info")
+        return True
+    except Exception as e:
+        progress(f"  ❌ 送信ボタンが見つかりません: {e}", "error")
+        return False
+
+
 def find_post_url(page):
     """ダッシュボードから求人新規作成URLを特定する"""
     current_url = page.url
@@ -406,7 +470,11 @@ def main():
                     rand_delay(0.8, 1.8)
                     save_screenshot(page, f"before_submit_{i}")
 
-                    page.click('button[type="submit"], .submit-btn, [type="submit"]')
+                    submitted = click_submit_button(page)
+                    if not submitted:
+                        progress(f"⚠️ 「{job['title']}」: 送信ボタンが見つかりませんでした", "warn")
+                        save_screenshot(page, f"no_submit_{i}")
+                        continue
                     rand_delay(3.0, 6.0)
                     page.wait_for_load_state('networkidle', timeout=15000)
 
