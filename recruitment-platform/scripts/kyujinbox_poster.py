@@ -332,28 +332,54 @@ def _safe_unroute(page, handler):
         pass
 
 
-def find_post_url(page):
-    """ダッシュボードから求人新規作成URLを特定する"""
+def find_post_url(page, group_id=None):
+    """
+    求人新規作成URLを特定する。
+    saiyo.kyujinbox.com のURL構造:
+      https://saiyo.kyujinbox.com/company/groups/G????-????-???/jobs/new
+    """
     current_url = page.url
-    base = get_base_url(current_url)
 
+    # ① 環境変数 KYUJINBOX_GROUP_ID を最優先
+    if not group_id:
+        group_id = os.environ.get("KYUJINBOX_GROUP_ID", "").strip()
+
+    if group_id:
+        url = f"https://saiyo.kyujinbox.com/company/groups/{group_id}/jobs/new"
+        progress(f"  📎 新規求人URL(env): {url}", "info")
+        return url
+
+    # ② 現在のページURLからグループIDを抽出
+    m = re.search(r'/company/groups/(G[\w-]+)', current_url)
+    if m:
+        gid = m.group(1)
+        url = f"https://saiyo.kyujinbox.com/company/groups/{gid}/jobs/new"
+        progress(f"  📎 新規求人URL(url抽出): {url}", "info")
+        return url
+
+    # ③ ページ内リンクからグループIDを抽出
     try:
         links = page.query_selector_all('a[href]')
         for link in links:
             href = link.get_attribute('href') or ''
+            m = re.search(r'/company/groups/(G[\w-]+)', href)
+            if m:
+                gid = m.group(1)
+                url = f"https://saiyo.kyujinbox.com/company/groups/{gid}/jobs/new"
+                progress(f"  📎 新規求人URL(リンク抽出): {url}", "info")
+                return url
+            # 旧来のリンクテキスト検索
             text = (link.inner_text() or '').strip()
-            if any(kw in text for kw in ['新規', '登録', '投稿', '掲載', '追加', '作成', '求人を出す', '求人を作成']):
+            if any(kw in text for kw in ['新規', '求人を作成', '求人を出す', '掲載申込']):
                 if href.startswith('http'):
                     return href
                 elif href.startswith('/'):
-                    return f"{base}{href}"
+                    return f"https://saiyo.kyujinbox.com{href}"
     except Exception:
         pass
 
-    if current_url.rstrip('/').endswith('/jobs'):
-        return current_url.rstrip('/') + '/new'
-
-    return f"{base}/jobs/new"
+    progress("  ⚠️ グループIDが特定できません。KYUJINBOX_GROUP_ID を .env に設定してください", "warn")
+    return "https://saiyo.kyujinbox.com/company/jobs/new"
 
 
 def fill_kyujinbox_form(page, job, company_name):
@@ -597,6 +623,24 @@ def fill_kyujinbox_form(page, job, company_name):
     # 給与詳細テキスト
     fill_text(page, 'textarea[name="benefit"]', salary_str)
     rand_delay(0.3, 0.6)
+
+    # 仕事のやりがい (rewarding) - あれば入力
+    rewarding = job.get('rewarding', job.get('description', ''))
+    if rewarding:
+        fill_text(page, 'textarea[name="rewarding"]', rewarding)
+        rand_delay(0.3, 0.6)
+
+    # 労働時間・休日 (worktimeHoliday)
+    worktime = job.get('worktimeHoliday', job.get('workTime', ''))
+    if worktime:
+        fill_text(page, 'textarea[name="worktimeHoliday"]', worktime)
+        rand_delay(0.3, 0.6)
+
+    # アクセス (transportation)
+    transport = job.get('transportation', job.get('access', ''))
+    if transport:
+        fill_text(page, 'textarea[name="transportation"]', transport)
+        rand_delay(0.3, 0.6)
 
     # 応募資格
     tags = job.get('tags', [])
@@ -860,8 +904,22 @@ def main():
                     save_screenshot(page, f"after_submit_{i}")
 
                     url_changed = final_url != actual_url
-                    has_id = bool(re.search(r'/jobs/\d+', final_url))
-                    if not url_changed and '/edit' in final_url and not has_id:
+                    # kyujinbox のジョブIDは 5922-7577-XXXX 形式（英数字ハイフン）
+                    # /new → /edit/5922-7577-XXXX へのリダイレクトを成功と判定
+                    was_new = '/jobs/new' in actual_url
+                    went_edit = '/jobs/edit/' in final_url
+                    has_job_id = bool(re.search(r'/jobs/edit/[\w-]+', final_url))
+
+                    if (was_new and went_edit) or (url_changed and has_job_id):
+                        # 新規作成→編集ページへ遷移: 成功
+                        progress(f"✅ 「{job['title']}」を投稿しました (URL: {final_url})", "success")
+                        success_count += 1
+                    elif url_changed and 'login' not in final_url and '/new' not in final_url:
+                        # URL変化あり・ログインでもなく新規ページでもない
+                        progress(f"✅ 「{job['title']}」を投稿しました (URL: {final_url})", "success")
+                        success_count += 1
+                    else:
+                        # URL変化なし or /new のまま → バリデーションエラー
                         try:
                             body_text = page.inner_text('body')
                             error_kw = ['必須', 'エラー', '入力してください', '選択してください',
@@ -874,13 +932,10 @@ def main():
                                 for el in err_lines[:15]:
                                     progress(f"      {el[:120]}", "warn")
                             else:
-                                progress(f"   ⚠️ 送信後も編集ページ（エラー文言不明）", "warn")
+                                progress(f"   ⚠️ 送信後もフォームページ（エラー文言不明）", "warn")
                                 progress(f"   ページ冒頭テキスト(500字): {body_text[:500]}", "warn")
                         except Exception as ex:
-                            progress(f"   ⚠️ 送信後も編集ページ（本文取得失敗: {ex}）", "warn")
-                    else:
-                        progress(f"✅ 「{job['title']}」を投稿しました (URL: {final_url})", "success")
-                        success_count += 1
+                            progress(f"   ⚠️ 送信後フォームページ（本文取得失敗: {ex}）", "warn")
 
                     if i < len(target_jobs) - 1:
                         wait = random.uniform(8.0, 20.0)
