@@ -203,19 +203,25 @@ def click_submit_button(page):
     except Exception:
         pass
 
-    # 日本語テキストで試す（複数ある場合は最後のものを使う）
-    for label in ['求人を保存', '保存して確認', '登録する', '保存する', '掲載する', '公開する', '次へ', '保存', '登録', '投稿', '確認', '公開', '送信']:
+    # 日本語テキストで試す（「公開する」を最優先、is-disabでも試みる）
+    # 「保存」は「一時保存」に含まれるので下書き保存になってしまう → 後回し
+    for label in ['公開する', '掲載する', '求人を公開', '保存して公開', '登録する', '確認する', '次へ', '一時保存', '保存']:
         for tag in ['button', 'a']:
             try:
                 locator = page.locator(f'{tag}:has-text("{label}")')
                 count = locator.count()
                 if count > 0:
-                    # 最後のボタン（フォーム末尾の送信ボタン）を使う
                     el = locator.last
                     if el.is_visible():
                         el.scroll_into_view_if_needed()
                         rand_delay(0.3, 0.6)
-                        el.click()
+                        # is-disab クラスでも強制クリック (JSで直接click)
+                        cls = el.get_attribute('class') or ''
+                        if 'is-disab' in cls or 'disabled' in cls:
+                            progress(f"  ⚠️ ボタンが無効状態 (is-disab) - JSで強制クリック試行", "warn")
+                            el.evaluate('e => e.click()')
+                        else:
+                            el.click()
                         progress(f"  ✅ ボタンクリック: {tag}:has-text(\"{label}\") (最後の{count}個目)", "info")
                         return True
             except Exception:
@@ -297,11 +303,36 @@ def fill_kyujinbox_form(page, job, company_name):
     fill_text(page, 'textarea[name="description"]', job.get('description', ''))
     rand_delay(0.5, 1.0)
 
-    # 職種 (select) - 値が合わなくてもエラーにしない（debug=Trueでオプション表示）
+    # 職種 (select) ← name=jobType 【必須・空だと公開するボタンが無効化される】
+    # jobTypeが一致しない場合でも最初の有効なオプションを選択する
     job_type = job.get('jobType', '')
-    if job_type:
-        select_option_safe(page, 'select[name="jobType"]', label=job_type, debug=True)
+    try:
+        jt_el = page.wait_for_selector('select[name="jobType"]', timeout=5000)
+        opts = jt_el.query_selector_all('option')
+        option_list = [(opt.get_attribute('value') or '', (opt.inner_text() or '').strip()) for opt in opts]
+        progress(f"  📋 jobType オプション({len(option_list)}件): {[t for v,t in option_list[:6]]}", "info")
+
+        selected = False
+        if job_type:
+            for v, t in option_list:
+                if v and (job_type in t or t in job_type):
+                    jt_el.select_option(value=v)
+                    progress(f"  ✅ jobType 設定(ラベル一致): '{t}'", "info")
+                    selected = True
+                    break
+
+        if not selected:
+            # フォールバック: 最初の有効な選択肢（空値でない最初のoptionを選択）
+            for v, t in option_list:
+                if v:
+                    jt_el.select_option(value=v)
+                    progress(f"  ℹ️ jobType フォールバック: '{t}'（求人jobTypeと一致なし）", "info")
+                    selected = True
+                    break
+
         rand_delay(0.3, 0.6)
+    except Exception as e:
+        progress(f"  ⚠️ jobType 選択失敗: {e}", "warn")
 
     # 都道府県 (select) ← name=prefVal
     location = job.get('location', '')
