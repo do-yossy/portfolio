@@ -844,6 +844,65 @@ ${jobUrls}
     return;
   }
 
+  if (pathname === '/api/post/indeed' && method === 'GET') {
+    sseInit(res);
+
+    const jobs = await Jobs.findAll(true);
+    if (jobs.length === 0) {
+      sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
+      res.end();
+      return;
+    }
+
+    const scriptPath = path.join(SCRIPTS_DIR, 'indeed_job_poster.py');
+    if (!fs.existsSync(scriptPath)) {
+      sseSend(res, { message: '⚠️ 投稿スクリプトが見つかりません（scripts/indeed_job_poster.py）', type: 'warn', done: true, success: false });
+      res.end();
+      return;
+    }
+
+    const jobsJson = JSON.stringify(jobs.slice(0, 5));
+    const proc = spawn('python3', [scriptPath], {
+      env: { ...process.env },
+      stdin: 'pipe'
+    });
+    proc.stdin.write(jobsJson);
+    proc.stdin.end();
+
+    proc.stdout.on('data', data => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try {
+          const obj = JSON.parse(line);
+          sseSend(res, { message: obj.message, type: obj.level || 'info' });
+        } catch {
+          sseSend(res, { message: line, type: 'info' });
+        }
+      }
+    });
+
+    proc.stderr.on('data', data => {
+      sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
+    });
+
+    proc.on('close', async code => {
+      const ok = code === 0;
+      const msg = ok ? '✅ Indeed掲載完了' : `❌ Indeed掲載失敗(exit ${code})`;
+      await Logs.create('indeed_post', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
+      sseSend(res, {
+        message: ok ? '✅ Indeed への掲載が完了しました' : `❌ 掲載が失敗しました（コード: ${code}）`,
+        type: ok ? 'success' : 'error',
+        done: true,
+        success: ok
+      });
+      res.end();
+    });
+
+    req.on('close', () => { try { proc.kill(); } catch {} });
+    return;
+  }
+
   if (pathname === '/api/post/stanby' && method === 'GET') {
     sseInit(res);
 

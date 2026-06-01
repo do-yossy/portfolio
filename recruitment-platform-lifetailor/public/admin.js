@@ -185,6 +185,18 @@ function startPostStanby() {
   );
 }
 
+// ── Indeed Post ──
+function startPostIndeed() {
+  confirmAction(
+    'Indeed に求人を掲載します。\nINDEED_EMAIL / INDEED_PASSWORD が設定されていることを確認してください。\n実行しますか？',
+    () => {
+      runSSE('/api/post/indeed', 'progress-indeed', 'btn-post-indeed', d => {
+        toast(d.message, d.success ? 'success' : 'error');
+      });
+    }
+  );
+}
+
 // ── CSV Import ──
 function triggerCSVImport() {
   document.getElementById('csv-file-input').click();

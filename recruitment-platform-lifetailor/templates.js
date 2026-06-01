@@ -226,6 +226,14 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [] }) {
       <div id="progress-stanby-wrap" class="progress-wrap hidden">
         <div id="progress-stanby" class="progress-box"></div>
       </div>
+      <div class="btn-group mt-8">
+        <button id="btn-post-indeed" class="btn btn-primary" onclick="startPostIndeed()">
+          🔎 Indeed に求人を掲載する
+        </button>
+      </div>
+      <div id="progress-indeed-wrap" class="progress-wrap hidden">
+        <div id="progress-indeed" class="progress-box"></div>
+      </div>
     </div>
   </div>
 
@@ -428,6 +436,7 @@ function adminLogsPage(logs) {
   const actionLabel = {
     kyujinbox_post: '求人ボックス投稿',
     stanby_post: 'スタンバイ投稿',
+    indeed_post: 'Indeed掲載',
     indeed_scrape: 'Indeedスクレイピング',
     xml_generate: 'XML生成',
     csv_import: 'CSVインポート'
