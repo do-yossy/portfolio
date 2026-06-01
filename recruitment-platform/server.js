@@ -288,33 +288,47 @@ function findVpncmd() {
 }
 
 // vpncmd出力から接続状態を判定
+// 日本語SoftEtherはShift-JISで出力される。toString('binary')で読むと
+// 「接続完了」は latin-1 文字 "\xe6\xa5\xe7\xb6\xe5\xae\xe4\xba" として現れる
+// ※ /api/vpn/debug の実出力から確認: "ç¶æ |æ¥ç¶å®äº"
 function isVpnConnectedFromOutput(out) {
   if (!out) return false;
-  // SoftEther AccountList の各行: "Account Name  | Session Status | ..."
-  // ステータスは英語: Connected / Connecting / Offline / Not Connected
-  // 日本語: 接続完了 / 接続中 / 未接続
-  const lines = out.split(/\r?\n/);
-  for (const line of lines) {
-    if (/connected|接続完了|接続中/i.test(line) && !/not.connected|未接続|offline/i.test(line)) {
-      return true;
-    }
-  }
+  // 英語版: "Connected"
+  if (/\bConnected\b/i.test(out)) return true;
+  // 日本語版: 接続完了 (Shift-JIS bytes decoded as latin-1)
+  if (out.includes('\xe6\xa5\xe7\xb6\xe5\xae\xe4\xba')) return true;
+  // 日本語版: 接続中 (接続処理中)
+  if (out.includes('\xe6\xa5\xe7\xb6\xe4\xb8\xad')) return true;
   return false;
 }
 
 // アカウント名リストを出力から抽出
+// 日本語版の出力形式:
+//   「接続設定名」(Shift-JIS→latin-1: \xe6\xa5\xe7\xb6\xe8\xa8\xad\xe5\xae\x9a\xe5\x90\x8d)
+//   の行に |VPN Gate Connection のようなASCII名が続く
 function parseAccountNames(out) {
   const names = [];
-  const lines = out.split(/\r?\n/);
-  for (const line of lines) {
-    // 典型的な行: "| VPN              | Connected     |"
-    // または:    "VPN              | Connected     | ..."
-    const m = line.match(/^\|?\s*([A-Za-z0-9_\-\.@\s]+?)\s*\|/);
-    if (m) {
-      const name = m[1].trim();
-      if (name && name !== 'Account Name' && !name.startsWith('-') && !name.startsWith('=') && name.length > 0) {
-        names.push(name);
+  for (const line of out.split(/\r?\n/)) {
+    // 日本語版: 接続設定名 の行（garbled）
+    if (out.includes('\xe6\xa5\xe7\xb6\xe8\xa8\xad') && line.includes('\xe6\xa5\xe7\xb6\xe8\xa8\xad')) {
+      const idx = line.indexOf('|');
+      if (idx >= 0) {
+        const name = line.slice(idx + 1).trim();
+        if (name) names.push(name);
       }
+      continue;
+    }
+    // 英語版: "Account Name | NAME"
+    const mEn = line.match(/Account Name\s*\|\s*(.+)/i);
+    if (mEn && mEn[1].trim()) names.push(mEn[1].trim());
+  }
+  // フォールバック: | の後にスペース含むASCII文字列（VPN Gate Connection など）
+  if (names.length === 0) {
+    for (const line of out.split(/\r?\n/)) {
+      const idx = line.indexOf('|');
+      if (idx < 0) continue;
+      const val = line.slice(idx + 1).trim();
+      if (/^[A-Za-z][A-Za-z0-9 _\-\.]{2,}$/.test(val)) names.push(val);
     }
   }
   return [...new Set(names)];
