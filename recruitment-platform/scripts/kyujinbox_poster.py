@@ -7,8 +7,13 @@ Node.js から subprocess として呼び出される。
 import json
 import sys
 import os
+import io
 import time
 import random
+from urllib.parse import urlparse
+
+# Windows での文字化け対策: 明示的にUTF-8で読む
+sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
 
 def progress(message, level="info"):
     print(json.dumps({"type": "progress", "message": message, "level": level}), flush=True)
@@ -35,8 +40,7 @@ def dump_inputs(page):
             name = el.get_attribute('name') or ''
             id_  = el.get_attribute('id') or ''
             ph   = el.get_attribute('placeholder') or ''
-            cls  = el.get_attribute('class') or ''
-            progress(f"  [{tag}] type={t} name={name} id={id_} placeholder={ph} class={cls[:40]}", "info")
+            progress(f"  [{tag}] type={t} name={name} id={id_} placeholder={ph}", "info")
     except Exception as e:
         progress(f"  input列挙エラー: {e}", "warn")
 
@@ -52,7 +56,7 @@ def save_screenshot(page, name):
     except Exception as e:
         progress(f"  スクリーンショット失敗: {e}", "warn")
 
-def find_input(page, *selectors, timeout=15000):
+def find_input(page, *selectors):
     """複数のセレクタを試して最初に見つかったものを返す"""
     for sel in selectors:
         try:
@@ -61,24 +65,38 @@ def find_input(page, *selectors, timeout=15000):
                 return sel
         except Exception:
             pass
-    # 最後のセレクタで proper timeout
     return selectors[-1]
 
+def get_base_url(url):
+    """URLのスキーム+ホストを返す (例: https://saiyo.kyujinbox.com)"""
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
 def find_post_url(page):
-    """ダッシュボードからリンクを探して求人投稿URLを特定する"""
+    """ダッシュボードから求人新規作成URLを特定する"""
+    current_url = page.url
+    base = get_base_url(current_url)
+
+    # まずページ上のリンクから「新規」「作成」系を探す
     try:
         links = page.query_selector_all('a[href]')
         for link in links:
             href = link.get_attribute('href') or ''
             text = (link.inner_text() or '').strip()
-            if any(kw in text for kw in ['新規', '登録', '投稿', '掲載', '追加', '作成']):
+            if any(kw in text for kw in ['新規', '登録', '投稿', '掲載', '追加', '作成', '求人を出す', '求人を作成']):
                 if href.startswith('http'):
                     return href
                 elif href.startswith('/'):
-                    return f"https://secure.kyujinbox.com{href}"
+                    return f"{base}{href}"
     except Exception:
         pass
-    return "https://secure.kyujinbox.com/post/new"
+
+    # 現在のURLから /new を試す
+    # 例: .../jobs → .../jobs/new
+    if current_url.rstrip('/').endswith('/jobs'):
+        return current_url.rstrip('/') + '/new'
+
+    return f"{base}/jobs/new"
 
 def main():
     try:
@@ -137,7 +155,6 @@ def main():
             locale="ja-JP",
             timezone_id="Asia/Tokyo",
         )
-
         ctx.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
             Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
@@ -149,62 +166,46 @@ def main():
         try:
             progress("🔑 求人ボックスにログイン中...", "info")
             page.goto("https://secure.kyujinbox.com/login", timeout=30000)
-            # ページが完全にロードされるまで待機
             page.wait_for_load_state('networkidle', timeout=15000)
             rand_delay(1.0, 2.0)
 
             progress(f"📍 ログインページURL: {page.url}", "info")
-            progress(f"📄 タイトル: {page.title()}", "info")
 
-            # フォームフィールドを列挙してデバッグ
-            progress("🔍 フォームフィールドを確認中...", "info")
-            dump_inputs(page)
-            save_screenshot(page, "login_page")
-
-            # ランダムにスクロール
             page.mouse.move(random.randint(200, 800), random.randint(100, 400))
             rand_delay(0.5, 1.0)
 
-            # メールフィールド - 複数のセレクタを試す
             email_sel = find_input(page,
+                'input[name="login[email]"]',
+                'input[id="login_email"]',
                 'input[type="email"]',
                 'input[name="email"]',
-                'input[name="mail"]',
-                'input[name="login"]',
-                'input[name="username"]',
-                'input[name="user_email"]',
                 'input[id*="email" i]',
                 'input[id*="mail" i]',
                 'input[placeholder*="メール" i]',
-                'input[placeholder*="mail" i]',
-                'input[placeholder*="email" i]',
                 'input[type="text"]:first-of-type',
             )
             progress(f"📧 メールセレクタ: {email_sel}", "info")
             human_type(page, email_sel, email)
             rand_delay(0.8, 1.5)
 
-            # パスワードフィールド
             pass_sel = find_input(page,
+                'input[name="login[password]"]',
+                'input[id="login_password"]',
                 'input[type="password"]',
                 'input[name="password"]',
-                'input[name="pass"]',
                 'input[id*="password" i]',
-                'input[placeholder*="パスワード" i]',
-                'input[placeholder*="password" i]',
             )
             progress(f"🔒 パスワードセレクタ: {pass_sel}", "info")
             human_type(page, pass_sel, password)
             rand_delay(0.5, 1.2)
 
-            page.click('button[type="submit"], input[type="submit"], .login-btn, [class*="login"] button, form button')
+            page.click('button[type="submit"], input[type="submit"], .login-btn, form button')
             rand_delay(3.0, 5.0)
-            page.wait_for_load_state('networkidle', timeout=10000)
+            page.wait_for_load_state('networkidle', timeout=15000)
 
             current_url = page.url
-            page_title = page.title()
             progress(f"📍 ログイン後URL: {current_url}", "info")
-            progress(f"📄 ページタイトル: {page_title}", "info")
+            progress(f"📄 ページタイトル: {page.title()}", "info")
             save_screenshot(page, "after_login")
 
             if 'login' in current_url.lower():
@@ -216,6 +217,7 @@ def main():
 
             progress("✅ ログイン成功", "success")
 
+            # 求人一覧ページ上のリンクから新規作成URLを特定
             post_url = find_post_url(page)
             progress(f"🔗 求人投稿ページ: {post_url}", "info")
 
