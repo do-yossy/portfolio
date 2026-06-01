@@ -44,13 +44,35 @@ async function refreshVpn() {
       return true;
     } else {
       el.className = 'vpn-badge vpn-disconnected';
-      el.innerHTML = '<span class="dot"></span> VPN未接続';
+      el.innerHTML = '<span class="dot"></span> VPN未接続 <button onclick="connectVpn(event)" class="vpn-connect-btn">接続する</button>';
       return false;
     }
   } catch {
     el.className = 'vpn-badge vpn-disconnected';
-    el.innerHTML = '<span class="dot"></span> 確認失敗';
+    el.innerHTML = '<span class="dot"></span> 確認失敗 <button onclick="connectVpn(event)" class="vpn-connect-btn">接続する</button>';
     return false;
+  }
+}
+
+async function connectVpn(e) {
+  if (e) e.stopPropagation();
+  const el = document.getElementById('vpn-badge');
+  if (!el) return;
+  el.className = 'vpn-badge vpn-checking';
+  el.innerHTML = '<span class="dot"></span> 接続中...';
+  try {
+    const r = await fetch('/api/vpn/connect', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      toast('VPN接続を開始しました。数秒後に確認します。', 'success');
+      setTimeout(refreshVpn, 5000);
+    } else {
+      toast(d.error || 'VPN接続に失敗しました', 'error');
+      refreshVpn();
+    }
+  } catch {
+    toast('VPN接続APIエラー', 'error');
+    refreshVpn();
   }
 }
 

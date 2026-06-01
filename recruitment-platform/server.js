@@ -297,6 +297,62 @@ async function checkVPN() {
   }
 }
 
+// SoftEther VPN connect
+async function vpnConnect() {
+  // vpncmd.exe の探索パス
+  const vpncmdPaths = [
+    process.env.VPNCMD_PATH,
+    'C:\\Program Files\\SoftEther VPN Client\\vpncmd.exe',
+    'C:\\Program Files (x86)\\SoftEther VPN Client\\vpncmd.exe',
+    'vpncmd',
+  ].filter(Boolean);
+
+  let vpncmdPath = null;
+  for (const p of vpncmdPaths) {
+    if (p === 'vpncmd' || require('fs').existsSync(p)) { vpncmdPath = p; break; }
+  }
+  if (!vpncmdPath) {
+    return { ok: false, error: 'vpncmd.exe が見つかりません。VPNCMD_PATH を .env に設定してください。' };
+  }
+
+  const accountName = process.env.VPNCMD_ACCOUNT;
+
+  // アカウント名未設定 → アカウント一覧を返す
+  if (!accountName) {
+    return await new Promise(resolve => {
+      const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountList'], { shell: true });
+      let out = '';
+      proc.stdout.on('data', d => out += d.toString());
+      proc.stderr.on('data', d => out += d.toString());
+      proc.on('close', () => {
+        const names = [...out.matchAll(/^([^\s|][^\n]+?)\s*\|/gm)]
+          .map(m => m[1].trim())
+          .filter(n => n && n !== 'Account Name' && !n.startsWith('-') && !n.startsWith('='));
+        resolve({ ok: false, error: `VPNCMD_ACCOUNT が未設定です。.env に設定してください。利用可能なアカウント: ${names.length ? names.join(', ') : '（取得失敗）'}` });
+      });
+      proc.on('error', err => resolve({ ok: false, error: err.message }));
+    });
+  }
+
+  // 接続実行
+  return await new Promise(resolve => {
+    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountConnect', accountName], { shell: true });
+    let out = '';
+    proc.stdout.on('data', d => out += d.toString());
+    proc.stderr.on('data', d => out += d.toString());
+    proc.on('close', code => {
+      // キャッシュリセット
+      vpnCache = { connected: false, ts: 0 };
+      if (code === 0 || out.toLowerCase().includes('command completed')) {
+        resolve({ ok: true, message: `${accountName} に接続しました` });
+      } else {
+        resolve({ ok: false, error: `接続失敗: ${out.slice(0, 200)}` });
+      }
+    });
+    proc.on('error', err => resolve({ ok: false, error: err.message }));
+  });
+}
+
 // Duplicate check
 async function checkDuplicate(data) {
   const nPhone = normalizePhone(data.phone);
@@ -872,6 +928,15 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   if (pathname === '/api/vpn/status' && method === 'GET') {
     const connected = await checkVPN();
     sendJSON(res, 200, { connected, ts: Date.now() });
+    return;
+  }
+
+  // ── API: VPN Connect (SoftEther) ──
+  if (pathname === '/api/vpn/connect' && method === 'POST') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const result = await vpnConnect();
+    sendJSON(res, 200, result);
     return;
   }
 
