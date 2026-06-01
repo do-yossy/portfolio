@@ -19,7 +19,7 @@ with sync_playwright() as p:
     page = ctx.new_page()
 
     print("=== ログインページにアクセス ===")
-    page.goto("https://secure.indeed.com/account/login", timeout=30000)
+    page.goto("https://secure.indeed.com/auth?hl=ja&userType=employer", timeout=30000)
     time.sleep(4)
 
     print(f"URL: {page.url}")

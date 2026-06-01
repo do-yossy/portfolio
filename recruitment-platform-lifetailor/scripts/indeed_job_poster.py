@@ -60,7 +60,7 @@ def main():
         try:
             # ── ログイン ──
             progress("🔑 Indeed雇用主アカウントにログイン中...", "info")
-            page.goto("https://secure.indeed.com/account/login", timeout=30000)
+            page.goto("https://secure.indeed.com/auth?hl=ja&userType=employer", timeout=30000)
             time.sleep(3)
 
             # メールアドレス入力（複数セレクター対応）
