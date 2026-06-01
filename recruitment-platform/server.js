@@ -287,30 +287,23 @@ function findVpncmd() {
   return null;
 }
 
-// vpncmd出力から接続状態を判定
-// 日本語SoftEtherはShift-JISで出力される。toString('binary')で読むと
-// 「接続完了」は latin-1 文字 "\xe6\xa5\xe7\xb6\xe5\xae\xe4\xba" として現れる
-// ※ /api/vpn/debug の実出力から確認: "ç¶æ |æ¥ç¶å®äº"
+// vpncmd出力から接続状態を判定（出力はUTF-8で読む）
 function isVpnConnectedFromOutput(out) {
   if (!out) return false;
   // 英語版: "Connected"
   if (/\bConnected\b/i.test(out)) return true;
-  // 日本語版: 接続完了 (Shift-JIS bytes decoded as latin-1)
-  if (out.includes('\xe6\xa5\xe7\xb6\xe5\xae\xe4\xba')) return true;
-  // 日本語版: 接続中 (接続処理中)
-  if (out.includes('\xe6\xa5\xe7\xb6\xe4\xb8\xad')) return true;
+  // 日本語版: 接続完了 / 接続中
+  if (out.includes('接続完了')) return true;
+  if (out.includes('接続中')) return true;
   return false;
 }
 
-// アカウント名リストを出力から抽出
-// 日本語版の出力形式:
-//   「接続設定名」(Shift-JIS→latin-1: \xe6\xa5\xe7\xb6\xe8\xa8\xad\xe5\xae\x9a\xe5\x90\x8d)
-//   の行に |VPN Gate Connection のようなASCII名が続く
+// アカウント名リストを出力から抽出（出力はUTF-8で読む）
 function parseAccountNames(out) {
   const names = [];
   for (const line of out.split(/\r?\n/)) {
-    // 日本語版: 接続設定名 の行（garbled）
-    if (out.includes('\xe6\xa5\xe7\xb6\xe8\xa8\xad') && line.includes('\xe6\xa5\xe7\xb6\xe8\xa8\xad')) {
+    // 日本語版: "接続設定名 | VPN Gate Connection ..."
+    if (line.includes('接続設定名')) {
       const idx = line.indexOf('|');
       if (idx >= 0) {
         const name = line.slice(idx + 1).trim();
@@ -334,16 +327,15 @@ function parseAccountNames(out) {
   return [...new Set(names)];
 }
 
-// vpncmdでアカウント一覧を取得し、接続中のものがあるか確認
-// vpncmd.exe を直接実行（cmd /c経由だとスペース入りパスのクォートが壊れる）
-// "Connected" はASCIIなのでShift-JIS出力でも正しく照合できる
+// vpncmdでアカウント一覧を取得
+// vpncmd.exe の出力はUTF-8（toString('binary')だと制御文字が混入して照合失敗する）
 function vpncmdAccountList(vpncmdPath) {
   return new Promise(resolve => {
     const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountList'], { shell: false });
     const chunks = [];
     proc.stdout.on('data', d => chunks.push(d));
     proc.stderr.on('data', d => chunks.push(d));
-    proc.on('close', () => resolve(Buffer.concat(chunks).toString('binary')));
+    proc.on('close', () => resolve(Buffer.concat(chunks).toString('utf8')));
     proc.on('error', () => resolve(''));
     setTimeout(() => { try { proc.kill(); } catch {} resolve(''); }, 8000);
   });
@@ -423,9 +415,9 @@ async function vpnConnect() {
     proc.stdout.on('data', d => chunks.push(d));
     proc.stderr.on('data', d => chunks.push(d));
     proc.on('close', code => {
-      const res2 = Buffer.concat(chunks).toString('binary');
+      const res2 = Buffer.concat(chunks).toString('utf8');
       vpnCache = { connected: false, ts: 0 };
-      if (code === 0 || /command completed/i.test(res2)) {
+      if (code === 0 || /command completed/i.test(res2) || res2.includes('コマンドは正常に終了')) {
         resolve({ ok: true, message: `${targetName} への接続を開始しました（数秒後に確認）` });
       } else {
         resolve({ ok: false, error: `接続失敗: ${res2.slice(0, 300)}` });
