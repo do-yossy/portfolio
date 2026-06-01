@@ -8,6 +8,21 @@ const url = require('url');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
+// .envファイルを読み込む（dotenvなし）
+(function loadEnv() {
+  const envFile = path.join(__dirname, '.env');
+  if (!fs.existsSync(envFile)) return;
+  fs.readFileSync(envFile, 'utf8').split(/\r?\n/).forEach(line => {
+    line = line.trim();
+    if (!line || line.startsWith('#')) return;
+    const eq = line.indexOf('=');
+    if (eq < 0) return;
+    const key = line.slice(0, eq).trim();
+    const val = line.slice(eq + 1).trim();
+    if (key && !(key in process.env)) process.env[key] = val;
+  });
+})();
+
 const { Jobs, Applicants, Applications, Logs, Analytics } = require('./db-factory');
 const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize');
 const { notify } = require('./lib/notify');
