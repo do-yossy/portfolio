@@ -9,8 +9,11 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 // .envファイルを読み込む（dotenvなし）
+// process.cwd()/.env を優先（別ディレクトリから起動する場合）、なければ __dirname/.env
 (function loadEnv() {
-  const envFile = path.join(__dirname, '.env');
+  const envFile = fs.existsSync(path.join(process.cwd(), '.env'))
+    ? path.join(process.cwd(), '.env')
+    : path.join(__dirname, '.env');
   if (!fs.existsSync(envFile)) return;
   fs.readFileSync(envFile, 'utf8').split(/\r?\n/).forEach(line => {
     line = line.trim();

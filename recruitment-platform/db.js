@@ -5,7 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-const DATA_DIR = path.join(__dirname, 'data');
+// DATA_DIR 環境変数で上書き可能（複数インスタンス対応）
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'recruitment.db');
 
 if (!fs.existsSync(DATA_DIR)) {
