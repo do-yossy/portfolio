@@ -322,17 +322,72 @@ def fill_kyujinbox_form(page, job, company_name):
                     break
 
         if not selected:
-            # フォールバック: 最初の有効な選択肢（空値でない最初のoptionを選択）
+            # フォールバック: 最初の有効な選択肢を選択
             for v, t in option_list:
                 if v:
                     jt_el.select_option(value=v)
-                    progress(f"  ℹ️ jobType フォールバック: '{t}'（求人jobTypeと一致なし）", "info")
+                    progress(f"  ℹ️ jobType フォールバック: '{t}'", "info")
                     selected = True
                     break
 
-        rand_delay(0.3, 0.6)
+        # Vue.js/React が DOM 変更を検知するよう input+change イベントを発火
+        if selected:
+            try:
+                page.evaluate("""() => {
+                    const el = document.querySelector('select[name="jobType"]');
+                    if (!el) return;
+                    const setter = Object.getOwnPropertyDescriptor(
+                        window.HTMLSelectElement.prototype, 'value')?.set;
+                    if (setter) setter.call(el, el.value);
+                    el.dispatchEvent(new Event('input',  {bubbles: true}));
+                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                }""")
+            except Exception:
+                pass
+
+        rand_delay(0.5, 1.0)
     except Exception as e:
         progress(f"  ⚠️ jobType 選択失敗: {e}", "warn")
+
+    # 雇用形態 (employTypes checkboxes) ← 必須: 少なくとも1つチェック
+    employment_type = job.get('employmentType', '')
+    EMPLOY_KEYWORDS = {
+        '正社員': ['正社員', '正職員'],
+        'アルバイト': ['アルバイト', 'バイト', 'パート'],
+        'パート': ['パート', 'アルバイト'],
+        '契約社員': ['契約', '嘱託'],
+        '派遣': ['派遣'],
+        '業務委託': ['業務委託', '委託', 'フリーランス'],
+    }
+    try:
+        cbs = page.query_selector_all('input[name="employTypes"]')
+        if cbs:
+            checked = False
+            # ラベルテキストから一致するものを探す
+            for cb in cbs:
+                try:
+                    label_el = cb.evaluate_handle(
+                        'e => e.closest("label") || e.parentElement')
+                    label_txt = label_el.as_element().inner_text() if label_el else ''
+                    for kw_list in EMPLOY_KEYWORDS.values():
+                        if any(kw in employment_type for kw in kw_list) and \
+                           any(kw in label_txt for kw in kw_list):
+                            cb.check()
+                            progress(f"  ✅ employTypes チェック(一致): '{label_txt.strip()}'", "info")
+                            checked = True
+                            break
+                    if checked:
+                        break
+                except Exception:
+                    pass
+
+            if not checked:
+                # フォールバック: 最初のチェックボックスをオン
+                cbs[0].check()
+                progress(f"  ℹ️ employTypes フォールバック: 最初の選択肢をチェック", "info")
+            rand_delay(0.3, 0.6)
+    except Exception as e:
+        progress(f"  ⚠️ employTypes チェック失敗: {e}", "warn")
 
     # 都道府県 (select) ← name=prefVal
     location = job.get('location', '')
@@ -397,6 +452,24 @@ def fill_kyujinbox_form(page, job, company_name):
         qual_text = ' / '.join(tags)
         fill_text(page, 'textarea[name="qualifications"]', qual_text)
         rand_delay(0.3, 0.6)
+
+    # 電話番号: isPhoneNumberRequired をオフにして、フィールドをクリア
+    try:
+        phone_req_cb = page.query_selector('input[name="isPhoneNumberRequired"]')
+        if phone_req_cb and phone_req_cb.is_checked():
+            phone_req_cb.uncheck()
+            rand_delay(0.2, 0.4)
+    except Exception:
+        pass
+    try:
+        tel_el = page.query_selector('input[name="applicationPhoneNumber"]')
+        if tel_el:
+            val = tel_el.input_value()
+            if val:
+                progress(f"  🔧 電話番号フィールドに値あり: '{val}' → クリア", "warn")
+                tel_el.fill('')
+    except Exception:
+        pass
 
     # 同意チェックボックス（必須）← name=agree_main (複数あり)
     try:
