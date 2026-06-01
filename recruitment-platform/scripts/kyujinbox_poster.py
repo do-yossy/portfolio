@@ -218,8 +218,12 @@ def click_submit_button(page):
                         # is-disab クラスでも強制クリック (JSで直接click)
                         cls = el.get_attribute('class') or ''
                         if 'is-disab' in cls or 'disabled' in cls:
-                            progress(f"  ⚠️ ボタンが無効状態 (is-disab) - JSで強制クリック試行", "warn")
-                            el.evaluate('e => e.click()')
+                            progress(f"  ⚠️ ボタンが無効状態 (is-disab) - is-disabクラス除去後にクリック", "warn")
+                            el.evaluate("""e => {
+                                e.classList.remove('is-disab');
+                                e.removeAttribute('disabled');
+                                e.click();
+                            }""")
                         else:
                             el.click()
                         progress(f"  ✅ ボタンクリック: {tag}:has-text(\"{label}\") (最後の{count}個目)", "info")
@@ -330,7 +334,7 @@ def fill_kyujinbox_form(page, job, company_name):
                     selected = True
                     break
 
-        # Vue.js/React が DOM 変更を検知するよう input+change イベントを発火
+        # Vue.js reactive state を確実に更新するためイベント発火
         if selected:
             try:
                 page.evaluate("""() => {
@@ -339,9 +343,10 @@ def fill_kyujinbox_form(page, job, company_name):
                     const setter = Object.getOwnPropertyDescriptor(
                         window.HTMLSelectElement.prototype, 'value')?.set;
                     if (setter) setter.call(el, el.value);
-                    el.dispatchEvent(new Event('input',  {bubbles: true}));
-                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                    ['input', 'change'].forEach(type =>
+                        el.dispatchEvent(new Event(type, {bubbles:true, composed:true})));
                 }""")
+                rand_delay(0.3, 0.5)
             except Exception:
                 pass
 
@@ -349,45 +354,47 @@ def fill_kyujinbox_form(page, job, company_name):
     except Exception as e:
         progress(f"  ⚠️ jobType 選択失敗: {e}", "warn")
 
-    # 雇用形態 (employTypes checkboxes) ← 必須: 少なくとも1つチェック
+    # 雇用形態 (employTypes) ← 必須 / チェックボックスは非表示→labelクリック
     employment_type = job.get('employmentType', '')
-    EMPLOY_KEYWORDS = {
-        '正社員': ['正社員', '正職員'],
-        'アルバイト': ['アルバイト', 'バイト', 'パート'],
-        'パート': ['パート', 'アルバイト'],
-        '契約社員': ['契約', '嘱託'],
-        '派遣': ['派遣'],
-        '業務委託': ['業務委託', '委託', 'フリーランス'],
-    }
     try:
-        cbs = page.query_selector_all('input[name="employTypes"]')
-        if cbs:
-            checked = False
-            # ラベルテキストから一致するものを探す
-            for cb in cbs:
-                try:
-                    label_el = cb.evaluate_handle(
-                        'e => e.closest("label") || e.parentElement')
-                    label_txt = label_el.as_element().inner_text() if label_el else ''
-                    for kw_list in EMPLOY_KEYWORDS.values():
-                        if any(kw in employment_type for kw in kw_list) and \
-                           any(kw in label_txt for kw in kw_list):
-                            cb.check()
-                            progress(f"  ✅ employTypes チェック(一致): '{label_txt.strip()}'", "info")
-                            checked = True
-                            break
-                    if checked:
-                        break
-                except Exception:
-                    pass
-
-            if not checked:
-                # フォールバック: 最初のチェックボックスをオン
-                cbs[0].check()
-                progress(f"  ℹ️ employTypes フォールバック: 最初の選択肢をチェック", "info")
-            rand_delay(0.3, 0.6)
+        # ラベルのテキストを読み取りつつ、JS でラベルをクリック（非表示checkbox対応）
+        result = page.evaluate(f"""() => {{
+            const cbs = document.querySelectorAll('input[name="employTypes"]');
+            if (!cbs.length) return 'none found';
+            const empType = {json.dumps(employment_type)};
+            const keywords = ['正社員','アルバイト','パート','契約社員','派遣','業務委託'];
+            let target = null;
+            // employment_type に一致するラベルを探す
+            for (const cb of cbs) {{
+                const label = cb.closest('label') || cb.nextElementSibling;
+                const txt = label ? label.textContent.trim() : '';
+                if (empType && keywords.some(k => empType.includes(k) && txt.includes(k))) {{
+                    target = {{label, txt}};
+                    break;
+                }}
+            }}
+            // 一致なし → 最初のcheckboxのラベルを使う
+            if (!target) {{
+                const cb = cbs[0];
+                const label = cb.closest('label') || cb.nextElementSibling;
+                if (label) target = {{label, txt: label.textContent.trim()}};
+            }}
+            if (!target || !target.label) {{
+                // ラベルなし → JS で直接 checked=true + events
+                const cb = cbs[0];
+                const setter = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype, 'checked')?.set;
+                if (setter) setter.call(cb, true);
+                cb.dispatchEvent(new Event('change', {{bubbles:true}}));
+                return 'forced-check';
+            }}
+            target.label.click();
+            return 'clicked: ' + target.txt;
+        }}""")
+        progress(f"  ✅ employTypes: {result}", "info")
+        rand_delay(0.3, 0.6)
     except Exception as e:
-        progress(f"  ⚠️ employTypes チェック失敗: {e}", "warn")
+        progress(f"  ⚠️ employTypes 失敗: {e}", "warn")
 
     # 都道府県 (select) ← name=prefVal
     location = job.get('location', '')
