@@ -382,6 +382,21 @@ def find_post_url(page, group_id=None):
     return "https://saiyo.kyujinbox.com/company/jobs/new"
 
 
+def find_visible_selector(page, *selectors, timeout=5000):
+    """
+    複数セレクタを順番に試して、実際にページに存在するものを返す。
+    Vue.js SPA の name なし input にも対応。
+    """
+    for sel in selectors:
+        try:
+            el = page.wait_for_selector(sel, timeout=timeout, state='visible')
+            if el:
+                return sel, el
+        except Exception:
+            pass
+    return None, None
+
+
 def fill_kyujinbox_form(page, job, company_name):
     """
     求人ボックスの求人フォームを埋める。
@@ -392,11 +407,36 @@ def fill_kyujinbox_form(page, job, company_name):
     rand_delay(0.3, 0.7)
 
     # タイトル（必須）
-    human_type(page, 'input[name="title"]', job['title'])
-    rand_delay(0.5, 1.0)
+    # Vue.js SPA では name 属性がない場合があるため複数セレクタを試す
+    title_sel, title_el = find_visible_selector(page,
+        'input[name="title"]',
+        'input[id="title"]',
+        'input[placeholder*="タイトル"]',
+        'input[placeholder*="求人タイトル"]',
+        'input[placeholder*="求人名"]',
+        'input[placeholder*="job_title" i]',
+        timeout=8000,
+    )
+    if title_sel:
+        title_el.click()
+        rand_delay(0.3, 0.6)
+        title_el.fill(job['title'])
+        rand_delay(0.5, 1.0)
+        progress(f"  ✅ タイトル入力: {job['title'][:40]}", "info")
+    else:
+        progress(f"  ⚠️ タイトル入力欄が見つかりません（スクリーンショットを確認してください）", "warn")
+        save_screenshot(page, "title_not_found")
 
     # 仕事内容（必須）
-    fill_text(page, 'textarea[name="description"]', job.get('description', ''))
+    desc_sel, _ = find_visible_selector(page,
+        'textarea[name="description"]',
+        'textarea[name="jobDescription"]',
+        'textarea[placeholder*="仕事内容"]',
+        'textarea[placeholder*="業務内容"]',
+        timeout=5000,
+    )
+    if desc_sel:
+        fill_text(page, desc_sel, job.get('description', ''))
     rand_delay(0.5, 1.0)
 
     # キャッチコピー (input[name="catch"] 等)
@@ -416,7 +456,14 @@ def fill_kyujinbox_form(page, job, company_name):
     # DB は snake_case で返すため両方チェック
     job_type = job.get('jobType') or job.get('job_type', '')
     try:
-        jt_el = page.wait_for_selector('select[name="jobType"]', timeout=5000)
+        _, jt_el = find_visible_selector(page,
+            'select[name="jobType"]',
+            'select[name="job_type"]',
+            'select[id="jobType"]',
+            timeout=8000,
+        )
+        if jt_el is None:
+            raise Exception("jobType セレクトが見つかりません")
         opts = jt_el.query_selector_all('option')
         option_list = [(opt.get_attribute('value') or '', (opt.inner_text() or '').strip()) for opt in opts]
         progress(f"  📋 jobType オプション({len(option_list)}件): {[t for v,t in option_list[:6]]}", "info")
@@ -441,20 +488,26 @@ def fill_kyujinbox_form(page, job, company_name):
                     break
 
         if chosen_val:
-            # Locator API で select_option（イベント発火がより確実）
+            # まず element 経由で select_option（イベント発火がより確実）
             try:
-                page.locator('select[name="jobType"]').select_option(value=chosen_val)
+                jt_el.select_option(value=chosen_val)
                 rand_delay(0.3, 0.6)
                 progress(f"  ✅ jobType 選択: '{chosen_txt}' (value={chosen_val})", "info")
             except Exception:
-                jt_el.select_option(value=chosen_val)
-                rand_delay(0.3, 0.6)
-                progress(f"  ✅ jobType 選択(fallback): '{chosen_txt}' (value={chosen_val})", "info")
+                try:
+                    page.locator('select').filter(has=page.locator('option')).first.select_option(value=chosen_val)
+                    rand_delay(0.3, 0.6)
+                    progress(f"  ✅ jobType 選択(fallback): '{chosen_txt}' (value={chosen_val})", "info")
+                except Exception as e2:
+                    progress(f"  ⚠️ jobType 選択失敗: {e2}", "warn")
 
             # Vue reactive state を可能な限り更新
             try:
                 result = page.evaluate(f"""(targetVal) => {{
-                    const sel = document.querySelector('select[name="jobType"]');
+                    // name または id で jobType select を探す
+                    const sel = document.querySelector('select[name="jobType"]')
+                             || document.querySelector('select[name="job_type"]')
+                             || document.querySelector('select[id="jobType"]');
                     if (!sel) return 'not found';
 
                     // native setter で強制設定
@@ -860,12 +913,33 @@ def main():
                 rand_delay(1.5, 3.0)
 
                 try:
-                    page.goto(post_url, timeout=20000)
-                    page.wait_for_load_state('networkidle', timeout=10000)
-                    rand_delay(1.5, 3.0)
+                    page.goto(post_url, timeout=30000)
+                    page.wait_for_load_state('networkidle', timeout=15000)
+                    rand_delay(2.0, 4.0)
 
                     actual_url = page.url
                     progress(f"📍 投稿フォームURL: {actual_url}", "info")
+
+                    # Vue.js SPA がフォームを描画し終わるまで待機
+                    # networkidle 後も JS がマウント中の場合があるため visible input が
+                    # 複数現れるまでポーリングする
+                    progress("  ⏳ Vueフォームの描画を待機中...", "info")
+                    try:
+                        page.wait_for_function("""() => {
+                            const vis = Array.from(document.querySelectorAll(
+                                'input:not([type="hidden"]), textarea'
+                            )).filter(el => {
+                                const s = window.getComputedStyle(el);
+                                return s.display !== 'none' && s.visibility !== 'hidden';
+                            });
+                            return vis.length >= 3;
+                        }""", timeout=30000)
+                        rand_delay(1.0, 2.0)
+                        progress("  ✅ フォーム描画完了", "info")
+                    except Exception as fe:
+                        progress(f"  ⚠️ フォーム描画待機タイムアウト（続行）: {fe}", "warn")
+                        rand_delay(3.0, 5.0)
+
                     if i == 0:
                         dump_inputs(page)
                     save_screenshot(page, f"post_form_{i}")
@@ -873,18 +947,26 @@ def main():
                     selected_job_type_val = fill_kyujinbox_form(page, job, company_name)
                     rand_delay(0.8, 1.8)
 
-                    # select値をJS確認
+                    # select値をJS確認（name or id どちらでも）
                     try:
                         sel_vals = page.evaluate("""() => {
-                            return ['jobType','prefVal','payType'].map(name => {
-                                const el = document.querySelector('select[name="'+name+'"]');
-                                if (!el) return {name, value: 'NOT FOUND', text: null};
-                                const opt = el.options[el.selectedIndex];
-                                return {name, value: el.value, text: opt ? opt.text : null};
-                            });
+                            function findSel(names) {
+                                for (const n of names) {
+                                    const el = document.querySelector('select[name="'+n+'"]')
+                                            || document.querySelector('select[id="'+n+'"]');
+                                    if (el) return {found: n, value: el.value,
+                                        text: el.options[el.selectedIndex]?.text || null};
+                                }
+                                return {found: null, value: 'NOT FOUND', text: null};
+                            }
+                            return [
+                                findSel(['jobType','job_type']),
+                                findSel(['prefVal','pref']),
+                                findSel(['payType','pay_type']),
+                            ];
                         }""")
                         for sv in sel_vals:
-                            progress(f"  📊 select[{sv['name']}] value='{sv['value']}' text='{sv['text']}'", "info")
+                            progress(f"  📊 select[{sv['found']}] value='{sv['value']}' text='{sv['text']}'", "info")
                     except Exception as ex:
                         progress(f"  select確認失敗: {ex}", "warn")
 
