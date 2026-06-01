@@ -61,18 +61,70 @@ def main():
             # ── ログイン ──
             progress("🔑 Indeed雇用主アカウントにログイン中...", "info")
             page.goto("https://secure.indeed.com/account/login", timeout=30000)
+            time.sleep(3)
+
+            # メールアドレス入力（複数セレクター対応）
+            email_selectors = [
+                'input[name="emailAddress"]',
+                'input[type="email"]',
+                'input[id*="email"]',
+                'input[autocomplete="email"]',
+            ]
+            email_filled = False
+            for sel in email_selectors:
+                try:
+                    page.wait_for_selector(sel, timeout=5000)
+                    page.fill(sel, email)
+                    email_filled = True
+                    break
+                except Exception:
+                    continue
+
+            if not email_filled:
+                progress("❌ メール入力欄が見つかりません", "error")
+                browser.close()
+                sys.exit(1)
+
+            # 次へボタン
+            for sel in ['button[type="submit"]', 'button:has-text("次へ")', 'button:has-text("Continue")']:
+                try:
+                    page.click(sel, timeout=3000)
+                    break
+                except Exception:
+                    continue
             time.sleep(2)
 
-            page.fill('input[name="emailAddress"]', email)
-            page.click('button[type="submit"]')
-            time.sleep(1.5)
+            # パスワード入力
+            pw_selectors = [
+                'input[name="password"]',
+                'input[type="password"]',
+                'input[id*="password"]',
+            ]
+            pw_filled = False
+            for sel in pw_selectors:
+                try:
+                    page.wait_for_selector(sel, timeout=5000)
+                    page.fill(sel, password)
+                    pw_filled = True
+                    break
+                except Exception:
+                    continue
 
-            page.fill('input[name="password"]', password)
-            page.click('button[type="submit"]')
-            time.sleep(4)
+            if not pw_filled:
+                progress("❌ パスワード入力欄が見つかりません", "error")
+                browser.close()
+                sys.exit(1)
+
+            for sel in ['button[type="submit"]', 'button:has-text("ログイン")', 'button:has-text("Sign in")']:
+                try:
+                    page.click(sel, timeout=3000)
+                    break
+                except Exception:
+                    continue
+            time.sleep(5)
 
             # ログイン確認
-            if "login" in page.url or "signin" in page.url:
+            if "login" in page.url or "signin" in page.url or "account/login" in page.url:
                 progress("❌ ログインに失敗しました。メールアドレス・パスワードを確認してください", "error")
                 browser.close()
                 sys.exit(1)
