@@ -481,20 +481,22 @@ async function computeDashboardStats(company = null) {
   const today   = new Date().toISOString().slice(0, 10);
 
   const parseMedia = j => JSON.parse(j.target_media || '[]');
+  const isKyujinbox = j => { const m = parseMedia(j); return m.includes('求人ボックス') || m.includes('kyujinbox'); };
+  const isStanby    = j => { const m = parseMedia(j); return m.includes('スタンバイ') || m.includes('stanby'); };
 
   // Published count per media (active)
-  const kyujinboxJobs  = allJobs.filter(j => j.is_published && parseMedia(j).includes('求人ボックス')).length;
-  const stanbyJobs     = allJobs.filter(j => j.is_published && parseMedia(j).includes('スタンバイ')).length;
+  const kyujinboxJobs  = allJobs.filter(j => j.is_published && isKyujinbox(j)).length;
+  const stanbyJobs     = allJobs.filter(j => j.is_published && isStanby(j)).length;
   const publishedTotal = allJobs.filter(j => j.is_published).length;
 
   // Today's published count per media (for daily task tracker)
   const todayKyujinbox = allJobs.filter(j => {
-    if (!j.is_published || !parseMedia(j).includes('求人ボックス')) return false;
+    if (!j.is_published || !isKyujinbox(j)) return false;
     const pub = (j.published_at || j.updated_at || '').slice(0, 10);
     return pub === today;
   }).length;
   const todayStanby = allJobs.filter(j => {
-    if (!j.is_published || !parseMedia(j).includes('スタンバイ')) return false;
+    if (!j.is_published || !isStanby(j)) return false;
     const pub = (j.published_at || j.updated_at || '').slice(0, 10);
     return pub === today;
   }).length;
@@ -1148,7 +1150,11 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const batchSize = Math.min(parseInt(query.limit || '5', 10), 10);
     const allJobs   = await Jobs.findAll(true);
     // 求人ボックス媒体が割り当てられた求人を優先、なければ全公開求人
-    let kbJobs = allJobs.filter(j => JSON.parse(j.target_media || '[]').includes('求人ボックス'));
+    // target_media は '求人ボックス'（旧）または 'kyujinbox'（英語）のどちらも受け付ける
+    let kbJobs = allJobs.filter(j => {
+      const m = JSON.parse(j.target_media || '[]');
+      return m.includes('求人ボックス') || m.includes('kyujinbox');
+    });
     if (kbJobs.length === 0) kbJobs = allJobs;
 
     if (kbJobs.length === 0) {

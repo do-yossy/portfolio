@@ -399,11 +399,22 @@ def fill_kyujinbox_form(page, job, company_name):
     fill_text(page, 'textarea[name="description"]', job.get('description', ''))
     rand_delay(0.5, 1.0)
 
+    # キャッチコピー (input[name="catch"] 等)
+    catchcopy = job.get('catchcopy', '')
+    if catchcopy:
+        for sel in ['input[name="catch"]', 'input[name="catchCopy"]', 'input[name="catchcopy"]',
+                    'input[placeholder*="キャッチ"]', 'input[placeholder*="コピー"]']:
+            if fill_text(page, sel, catchcopy, timeout=3000):
+                progress(f"  ✅ catchcopy 入力: {catchcopy[:30]}", "info")
+                break
+        rand_delay(0.2, 0.5)
+
     # ---- 職種 (select[name="jobType"]) ----
     # 必須。空のままだと「公開する」ボタンが is-disab になる。
     # Vue reactiveの更新に依存しないよう、選択した value をインターセプターに渡す。
     selected_job_type_val = None
-    job_type = job.get('jobType', '')
+    # DB は snake_case で返すため両方チェック
+    job_type = job.get('jobType') or job.get('job_type', '')
     try:
         jt_el = page.wait_for_selector('select[name="jobType"]', timeout=5000)
         opts = jt_el.query_selector_all('option')
@@ -537,7 +548,8 @@ def fill_kyujinbox_form(page, job, company_name):
         progress(f"  ⚠️ jobType 選択失敗: {e}", "warn")
 
     # ---- 雇用形態 (employTypes checkboxes) ----
-    employment_type = job.get('employmentType', '')
+    # DB は snake_case で返すため両方チェック
+    employment_type = job.get('employmentType') or job.get('employment_type', '')
     try:
         result = page.evaluate(f"""() => {{
             const cbs = document.querySelectorAll('input[name="employTypes"]');
