@@ -321,16 +321,15 @@ function parseAccountNames(out) {
 }
 
 // vpncmdでアカウント一覧を取得し、接続中のものがあるか確認
-// chcp 65001 でUTF-8強制（Windows Shift-JIS文字化け対策）
+// vpncmd.exe を直接実行（cmd /c経由だとスペース入りパスのクォートが壊れる）
+// "Connected" はASCIIなのでShift-JIS出力でも正しく照合できる
 function vpncmdAccountList(vpncmdPath) {
   return new Promise(resolve => {
-    const q = vpncmdPath.includes(' ') ? `"${vpncmdPath}"` : vpncmdPath;
-    const cmd = `chcp 65001 > nul 2>&1 && ${q} localhost /CLIENT /CMD AccountList`;
-    const proc = spawn('cmd', ['/c', cmd], { shell: false });
+    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountList'], { shell: false });
     const chunks = [];
     proc.stdout.on('data', d => chunks.push(d));
     proc.stderr.on('data', d => chunks.push(d));
-    proc.on('close', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    proc.on('close', () => resolve(Buffer.concat(chunks).toString('binary')));
     proc.on('error', () => resolve(''));
     setTimeout(() => { try { proc.kill(); } catch {} resolve(''); }, 8000);
   });
@@ -403,16 +402,14 @@ async function vpnConnect() {
     return { ok: false, error: `接続先アカウントが見つかりません。\nvpncmd出力（先頭）:\n${out.slice(0, 500)}` };
   }
 
-  // chcp 65001 でUTF-8強制してAccountConnect実行
+  // vpncmd.exe を直接実行してAccountConnect
   return await new Promise(resolve => {
-    const q = vpncmdPath.includes(' ') ? `"${vpncmdPath}"` : vpncmdPath;
-    const cmd = `chcp 65001 > nul 2>&1 && ${q} localhost /CLIENT /CMD AccountConnect "${targetName}"`;
-    const proc = spawn('cmd', ['/c', cmd], { shell: false });
+    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountConnect', targetName], { shell: false });
     const chunks = [];
     proc.stdout.on('data', d => chunks.push(d));
     proc.stderr.on('data', d => chunks.push(d));
     proc.on('close', code => {
-      const res2 = Buffer.concat(chunks).toString('utf8');
+      const res2 = Buffer.concat(chunks).toString('binary');
       vpnCache = { connected: false, ts: 0 };
       if (code === 0 || /command completed/i.test(res2)) {
         resolve({ ok: true, message: `${targetName} への接続を開始しました（数秒後に確認）` });
