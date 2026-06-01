@@ -18,36 +18,67 @@ def rand_delay(min_s=1.5, max_s=4.0):
 
 def human_type(page, selector, text):
     """人間らしいランダム速度でテキストを入力"""
-    page.click(selector)
+    el = page.wait_for_selector(selector, timeout=15000)
+    el.click()
     rand_delay(0.3, 0.8)
     for char in text:
         page.keyboard.type(char)
         time.sleep(random.uniform(0.03, 0.12))
 
+def dump_inputs(page):
+    """デバッグ用: ページ上の全inputを列挙"""
+    try:
+        inputs = page.query_selector_all('input, textarea, select')
+        for el in inputs:
+            tag  = el.evaluate('e => e.tagName.toLowerCase()')
+            t    = el.get_attribute('type') or ''
+            name = el.get_attribute('name') or ''
+            id_  = el.get_attribute('id') or ''
+            ph   = el.get_attribute('placeholder') or ''
+            cls  = el.get_attribute('class') or ''
+            progress(f"  [{tag}] type={t} name={name} id={id_} placeholder={ph} class={cls[:40]}", "info")
+    except Exception as e:
+        progress(f"  input列挙エラー: {e}", "warn")
+
+def save_screenshot(page, name):
+    """スクリーンショットを保存"""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        logs_dir = os.path.join(script_dir, '..', 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        path = os.path.join(logs_dir, f'kyujinbox_{name}.png')
+        page.screenshot(path=path, full_page=True)
+        progress(f"📸 スクリーンショット保存: logs/kyujinbox_{name}.png", "info")
+    except Exception as e:
+        progress(f"  スクリーンショット失敗: {e}", "warn")
+
+def find_input(page, *selectors, timeout=15000):
+    """複数のセレクタを試して最初に見つかったものを返す"""
+    for sel in selectors:
+        try:
+            el = page.wait_for_selector(sel, timeout=3000)
+            if el:
+                return sel
+        except Exception:
+            pass
+    # 最後のセレクタで proper timeout
+    return selectors[-1]
+
 def find_post_url(page):
     """ダッシュボードからリンクを探して求人投稿URLを特定する"""
-    # よく使われるURLパターンを試す
-    candidates = [
-        "https://secure.kyujinbox.com/post/new",
-        "https://secure.kyujinbox.com/jobs/new",
-        "https://secure.kyujinbox.com/job/new",
-        "https://secure.kyujinbox.com/recruit/new",
-        "https://secure.kyujinbox.com/offers/new",
-    ]
-    # ページ上のリンクから求人投稿リンクを探す
     try:
         links = page.query_selector_all('a[href]')
         for link in links:
             href = link.get_attribute('href') or ''
             text = (link.inner_text() or '').strip()
-            if any(kw in text for kw in ['新規', '登録', '投稿', '掲載', '追加']) and any(kw in href for kw in ['new', 'post', 'job', 'offer', 'recruit']):
+            if any(kw in text for kw in ['新規', '登録', '投稿', '掲載', '追加', '作成']):
                 if href.startswith('http'):
                     return href
                 elif href.startswith('/'):
                     return f"https://secure.kyujinbox.com{href}"
     except Exception:
         pass
-    return candidates[0]  # フォールバック
+    return "https://secure.kyujinbox.com/post/new"
 
 def main():
     try:
@@ -80,7 +111,6 @@ def main():
         progress("❌ playwright がインストールされていません: pip install playwright && playwright install chromium", "error")
         sys.exit(1)
 
-    # ランダムなビューポートサイズ（bot検知回避）
     viewports = [
         {"width": 1366, "height": 768},
         {"width": 1440, "height": 900},
@@ -108,7 +138,6 @@ def main():
             timezone_id="Asia/Tokyo",
         )
 
-        # navigator.webdriver を隠す
         ctx.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
             Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
@@ -120,39 +149,73 @@ def main():
         try:
             progress("🔑 求人ボックスにログイン中...", "info")
             page.goto("https://secure.kyujinbox.com/login", timeout=30000)
-            rand_delay(1.5, 3.0)
+            # ページが完全にロードされるまで待機
+            page.wait_for_load_state('networkidle', timeout=15000)
+            rand_delay(1.0, 2.0)
 
-            # ランダムにスクロール（人間らしい挙動）
+            progress(f"📍 ログインページURL: {page.url}", "info")
+            progress(f"📄 タイトル: {page.title()}", "info")
+
+            # フォームフィールドを列挙してデバッグ
+            progress("🔍 フォームフィールドを確認中...", "info")
+            dump_inputs(page)
+            save_screenshot(page, "login_page")
+
+            # ランダムにスクロール
             page.mouse.move(random.randint(200, 800), random.randint(100, 400))
             rand_delay(0.5, 1.0)
 
-            human_type(page, 'input[type="email"], input[name="email"]', email)
+            # メールフィールド - 複数のセレクタを試す
+            email_sel = find_input(page,
+                'input[type="email"]',
+                'input[name="email"]',
+                'input[name="mail"]',
+                'input[name="login"]',
+                'input[name="username"]',
+                'input[name="user_email"]',
+                'input[id*="email" i]',
+                'input[id*="mail" i]',
+                'input[placeholder*="メール" i]',
+                'input[placeholder*="mail" i]',
+                'input[placeholder*="email" i]',
+                'input[type="text"]:first-of-type',
+            )
+            progress(f"📧 メールセレクタ: {email_sel}", "info")
+            human_type(page, email_sel, email)
             rand_delay(0.8, 1.5)
-            human_type(page, 'input[type="password"], input[name="password"]', password)
-            rand_delay(0.5, 1.2)
-            page.click('button[type="submit"]')
-            rand_delay(3.0, 5.0)
 
-            # ログイン後のURLを確認
+            # パスワードフィールド
+            pass_sel = find_input(page,
+                'input[type="password"]',
+                'input[name="password"]',
+                'input[name="pass"]',
+                'input[id*="password" i]',
+                'input[placeholder*="パスワード" i]',
+                'input[placeholder*="password" i]',
+            )
+            progress(f"🔒 パスワードセレクタ: {pass_sel}", "info")
+            human_type(page, pass_sel, password)
+            rand_delay(0.5, 1.2)
+
+            page.click('button[type="submit"], input[type="submit"], .login-btn, [class*="login"] button, form button')
+            rand_delay(3.0, 5.0)
+            page.wait_for_load_state('networkidle', timeout=10000)
+
             current_url = page.url
             page_title = page.title()
             progress(f"📍 ログイン後URL: {current_url}", "info")
             progress(f"📄 ページタイトル: {page_title}", "info")
+            save_screenshot(page, "after_login")
 
-            # ログイン失敗チェック（まだログインページにいる場合）
             if 'login' in current_url.lower():
-                # エラーメッセージを探す
-                error_el = page.query_selector('.error, .alert, [class*="error"], [class*="alert"]')
-                if error_el:
-                    progress(f"❌ ログイン失敗: {error_el.inner_text()}", "error")
-                else:
-                    progress("❌ ログイン失敗: ログインページから移動できませんでした", "error")
+                error_el = page.query_selector('.error, .alert, [class*="error"], [class*="alert"], [class*="danger"]')
+                err_msg = error_el.inner_text() if error_el else "ログインページから移動できませんでした"
+                progress(f"❌ ログイン失敗: {err_msg}", "error")
                 browser.close()
                 sys.exit(1)
 
             progress("✅ ログイン成功", "success")
 
-            # 求人投稿URLを特定
             post_url = find_post_url(page)
             progress(f"🔗 求人投稿ページ: {post_url}", "info")
 
@@ -165,17 +228,13 @@ def main():
 
                 try:
                     page.goto(post_url, timeout=20000)
-                    rand_delay(2.0, 4.0)
+                    page.wait_for_load_state('networkidle', timeout=10000)
+                    rand_delay(1.5, 3.0)
 
-                    # 現在のURLを確認（404やリダイレクトを検出）
                     actual_url = page.url
-                    if actual_url != post_url:
-                        progress(f"⚠️ リダイレクト: {actual_url}", "warn")
-                        # ダッシュボードに戻った場合、再度リンクを探す
-                        post_url = find_post_url(page)
-                        if post_url != actual_url:
-                            page.goto(post_url, timeout=20000)
-                            rand_delay(2.0, 3.0)
+                    progress(f"📍 投稿フォームURL: {actual_url}", "info")
+                    dump_inputs(page)
+                    save_screenshot(page, f"post_form_{i}")
 
                     human_type(page, 'input[name="title"], #job-title, [placeholder*="タイトル"]', job['title'])
                     rand_delay(0.5, 1.2)
@@ -199,7 +258,6 @@ def main():
                     progress(f"✅ 「{job['title']}」を投稿しました", "success")
                     success_count += 1
 
-                    # 投稿間に長めのランダム待機（BAN回避）
                     if i < len(target_jobs) - 1:
                         wait = random.uniform(8.0, 20.0)
                         progress(f"⏳ 次の投稿まで {wait:.0f}秒 待機中（BAN回避）...", "info")
@@ -207,9 +265,9 @@ def main():
 
                 except Exception as e:
                     progress(f"⚠️ 「{job['title']}」の投稿中にエラー: {str(e)}", "warn")
-                    # 現在のURLをデバッグ用に出力
                     try:
                         progress(f"   現在のURL: {page.url}", "warn")
+                        save_screenshot(page, f"error_{i}")
                     except Exception:
                         pass
                     continue
@@ -218,6 +276,7 @@ def main():
             progress(f"❌ ログインエラー: {str(e)}", "error")
             try:
                 progress(f"   現在のURL: {page.url}", "error")
+                save_screenshot(page, "login_error")
             except Exception:
                 pass
             browser.close()
