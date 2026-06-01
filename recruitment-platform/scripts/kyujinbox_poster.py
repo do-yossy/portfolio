@@ -318,11 +318,30 @@ def fill_kyujinbox_form(page, job, company_name):
     rand_delay(0.2, 0.5)
 
     if pay_min:
-        fill_text(page, 'input[name="payMin"]', pay_min)
+        # payMinフィールドのplaceholderを確認して万円単位か円単位かを判定
+        try:
+            pm_el = page.wait_for_selector('input[name="payMin"]', timeout=5000)
+            ph = pm_el.get_attribute('placeholder') or ''
+            # placeholderに「万」が含まれる or 値が大きすぎる場合は万円単位に変換
+            pay_min_val = pay_min
+            if '万' in ph and int(pay_min) >= 10000:
+                pay_min_val = str(int(pay_min) // 10000)
+                progress(f"  💴 payMin を万円単位に変換: {pay_min} → {pay_min_val}", "info")
+            fill_text(page, 'input[name="payMin"]', pay_min_val)
+        except Exception:
+            fill_text(page, 'input[name="payMin"]', pay_min)
         rand_delay(0.2, 0.5)
 
     if pay_max:
-        fill_text(page, 'input[name="payMax"]', pay_max)
+        try:
+            px_el = page.wait_for_selector('input[name="payMax"]', timeout=5000)
+            ph = px_el.get_attribute('placeholder') or ''
+            pay_max_val = pay_max
+            if '万' in ph and int(pay_max) >= 10000:
+                pay_max_val = str(int(pay_max) // 10000)
+            fill_text(page, 'input[name="payMax"]', pay_max_val)
+        except Exception:
+            fill_text(page, 'input[name="payMax"]', pay_max)
         rand_delay(0.2, 0.5)
 
     # 給与詳細テキスト ← name=benefit
@@ -518,28 +537,24 @@ def main():
 
                     # 送信後も /edit のままならバリデーションエラーの可能性
                     if '/edit' in final_url:
-                        # エラーメッセージを幅広く探す
-                        error_texts = []
-                        for err_sel in [
-                            '.c-errorMessage', '.p-errorMessage', '.c-error',
-                            '[class*="error"]', '[class*="Error"]',
-                            '.alert', '[class*="alert"]',
-                            '[class*="invalid"]', '[class*="Invalid"]',
-                        ]:
-                            try:
-                                els = page.query_selector_all(err_sel)
-                                for el in els:
-                                    t = el.inner_text().strip()
-                                    if t and t not in error_texts:
-                                        error_texts.append(t[:100])
-                            except Exception:
-                                pass
-                        if error_texts:
-                            progress(f"   ❌ バリデーションエラー:", "warn")
-                            for et in error_texts[:10]:
-                                progress(f"      {et}", "warn")
-                        else:
-                            progress(f"   ⚠️ 送信後も編集ページ（エラー文言不明 - スクリーンショット確認）", "warn")
+                        # ページ本文から日本語エラーキーワードを含む行を抽出
+                        try:
+                            body_text = page.inner_text('body')
+                            error_kw = ['必須', 'エラー', '入力してください', '選択してください',
+                                        '不正', '無効', '空', 'ご確認', '正しく', '半角数字']
+                            lines = body_text.split('\n')
+                            err_lines = [l.strip() for l in lines
+                                         if l.strip() and any(kw in l for kw in error_kw)]
+                            if err_lines:
+                                progress(f"   ❌ ページ上のエラー文言:", "warn")
+                                for el in err_lines[:15]:
+                                    progress(f"      {el[:120]}", "warn")
+                            else:
+                                progress(f"   ⚠️ 送信後も編集ページ（エラー文言不明）", "warn")
+                                # 最初の2000文字を出力してデバッグ
+                                progress(f"   ページ冒頭テキスト: {body_text[:500]}", "warn")
+                        except Exception as ex:
+                            progress(f"   ⚠️ 送信後も編集ページ（本文取得失敗: {ex}）", "warn")
                     else:
                         progress(f"✅ 「{job['title']}」を投稿しました", "success")
                         success_count += 1
