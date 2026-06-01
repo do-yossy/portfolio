@@ -94,7 +94,7 @@ def main():
 
         try:
             progress("🔑 求人ボックスにログイン中...", "info")
-            page.goto("https://www.kyujinbox.com/login", timeout=30000)
+            page.goto("https://secure.kyujinbox.com/login", timeout=30000)
             rand_delay(1.5, 3.0)
 
             # ランダムにスクロール（人間らしい挙動）
@@ -116,7 +116,7 @@ def main():
                 rand_delay(1.5, 3.0)
 
                 try:
-                    page.goto("https://www.kyujinbox.com/post/new", timeout=20000)
+                    page.goto("https://secure.kyujinbox.com/post/new", timeout=20000)
                     rand_delay(2.0, 4.0)
 
                     human_type(page, 'input[name="title"], #job-title, [placeholder*="タイトル"]', job['title'])
