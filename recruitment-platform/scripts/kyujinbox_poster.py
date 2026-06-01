@@ -10,10 +10,22 @@ import os
 import io
 import time
 import random
+import re
 from urllib.parse import urlparse
 
-# Windows での文字化け対策: 明示的にUTF-8で読む
+# Windows での文字化け対策
 sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
+
+PREFECTURES = [
+    '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+    '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+    '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県',
+    '岐阜県', '静岡県', '愛知県', '三重県',
+    '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県',
+    '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+    '徳島県', '香川県', '愛媛県', '高知県',
+    '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+]
 
 def progress(message, level="info"):
     print(json.dumps({"type": "progress", "message": message, "level": level}), flush=True)
@@ -21,14 +33,41 @@ def progress(message, level="info"):
 def rand_delay(min_s=1.5, max_s=4.0):
     time.sleep(random.uniform(min_s, max_s))
 
-def human_type(page, selector, text):
-    """人間らしいランダム速度でテキストを入力"""
-    el = page.wait_for_selector(selector, timeout=15000)
-    el.click()
-    rand_delay(0.3, 0.8)
-    for char in text:
-        page.keyboard.type(char)
-        time.sleep(random.uniform(0.03, 0.12))
+def extract_prefecture(location):
+    """住所文字列から都道府県を抽出"""
+    for pref in PREFECTURES:
+        if pref in location:
+            return pref
+    return None
+
+def parse_salary(salary_str):
+    """
+    給与文字列を解析して (payType, payMin, payMax) を返す
+    例: "時給1,200円"      → ("時給", "1200", "")
+        "月給20〜30万円"   → ("月給", "200000", "300000")
+        "年収300万円"      → ("年収", "3000000", "")
+    """
+    if '時給' in salary_str:
+        pay_type = '時給'
+    elif '日給' in salary_str:
+        pay_type = '日給'
+    elif '月給' in salary_str:
+        pay_type = '月給'
+    elif '年収' in salary_str or '年俸' in salary_str:
+        pay_type = '年収'
+    else:
+        pay_type = '月給'
+
+    man_match = re.findall(r'(\d+(?:\.\d+)?)万', salary_str)
+    if man_match:
+        values = [int(float(v) * 10000) for v in man_match]
+    else:
+        raw = re.findall(r'[\d,]+', salary_str)
+        values = [int(v.replace(',', '')) for v in raw if len(v.replace(',', '')) >= 3]
+
+    pay_min = str(values[0]) if values else ''
+    pay_max = str(values[1]) if len(values) > 1 else ''
+    return pay_type, pay_min, pay_max
 
 def dump_inputs(page):
     """デバッグ用: ページ上の全inputを列挙"""
@@ -68,16 +107,47 @@ def find_input(page, *selectors):
     return selectors[-1]
 
 def get_base_url(url):
-    """URLのスキーム+ホストを返す (例: https://saiyo.kyujinbox.com)"""
     parsed = urlparse(url)
     return f"{parsed.scheme}://{parsed.netloc}"
+
+def human_type(page, selector, text, timeout=15000):
+    """人間らしいランダム速度でテキストを入力"""
+    el = page.wait_for_selector(selector, timeout=timeout)
+    el.click()
+    rand_delay(0.3, 0.8)
+    for char in text:
+        page.keyboard.type(char)
+        time.sleep(random.uniform(0.03, 0.12))
+
+def fill_text(page, selector, value, timeout=8000):
+    """テキスト/テキストエリアを fill() で埋める（失敗時は無視）"""
+    try:
+        el = page.wait_for_selector(selector, timeout=timeout)
+        el.click()
+        el.fill(value)
+        rand_delay(0.2, 0.5)
+        return True
+    except Exception:
+        return False
+
+def select_option_safe(page, selector, label=None, value=None, timeout=5000):
+    """select要素を安全にセット"""
+    try:
+        el = page.wait_for_selector(selector, timeout=timeout)
+        if label:
+            el.select_option(label=label)
+        elif value:
+            el.select_option(value=value)
+        rand_delay(0.2, 0.5)
+        return True
+    except Exception:
+        return False
 
 def find_post_url(page):
     """ダッシュボードから求人新規作成URLを特定する"""
     current_url = page.url
     base = get_base_url(current_url)
 
-    # まずページ上のリンクから「新規」「作成」系を探す
     try:
         links = page.query_selector_all('a[href]')
         for link in links:
@@ -91,12 +161,106 @@ def find_post_url(page):
     except Exception:
         pass
 
-    # 現在のURLから /new を試す
-    # 例: .../jobs → .../jobs/new
     if current_url.rstrip('/').endswith('/jobs'):
         return current_url.rstrip('/') + '/new'
 
     return f"{base}/jobs/new"
+
+
+def fill_kyujinbox_form(page, job, company_name):
+    """
+    求人ボックスの求人フォームを埋める。
+    フォームフィールド（フォームダンプで確認済み）:
+      name=company, name=title, name=jobType (select),
+      name=employTypes (checkbox), name=description, name=rewarding,
+      name=qualifications, name=image (file),
+      name=prefVal (select), name=address, name=transportation,
+      name=payType (select), name=payMin, name=payMax, name=benefit,
+      name=worktimeHoliday, name=resumeRequired (radio),
+      name=isPhoneNumberRequired, name=applicationPhoneNumber,
+      name=howToApply, name=agree_main (checkbox), name=agree_side (checkbox)
+    """
+    # 会社名（アカウントに紐付いているので任意だが念のため）
+    fill_text(page, 'input[name="company"]', company_name, timeout=5000)
+    rand_delay(0.3, 0.7)
+
+    # タイトル（必須）
+    human_type(page, 'input[name="title"]', job['title'])
+    rand_delay(0.5, 1.0)
+
+    # 仕事内容（必須）
+    fill_text(page, 'textarea[name="description"]', job.get('description', ''))
+    rand_delay(0.5, 1.0)
+
+    # 職種 (select) - 値が合わなくてもエラーにしない
+    job_type = job.get('jobType', '')
+    if job_type:
+        select_option_safe(page, 'select[name="jobType"]', label=job_type)
+        rand_delay(0.3, 0.6)
+
+    # 都道府県 (select) ← name=prefVal
+    location = job.get('location', '')
+    pref = extract_prefecture(location)
+    if pref:
+        ok = select_option_safe(page, 'select[name="prefVal"]', label=pref)
+        if not ok:
+            progress(f"  ⚠️ 都道府県 '{pref}' の選択失敗 - スキップ", "warn")
+        rand_delay(0.3, 0.7)
+
+    # 住所テキスト ← name=address
+    fill_text(page, 'input[name="address"]', location)
+    rand_delay(0.3, 0.7)
+
+    # 給与タイプ・金額
+    salary_str = job.get('salary', '')
+    pay_type, pay_min, pay_max = parse_salary(salary_str)
+    progress(f"  💰 給与解析: タイプ={pay_type}, 最小={pay_min}, 最大={pay_max}", "info")
+
+    select_option_safe(page, 'select[name="payType"]', label=pay_type)
+    rand_delay(0.2, 0.5)
+
+    if pay_min:
+        fill_text(page, 'input[name="payMin"]', pay_min)
+        rand_delay(0.2, 0.5)
+
+    if pay_max:
+        fill_text(page, 'input[name="payMax"]', pay_max)
+        rand_delay(0.2, 0.5)
+
+    # 給与詳細テキスト ← name=benefit
+    fill_text(page, 'textarea[name="benefit"]', salary_str)
+    rand_delay(0.3, 0.6)
+
+    # 応募資格（タグをテキストとして入力）
+    tags = job.get('tags', [])
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except Exception:
+            tags = []
+    if tags:
+        qual_text = ' / '.join(tags)
+        fill_text(page, 'textarea[name="qualifications"]', qual_text)
+        rand_delay(0.3, 0.6)
+
+    # 同意チェックボックス（必須）← name=agree_main (複数あり)
+    try:
+        agree_boxes = page.query_selector_all('input[name="agree_main"]')
+        for cb in agree_boxes:
+            if not cb.is_checked():
+                cb.check()
+                rand_delay(0.2, 0.4)
+    except Exception as e:
+        progress(f"  ⚠️ agree_main チェック失敗: {e}", "warn")
+
+    try:
+        cb_side = page.query_selector('input[name="agree_side"]')
+        if cb_side and not cb_side.is_checked():
+            cb_side.check()
+            rand_delay(0.2, 0.4)
+    except Exception:
+        pass
+
 
 def main():
     try:
@@ -109,9 +273,10 @@ def main():
         progress("⚠️ 投稿する求人データがありません", "warn")
         sys.exit(0)
 
-    email    = os.environ.get("KYUJINBOX_EMAIL", "")
-    password = os.environ.get("KYUJINBOX_PASSWORD", "")
-    batch    = int(os.environ.get("KYUJINBOX_BATCH_SIZE", str(len(jobs))))
+    email        = os.environ.get("KYUJINBOX_EMAIL", "")
+    password     = os.environ.get("KYUJINBOX_PASSWORD", "")
+    company_name = os.environ.get("COMPANY_NAME", "株式会社Social Quality")
+    batch        = int(os.environ.get("KYUJINBOX_BATCH_SIZE", str(len(jobs))))
 
     if not email or not password:
         progress("⚠️ 環境変数 KYUJINBOX_EMAIL / KYUJINBOX_PASSWORD が未設定です", "warn")
@@ -170,7 +335,6 @@ def main():
             rand_delay(1.0, 2.0)
 
             progress(f"📍 ログインページURL: {page.url}", "info")
-
             page.mouse.move(random.randint(200, 800), random.randint(100, 400))
             rand_delay(0.5, 1.0)
 
@@ -180,7 +344,6 @@ def main():
                 'input[type="email"]',
                 'input[name="email"]',
                 'input[id*="email" i]',
-                'input[id*="mail" i]',
                 'input[placeholder*="メール" i]',
                 'input[type="text"]:first-of-type',
             )
@@ -217,7 +380,6 @@ def main():
 
             progress("✅ ログイン成功", "success")
 
-            # 求人一覧ページ上のリンクから新規作成URLを特定
             post_url = find_post_url(page)
             progress(f"🔗 求人投稿ページ: {post_url}", "info")
 
@@ -235,30 +397,33 @@ def main():
 
                     actual_url = page.url
                     progress(f"📍 投稿フォームURL: {actual_url}", "info")
-                    dump_inputs(page)
+                    # 1件目だけフィールド一覧をダンプ（ログが長くなるので以降は省略）
+                    if i == 0:
+                        dump_inputs(page)
                     save_screenshot(page, f"post_form_{i}")
 
-                    human_type(page, 'input[name="title"], #job-title, [placeholder*="タイトル"]', job['title'])
-                    rand_delay(0.5, 1.2)
-                    human_type(page, 'textarea[name="description"], #job-description, [placeholder*="仕事内容"]', job.get('description', ''))
-                    rand_delay(0.5, 1.0)
-                    human_type(page, 'input[name="location"], #job-location, [placeholder*="勤務地"]', job.get('location', ''))
-                    rand_delay(0.4, 0.9)
-                    human_type(page, 'input[name="salary"], #job-salary, [placeholder*="給与"]', job.get('salary', ''))
+                    fill_kyujinbox_form(page, job, company_name)
                     rand_delay(0.8, 1.8)
-
-                    if job.get('catchcopy'):
-                        try:
-                            human_type(page, 'input[name="catch"], #job-catch, [placeholder*="キャッチ"]', job['catchcopy'])
-                            rand_delay(0.5, 1.0)
-                        except Exception:
-                            pass
+                    save_screenshot(page, f"before_submit_{i}")
 
                     page.click('button[type="submit"], .submit-btn, [type="submit"]')
                     rand_delay(3.0, 6.0)
+                    page.wait_for_load_state('networkidle', timeout=15000)
 
-                    progress(f"✅ 「{job['title']}」を投稿しました", "success")
-                    success_count += 1
+                    final_url = page.url
+                    progress(f"📍 送信後URL: {final_url}", "info")
+                    save_screenshot(page, f"after_submit_{i}")
+
+                    # 送信後も /edit のままならバリデーションエラーの可能性
+                    if '/edit' in final_url:
+                        error_el = page.query_selector('.error-message, .alert, [class*="error"], [class*="invalid"]')
+                        if error_el:
+                            progress(f"   バリデーションエラー: {error_el.inner_text()[:300]}", "warn")
+                        else:
+                            progress(f"   ⚠️ 送信後も編集ページ（バリデーションエラーの可能性）", "warn")
+                    else:
+                        progress(f"✅ 「{job['title']}」を投稿しました", "success")
+                        success_count += 1
 
                     if i < len(target_jobs) - 1:
                         wait = random.uniform(8.0, 20.0)
