@@ -11,7 +11,7 @@ import io
 import time
 import random
 import re
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 # Windows での文字化け対策
 sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
@@ -134,7 +134,6 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
     """select要素を安全にセット。失敗時はオプション一覧をログ出力"""
     try:
         el = page.wait_for_selector(selector, timeout=timeout)
-        # まずラベルで試す
         if label:
             try:
                 el.select_option(label=label)
@@ -142,7 +141,6 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
                 return True
             except Exception:
                 pass
-            # ラベル部分一致で試す
             try:
                 opts = el.query_selector_all('option')
                 for opt in opts:
@@ -155,7 +153,6 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
                         return True
             except Exception:
                 pass
-            # 失敗時にオプション一覧を表示
             if debug:
                 try:
                     opts = el.query_selector_all('option')
@@ -176,11 +173,9 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
 
 def click_submit_button(page):
     """フォームの送信ボタンをクリック（複数の方法を試す）"""
-    # ページ末尾までスクロール
     page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
     rand_delay(0.5, 1.0)
 
-    # デバッグ: ページ上のボタン一覧を表示（先頭10件 + 末尾10件）
     try:
         buttons = page.query_selector_all('button, input[type="submit"]')
         progress(f"  🔍 ボタン数: {len(buttons)}", "info")
@@ -203,8 +198,6 @@ def click_submit_button(page):
     except Exception:
         pass
 
-    # 日本語テキストで試す（「公開する」を最優先、is-disabでも試みる）
-    # 「保存」は「一時保存」に含まれるので下書き保存になってしまう → 後回し
     for label in ['公開する', '掲載する', '求人を公開', '保存して公開', '登録する', '確認する', '次へ', '一時保存', '保存']:
         for tag in ['button', 'a']:
             try:
@@ -215,10 +208,9 @@ def click_submit_button(page):
                     if el.is_visible():
                         el.scroll_into_view_if_needed()
                         rand_delay(0.3, 0.6)
-                        # is-disab クラスでも強制クリック (JSで直接click)
                         cls = el.get_attribute('class') or ''
                         if 'is-disab' in cls or 'disabled' in cls:
-                            progress(f"  ⚠️ ボタンが無効状態 (is-disab) - is-disabクラス除去後にクリック", "warn")
+                            progress(f"  ⚠️ ボタンが無効状態 (is-disab) - クラス除去後にクリック", "warn")
                             el.evaluate("""e => {
                                 e.classList.remove('is-disab');
                                 e.removeAttribute('disabled');
@@ -226,12 +218,11 @@ def click_submit_button(page):
                             }""")
                         else:
                             el.click()
-                        progress(f"  ✅ ボタンクリック: {tag}:has-text(\"{label}\") (最後の{count}個目)", "info")
+                        progress(f"  ✅ ボタンクリック: {tag}:has-text(\"{label}\") ({count}個中の最後)", "info")
                         return True
             except Exception:
                 pass
 
-    # CSSクラス・タイプで試す
     for sel in [
         'button[type="submit"]', 'input[type="submit"]', '[type="submit"]',
         '.btn-primary', '.btn-submit', '.submit-btn',
@@ -248,7 +239,6 @@ def click_submit_button(page):
         except Exception:
             pass
 
-    # 最終手段: JS で form.submit()
     try:
         page.evaluate("document.querySelector('form').submit()")
         progress("  ✅ JavaScript form.submit() を実行", "info")
@@ -256,6 +246,90 @@ def click_submit_button(page):
     except Exception as e:
         progress(f"  ❌ 送信ボタンが見つかりません: {e}", "error")
         return False
+
+
+def setup_submit_interceptor(page, job_type_val, phone_clear=True):
+    """
+    フォーム送信POSTをインターセプトしてjobType・電話番号を強制修正する。
+    Vue.jsのreactive状態が未更新でも確実に正しい値をサーバーに送信できる。
+    JSON・form-encoded 両方に対応。
+    """
+    intercepted = {'count': 0}
+
+    def handle(route):
+        req = route.request
+        if req.method != 'POST':
+            route.continue_()
+            return
+
+        ct = (req.headers.get('content-type') or '').lower()
+        body = req.post_data or ''
+
+        if not body:
+            route.continue_()
+            return
+
+        try:
+            if 'application/json' in ct:
+                data = json.loads(body)
+                modified = []
+
+                cur_jt = str(data.get('jobType', '')).strip()
+                if cur_jt in ('', 'null', '0', 'None', 'undefined'):
+                    data['jobType'] = job_type_val
+                    modified.append(f"jobType={job_type_val}")
+
+                if phone_clear:
+                    if data.get('applicationPhoneNumber'):
+                        data['applicationPhoneNumber'] = ''
+                        modified.append('phone cleared')
+                    if data.get('isPhoneNumberRequired'):
+                        data['isPhoneNumberRequired'] = False
+                        modified.append('phoneRequired=false')
+
+                if modified:
+                    intercepted['count'] += 1
+                    new_body = json.dumps(data, ensure_ascii=False)
+                    progress(f"  🔧 POST修正(JSON) [{req.url.split('?')[0][-60:]}]: {', '.join(modified)}", "info")
+                    route.continue_(post_data=new_body)
+                    return
+
+            elif 'x-www-form-urlencoded' in ct:
+                data = parse_qs(body, keep_blank_values=True)
+                modified = []
+
+                cur_jt = data.get('jobType', [''])[0].strip()
+                if cur_jt in ('', '0'):
+                    data['jobType'] = [str(job_type_val)]
+                    modified.append(f"jobType={job_type_val}")
+
+                if phone_clear:
+                    if data.get('applicationPhoneNumber', [''])[0]:
+                        data['applicationPhoneNumber'] = ['']
+                        modified.append('phone cleared')
+                    data['isPhoneNumberRequired'] = ['0']
+
+                if modified:
+                    intercepted['count'] += 1
+                    new_body = urlencode({k: v[0] for k, v in data.items()})
+                    progress(f"  🔧 POST修正(form) [{req.url.split('?')[0][-60:]}]: {', '.join(modified)}", "info")
+                    route.continue_(post_data=new_body)
+                    return
+
+        except Exception as ex:
+            progress(f"  インターセプト処理エラー: {ex}", "warn")
+
+        route.continue_()
+
+    page.route('**', handle)
+    return intercepted, lambda: _safe_unroute(page, handle)
+
+
+def _safe_unroute(page, handler):
+    try:
+        page.unroute('**', handler)
+    except Exception:
+        pass
 
 
 def find_post_url(page):
@@ -285,17 +359,9 @@ def find_post_url(page):
 def fill_kyujinbox_form(page, job, company_name):
     """
     求人ボックスの求人フォームを埋める。
-    フォームフィールド（フォームダンプで確認済み）:
-      name=company, name=title, name=jobType (select),
-      name=employTypes (checkbox), name=description, name=rewarding,
-      name=qualifications, name=image (file),
-      name=prefVal (select), name=address, name=transportation,
-      name=payType (select), name=payMin, name=payMax, name=benefit,
-      name=worktimeHoliday, name=resumeRequired (radio),
-      name=isPhoneNumberRequired, name=applicationPhoneNumber,
-      name=howToApply, name=agree_main (checkbox), name=agree_side (checkbox)
+    戻り値: 選択したjobTypeの value 文字列（インターセプター用）
     """
-    # 会社名（アカウントに紐付いているので任意だが念のため）
+    # 会社名
     fill_text(page, 'input[name="company"]', company_name, timeout=5000)
     rand_delay(0.3, 0.7)
 
@@ -307,8 +373,10 @@ def fill_kyujinbox_form(page, job, company_name):
     fill_text(page, 'textarea[name="description"]', job.get('description', ''))
     rand_delay(0.5, 1.0)
 
-    # 職種 (select) ← name=jobType 【必須・空だと公開するボタンが無効化される】
-    # jobTypeが一致しない場合でも最初の有効なオプションを選択する
+    # ---- 職種 (select[name="jobType"]) ----
+    # 必須。空のままだと「公開する」ボタンが is-disab になる。
+    # Vue reactiveの更新に依存しないよう、選択した value をインターセプターに渡す。
+    selected_job_type_val = None
     job_type = job.get('jobType', '')
     try:
         jt_el = page.wait_for_selector('select[name="jobType"]', timeout=5000)
@@ -316,55 +384,141 @@ def fill_kyujinbox_form(page, job, company_name):
         option_list = [(opt.get_attribute('value') or '', (opt.inner_text() or '').strip()) for opt in opts]
         progress(f"  📋 jobType オプション({len(option_list)}件): {[t for v,t in option_list[:6]]}", "info")
 
-        selected = False
+        chosen_val = None
+        chosen_txt = None
+
+        # ① ラベル一致で選択
         if job_type:
             for v, t in option_list:
                 if v and (job_type in t or t in job_type):
-                    jt_el.select_option(value=v)
-                    progress(f"  ✅ jobType 設定(ラベル一致): '{t}'", "info")
-                    selected = True
+                    chosen_val = v
+                    chosen_txt = t
                     break
 
-        if not selected:
-            # フォールバック: 最初の有効な選択肢を選択
+        # ② フォールバック: 最初の有効なオプション
+        if not chosen_val:
             for v, t in option_list:
                 if v:
-                    jt_el.select_option(value=v)
-                    progress(f"  ℹ️ jobType フォールバック: '{t}'", "info")
-                    selected = True
+                    chosen_val = v
+                    chosen_txt = t
                     break
 
-        # Vue.js reactive state を確実に更新するためイベント発火
-        if selected:
+        if chosen_val:
+            # Locator API で select_option（イベント発火がより確実）
             try:
-                page.evaluate("""() => {
-                    const el = document.querySelector('select[name="jobType"]');
-                    if (!el) return;
+                page.locator('select[name="jobType"]').select_option(value=chosen_val)
+                rand_delay(0.3, 0.6)
+                progress(f"  ✅ jobType 選択: '{chosen_txt}' (value={chosen_val})", "info")
+            except Exception:
+                jt_el.select_option(value=chosen_val)
+                rand_delay(0.3, 0.6)
+                progress(f"  ✅ jobType 選択(fallback): '{chosen_txt}' (value={chosen_val})", "info")
+
+            # Vue reactive state を可能な限り更新
+            try:
+                result = page.evaluate(f"""(targetVal) => {{
+                    const sel = document.querySelector('select[name="jobType"]');
+                    if (!sel) return 'not found';
+
+                    // native setter で強制設定
                     const setter = Object.getOwnPropertyDescriptor(
                         window.HTMLSelectElement.prototype, 'value')?.set;
-                    if (setter) setter.call(el, el.value);
-                    ['input', 'change'].forEach(type =>
-                        el.dispatchEvent(new Event(type, {bubbles:true, composed:true})));
-                }""")
-                rand_delay(0.3, 0.5)
-            except Exception:
-                pass
+                    if (setter) setter.call(sel, targetVal);
 
-        rand_delay(0.5, 1.0)
+                    // Vue2: __vue__ ウォーク
+                    function tryVue2(el) {{
+                        let node = el;
+                        for (let i = 0; i < 30; i++) {{
+                            if (!node) break;
+                            const vm = node.__vue__;
+                            if (vm) {{
+                                let p = vm;
+                                while (p) {{
+                                    const data = p.$data || {{}};
+                                    // 直接キー
+                                    if ('jobType' in data) {{
+                                        p.jobType = targetVal;
+                                        return 'v2:direct:jobType';
+                                    }}
+                                    // ネストされたオブジェクト
+                                    for (const k of Object.keys(data)) {{
+                                        const d = data[k];
+                                        if (d && typeof d === 'object' && !Array.isArray(d)) {{
+                                            if ('jobType' in d) {{
+                                                d.jobType = targetVal;
+                                                return 'v2:nested:' + k + '.jobType';
+                                            }}
+                                        }}
+                                    }}
+                                    p = p.$parent;
+                                }}
+                            }}
+                            node = node.parentElement;
+                        }}
+                        return null;
+                    }}
+
+                    // Vue3: __vueParentComponent ウォーク
+                    function tryVue3(el) {{
+                        let node = el;
+                        for (let i = 0; i < 30; i++) {{
+                            if (!node) break;
+                            const comp = node.__vueParentComponent;
+                            if (comp) {{
+                                for (const state of [comp.setupState, comp.ctx, comp.props]) {{
+                                    if (!state || typeof state !== 'object') continue;
+                                    try {{
+                                        const keys = Object.keys(state);
+                                        if (keys.includes('jobType')) {{
+                                            state.jobType = targetVal;
+                                            return 'v3:direct:jobType';
+                                        }}
+                                        for (const k of keys) {{
+                                            const d = state[k];
+                                            if (d && typeof d === 'object' && !Array.isArray(d)) {{
+                                                if ('jobType' in d) {{
+                                                    d.jobType = targetVal;
+                                                    return 'v3:nested:' + k + '.jobType';
+                                                }}
+                                            }}
+                                        }}
+                                    }} catch(e) {{}}
+                                }}
+                            }}
+                            node = node.parentElement;
+                        }}
+                        return null;
+                    }}
+
+                    const v2 = tryVue2(sel);
+                    const v3 = tryVue3(sel);
+
+                    // 全イベントを再発火
+                    ['focus','input','change','blur'].forEach(t =>
+                        sel.dispatchEvent(new Event(t, {{bubbles: true, composed: true}}))
+                    );
+
+                    return (v2 || v3 || 'events-only') + ' val=' + sel.value;
+                }}""", chosen_val)
+                progress(f"  🔧 jobType Vue更新: {result}", "info")
+                rand_delay(0.5, 1.0)
+            except Exception as e:
+                progress(f"  ⚠️ jobType Vue更新失敗(無視): {e}", "warn")
+
+            selected_job_type_val = chosen_val
+
     except Exception as e:
         progress(f"  ⚠️ jobType 選択失敗: {e}", "warn")
 
-    # 雇用形態 (employTypes) ← 必須 / チェックボックスは非表示→labelクリック
+    # ---- 雇用形態 (employTypes checkboxes) ----
     employment_type = job.get('employmentType', '')
     try:
-        # ラベルのテキストを読み取りつつ、JS でラベルをクリック（非表示checkbox対応）
         result = page.evaluate(f"""() => {{
             const cbs = document.querySelectorAll('input[name="employTypes"]');
             if (!cbs.length) return 'none found';
             const empType = {json.dumps(employment_type)};
             const keywords = ['正社員','アルバイト','パート','契約社員','派遣','業務委託'];
             let target = null;
-            // employment_type に一致するラベルを探す
             for (const cb of cbs) {{
                 const label = cb.closest('label') || cb.nextElementSibling;
                 const txt = label ? label.textContent.trim() : '';
@@ -373,14 +527,12 @@ def fill_kyujinbox_form(page, job, company_name):
                     break;
                 }}
             }}
-            // 一致なし → 最初のcheckboxのラベルを使う
             if (!target) {{
                 const cb = cbs[0];
                 const label = cb.closest('label') || cb.nextElementSibling;
                 if (label) target = {{label, txt: label.textContent.trim()}};
             }}
             if (!target || !target.label) {{
-                // ラベルなし → JS で直接 checked=true + events
                 const cb = cbs[0];
                 const setter = Object.getOwnPropertyDescriptor(
                     window.HTMLInputElement.prototype, 'checked')?.set;
@@ -396,7 +548,7 @@ def fill_kyujinbox_form(page, job, company_name):
     except Exception as e:
         progress(f"  ⚠️ employTypes 失敗: {e}", "warn")
 
-    # 都道府県 (select) ← name=prefVal
+    # ---- 都道府県 (select[name="prefVal"]) ----
     location = job.get('location', '')
     pref = extract_prefecture(location)
     if pref:
@@ -405,11 +557,11 @@ def fill_kyujinbox_form(page, job, company_name):
             progress(f"  ⚠️ 都道府県 '{pref}' の選択失敗", "warn")
         rand_delay(0.3, 0.7)
 
-    # 住所テキスト ← name=address
+    # ---- 住所テキスト (input[name="address"]) ----
     fill_text(page, 'input[name="address"]', location)
     rand_delay(0.3, 0.7)
 
-    # 給与タイプ・金額
+    # ---- 給与 ----
     salary_str = job.get('salary', '')
     pay_type, pay_min, pay_max = parse_salary(salary_str)
     progress(f"  💰 給与解析: タイプ={pay_type}, 最小={pay_min}, 最大={pay_max}", "info")
@@ -418,11 +570,9 @@ def fill_kyujinbox_form(page, job, company_name):
     rand_delay(0.2, 0.5)
 
     if pay_min:
-        # payMinフィールドのplaceholderを確認して万円単位か円単位かを判定
         try:
             pm_el = page.wait_for_selector('input[name="payMin"]', timeout=5000)
             ph = pm_el.get_attribute('placeholder') or ''
-            # placeholderに「万」が含まれる or 値が大きすぎる場合は万円単位に変換
             pay_min_val = pay_min
             if '万' in ph and int(pay_min) >= 10000:
                 pay_min_val = str(int(pay_min) // 10000)
@@ -444,11 +594,11 @@ def fill_kyujinbox_form(page, job, company_name):
             fill_text(page, 'input[name="payMax"]', pay_max)
         rand_delay(0.2, 0.5)
 
-    # 給与詳細テキスト ← name=benefit
+    # 給与詳細テキスト
     fill_text(page, 'textarea[name="benefit"]', salary_str)
     rand_delay(0.3, 0.6)
 
-    # 応募資格（タグをテキストとして入力）
+    # 応募資格
     tags = job.get('tags', [])
     if isinstance(tags, str):
         try:
@@ -460,25 +610,47 @@ def fill_kyujinbox_form(page, job, company_name):
         fill_text(page, 'textarea[name="qualifications"]', qual_text)
         rand_delay(0.3, 0.6)
 
-    # 電話番号: isPhoneNumberRequired をオフにして、フィールドをクリア
+    # ---- 電話番号 ----
+    # DOM操作でクリアする（インターセプターでもバックアップ対応）
     try:
         phone_req_cb = page.query_selector('input[name="isPhoneNumberRequired"]')
         if phone_req_cb and phone_req_cb.is_checked():
-            phone_req_cb.uncheck()
+            # ラベルクリックで Vue reactive に反映させる
+            page.evaluate("""() => {
+                const cb = document.querySelector('input[name="isPhoneNumberRequired"]');
+                if (!cb) return;
+                const label = cb.closest('label') || cb.nextElementSibling
+                    || document.querySelector('label[for="' + cb.id + '"]');
+                if (label) { label.click(); return; }
+                const setter = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype, 'checked').set;
+                setter.call(cb, false);
+                cb.dispatchEvent(new Event('change', {bubbles: true}));
+            }""")
             rand_delay(0.2, 0.4)
     except Exception:
         pass
+
     try:
-        tel_el = page.query_selector('input[name="applicationPhoneNumber"]')
-        if tel_el:
-            val = tel_el.input_value()
-            if val:
-                progress(f"  🔧 電話番号フィールドに値あり: '{val}' → クリア", "warn")
-                tel_el.fill('')
+        result = page.evaluate("""() => {
+            const tel = document.querySelector('input[name="applicationPhoneNumber"]');
+            if (!tel) return 'not found';
+            const before = tel.value;
+            // native setter で強制クリア
+            const setter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype, 'value').set;
+            setter.call(tel, '');
+            ['input','change'].forEach(t =>
+                tel.dispatchEvent(new Event(t, {bubbles: true}))
+            );
+            return 'cleared from: ' + before;
+        }""")
+        if 'cleared' in result:
+            progress(f"  🔧 電話番号クリア: {result}", "info")
     except Exception:
         pass
 
-    # 同意チェックボックス（必須）← name=agree_main (複数あり)
+    # ---- 同意チェックボックス ----
     try:
         agree_boxes = page.query_selector_all('input[name="agree_main"]')
         for cb in agree_boxes:
@@ -496,6 +668,8 @@ def fill_kyujinbox_form(page, job, company_name):
     except Exception:
         pass
 
+    return selected_job_type_val
+
 
 def main():
     try:
@@ -512,6 +686,7 @@ def main():
     password     = os.environ.get("KYUJINBOX_PASSWORD", "")
     company_name = os.environ.get("COMPANY_NAME", "株式会社Social Quality")
     batch        = int(os.environ.get("KYUJINBOX_BATCH_SIZE", str(len(jobs))))
+    headless     = os.environ.get("HEADLESS", "1").strip() not in ("0", "false", "no")
 
     if not email or not password:
         progress("⚠️ 環境変数 KYUJINBOX_EMAIL / KYUJINBOX_PASSWORD が未設定です", "warn")
@@ -537,10 +712,13 @@ def main():
     ]
     viewport = random.choice(viewports)
 
+    if not headless:
+        progress("🖥️ 有頭モードで起動 (HEADLESS=0)", "info")
+
     with sync_playwright() as p:
         progress("🌐 ブラウザを起動しています...", "info")
         browser = p.chromium.launch(
-            headless=True,
+            headless=headless,
             args=[
                 '--disable-blink-features=AutomationControlled',
                 '--disable-infobars',
@@ -632,15 +810,14 @@ def main():
 
                     actual_url = page.url
                     progress(f"📍 投稿フォームURL: {actual_url}", "info")
-                    # 1件目だけフィールド一覧をダンプ（ログが長くなるので以降は省略）
                     if i == 0:
                         dump_inputs(page)
                     save_screenshot(page, f"post_form_{i}")
 
-                    fill_kyujinbox_form(page, job, company_name)
+                    selected_job_type_val = fill_kyujinbox_form(page, job, company_name)
                     rand_delay(0.8, 1.8)
 
-                    # フォーム入力後のselect値をJS確認
+                    # select値をJS確認
                     try:
                         sel_vals = page.evaluate("""() => {
                             return ['jobType','prefVal','payType'].map(name => {
@@ -657,11 +834,24 @@ def main():
 
                     save_screenshot(page, f"before_submit_{i}")
 
+                    # ---- POSTインターセプター設定 ----
+                    # Vue reactive が未更新でも jobType・電話番号を強制修正
+                    intercept_val = selected_job_type_val or '1'
+                    intercepted, unroute = setup_submit_interceptor(page, intercept_val, phone_clear=True)
+                    progress(f"  🔧 POSTインターセプター設定 (jobType={intercept_val})", "info")
+
                     submitted = click_submit_button(page)
+
+                    # インターセプター解除
+                    unroute()
+
                     if not submitted:
                         progress(f"⚠️ 「{job['title']}」: 送信ボタンが見つかりませんでした", "warn")
                         save_screenshot(page, f"no_submit_{i}")
                         continue
+
+                    progress(f"  📊 POST修正回数: {intercepted['count']}", "info")
+
                     rand_delay(3.0, 6.0)
                     page.wait_for_load_state('networkidle', timeout=15000)
 
@@ -669,14 +859,11 @@ def main():
                     progress(f"📍 送信後URL: {final_url}", "info")
                     save_screenshot(page, f"after_submit_{i}")
 
-                    # 成功判定: URLが /edit でなくなるか、URLにIDが付いたら成功
                     url_changed = final_url != actual_url
                     has_id = bool(re.search(r'/jobs/\d+', final_url))
                     if not url_changed and '/edit' in final_url and not has_id:
-                        # バリデーションエラーの可能性: ページ本文から抽出
                         try:
                             body_text = page.inner_text('body')
-                            # 誤検知しやすい単語は除外
                             error_kw = ['必須', 'エラー', '入力してください', '選択してください',
                                         '不正', '無効', 'ご確認ください', '正しく入力', '半角数字']
                             lines = body_text.split('\n')
