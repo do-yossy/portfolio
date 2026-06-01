@@ -180,19 +180,26 @@ def click_submit_button(page):
     page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
     rand_delay(0.5, 1.0)
 
-    # デバッグ: ページ上のボタン一覧を表示
+    # デバッグ: ページ上のボタン一覧を表示（先頭10件 + 末尾10件）
     try:
         buttons = page.query_selector_all('button, input[type="submit"]')
         progress(f"  🔍 ボタン数: {len(buttons)}", "info")
-        for btn in buttons[:15]:
+        btn_info = []
+        for btn in buttons:
             try:
                 tag = btn.evaluate('e => e.tagName.toLowerCase()')
                 typ = btn.get_attribute('type') or ''
                 cls = (btn.get_attribute('class') or '')[:50]
                 txt = (btn.inner_text() or '').strip()[:40]
-                progress(f"    [{tag}] type={typ} class={cls} text={txt}", "info")
+                btn_info.append(f"[{tag}] type={typ} class={cls} text={txt}")
             except Exception:
-                pass
+                btn_info.append('?')
+        for line in btn_info[:10]:
+            progress(f"    {line}", "info")
+        if len(btn_info) > 20:
+            progress(f"    ... ({len(btn_info)-20}件省略) ...", "info")
+        for line in btn_info[-10:]:
+            progress(f"    {line}", "info")
     except Exception:
         pass
 
@@ -521,6 +528,22 @@ def main():
 
                     fill_kyujinbox_form(page, job, company_name)
                     rand_delay(0.8, 1.8)
+
+                    # フォーム入力後のselect値をJS確認
+                    try:
+                        sel_vals = page.evaluate("""() => {
+                            return ['jobType','prefVal','payType'].map(name => {
+                                const el = document.querySelector('select[name="'+name+'"]');
+                                if (!el) return {name, value: 'NOT FOUND', text: null};
+                                const opt = el.options[el.selectedIndex];
+                                return {name, value: el.value, text: opt ? opt.text : null};
+                            });
+                        }""")
+                        for sv in sel_vals:
+                            progress(f"  📊 select[{sv['name']}] value='{sv['value']}' text='{sv['text']}'", "info")
+                    except Exception as ex:
+                        progress(f"  select確認失敗: {ex}", "warn")
+
                     save_screenshot(page, f"before_submit_{i}")
 
                     submitted = click_submit_button(page)
@@ -535,13 +558,16 @@ def main():
                     progress(f"📍 送信後URL: {final_url}", "info")
                     save_screenshot(page, f"after_submit_{i}")
 
-                    # 送信後も /edit のままならバリデーションエラーの可能性
-                    if '/edit' in final_url:
-                        # ページ本文から日本語エラーキーワードを含む行を抽出
+                    # 成功判定: URLが /edit でなくなるか、URLにIDが付いたら成功
+                    url_changed = final_url != actual_url
+                    has_id = bool(re.search(r'/jobs/\d+', final_url))
+                    if not url_changed and '/edit' in final_url and not has_id:
+                        # バリデーションエラーの可能性: ページ本文から抽出
                         try:
                             body_text = page.inner_text('body')
+                            # 誤検知しやすい単語は除外
                             error_kw = ['必須', 'エラー', '入力してください', '選択してください',
-                                        '不正', '無効', '空', 'ご確認', '正しく', '半角数字']
+                                        '不正', '無効', 'ご確認ください', '正しく入力', '半角数字']
                             lines = body_text.split('\n')
                             err_lines = [l.strip() for l in lines
                                          if l.strip() and any(kw in l for kw in error_kw)]
@@ -551,12 +577,11 @@ def main():
                                     progress(f"      {el[:120]}", "warn")
                             else:
                                 progress(f"   ⚠️ 送信後も編集ページ（エラー文言不明）", "warn")
-                                # 最初の2000文字を出力してデバッグ
-                                progress(f"   ページ冒頭テキスト: {body_text[:500]}", "warn")
+                                progress(f"   ページ冒頭テキスト(500字): {body_text[:500]}", "warn")
                         except Exception as ex:
                             progress(f"   ⚠️ 送信後も編集ページ（本文取得失敗: {ex}）", "warn")
                     else:
-                        progress(f"✅ 「{job['title']}」を投稿しました", "success")
+                        progress(f"✅ 「{job['title']}」を投稿しました (URL: {final_url})", "success")
                         success_count += 1
 
                     if i < len(target_jobs) - 1:
