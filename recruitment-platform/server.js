@@ -272,20 +272,60 @@ function generateCSV(applicants, includeCompany = false) {
   return [headers.join(','), ...rows].join('\n');
 }
 
-// VPN check
+// ── VPN ──────────────────────────────────────────────────────
+
+function findVpncmd() {
+  const candidates = [
+    process.env.VPNCMD_PATH,
+    'C:\\Program Files\\SoftEther VPN Client\\vpncmd.exe',
+    'C:\\Program Files (x86)\\SoftEther VPN Client\\vpncmd.exe',
+    'vpncmd',
+  ].filter(Boolean);
+  for (const p of candidates) {
+    if (p === 'vpncmd' || fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+// vpncmdでアカウント一覧を取得し、接続中のものがあるか確認
+function vpncmdAccountList(vpncmdPath) {
+  return new Promise(resolve => {
+    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountList'], { shell: true });
+    let out = '';
+    proc.stdout.on('data', d => out += d.toString());
+    proc.stderr.on('data', d => out += d.toString());
+    proc.on('close', () => resolve(out));
+    proc.on('error', () => resolve(''));
+    setTimeout(() => { try { proc.kill(); } catch {} resolve(''); }, 8000);
+  });
+}
+
+// VPN check: vpncmd優先（IP不問）→ IP範囲フォールバック
 let vpnCache = { connected: false, ts: 0 };
 async function checkVPN() {
-  // Cache for 30 seconds
   if (Date.now() - vpnCache.ts < 30000) return vpnCache.connected;
+
+  const vpncmdPath = findVpncmd();
+  if (vpncmdPath) {
+    // SoftEther の接続状態をアカウントリストで確認（IPアドレス不問）
+    const out = await vpncmdAccountList(vpncmdPath);
+    // AccountList 出力に "Session Status" が含まれ、"Connected" があれば接続中
+    const connected = /session status.*connected|セッション状態.*接続/i.test(out)
+      || out.includes('Connected\r') || out.includes('Connected\n')
+      || /\|\s*Connected\s*\|/i.test(out);
+    vpnCache = { connected, ts: Date.now() };
+    return connected;
+  }
+
+  // vpncmd未インストール → IP範囲チェックにフォールバック
   const vpnRanges = (process.env.VPN_IP_RANGES || '').split(',').map(s => s.trim()).filter(Boolean);
   if (!vpnRanges.length) {
-    // Without config, always return true in development
+    // 設定なし = 開発環境（常にOK）
     vpnCache = { connected: true, ts: Date.now() };
     return true;
   }
   try {
-    // Try to get external IP
-    const result = await new Promise((resolve, reject) => {
+    const externalIp = await new Promise((resolve, reject) => {
       const opts = url.parse('http://api.ipify.org');
       const req2 = http.get(opts, r => {
         let d = '';
@@ -295,7 +335,9 @@ async function checkVPN() {
       req2.setTimeout(5000, () => { req2.destroy(); reject(new Error('timeout')); });
       req2.on('error', reject);
     });
-    const connected = vpnRanges.some(range => result.startsWith(range.split('/')[0].split('.').slice(0,3).join('.')));
+    const connected = vpnRanges.some(range =>
+      externalIp.startsWith(range.split('/')[0].split('.').slice(0, 3).join('.'))
+    );
     vpnCache = { connected, ts: Date.now() };
     return connected;
   } catch {
@@ -304,56 +346,49 @@ async function checkVPN() {
   }
 }
 
-// SoftEther VPN connect
+// SoftEther VPN 接続（アカウント名不問 or 指定）
 async function vpnConnect() {
-  // vpncmd.exe の探索パス
-  const vpncmdPaths = [
-    process.env.VPNCMD_PATH,
-    'C:\\Program Files\\SoftEther VPN Client\\vpncmd.exe',
-    'C:\\Program Files (x86)\\SoftEther VPN Client\\vpncmd.exe',
-    'vpncmd',
-  ].filter(Boolean);
-
-  let vpncmdPath = null;
-  for (const p of vpncmdPaths) {
-    if (p === 'vpncmd' || require('fs').existsSync(p)) { vpncmdPath = p; break; }
-  }
+  const vpncmdPath = findVpncmd();
   if (!vpncmdPath) {
     return { ok: false, error: 'vpncmd.exe が見つかりません。VPNCMD_PATH を .env に設定してください。' };
   }
 
-  const accountName = process.env.VPNCMD_ACCOUNT;
+  const out = await vpncmdAccountList(vpncmdPath);
 
-  // アカウント名未設定 → アカウント一覧を返す
-  if (!accountName) {
-    return await new Promise(resolve => {
-      const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountList'], { shell: true });
-      let out = '';
-      proc.stdout.on('data', d => out += d.toString());
-      proc.stderr.on('data', d => out += d.toString());
-      proc.on('close', () => {
-        const names = [...out.matchAll(/^([^\s|][^\n]+?)\s*\|/gm)]
-          .map(m => m[1].trim())
-          .filter(n => n && n !== 'Account Name' && !n.startsWith('-') && !n.startsWith('='));
-        resolve({ ok: false, error: `VPNCMD_ACCOUNT が未設定です。.env に設定してください。利用可能なアカウント: ${names.length ? names.join(', ') : '（取得失敗）'}` });
-      });
-      proc.on('error', err => resolve({ ok: false, error: err.message }));
-    });
+  // アカウント名を一覧から全部抽出
+  const accounts = [];
+  for (const line of out.split(/\r?\n/)) {
+    // "Account Name   | VPN"  or  "VPN              | ..."
+    const m = line.match(/^\|\s*([^\|]+?)\s*\|\s*(Connected|Connecting|Offline|接続完了|切断|未接続)/i);
+    if (m) accounts.push({ name: m[1].trim(), status: m[2].trim() });
   }
 
-  // 接続実行
+  // すでに接続中があれば成功扱い
+  const alreadyConnected = accounts.find(a => /connected|接続完了/i.test(a.status));
+  if (alreadyConnected) {
+    vpnCache = { connected: true, ts: Date.now() };
+    return { ok: true, message: `${alreadyConnected.name} は接続済みです` };
+  }
+
+  // 特定アカウント指定 or 最初のアカウントに接続
+  const targetName = process.env.VPNCMD_ACCOUNT || (accounts[0] && accounts[0].name);
+  if (!targetName) {
+    // アカウントが解析できなかった場合は生テキストを返す
+    const raw = out.slice(0, 400);
+    return { ok: false, error: `接続先アカウントが見つかりません。VPNCMD_ACCOUNT を .env に設定してください。\n\nvpncmd出力:\n${raw}` };
+  }
+
   return await new Promise(resolve => {
-    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountConnect', accountName], { shell: true });
-    let out = '';
-    proc.stdout.on('data', d => out += d.toString());
-    proc.stderr.on('data', d => out += d.toString());
+    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountConnect', targetName], { shell: true });
+    let res2 = '';
+    proc.stdout.on('data', d => res2 += d.toString());
+    proc.stderr.on('data', d => res2 += d.toString());
     proc.on('close', code => {
-      // キャッシュリセット
-      vpnCache = { connected: false, ts: 0 };
-      if (code === 0 || out.toLowerCase().includes('command completed')) {
-        resolve({ ok: true, message: `${accountName} に接続しました` });
+      vpnCache = { connected: false, ts: 0 }; // キャッシュリセット → 次回再確認
+      if (code === 0 || /command completed/i.test(res2)) {
+        resolve({ ok: true, message: `${targetName} への接続を開始しました（数秒後に確認）` });
       } else {
-        resolve({ ok: false, error: `接続失敗: ${out.slice(0, 200)}` });
+        resolve({ ok: false, error: `接続失敗: ${res2.slice(0, 300)}` });
       }
     });
     proc.on('error', err => resolve({ ok: false, error: err.message }));
