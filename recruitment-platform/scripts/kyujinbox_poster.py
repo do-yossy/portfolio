@@ -130,16 +130,47 @@ def fill_text(page, selector, value, timeout=8000):
     except Exception:
         return False
 
-def select_option_safe(page, selector, label=None, value=None, timeout=5000):
-    """select要素を安全にセット"""
+def select_option_safe(page, selector, label=None, value=None, timeout=5000, debug=False):
+    """select要素を安全にセット。失敗時はオプション一覧をログ出力"""
     try:
         el = page.wait_for_selector(selector, timeout=timeout)
+        # まずラベルで試す
         if label:
-            el.select_option(label=label)
+            try:
+                el.select_option(label=label)
+                rand_delay(0.2, 0.5)
+                return True
+            except Exception:
+                pass
+            # ラベル部分一致で試す
+            try:
+                opts = el.query_selector_all('option')
+                for opt in opts:
+                    txt = (opt.inner_text() or '').strip()
+                    if label in txt or txt in label:
+                        val = opt.get_attribute('value') or ''
+                        el.select_option(value=val)
+                        progress(f"    select 部分一致: '{txt}' (value={val})", "info")
+                        rand_delay(0.2, 0.5)
+                        return True
+            except Exception:
+                pass
+            # 失敗時にオプション一覧を表示
+            if debug:
+                try:
+                    opts = el.query_selector_all('option')
+                    progress(f"  ⚠️ select '{label}' 選択失敗。利用可能なオプション:", "warn")
+                    for opt in opts[:15]:
+                        v = opt.get_attribute('value') or ''
+                        t = (opt.inner_text() or '').strip()
+                        progress(f"    value='{v}' text='{t}'", "warn")
+                except Exception:
+                    pass
         elif value:
             el.select_option(value=value)
-        rand_delay(0.2, 0.5)
-        return True
+            rand_delay(0.2, 0.5)
+            return True
+        return False
     except Exception:
         return False
 
@@ -165,18 +196,21 @@ def click_submit_button(page):
     except Exception:
         pass
 
-    # 日本語テキストで試す
-    for label in ['登録', '保存', '投稿', '確認', '公開', '次へ', '送信', '掲載']:
-        for tag in ['button', 'a', 'input']:
+    # 日本語テキストで試す（複数ある場合は最後のものを使う）
+    for label in ['求人を保存', '保存して確認', '登録する', '保存する', '掲載する', '公開する', '次へ', '保存', '登録', '投稿', '確認', '公開', '送信']:
+        for tag in ['button', 'a']:
             try:
-                sel = f'{tag}:has-text("{label}")'
-                el = page.wait_for_selector(sel, timeout=2000)
-                if el and el.is_visible():
-                    el.scroll_into_view_if_needed()
-                    rand_delay(0.3, 0.6)
-                    el.click()
-                    progress(f"  ✅ ボタンクリック: {sel}", "info")
-                    return True
+                locator = page.locator(f'{tag}:has-text("{label}")')
+                count = locator.count()
+                if count > 0:
+                    # 最後のボタン（フォーム末尾の送信ボタン）を使う
+                    el = locator.last
+                    if el.is_visible():
+                        el.scroll_into_view_if_needed()
+                        rand_delay(0.3, 0.6)
+                        el.click()
+                        progress(f"  ✅ ボタンクリック: {tag}:has-text(\"{label}\") (最後の{count}個目)", "info")
+                        return True
             except Exception:
                 pass
 
@@ -256,19 +290,19 @@ def fill_kyujinbox_form(page, job, company_name):
     fill_text(page, 'textarea[name="description"]', job.get('description', ''))
     rand_delay(0.5, 1.0)
 
-    # 職種 (select) - 値が合わなくてもエラーにしない
+    # 職種 (select) - 値が合わなくてもエラーにしない（debug=Trueでオプション表示）
     job_type = job.get('jobType', '')
     if job_type:
-        select_option_safe(page, 'select[name="jobType"]', label=job_type)
+        select_option_safe(page, 'select[name="jobType"]', label=job_type, debug=True)
         rand_delay(0.3, 0.6)
 
     # 都道府県 (select) ← name=prefVal
     location = job.get('location', '')
     pref = extract_prefecture(location)
     if pref:
-        ok = select_option_safe(page, 'select[name="prefVal"]', label=pref)
+        ok = select_option_safe(page, 'select[name="prefVal"]', label=pref, debug=True)
         if not ok:
-            progress(f"  ⚠️ 都道府県 '{pref}' の選択失敗 - スキップ", "warn")
+            progress(f"  ⚠️ 都道府県 '{pref}' の選択失敗", "warn")
         rand_delay(0.3, 0.7)
 
     # 住所テキスト ← name=address
@@ -280,7 +314,7 @@ def fill_kyujinbox_form(page, job, company_name):
     pay_type, pay_min, pay_max = parse_salary(salary_str)
     progress(f"  💰 給与解析: タイプ={pay_type}, 最小={pay_min}, 最大={pay_max}", "info")
 
-    select_option_safe(page, 'select[name="payType"]', label=pay_type)
+    select_option_safe(page, 'select[name="payType"]', label=pay_type, debug=True)
     rand_delay(0.2, 0.5)
 
     if pay_min:
@@ -484,11 +518,28 @@ def main():
 
                     # 送信後も /edit のままならバリデーションエラーの可能性
                     if '/edit' in final_url:
-                        error_el = page.query_selector('.error-message, .alert, [class*="error"], [class*="invalid"]')
-                        if error_el:
-                            progress(f"   バリデーションエラー: {error_el.inner_text()[:300]}", "warn")
+                        # エラーメッセージを幅広く探す
+                        error_texts = []
+                        for err_sel in [
+                            '.c-errorMessage', '.p-errorMessage', '.c-error',
+                            '[class*="error"]', '[class*="Error"]',
+                            '.alert', '[class*="alert"]',
+                            '[class*="invalid"]', '[class*="Invalid"]',
+                        ]:
+                            try:
+                                els = page.query_selector_all(err_sel)
+                                for el in els:
+                                    t = el.inner_text().strip()
+                                    if t and t not in error_texts:
+                                        error_texts.append(t[:100])
+                            except Exception:
+                                pass
+                        if error_texts:
+                            progress(f"   ❌ バリデーションエラー:", "warn")
+                            for et in error_texts[:10]:
+                                progress(f"      {et}", "warn")
                         else:
-                            progress(f"   ⚠️ 送信後も編集ページ（バリデーションエラーの可能性）", "warn")
+                            progress(f"   ⚠️ 送信後も編集ページ（エラー文言不明 - スクリーンショット確認）", "warn")
                     else:
                         progress(f"✅ 「{job['title']}」を投稿しました", "success")
                         success_count += 1
