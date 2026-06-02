@@ -66,6 +66,7 @@ function publicLayout(title, content, { description = '', jsonld = '', canonical
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
+<meta name="google-site-verification" content="3jz3zHw23HzRLL6kianNdfBLtX-V9JZnXrN-YmkYNeU">
 ${description ? `<meta name="description" content="${esc(description)}">` : ''}
 <link rel="canonical" href="${canonicalUrl}">
 <meta property="og:type" content="website">
