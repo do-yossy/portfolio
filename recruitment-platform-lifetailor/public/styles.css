@@ -575,3 +575,16 @@ select.s-select { width: auto; padding: 4px 8px; font-size: 12px; border-radius:
 .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
 .empty-state p { font-size: 14px; }
 hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ── Media Import ── */
+.media-import-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 12px; }
+.media-import-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.media-import-label { font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
+.media-import-label.indeed    { background: #003A9B; color: #fff; }
+.media-import-label.kyujinbox { background: #e8f4fd; color: #1a6fa8; }
+.media-import-label.stanby    { background: #e8f0fe; color: #1a56db; }
+.media-import-label.google    { background: #f0fdf4; color: #166534; }
+.import-result { margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px; }
+.import-result.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.import-result.error   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+@media (max-width: 768px) { .media-import-grid { grid-template-columns: 1fr 1fr; } }

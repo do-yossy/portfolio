@@ -92,7 +92,7 @@ function parseCSV(text) {
 }
 
 // Map CSV columns to applicant fields (flexible column names)
-function mapCSVRow(row) {
+function mapCSVRow(row, mediaHint) {
   const col = (keys) => {
     for (const k of keys) {
       const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
@@ -100,6 +100,53 @@ function mapCSVRow(row) {
     }
     return '';
   };
+
+  // 媒体別マッピング
+  if (mediaHint === 'stanby') {
+    // スタンバイCSV列名: 氏名・電話番号・メールアドレス・応募日時・求人タイトル等
+    return {
+      name:        col(['氏名']),
+      phone:       col(['電話番号']),
+      email:       col(['メールアドレス']),
+      age:         col(['生年月日']),
+      address:     col(['住所']),
+      jobTitle:    col(['求人タイトル']),
+      appliedAt:   col(['応募日時']),
+      sourceMedia: 'スタンバイ',
+      note:        col(['備考・PR']),
+    };
+  }
+
+  if (mediaHint === 'kyujinbox') {
+    // 求人ボックスCSV列名（共有された列名を使用）
+    return {
+      name:        col(['氏名','名前']),
+      phone:       col(['電話番号','電話','tel']),
+      email:       col(['メールアドレス','メール','email']),
+      age:         col(['年齢','生年月日']),
+      address:     col(['住所']),
+      jobTitle:    col(['求人タイトル','応募求人']),
+      appliedAt:   col(['応募日時','応募日']),
+      sourceMedia: '求人ボックス',
+      note:        col(['備考','メッセージ']),
+    };
+  }
+
+  if (mediaHint === 'indeed') {
+    return {
+      name:        col(['氏名','名前','name','お名前']),
+      phone:       col(['電話番号','電話','phone','tel']),
+      email:       col(['メールアドレス','メール','email','mail']),
+      age:         col(['年齢']),
+      address:     col(['住所','address']),
+      jobTitle:    col(['求人タイトル','応募求人','job_title']),
+      appliedAt:   col(['応募日時','応募日','date']),
+      sourceMedia: 'Indeed',
+      note:        col(['メモ','備考','note']),
+    };
+  }
+
+  // デフォルト（媒体不明）
   return {
     name:        col(['氏名','name','名前','お名前','姓名']),
     phone:       col(['電話番号','phone','tel','電話','携帯']),
@@ -643,10 +690,14 @@ ${jobUrls}
       csvText = buf.toString('utf8');
     }
 
+    const mediaHint = parsedUrl.query.media || '';
+    const mediaNames = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ' };
+    const mediaLabel = mediaNames[mediaHint] || 'CSV取込';
+
     const rows = parseCSV(csvText);
     let imported = 0, duplicates = 0;
     for (const row of rows) {
-      const mapped = mapCSVRow(row);
+      const mapped = mapCSVRow(row, mediaHint);
       if (!mapped.name || (!mapped.phone && !mapped.email)) continue;
       const dupId = await checkDuplicate(mapped);
       await Applicants.create({
@@ -657,8 +708,8 @@ ${jobUrls}
       });
       if (dupId) duplicates++; else imported++;
     }
-    await Logs.create('csv_import', 'success', `CSV取込: ${imported}件新規, ${duplicates}件重複`);
-    sendJSON(res, 200, { ok: true, imported, duplicates, total: imported + duplicates });
+    await Logs.create('csv_import', 'success', `${mediaLabel} CSV取込: ${imported}件新規, ${duplicates}件重複`);
+    sendJSON(res, 200, { ok: true, imported, duplicates, total: imported + duplicates, media: mediaLabel });
     return;
   }
 
