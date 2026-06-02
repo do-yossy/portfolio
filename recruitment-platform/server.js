@@ -292,9 +292,11 @@ function isVpnConnectedFromOutput(out) {
   if (!out) return false;
   // 英語版: "Connected"
   if (/\bConnected\b/i.test(out)) return true;
-  // 日本語版: 接続完了 / 接続中
+  // 日本語版: 各種表現に対応
   if (out.includes('接続完了')) return true;
   if (out.includes('接続中')) return true;
+  if (out.includes('接続済み')) return true;
+  if (out.includes('接続済')) return true;
   return false;
 }
 
@@ -344,6 +346,8 @@ function vpncmdAccountList(vpncmdPath) {
 // VPN check: vpncmd優先（IP不問）→ IP範囲フォールバック
 let vpnCache = { connected: false, ts: 0 };
 async function checkVPN() {
+  // VPN_BYPASS=true で常にOK（テスト・デバッグ用）
+  if (process.env.VPN_BYPASS === 'true') return true;
   if (Date.now() - vpnCache.ts < 30000) return vpnCache.connected;
 
   const vpncmdPath = findVpncmd();
