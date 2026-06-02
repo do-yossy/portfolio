@@ -118,31 +118,32 @@ function mapCSVRow(row, mediaHint) {
   }
 
   if (mediaHint === 'kyujinbox') {
-    // 求人ボックスCSV列名（共有された列名を使用）
+    // 求人ボックスCSV列名: 氏名・メールアドレス・電話番号・ステータス・応募者の居住地・関連のある経験・学歴・職種名・勤務地・日付・年齢・生年月日・架電回数
     return {
       name:        col(['氏名','名前']),
       phone:       col(['電話番号','電話','tel']),
       email:       col(['メールアドレス','メール','email']),
       age:         col(['年齢','生年月日']),
-      address:     col(['住所']),
-      jobTitle:    col(['求人タイトル','応募求人']),
-      appliedAt:   col(['応募日時','応募日']),
+      address:     col(['応募者の居住地','住所']),
+      jobTitle:    col(['職種名','求人タイトル','勤務地']),
+      appliedAt:   col(['日付','応募日時','応募日']),
       sourceMedia: '求人ボックス',
-      note:        col(['備考','メッセージ']),
+      note:        col(['関連のある経験','学歴','備考']),
     };
   }
 
   if (mediaHint === 'indeed') {
+    // Indeed CSV列名: 名前・メールアドレス・電話番号・ステータス・応募者の居住地・職種名・勤務地・日付・年齢・生年月日
     return {
-      name:        col(['氏名','名前','name','お名前']),
+      name:        col(['名前','氏名','name']),
       phone:       col(['電話番号','電話','phone','tel']),
       email:       col(['メールアドレス','メール','email','mail']),
       age:         col(['年齢']),
-      address:     col(['住所','address']),
-      jobTitle:    col(['求人タイトル','応募求人','job_title']),
-      appliedAt:   col(['応募日時','応募日','date']),
+      address:     col(['応募者の居住地','住所','address']),
+      jobTitle:    col(['職種名','求人タイトル','勤務地']),
+      appliedAt:   col(['日付','応募日時','応募日']),
       sourceMedia: 'Indeed',
-      note:        col(['メモ','備考','note']),
+      note:        col(['関連のある経験','学歴','備考']),
     };
   }
 
