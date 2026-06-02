@@ -762,18 +762,15 @@ def publish_draft(page, draft_url):
                 pub.click()
                 progress("  ⚠️ is-disab除去後にクリック（公開可否は要確認）", "warn")
                 rand_delay(2.0, 3.0)
-                # 確認ダイアログのOKも押す（JS直接クリック）
+                # 確認ダイアログのOKも押す（force click）
                 for _a in range(10):
                     try:
-                        r = page.evaluate("""() => {
-                            const btns = Array.from(document.querySelectorAll('button'));
-                            const ok = btns.find(b => (b.textContent||'').trim()==='OK' && (b.className||'').includes('blue'))
-                                     || btns.find(b => (b.textContent||'').trim()==='OK');
-                            if (ok) { ok.click(); return 'ok'; }
-                            return 'not-found';
-                        }""")
-                        if r != 'not-found':
-                            progress("  ✅ 確認ダイアログ「OK」クリック(is-disab後)", "success")
+                        ok_l = page.locator('button.c-button--blue:has-text("OK")')
+                        if ok_l.count() == 0:
+                            ok_l = page.locator('button:has-text("OK")')
+                        if ok_l.count() > 0:
+                            ok_l.first.click(force=True)
+                            progress("  ✅ 確認ダイアログ「OK」force click(is-disab後)", "success")
                             break
                     except Exception:
                         pass
@@ -798,29 +795,27 @@ def publish_draft(page, draft_url):
         rand_delay(2.0, 3.0)
 
         # ── 確認ダイアログ「求人を公開します。」→ OK をクリック ──
-        # Playwrightの可視性チェック(wait_for_selector visible)はCSSアニメーション等で
-        # 誤判定するため、JavaScriptで直接クリックする（可視性チェックなし）
+        # force=True でPlaywrightの実クリック（isTrusted=true）を使う。
+        # JS .click() は isTrusted=false でVueに無視される可能性があるため使わない。
         ok_clicked = False
         for _attempt in range(10):
             try:
-                result = page.evaluate("""() => {
-                    const btns = Array.from(document.querySelectorAll('button'));
-                    // 青いOKボタン優先（確認ダイアログの決定ボタン）
-                    const blueOk = btns.find(b =>
-                        (b.textContent || '').trim() === 'OK' &&
-                        (b.className || '').includes('blue'));
-                    if (blueOk) { blueOk.click(); return 'blue-ok'; }
-                    // 任意のOKボタン
-                    const anyOk = btns.find(b => (b.textContent || '').trim() === 'OK');
-                    if (anyOk) { anyOk.click(); return 'any-ok'; }
-                    return 'not-found';
-                }""")
-                if result != 'not-found':
-                    progress(f"  ✅ 確認ダイアログ「OK」クリック成功: {result}", "success")
+                # blue ボタン優先で探す
+                ok_loc = page.locator('button.c-button--blue:has-text("OK")')
+                if ok_loc.count() == 0:
+                    ok_loc = page.locator('button:has-text("OK")')
+                if ok_loc.count() > 0:
+                    # スクリーンショットで状態確認
+                    if _attempt == 0:
+                        save_screenshot(page, f'before_ok_click')
+                    ok_loc.first.scroll_into_view_if_needed()
+                    rand_delay(0.2, 0.4)
+                    ok_loc.first.click(force=True)
+                    progress(f"  ✅ 確認ダイアログ「OK」force click成功 (試行{_attempt+1})", "success")
                     ok_clicked = True
                     break
-            except Exception:
-                pass
+            except Exception as e:
+                progress(f"  ⚠️ OKクリック試行{_attempt+1}失敗: {e}", "warn")
             rand_delay(0.5, 1.0)
 
         if not ok_clicked:
