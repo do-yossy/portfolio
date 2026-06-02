@@ -12,6 +12,18 @@ import random
 
 sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
 
+# .env 読み込み
+import pathlib
+_env_path = pathlib.Path(__file__).parent.parent / '.env'
+if _env_path.exists():
+    for _line in _env_path.read_text(encoding='utf-8').splitlines():
+        _line = _line.strip()
+        if not _line or _line.startswith('#') or '=' not in _line:
+            continue
+        _k, _v = _line.split('=', 1)
+        if _k.strip() and _k.strip() not in os.environ:
+            os.environ[_k.strip()] = _v.strip()
+
 GROUP_ID   = os.environ.get("KYUJINBOX_GROUP_ID", "G5922-7577-0001")
 TARGET_URL = f"https://saiyo.kyujinbox.com/company/groups/{GROUP_ID}/jobs/new"
 
