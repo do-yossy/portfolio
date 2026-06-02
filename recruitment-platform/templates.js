@@ -691,14 +691,33 @@ function jobDetailPage(job) {
     }
   } : undefined;
 
+  const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+  const jobUrl  = `${siteUrl}/jobs/${job.id}`;
+
+  // 都道府県を location 文字列から抽出（Google Jobs: addressRegion）
+  const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+  const addressRegion = PREFS.find(p => job.location.includes(p)) || '';
+
+  // validThrough: DB に expires_at があればその値、なければ掲載日から60日後
+  const datePosted = (job.published_at || job.created_at || '').slice(0, 10);
+  const validThrough = job.expires_at
+    ? job.expires_at.slice(0, 10)
+    : (() => {
+        const d = new Date(datePosted || Date.now());
+        d.setDate(d.getDate() + 60);
+        return d.toISOString().slice(0, 10);
+      })();
+
   const jsonldObj = {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
     "title": job.title,
     "description": job.description,
+    "url": jobUrl,
     "identifier": { "@type": "PropertyValue", "name": process.env.COMPANY_NAME || "採用企業", "value": job.id },
-    "datePosted": (job.published_at || job.created_at || '').slice(0, 10),
-    ...(job.expires_at ? { "validThrough": job.expires_at.slice(0, 10) } : {}),
+    "datePosted": datePosted,
+    "validThrough": validThrough,
+    "directApply": true,
     "employmentType": mapEmploymentType(job.employment_type),
     "hiringOrganization": {
       "@type": "Organization",
@@ -710,6 +729,7 @@ function jobDetailPage(job) {
       "address": {
         "@type": "PostalAddress",
         "addressLocality": job.location,
+        ...(addressRegion ? { "addressRegion": addressRegion } : {}),
         "addressCountry": "JP"
       }
     },
@@ -783,7 +803,6 @@ function jobDetailPage(job) {
   </div>
 </div>`;
 
-  const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
   return publicLayout(`${esc(job.title)} | 求人詳細`, content, {
     description: `${job.location}・${job.salary}・${job.employment_type}。${job.description.slice(0, 100)}`,
     jsonld,
