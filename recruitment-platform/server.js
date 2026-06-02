@@ -1061,8 +1061,9 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── API: CSV Export ──
   if (pathname === '/api/export/csv' && method === 'GET') {
-    const exportCo = query.company || co;
-    const filter = query.filter || '';   // '' | 'new' | 'monthly' | 'ng'
+    const exportCo = query.company || query.co || co;
+    // type / filter どちらの名前でも受け付ける（'new' | 'monthly' | 'ng'）
+    const filter = query.filter || query.type || '';
     const month  = query.month  || '';   // 'YYYY-MM'
     let applicants, includeCompany;
     if (exportCo === 'all') {

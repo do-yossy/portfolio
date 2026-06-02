@@ -178,36 +178,23 @@ async function exportCSV(company) {
 
 // ── List Export (新規 / 月次全件 / 月次NG) ──
 async function exportList(type) {
-  const co = new URLSearchParams(location.search).get('co') || 'sq';
-  const params = new URLSearchParams();
-  params.set('company', co);
-  let labelText = '', fileTag = type;
-  if (type === 'new') {
-    params.set('filter', 'new');
-    labelText = '新規リスト';
-  } else if (type === 'monthly' || type === 'ng') {
-    const month = document.getElementById('export-month')?.value || '';
-    if (!month) { toast('対象月を選択してください', 'error'); return; }
-    params.set('filter', type);
-    params.set('month', month);
-    fileTag = `${type}-${month}`;
-    labelText = type === 'monthly' ? `${month} 全応募者` : `${month} NGリスト`;
-  } else {
-    return;
-  }
+  const month = document.getElementById('export-month')?.value || '';
+  const co = new URLSearchParams(location.search).get('co') || '';
+  const labels = { new: '新規リスト', monthly: `全応募者_${month}`, ng: `NGリスト_${month}` };
   try {
-    const r = await fetch('/api/export/csv?' + params.toString());
-    if (!r.ok) throw new Error();
+    let url = `/api/export/csv?type=${type}`;
+    if (month && (type === 'monthly' || type === 'ng')) url += `&month=${month}`;
+    if (co) url += `&co=${co}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(await r.text());
     const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `${fileTag}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.href = URL.createObjectURL(blob);
+    a.download = `${labels[type]}_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
-    toast(`${labelText}を出力しました`, 'success');
+    toast(`${labels[type]}をダウンロードしました`, 'success');
   } catch {
-    toast('リスト出力に失敗しました', 'error');
+    toast('CSV出力に失敗しました', 'error');
   }
 }
 
