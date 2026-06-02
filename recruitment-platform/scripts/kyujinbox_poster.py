@@ -246,6 +246,35 @@ def click_submit_button(page):
     except Exception:
         pass
 
+    # まず「公開する」ボタンが有効か確認
+    publish_disabled = False
+    try:
+        pub_loc = page.locator('button:has-text("公開する")')
+        if pub_loc.count() > 0:
+            pub_el = pub_loc.last
+            if pub_el.is_visible():
+                cls = pub_el.get_attribute('class') or ''
+                publish_disabled = 'is-disab' in cls or pub_el.get_attribute('disabled') is not None
+    except Exception:
+        pass
+
+    # 公開するが無効なら「一時保存」を先に試みる（バリデーション回避）
+    if publish_disabled:
+        progress("  ⚠️ 「公開する」が無効 → 「一時保存」を試みます", "warn")
+        for tag in ['button', 'a']:
+            try:
+                draft_loc = page.locator(f'{tag}:has-text("一時保存")')
+                if draft_loc.count() > 0:
+                    draft_el = draft_loc.last
+                    if draft_el.is_visible():
+                        draft_el.scroll_into_view_if_needed()
+                        rand_delay(0.3, 0.6)
+                        draft_el.click()
+                        progress(f"  ✅ 一時保存クリック（後で手動公開が必要）", "info")
+                        return True
+            except Exception:
+                pass
+
     for label in ['公開する', '掲載する', '求人を公開', '保存して公開', '登録する', '確認する', '次へ', '一時保存', '保存']:
         for tag in ['button', 'a']:
             try:
@@ -667,6 +696,40 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
                 }
             }
 
+            // ── Nuxt2 ($nuxt) 試行 ──
+            try {
+                const nuxt = window.$nuxt;
+                if (nuxt && nuxt.$store) {
+                    // Vuex ストアから kyujin 系モジュールを探す
+                    const st = nuxt.$store.state;
+                    for (const mod of Object.keys(st)) {
+                        const m = st[mod];
+                        if (m && typeof m === 'object' && looksLikeFormData(m)) {
+                            applyPatch(m, (obj, k, v) => nuxt.$store.commit(mod + '/SET_' + k.toUpperCase(), v) || (obj[k] = v));
+                            if (msgs.length) return 'nuxt2-store[' + mod + ']: ' + msgs.join('; ');
+                        }
+                    }
+                }
+            } catch(e) {}
+
+            // ── Nuxt3 (useNuxtApp) 試行 ──
+            try {
+                const app = window.__nuxt_app__ || (document.querySelector('#__nuxt')?.__vueParentComponent?.appContext?.app);
+                if (app) {
+                    // Pinia ストアを探す
+                    const pinia = app._context?.provides?.pinia || app._context?.provides?.$pinia;
+                    if (pinia && pinia._s) {
+                        for (const [id, store] of pinia._s) {
+                            if (looksLikeFormData(store.$state || store)) {
+                                const storeData = store.$state || store;
+                                applyPatch(storeData, (obj, k, v) => { obj[k] = v; });
+                                if (msgs.length) return 'nuxt3-pinia[' + id + ']: ' + msgs.join('; ');
+                            }
+                        }
+                    }
+                }
+            } catch(e) {}
+
             // ── Vue2 試行 ──
             const v2r = findVue2FormVm();
             if (v2r) {
@@ -682,22 +745,26 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
             }
 
             // ── 最終手段: 全フィールドに native setter + InputEvent で Vue 通知 ──
+            // NOTE: selectMap は削除。payType の change イベントが Vue の watcher を起動して
+            //       payMin をクリアしてしまうため DOM 直接書き込みに統一する。
             let domCount = 0;
 
-            // テキスト系フィールド
+            // テキスト/数値フィールド（input + textarea）
             const domMap = {
-                title: 'input[name="title"]',
-                description: 'textarea[name="description"]',
-                rewarding: 'textarea[name="rewarding"]',
-                qualifications: 'textarea[name="qualifications"]',
-                transportation: 'textarea[name="transportation"]',
+                title:           'input[name="title"]',
+                description:     'textarea[name="description"]',
+                rewarding:       'textarea[name="rewarding"]',
+                qualifications:  'textarea[name="qualifications"]',
+                transportation:  'textarea[name="transportation"]',
                 worktimeHoliday: 'textarea[name="worktimeHoliday"]',
-                benefit: 'textarea[name="benefit"]',
-                howToApply: 'textarea[name="howToApply"]',
+                benefit:         'textarea[name="benefit"]',
+                howToApply:      'textarea[name="howToApply"]',
+                payMin:          'input[name="payMin"]',
+                payMax:          'input[name="payMax"]',
             };
             for (const [k, sel] of Object.entries(domMap)) {
                 const v = patch[k];
-                if (!v) continue;
+                if (v === null || v === undefined || v === '') continue;
                 const el = document.querySelector(sel);
                 if (!el) continue;
                 try {
@@ -705,35 +772,11 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
                         ? window.HTMLTextAreaElement.prototype
                         : window.HTMLInputElement.prototype;
                     const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-                    if (setter) setter.call(el, v);
-                    else el.value = v;
+                    if (setter) setter.call(el, String(v));
+                    else el.value = String(v);
                     el.dispatchEvent(new InputEvent('input', {bubbles: true, cancelable: true, composed: true, inputType: 'insertText'}));
                     el.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
                     el.dispatchEvent(new Event('blur', {bubbles: true, composed: true}));
-                    domCount++;
-                } catch(e) {}
-            }
-
-            // セレクト系フィールド（Vue reactive に必須）
-            const selectMap = [
-                {sel: 'select[name="jobType"]',  val: String(patch.jobType || '')},
-                {sel: 'select[name="prefVal"]',   val: patch.workLocations?.[0]?.prefectureId != null
-                                                        ? String(patch.workLocations[0].prefectureId) : null},
-                {sel: 'select[name="payType"]',   val: patch.payType != null ? String(patch.payType) : null},
-            ];
-            for (const {sel, val} of selectMap) {
-                if (!val) continue;
-                const el = document.querySelector(sel);
-                if (!el) continue;
-                try {
-                    const setter = Object.getOwnPropertyDescriptor(
-                        window.HTMLSelectElement.prototype, 'value')?.set;
-                    if (setter) setter.call(el, val);
-                    else el.value = val;
-                    el.dispatchEvent(new Event('focus',  {bubbles: true, composed: true}));
-                    el.dispatchEvent(new Event('input',  {bubbles: true, composed: true}));
-                    el.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
-                    el.dispatchEvent(new Event('blur',   {bubbles: true, composed: true}));
                     domCount++;
                 } catch(e) {}
             }
@@ -1651,13 +1694,15 @@ def main():
                     url_changed = final_url != actual_url
                     # kyujinbox のジョブIDは 5922-7577-XXXX 形式（英数字ハイフン）
                     # /new → /edit/5922-7577-XXXX へのリダイレクトを成功と判定
-                    was_new = '/jobs/new' in actual_url
+                    was_new = '/jobs/new' in actual_url or '/jobs/edit' in actual_url
                     went_edit = '/jobs/edit/' in final_url
                     has_job_id = bool(re.search(r'/jobs/edit/[\w-]+', final_url))
+                    # 一時保存も成功: /draft/ や /jobs/ トップへの遷移
+                    went_draft = '/draft' in final_url or (url_changed and '/jobs' in final_url and 'login' not in final_url)
 
-                    if (was_new and went_edit) or (url_changed and has_job_id):
-                        # 新規作成→編集ページへ遷移: 成功
-                        progress(f"✅ 「{job['title']}」を投稿しました (URL: {final_url})", "success")
+                    if went_edit or has_job_id or went_draft:
+                        label = "一時保存" if not went_edit else "投稿"
+                        progress(f"✅ 「{job['title']}」を{label}しました (URL: {final_url})", "success")
                         success_count += 1
                     elif url_changed and 'login' not in final_url and '/new' not in final_url:
                         # URL変化あり・ログインでもなく新規ページでもない
