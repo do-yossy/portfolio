@@ -761,7 +761,16 @@ def publish_draft(page, draft_url):
                 rand_delay(0.2, 0.4)
                 pub.click()
                 progress("  ⚠️ is-disab除去後にクリック（公開可否は要確認）", "warn")
-                rand_delay(3.0, 5.0)
+                rand_delay(1.5, 2.5)
+                # 確認ダイアログのOKも押す
+                try:
+                    page.wait_for_selector('button:has-text("OK")', timeout=8000, state='visible')
+                    rand_delay(0.3, 0.6)
+                    page.locator('button:has-text("OK")').last.click()
+                    progress("  ✅ 確認ダイアログ「OK」をクリックしました（is-disab後）", "success")
+                    rand_delay(3.0, 5.0)
+                except Exception:
+                    rand_delay(2.0, 3.0)
                 try:
                     page.wait_for_load_state('networkidle', timeout=15000)
                 except Exception:
@@ -778,11 +787,26 @@ def publish_draft(page, draft_url):
         rand_delay(0.3, 0.6)
         pub.click()
         progress("  ✅ 公開するをクリックしました", "info")
-        rand_delay(3.0, 5.0)
+        rand_delay(1.5, 2.5)
+
+        # ── 確認ダイアログ「求人を公開します。」→ OK をクリック ──
+        try:
+            ok_btn = page.locator('button:has-text("OK"), button:has-text("ＯＫ"), button:has-text("はい"), button:has-text("公開する"):visible').last
+            # ダイアログが出るまで少し待機（モーダルアニメーション）
+            page.wait_for_selector('button:has-text("OK")', timeout=8000, state='visible')
+            rand_delay(0.3, 0.6)
+            page.locator('button:has-text("OK")').last.click()
+            progress("  ✅ 確認ダイアログ「OK」をクリックしました", "success")
+            rand_delay(3.0, 5.0)
+        except Exception as e:
+            progress(f"  ⚠️ 確認ダイアログが見つからないかOKクリック失敗: {e}", "warn")
+            rand_delay(2.0, 3.0)
+
         try:
             page.wait_for_load_state('networkidle', timeout=15000)
         except Exception:
             pass
+        progress("  🎉 公開処理完了", "success")
         return True
     except Exception as e:
         progress(f"  ⚠️ 公開処理エラー: {e}", "warn")
