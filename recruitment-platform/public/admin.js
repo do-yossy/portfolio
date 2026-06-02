@@ -176,6 +176,41 @@ async function exportCSV(company) {
   }
 }
 
+// ── List Export (新規 / 月次全件 / 月次NG) ──
+async function exportList(type) {
+  const co = new URLSearchParams(location.search).get('co') || 'sq';
+  const params = new URLSearchParams();
+  params.set('company', co);
+  let labelText = '', fileTag = type;
+  if (type === 'new') {
+    params.set('filter', 'new');
+    labelText = '新規リスト';
+  } else if (type === 'monthly' || type === 'ng') {
+    const month = document.getElementById('export-month')?.value || '';
+    if (!month) { toast('対象月を選択してください', 'error'); return; }
+    params.set('filter', type);
+    params.set('month', month);
+    fileTag = `${type}-${month}`;
+    labelText = type === 'monthly' ? `${month} 全応募者` : `${month} NGリスト`;
+  } else {
+    return;
+  }
+  try {
+    const r = await fetch('/api/export/csv?' + params.toString());
+    if (!r.ok) throw new Error();
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fileTag}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`${labelText}を出力しました`, 'success');
+  } catch {
+    toast('リスト出力に失敗しました', 'error');
+  }
+}
+
 // ── Indeed Scrape ──
 async function runRotation() {
   const btn = document.getElementById('btn-rotate');

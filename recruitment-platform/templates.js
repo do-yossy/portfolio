@@ -632,6 +632,17 @@ function adminApplicantsPage(applicants, filter = 'all', co = 'sq') {
     <button class="btn btn-primary" onclick="exportCSV('all')" title="Social Quality + Life Tailor を合算してCSV出力">📊 全社合算CSV出力</button>
   </div>
 </div>
+<div class="card mb-16">
+  <div class="action-section-title">📤 リスト出力</div>
+  <div class="btn-group flex-wrap">
+    <button class="btn btn-primary btn-sm" onclick="exportList('new')">① 新規リスト出力</button>
+    <div class="flex items-center gap-8">
+      <input type="month" id="export-month" class="input-sm" value="${new Date().toISOString().slice(0,7)}">
+      <button class="btn btn-ghost btn-sm" onclick="exportList('monthly')">② 月次全応募者出力</button>
+      <button class="btn btn-warning btn-sm" onclick="exportList('ng')">③ 月次NGリスト出力</button>
+    </div>
+  </div>
+</div>
 <div id="drop-zone" class="drop-zone mb-16" onclick="triggerCSVImport()">
   <div class="drop-zone-icon">📄</div>
   <p>CSVファイルをドロップまたはクリックで選択</p>

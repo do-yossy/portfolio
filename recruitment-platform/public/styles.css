@@ -181,6 +181,7 @@ a { color: inherit; text-decoration: none; }
 .btn-ghost:hover:not(:disabled)    { background: var(--bg); color: var(--text); }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-lg { padding: 11px 20px; font-size: 15px; }
+.input-sm { padding: 5px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; }
 
 .btn-group { display: flex; flex-wrap: wrap; gap: 8px; }
 

@@ -1062,6 +1062,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   // ── API: CSV Export ──
   if (pathname === '/api/export/csv' && method === 'GET') {
     const exportCo = query.company || co;
+    const filter = query.filter || '';   // '' | 'new' | 'monthly' | 'ng'
+    const month  = query.month  || '';   // 'YYYY-MM'
     let applicants, includeCompany;
     if (exportCo === 'all') {
       // 全会社合算 (両社のデータをマージ)
@@ -1071,8 +1073,20 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       applicants = await Applicants.findAll({ company: exportCo });
       includeCompany = false;
     }
+    // ── リスト出力フィルタ ──
+    let label = exportCo === 'all' ? 'all' : exportCo;
+    if (filter === 'new') {
+      applicants = applicants.filter(a => a.status === '新規');
+      label += '-new';
+    } else if (filter === 'monthly') {
+      applicants = applicants.filter(a => (a.applied_at || '').slice(0, 7) === month);
+      label += `-${month}`;
+    } else if (filter === 'ng') {
+      applicants = applicants.filter(a =>
+        a.status === 'NG' && (!month || (a.applied_at || '').slice(0, 7) === month));
+      label += month ? `-ng-${month}` : '-ng';
+    }
     const csv = generateCSV(applicants, includeCompany);
-    const label = exportCo === 'all' ? 'all' : exportCo;
     res.writeHead(200, {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="ca-list-${label}-${new Date().toISOString().slice(0,10)}.csv"`
