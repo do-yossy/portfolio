@@ -1228,6 +1228,11 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         if (txt) pushLog(`⚠️ ${txt}`, 'warn');
       });
 
+      proc.on('error', err => {
+        pushLog(`❌ プロセス起動失敗: ${err.message}`, 'error');
+        session.done = true; session.success = false;
+      });
+
       proc.on('close', async code => {
         const ok = code === 0;
         const msg = ok ? '✅ 求人ボックス投稿完了' : `❌ 求人ボックス投稿失敗(exit ${code})`;
@@ -1239,7 +1244,10 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         );
         session.done = true; session.success = ok;
       });
-    })();
+    })().catch(err => {
+      pushLog(`❌ 内部エラー: ${err.message}`, 'error');
+      session.done = true; session.success = false;
+    });
     return;
   }
 

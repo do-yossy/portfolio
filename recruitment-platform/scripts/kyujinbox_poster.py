@@ -31,7 +31,7 @@ PREFECTURES = [
 def progress(message, level="info"):
     print(json.dumps({"type": "progress", "message": str(message) if message is not None else "", "level": level}), flush=True)
 
-def rand_delay(min_s=1.5, max_s=4.0):
+def rand_delay(min_s=0.5, max_s=1.5):
     time.sleep(random.uniform(min_s, max_s))
 
 def start_keepalive(interval=12):
@@ -125,10 +125,10 @@ def human_type(page, selector, text, timeout=15000):
     """人間らしいランダム速度でテキストを入力"""
     el = page.wait_for_selector(selector, timeout=timeout)
     el.click()
-    rand_delay(0.3, 0.8)
+    rand_delay(0.2, 0.5)
     for char in text:
         page.keyboard.type(char)
-        time.sleep(random.uniform(0.03, 0.12))
+        time.sleep(random.uniform(0.02, 0.06))
 
 def fill_text(page, selector, value, timeout=8000):
     """テキスト/テキストエリアを fill() で埋める（失敗時は無視）"""
@@ -1285,10 +1285,10 @@ def main():
             )
             progress(f"🔒 パスワードセレクタ: {pass_sel}", "info")
             human_type(page, pass_sel, password)
-            rand_delay(0.5, 1.2)
+            rand_delay(0.3, 0.8)
 
             page.click('button[type="submit"], input[type="submit"], .login-btn, form button')
-            rand_delay(1.5, 3.0)
+            rand_delay(0.8, 1.5)
             page.wait_for_load_state('networkidle', timeout=15000)
 
             current_url = page.url
@@ -1323,7 +1323,7 @@ def main():
 
             for i, job in enumerate(target_jobs):
                 progress(f"📝 [{i+1}/{len(target_jobs)}] 「{job['title']}」を投稿中...", "info")
-                rand_delay(1.5, 3.0)
+                rand_delay(0.5, 1.0)
 
                 try:
                     page.goto(post_url, timeout=30000)
@@ -1346,12 +1346,12 @@ def main():
                                 return s.display !== 'none' && s.visibility !== 'hidden';
                             });
                             return vis.length >= 3;
-                        }""", timeout=30000)
-                        rand_delay(1.0, 2.0)
+                        }""", timeout=15000)
+                        rand_delay(0.5, 1.0)
                         progress("  ✅ フォーム描画完了", "info")
                     except Exception as fe:
                         progress(f"  ⚠️ フォーム描画待機タイムアウト（続行）: {fe}", "warn")
-                        rand_delay(3.0, 5.0)
+                        rand_delay(1.0, 2.0)
 
                     # Vue描画後に全フィールドをダンプ（毎回）
                     dump_visible_inputs(page)
