@@ -424,6 +424,12 @@ function adminApplicantsPage(applicants, filter = 'all') {
       <div class="media-import-label google">🔍 Googleしごと検索</div>
       <span class="text-sm text-muted">応募フォームから自動取得</span>
     </div>
+    <div class="media-import-item">
+      <div class="media-import-label" style="background:#f3f4f6;color:#374151">📁 過去応募データ</div>
+      <button class="btn btn-ghost btn-sm" onclick="triggerMediaCSV('past')">ExcelCSVインポート</button>
+      <input type="file" id="csv-past" accept=".csv" style="display:none" onchange="handleMediaCSV(this,'past')">
+      <span class="text-sm text-muted">重複チェック対象に追加</span>
+    </div>
   </div>
   <div id="import-result" class="import-result hidden"></div>
 </div>

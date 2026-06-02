@@ -200,7 +200,7 @@ async function handleMediaCSV(input, media) {
   const file = input.files[0];
   if (!file) return;
 
-  const mediaNames = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ' };
+  const mediaNames = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ', past: '過去応募データ' };
   const resultEl = document.getElementById('import-result');
   if (resultEl) { resultEl.className = 'import-result'; resultEl.textContent = `${mediaNames[media]} のCSVを処理中...`; }
 

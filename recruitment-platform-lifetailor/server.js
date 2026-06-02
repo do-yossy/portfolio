@@ -102,8 +102,7 @@ function mapCSVRow(row, mediaHint) {
   };
 
   // 媒体別マッピング
-  if (mediaHint === 'stanby') {
-    // スタンバイCSV列名: 氏名・電話番号・メールアドレス・応募日時・求人タイトル等
+  if (mediaHint === 'stanby' || mediaHint === 'past') {
     return {
       name:        col(['氏名']),
       phone:       col(['電話番号']),
@@ -112,8 +111,8 @@ function mapCSVRow(row, mediaHint) {
       address:     col(['住所']),
       jobTitle:    col(['求人タイトル']),
       appliedAt:   col(['応募日時']),
-      sourceMedia: 'スタンバイ',
-      note:        col(['備考・PR']),
+      sourceMedia: mediaHint === 'past' ? '過去応募' : 'スタンバイ',
+      note:        col(['備考・PR','備考','選考コメント']),
     };
   }
 
