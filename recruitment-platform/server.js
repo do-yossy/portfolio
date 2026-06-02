@@ -92,19 +92,41 @@ function parseCSV(text) {
 }
 
 // Map CSV columns to applicant fields (flexible column names)
+function cleanCell(v) {
+  if (!v) return '';
+  v = String(v).trim();
+  // Excel式エラー・空扱い
+  if (/^#(REF|N\/A|VALUE|DIV\/0|NAME|NULL|NUM)!?$/i.test(v)) return '';
+  return v;
+}
+
+function cleanPhone(v) {
+  if (!v) return '';
+  // スペース・ハイフン・括弧を除いた数字のみに正規化
+  const digits = v.replace(/[\s\-\(\)\.]/g, '');
+  // 国際番号 +81 → 0 に変換
+  return digits.replace(/^\+81/, '0');
+}
+
+function cleanName(v) {
+  if (!v) return '';
+  // 「氏名（ふりがな）」形式からふりがな部分を除去
+  return v.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
+}
+
 function mapCSVRow(row, mediaHint) {
   const col = (keys) => {
     for (const k of keys) {
       const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
-      if (v) return v;
+      if (v) return cleanCell(v);
     }
     return '';
   };
 
   if (mediaHint === 'stanby' || mediaHint === 'past') {
     return {
-      name:        col(['氏名']),
-      phone:       col(['電話番号']),
+      name:        cleanName(col(['氏名'])),
+      phone:       cleanPhone(col(['電話番号'])),
       email:       col(['メールアドレス']),
       age:         col(['生年月日']),
       address:     col(['住所']),
@@ -117,8 +139,8 @@ function mapCSVRow(row, mediaHint) {
 
   if (mediaHint === 'kyujinbox') {
     return {
-      name:        col(['氏名','名前']),
-      phone:       col(['電話番号','電話','tel']),
+      name:        cleanName(col(['氏名','名前'])),
+      phone:       cleanPhone(col(['電話番号','電話','tel'])),
       email:       col(['メールアドレス','メール','email']),
       age:         col(['年齢','生年月日']),
       address:     col(['応募者の居住地','住所']),
@@ -131,10 +153,10 @@ function mapCSVRow(row, mediaHint) {
 
   if (mediaHint === 'indeed') {
     return {
-      name:        col(['名前','氏名','name']),
-      phone:       col(['電話番号','電話','phone','tel']),
+      name:        cleanName(col(['名前','氏名','name'])),
+      phone:       cleanPhone(col(['電話番号','電話','phone','tel'])),
       email:       col(['メールアドレス','メール','email','mail']),
-      age:         col(['年齢']),
+      age:         col(['年齢','生年月日']),
       address:     col(['応募者の居住地','住所','address']),
       jobTitle:    col(['職種名','求人タイトル','勤務地']),
       appliedAt:   col(['日付','応募日時','応募日']),
@@ -675,19 +697,34 @@ ${jobUrls}
     const buf = await readBody(req);
     const ct = req.headers['content-type'] || '';
     let csvText = '';
+
+    function decodeBuffer(b) {
+      // UTF-8（BOM付き含む）を最初に試みる
+      try {
+        const d = new TextDecoder('utf-8', { fatal: true });
+        return d.decode(b).replace(/^﻿/, '');
+      } catch (_) {}
+      // Shift-JIS / CP932 を試みる
+      try {
+        const d = new TextDecoder('shift_jis');
+        return d.decode(b);
+      } catch (_) {}
+      return b.toString('utf8');
+    }
+
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=([^;]+)/);
       if (!boundaryMatch) { sendError(res, 400, 'boundary not found'); return; }
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
       const filePart = parts.find(p => p.header.includes('filename'));
       if (!filePart) { sendError(res, 400, 'ファイルが見つかりません'); return; }
-      csvText = filePart.content.toString('utf8');
+      csvText = decodeBuffer(filePart.content);
     } else {
-      csvText = buf.toString('utf8');
+      csvText = decodeBuffer(buf);
     }
 
     const mediaHint = parsedUrl.query.media || '';
-    const mediaNames = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ' };
+    const mediaNames = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ', past: '過去応募データ' };
     const mediaLabel = mediaNames[mediaHint] || 'CSV取込';
 
     const rows = parseCSV(csvText);

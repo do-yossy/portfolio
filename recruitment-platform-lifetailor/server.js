@@ -92,20 +92,37 @@ function parseCSV(text) {
 }
 
 // Map CSV columns to applicant fields (flexible column names)
+function cleanCell(v) {
+  if (!v) return '';
+  v = String(v).trim();
+  if (/^#(REF|N\/A|VALUE|DIV\/0|NAME|NULL|NUM)!?$/i.test(v)) return '';
+  return v;
+}
+
+function cleanPhone(v) {
+  if (!v) return '';
+  const digits = v.replace(/[\s\-\(\)\.]/g, '');
+  return digits.replace(/^\+81/, '0');
+}
+
+function cleanName(v) {
+  if (!v) return '';
+  return v.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
+}
+
 function mapCSVRow(row, mediaHint) {
   const col = (keys) => {
     for (const k of keys) {
       const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
-      if (v) return v;
+      if (v) return cleanCell(v);
     }
     return '';
   };
 
-  // 媒体別マッピング
   if (mediaHint === 'stanby' || mediaHint === 'past') {
     return {
-      name:        col(['氏名']),
-      phone:       col(['電話番号']),
+      name:        cleanName(col(['氏名'])),
+      phone:       cleanPhone(col(['電話番号'])),
       email:       col(['メールアドレス']),
       age:         col(['生年月日']),
       address:     col(['住所']),
@@ -117,10 +134,9 @@ function mapCSVRow(row, mediaHint) {
   }
 
   if (mediaHint === 'kyujinbox') {
-    // 求人ボックスCSV列名: 氏名・メールアドレス・電話番号・ステータス・応募者の居住地・関連のある経験・学歴・職種名・勤務地・日付・年齢・生年月日・架電回数
     return {
-      name:        col(['氏名','名前']),
-      phone:       col(['電話番号','電話','tel']),
+      name:        cleanName(col(['氏名','名前'])),
+      phone:       cleanPhone(col(['電話番号','電話','tel'])),
       email:       col(['メールアドレス','メール','email']),
       age:         col(['年齢','生年月日']),
       address:     col(['応募者の居住地','住所']),
@@ -132,12 +148,11 @@ function mapCSVRow(row, mediaHint) {
   }
 
   if (mediaHint === 'indeed') {
-    // Indeed CSV列名: 名前・メールアドレス・電話番号・ステータス・応募者の居住地・職種名・勤務地・日付・年齢・生年月日
     return {
-      name:        col(['名前','氏名','name']),
-      phone:       col(['電話番号','電話','phone','tel']),
+      name:        cleanName(col(['名前','氏名','name'])),
+      phone:       cleanPhone(col(['電話番号','電話','phone','tel'])),
       email:       col(['メールアドレス','メール','email','mail']),
-      age:         col(['年齢']),
+      age:         col(['年齢','生年月日']),
       address:     col(['応募者の居住地','住所','address']),
       jobTitle:    col(['職種名','求人タイトル','勤務地']),
       appliedAt:   col(['日付','応募日時','応募日']),
@@ -146,10 +161,9 @@ function mapCSVRow(row, mediaHint) {
     };
   }
 
-  // デフォルト（媒体不明）
   return {
-    name:        col(['氏名','name','名前','お名前','姓名']),
-    phone:       col(['電話番号','phone','tel','電話','携帯']),
+    name:        cleanName(col(['氏名','name','名前','お名前','姓名'])),
+    phone:       cleanPhone(col(['電話番号','phone','tel','電話','携帯'])),
     email:       col(['メール','email','mail','メールアドレス']),
     age:         col(['年齢','age']),
     address:     col(['住所','address','addr']),
@@ -679,19 +693,32 @@ ${jobUrls}
     const buf = await readBody(req);
     const ct = req.headers['content-type'] || '';
     let csvText = '';
+
+    function decodeBuffer(b) {
+      try {
+        const d = new TextDecoder('utf-8', { fatal: true });
+        return d.decode(b).replace(/^﻿/, '');
+      } catch (_) {}
+      try {
+        const d = new TextDecoder('shift_jis');
+        return d.decode(b);
+      } catch (_) {}
+      return b.toString('utf8');
+    }
+
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=([^;]+)/);
       if (!boundaryMatch) { sendError(res, 400, 'boundary not found'); return; }
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
       const filePart = parts.find(p => p.header.includes('filename'));
       if (!filePart) { sendError(res, 400, 'ファイルが見つかりません'); return; }
-      csvText = filePart.content.toString('utf8');
+      csvText = decodeBuffer(filePart.content);
     } else {
-      csvText = buf.toString('utf8');
+      csvText = decodeBuffer(buf);
     }
 
     const mediaHint = parsedUrl.query.media || '';
-    const mediaNames = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ' };
+    const mediaNames = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ', past: '過去応募データ' };
     const mediaLabel = mediaNames[mediaHint] || 'CSV取込';
 
     const rows = parseCSV(csvText);
