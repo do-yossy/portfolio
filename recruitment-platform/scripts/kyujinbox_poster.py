@@ -383,18 +383,59 @@ def find_post_url(page, group_id=None):
 
 
 def find_visible_selector(page, *selectors, timeout=5000):
-    """
-    複数セレクタを順番に試して、実際にページに存在するものを返す。
-    Vue.js SPA の name なし input にも対応。
-    """
+    """複数セレクタを順番に試して最初に見つかったものを返す（visible/attached 両方試す）"""
     for sel in selectors:
-        try:
-            el = page.wait_for_selector(sel, timeout=timeout, state='visible')
-            if el:
-                return sel, el
-        except Exception:
-            pass
+        for state in ('visible', 'attached'):
+            try:
+                el = page.wait_for_selector(sel, timeout=timeout, state=state)
+                if el:
+                    return sel, el
+            except Exception:
+                pass
     return None, None
+
+
+def dump_visible_inputs(page):
+    """Vue描画後の全visible inputをログ出力（フォーム構造把握用）"""
+    try:
+        fields = page.evaluate("""() => {
+            return Array.from(document.querySelectorAll('input,textarea,select'))
+              .filter(el => {
+                  const s = window.getComputedStyle(el);
+                  return s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0';
+              })
+              .map(el => {
+                  let label = '';
+                  if (el.id) {
+                      const l = document.querySelector('label[for="'+el.id+'"]');
+                      if (l) label = l.textContent.trim().slice(0,40);
+                  }
+                  if (!label) {
+                      const l = el.closest('label') || el.closest('div,td')?.querySelector('label');
+                      if (l) label = l.textContent.trim().slice(0,40);
+                  }
+                  const opts = el.tagName==='SELECT'
+                      ? Array.from(el.options).slice(0,5).map(o=>o.value+':'+o.text.trim()).join('|')
+                      : null;
+                  return {
+                      tag: el.tagName.toLowerCase(),
+                      name: el.name||'',
+                      id: el.id||'',
+                      type: el.type||'',
+                      ph: (el.placeholder||'').slice(0,30),
+                      label,
+                      opts
+                  };
+              });
+        }""")
+        progress(f"  📋 描画済みフィールド {len(fields)}件:", "info")
+        for f in fields:
+            line = f"    [{f['tag']}] name={f['name']!r} id={f['id']!r} type={f['type']!r} ph={f['ph']!r} label={f['label']!r}"
+            if f['opts']:
+                line += f"\n         opts: {f['opts']}"
+            progress(line, "info")
+    except Exception as e:
+        progress(f"  フィールドダンプ失敗: {e}", "warn")
 
 
 def fill_kyujinbox_form(page, job, company_name):
@@ -424,8 +465,50 @@ def fill_kyujinbox_form(page, job, company_name):
         rand_delay(0.5, 1.0)
         progress(f"  ✅ タイトル入力: {job['title'][:40]}", "info")
     else:
-        progress(f"  ⚠️ タイトル入力欄が見つかりません（スクリーンショットを確認してください）", "warn")
-        save_screenshot(page, "title_not_found")
+        # ラベルテキストで「求人名」「タイトル」を含む input を探す
+        try:
+            result = page.evaluate("""(title) => {
+                const labels = Array.from(document.querySelectorAll('label'));
+                for (const lbl of labels) {
+                    const txt = lbl.textContent.trim();
+                    if (/タイトル|求人名|職種名/.test(txt)) {
+                        const id = lbl.getAttribute('for');
+                        const target = id
+                            ? document.getElementById(id)
+                            : lbl.closest('div,td')?.querySelector('input,textarea');
+                        if (target) {
+                            target.focus();
+                            const setter = Object.getOwnPropertyDescriptor(
+                                window.HTMLInputElement.prototype, 'value')?.set;
+                            if (setter) setter.call(target, title);
+                            target.dispatchEvent(new Event('input', {bubbles:true}));
+                            target.dispatchEvent(new Event('change', {bubbles:true}));
+                            return 'ok:' + txt;
+                        }
+                    }
+                }
+                // 最終手段: 最初の visible text input
+                const first = Array.from(document.querySelectorAll('input[type="text"],input:not([type])'))
+                    .find(el => el.offsetWidth > 0 && el.offsetHeight > 0);
+                if (first) {
+                    first.focus();
+                    const setter = Object.getOwnPropertyDescriptor(
+                        window.HTMLInputElement.prototype, 'value')?.set;
+                    if (setter) setter.call(first, title);
+                    first.dispatchEvent(new Event('input', {bubbles:true}));
+                    first.dispatchEvent(new Event('change', {bubbles:true}));
+                    return 'fallback-first-input';
+                }
+                return null;
+            }""", job['title'])
+            if result:
+                progress(f"  ✅ タイトル入力（ラベル/フォールバック）: {result}", "info")
+            else:
+                progress(f"  ⚠️ タイトル入力欄が見つかりません", "warn")
+                save_screenshot(page, "title_not_found")
+        except Exception as e:
+            progress(f"  ⚠️ タイトル入力失敗: {e}", "warn")
+            save_screenshot(page, "title_not_found")
 
     # 仕事内容（必須）
     desc_sel, _ = find_visible_selector(page,
@@ -940,8 +1023,8 @@ def main():
                         progress(f"  ⚠️ フォーム描画待機タイムアウト（続行）: {fe}", "warn")
                         rand_delay(3.0, 5.0)
 
-                    if i == 0:
-                        dump_inputs(page)
+                    # Vue描画後に全フィールドをダンプ（毎回）
+                    dump_visible_inputs(page)
                     save_screenshot(page, f"post_form_{i}")
 
                     selected_job_type_val = fill_kyujinbox_form(page, job, company_name)

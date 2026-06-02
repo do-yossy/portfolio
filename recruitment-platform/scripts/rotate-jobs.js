@@ -115,6 +115,32 @@ async function main() {
     console.log(`\n⚠️  公開数が ${TARGET_ACTIVE} 件を下回っています（${finalActive}件）`);
     console.log('   求人プールを追加登録してください。');
   }
+
+  // ── Google へサイトマップ再クロール通知
+  // 新規公開があった場合のみ ping を送信
+  if (toPublish.length > 0) {
+    const siteUrl = process.env.SITE_URL || '';
+    if (siteUrl) {
+      const sitemapUrl = `${siteUrl}/sitemap.xml`;
+      try {
+        const { get } = require('https');
+        await new Promise((resolve) => {
+          const pingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`;
+          get(pingUrl, (res) => {
+            console.log(`\n🔔 Google サイトマップ通知: ${res.statusCode} (${sitemapUrl})`);
+            resolve();
+          }).on('error', (e) => {
+            console.log(`\n⚠️  Google ping 失敗（ネットワーク確認）: ${e.message}`);
+            resolve();
+          });
+        });
+      } catch (e) {
+        console.log(`\n⚠️  Google ping エラー: ${e.message}`);
+      }
+    } else {
+      console.log('\n⚠️  SITE_URL 未設定のため Google ping をスキップ');
+    }
+  }
 }
 
 main().catch(err => {

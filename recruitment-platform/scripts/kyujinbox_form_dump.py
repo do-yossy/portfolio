@@ -12,7 +12,8 @@ import random
 
 sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
 
-TARGET_URL = "https://saiyo.kyujinbox.com/company/groups/G5922-7577-0001/jobs/edit/5922-7577-0619"
+GROUP_ID   = os.environ.get("KYUJINBOX_GROUP_ID", "G5922-7577-0001")
+TARGET_URL = f"https://saiyo.kyujinbox.com/company/groups/{GROUP_ID}/jobs/new"
 
 def main():
     email    = os.environ.get("KYUJINBOX_EMAIL", "")
