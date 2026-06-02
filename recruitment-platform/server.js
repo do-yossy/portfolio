@@ -136,6 +136,7 @@ function sseInit(res) {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
     'Access-Control-Allow-Origin': '*'
   });
 }
@@ -1201,7 +1202,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     // SSE keepalive: prevent Cloudflare/proxy from closing idle SSE connections
     // during long Playwright operations (form filling can take 30-60 seconds)
     const keepalive = setInterval(() => {
-      if (!res.writableEnded) res.write(': keepalive\n\n');
+      if (!res.writableEnded) sseSend(res, { type: 'ping' });
     }, 15000);
 
     proc.stdout.on('data', data => {

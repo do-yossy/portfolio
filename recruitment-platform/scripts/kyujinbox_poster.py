@@ -967,10 +967,12 @@ def fill_kyujinbox_form(page, job, company_name):
     pay_type, pay_min, pay_max = parse_salary(salary_str)
     progress(f"  💰 給与解析: タイプ={pay_type}, 最小={pay_min}, 最大={pay_max}", "info")
 
+    progress(f"  💰 給与タイプ選択中: {pay_type}", "info")
     select_option_safe(page, 'select[name="payType"]', label=pay_type, debug=True)
     rand_delay(0.2, 0.5)
 
     if pay_min:
+        progress(f"  💰 最小給与入力中: {pay_min}", "info")
         try:
             pm_el = page.wait_for_selector('input[name="payMin"]', timeout=5000)
             ph = pm_el.get_attribute('placeholder') or ''
@@ -984,6 +986,7 @@ def fill_kyujinbox_form(page, job, company_name):
         rand_delay(0.2, 0.5)
 
     if pay_max:
+        progress(f"  💰 最大給与入力中: {pay_max}", "info")
         try:
             px_el = page.wait_for_selector('input[name="payMax"]', timeout=5000)
             ph = px_el.get_attribute('placeholder') or ''
@@ -996,24 +999,28 @@ def fill_kyujinbox_form(page, job, company_name):
         rand_delay(0.2, 0.5)
 
     # 給与詳細テキスト
+    progress(f"  📝 給与詳細テキスト入力中", "info")
     fill_text(page, 'textarea[name="benefit"]', salary_str)
     rand_delay(0.3, 0.6)
 
     # 仕事のやりがい (rewarding) - あれば入力
     rewarding = job.get('rewarding', job.get('description', ''))
     if rewarding:
+        progress(f"  📝 やりがい入力中", "info")
         fill_text(page, 'textarea[name="rewarding"]', rewarding)
         rand_delay(0.3, 0.6)
 
     # 労働時間・休日 (worktimeHoliday)
     worktime = job.get('worktimeHoliday', job.get('workTime', ''))
     if worktime:
+        progress(f"  📝 勤務時間・休日入力中", "info")
         fill_text(page, 'textarea[name="worktimeHoliday"]', worktime)
         rand_delay(0.3, 0.6)
 
     # アクセス (transportation)
     transport = job.get('transportation', job.get('access', ''))
     if transport:
+        progress(f"  📝 アクセス情報入力中", "info")
         fill_text(page, 'textarea[name="transportation"]', transport)
         rand_delay(0.3, 0.6)
 
@@ -1025,6 +1032,7 @@ def fill_kyujinbox_form(page, job, company_name):
         except Exception:
             tags = []
     if tags:
+        progress(f"  📝 応募資格・タグ入力中", "info")
         qual_text = ' / '.join(tags)
         fill_text(page, 'textarea[name="qualifications"]', qual_text)
         rand_delay(0.3, 0.6)

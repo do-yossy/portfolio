@@ -105,6 +105,7 @@ function runSSE(url, boxId, btnId, onDone) {
   evs.onmessage = e => {
     try {
       const d = JSON.parse(e.data);
+      if (d.type === 'ping') return;
       appendLog(box, d.message, d.type || 'info');
       if (d.done) {
         evs.close();
