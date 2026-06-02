@@ -817,6 +817,38 @@ def fill_kyujinbox_form(page, job, company_name):
         fill_text(page, 'textarea[name="qualifications"]', qual_text)
         rand_delay(0.3, 0.6)
 
+    # ---- 特徴チェックボックス (characteristics) ----
+    # 確認済みvalue: 未経験歓迎=1, 研修あり=19, 昇給あり=23, 社会保険完備=24, 週休2日制=43, 車通勤OK=52
+    CHAR_VALUES = ['1', '19', '23', '24', '43', '52']
+    try:
+        checked_chars = page.evaluate(f"""(targetValues) => {{
+            const checkboxes = document.querySelectorAll('input[name="characteristics"]');
+            if (!checkboxes.length) return 'none found';
+            let checked = 0;
+            for (const cb of checkboxes) {{
+                if (targetValues.includes(cb.value)) {{
+                    if (!cb.checked) {{
+                        const label = cb.closest('label') || cb.nextElementSibling
+                            || document.querySelector('label[for="' + cb.id + '"]');
+                        if (label) {{
+                            label.click();
+                        }} else {{
+                            const setter = Object.getOwnPropertyDescriptor(
+                                window.HTMLInputElement.prototype, 'checked')?.set;
+                            if (setter) setter.call(cb, true);
+                            cb.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        }}
+                        checked++;
+                    }}
+                }}
+            }}
+            return 'checked ' + checked + '/' + checkboxes.length;
+        }}""", CHAR_VALUES)
+        progress(f"  ✅ characteristics: {checked_chars}", "info")
+        rand_delay(0.3, 0.6)
+    except Exception as e:
+        progress(f"  ⚠️ characteristics 失敗: {e}", "warn")
+
     # ---- 電話番号 ----
     # DOM操作でクリアする（インターセプターでもバックアップ対応）
     try:

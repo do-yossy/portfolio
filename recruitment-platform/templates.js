@@ -262,6 +262,30 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
     </div>
 
     <div class="action-section mt-16">
+      <div class="action-section-title">🤖 AI求人自動生成 <span class="text-muted text-sm">（軽配送エリア別・30日で自動削除）</span></div>
+      <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px">
+        <label style="font-size:12px;color:#64748b;white-space:nowrap">媒体:</label>
+        <select id="ai-gen-target" class="form-input" style="width:130px;padding:4px 8px;font-size:13px">
+          <option value="all">全媒体</option>
+          <option value="kyujinbox">求人ボックス</option>
+          <option value="stanby">スタンバイ</option>
+        </select>
+        <label style="font-size:12px;color:#64748b;white-space:nowrap">件数:</label>
+        <select id="ai-gen-count" class="form-input" style="width:70px;padding:4px 8px;font-size:13px">
+          <option value="0">自動</option>
+          <option value="5">5件</option>
+          <option value="10">10件</option>
+          <option value="25">25件</option>
+        </select>
+        <button class="btn btn-primary" onclick="runAIGenerate()" id="btn-ai-generate" style="background:#7c3aed;border-color:#7c3aed">
+          🤖 AI求人を生成する
+        </button>
+        <span class="text-sm text-muted">毎日7:30に自動実行</span>
+      </div>
+      <div id="ai-gen-result" class="text-sm" style="margin-top:8px;white-space:pre-wrap;background:#f8fafc;border-radius:6px;padding:8px;display:none"></div>
+    </div>
+
+    <div class="action-section mt-16">
       <div class="action-section-title">📡 媒体運用</div>
 
       <div class="media-op-section">

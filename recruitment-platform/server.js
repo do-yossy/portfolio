@@ -1399,6 +1399,35 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
+  // ── AI求人生成（手動実行）──
+  if (pathname === '/api/admin/generate-jobs-ai' && method === 'POST') {
+    const scriptPath = path.join(SCRIPTS_DIR, 'generate-jobs-ai.js');
+    if (!fs.existsSync(scriptPath)) {
+      sendJSON(res, 400, { error: 'generate-jobs-ai.js が見つかりません' });
+      return;
+    }
+    const body = await parseJSON(req);
+    const target = body.target || 'all'; // 'kyujinbox' | 'stanby' | 'all'
+    const count  = parseInt(body.count || '0', 10);
+    const extraArgs = [];
+    if (target !== 'all') extraArgs.push('--target', target);
+    if (count > 0) extraArgs.push('--count', String(count));
+
+    const proc = spawn(process.execPath, ['--experimental-sqlite', scriptPath, ...extraArgs], {
+      env: { ...process.env },
+      cwd: path.join(__dirname),
+    });
+    let out = '';
+    proc.stdout.on('data', d => { out += d.toString(); });
+    proc.stderr.on('data', d => { out += d.toString(); });
+    proc.on('close', async code => {
+      const ok = code === 0;
+      await Logs.create('ai_generate', ok ? 'success' : 'error', out.slice(-800));
+      sendJSON(res, ok ? 200 : 500, { ok, output: out });
+    });
+    return;
+  }
+
   // ── 404 ──
   if (pathname.startsWith('/api/')) {
     sendError(res, 404, 'Not Found');

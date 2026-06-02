@@ -195,6 +195,31 @@ async function runRotation() {
   }
 }
 
+async function runAIGenerate() {
+  const btn    = document.getElementById('btn-ai-generate');
+  const result = document.getElementById('ai-gen-result');
+  const target = document.getElementById('ai-gen-target')?.value || 'all';
+  const count  = parseInt(document.getElementById('ai-gen-count')?.value || '0', 10);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 生成中...'; }
+  if (result) { result.style.display = 'block'; result.textContent = 'AI生成中... しばらくお待ちください（1〜3分かかります）'; }
+  try {
+    const res = await fetch('/api/admin/generate-jobs-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target, count }),
+    });
+    const data = await res.json();
+    if (result) result.textContent = data.output || (data.ok ? '完了' : 'エラー');
+    showToast(data.ok ? 'AI求人生成完了' : 'エラーが発生しました', data.ok ? 'success' : 'error');
+    if (data.ok) setTimeout(() => location.reload(), 3000);
+  } catch (e) {
+    if (result) result.textContent = 'エラー: ' + e.message;
+    showToast('通信エラー', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 AI求人を生成する'; }
+  }
+}
+
 function startScrapeIndeed() {
   confirmAction(
     'Indeedから応募者データを取得します。\nVPN接続を確認してから実行してください。\n実行しますか？',
