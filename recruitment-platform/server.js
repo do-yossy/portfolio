@@ -102,9 +102,12 @@ function cleanCell(v) {
 
 function cleanPhone(v) {
   if (!v) return '';
-  // スペース・ハイフン・括弧を除いた数字のみに正規化
+  v = String(v).trim();
+  // Excelの指数表記（8.19056E+11等）は電話番号として使えないため除外
+  if (/^\d+\.?\d*[Ee][+\-]?\d+$/.test(v)) return '';
+  // 先頭の ' はExcelが数値化防止で付ける
+  v = v.replace(/^'+/, '');
   const digits = v.replace(/[\s\-\(\)\.]/g, '');
-  // 国際番号 +81 → 0 に変換
   return digits.replace(/^\+81/, '0');
 }
 

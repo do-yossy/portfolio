@@ -101,6 +101,9 @@ function cleanCell(v) {
 
 function cleanPhone(v) {
   if (!v) return '';
+  v = String(v).trim();
+  if (/^\d+\.?\d*[Ee][+\-]?\d+$/.test(v)) return '';
+  v = v.replace(/^'+/, '');
   const digits = v.replace(/[\s\-\(\)\.]/g, '');
   return digits.replace(/^\+81/, '0');
 }
