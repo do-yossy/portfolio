@@ -131,15 +131,46 @@ def human_type(page, selector, text, timeout=15000):
         time.sleep(random.uniform(0.02, 0.06))
 
 def fill_text(page, selector, value, timeout=8000):
-    """テキスト/テキストエリアを fill() で埋める（Tab押下でVue blur更新）"""
+    """テキスト/テキストエリアを埋める（Vue v-model完全対応版）
+    - 200字以内: press_sequentially で1文字ずつ入力 → Vue input イベントが確実に発火
+    - 200字超: fill() + native InputEvent dispatch で高速処理
+    """
     try:
         el = page.wait_for_selector(selector, timeout=timeout)
+        if not el:
+            return False
+        el.scroll_into_view_if_needed()
         el.click()
-        rand_delay(0.05, 0.1)
-        el.fill(value)
-        # Tab キー押下で blur イベントを発生させ Vue v-model.lazy を更新する
+        rand_delay(0.08, 0.15)
+        # 既存テキストをクリア
+        el.press('Control+a')
+        rand_delay(0.03, 0.06)
+        el.press('Delete')
+        rand_delay(0.05, 0.08)
+        str_val = str(value)
+        if len(str_val) <= 200:
+            # キー入力シミュレーション: Vue の input/change イベントを確実に発火させる
+            el.press_sequentially(str_val, delay=15)
+        else:
+            # 長文: fill() で高速セット後、native setter + InputEvent で Vue に通知
+            el.fill(str_val)
+            try:
+                el.evaluate("""el => {
+                    const proto = el.tagName === 'TEXTAREA'
+                        ? HTMLTextAreaElement.prototype
+                        : HTMLInputElement.prototype;
+                    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+                    if (setter) setter.call(el, el.value);
+                    el.dispatchEvent(new InputEvent('input', {
+                        bubbles: true, cancelable: true, composed: true, inputType: 'insertText'
+                    }));
+                    el.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+                }""")
+            except Exception:
+                pass
+        # Tab でブラー → Vue v-model / v-model.lazy を更新
         el.press('Tab')
-        rand_delay(0.1, 0.2)
+        rand_delay(0.12, 0.25)
         return True
     except Exception:
         return False
@@ -711,6 +742,13 @@ def fill_kyujinbox_form(page, job, company_name):
     求人ボックスの求人フォームを埋める。
     戻り値: 選択したjobTypeの value 文字列（インターセプター用）
     """
+    # ---- フォーム全体をスクロールして Vue の遅延レンダリングをすべて完了させる ----
+    progress("  🔄 フォームセクション展開中（スクロール）...", "info")
+    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    rand_delay(1.0, 1.5)
+    page.evaluate("window.scrollTo(0, 0)")
+    rand_delay(0.5, 1.0)
+
     # 会社名
     fill_text(page, 'input[name="company"]', company_name, timeout=5000)
     rand_delay(0.3, 0.7)
@@ -727,10 +765,8 @@ def fill_kyujinbox_form(page, job, company_name):
         timeout=8000,
     )
     if title_sel:
-        title_el.click()
-        rand_delay(0.3, 0.6)
-        title_el.fill(job['title'])
-        rand_delay(0.5, 1.0)
+        # fill_text を使うことでVue v-model の input/blur イベントが確実に発火する
+        fill_text(page, title_sel, job['title'])
         progress(f"  ✅ タイトル入力: {job['title'][:40]}", "info")
     else:
         # ラベルテキストで「求人名」「タイトル」を含む input を探す
@@ -1156,37 +1192,58 @@ def fill_kyujinbox_form(page, job, company_name):
         pass
 
     # ---- 応募必要項目 (applicationInfo) ----
-    # 既存求人と同じく「基本情報+職務経歴」を選択する（必須項目）
+    # 「基本情報+職務経歴」を選択する（必須項目）
     try:
         result = page.evaluate("""() => {
-            // radio[name="applicationInfo"] を探す
             const radios = document.querySelectorAll('input[name="applicationInfo"]');
-            if (radios.length) {
-                // 「基本情報+職務経歴」のラジオを探す（通常 value=2 か 3）
-                const keywords = ['基本情報+職務経歴', '基本情報＋職務経歴', '職務経歴'];
+            if (!radios.length) return 'not found';
+
+            // まずスクロールしてセクションを表示（Vue lazy render 対策）
+            radios[0].scrollIntoView({block: 'center'});
+
+            // すべてのラジオとラベルをダンプ（デバッグ用）
+            const info = Array.from(radios).map(r => {
+                const lbl = r.closest('label') || document.querySelector('label[for="' + r.id + '"]')
+                          || r.nextElementSibling;
+                return r.value + ':' + (lbl ? lbl.textContent.trim().slice(0,20) : '?');
+            });
+
+            // 「基本情報+職務経歴」または最も詳しいオプションを選択
+            const keywords = ['基本情報+職務経歴', '基本情報＋職務経歴', '職務経歴', '基本情報'];
+            for (const kw of keywords) {
                 for (const r of radios) {
                     const lbl = r.closest('label') || document.querySelector('label[for="' + r.id + '"]')
                               || r.nextElementSibling;
                     const txt = lbl ? lbl.textContent.trim() : '';
-                    if (keywords.some(k => txt.includes(k))) {
-                        if (lbl) { lbl.click(); return 'clicked: ' + txt; }
+                    if (txt.includes(kw)) {
+                        if (lbl) { lbl.click(); return 'clicked: ' + txt + ' [opts:' + info.join('|') + ']'; }
                         r.checked = true;
-                        r.dispatchEvent(new Event('change', {bubbles: true}));
-                        return 'checked: ' + txt;
+                        r.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+                        return 'forced: ' + txt;
                     }
                 }
-                // フォールバック: 最後のラジオをクリック（最も詳細な選択肢が多い）
-                const last = radios[radios.length - 1];
-                const lbl = last.closest('label') || document.querySelector('label[for="' + last.id + '"]');
-                if (lbl) { lbl.click(); return 'fallback-last: ' + lbl.textContent.trim().slice(0,30); }
-                last.checked = true;
-                last.dispatchEvent(new Event('change', {bubbles: true}));
-                return 'fallback-last-check';
             }
-            return 'not found';
+            // value=2 か value=3 を直接試す（基本情報+職務経歴は通常このvalue）
+            for (const v of ['3', '2']) {
+                const r = Array.from(radios).find(r => r.value === v);
+                if (r) {
+                    const lbl = r.closest('label') || document.querySelector('label[for="' + r.id + '"]');
+                    if (lbl) { lbl.click(); return 'by-value-' + v + ': ' + lbl.textContent.trim().slice(0,20); }
+                    r.checked = true;
+                    r.dispatchEvent(new Event('change', {bubbles: true}));
+                    return 'by-value-forced-' + v;
+                }
+            }
+            // 最終フォールバック: 最後のラジオ（最も詳細な選択肢）
+            const last = radios[radios.length - 1];
+            const lbl = last.closest('label') || document.querySelector('label[for="' + last.id + '"]');
+            if (lbl) { lbl.click(); return 'fallback-last: ' + lbl.textContent.trim().slice(0,30); }
+            last.checked = true;
+            last.dispatchEvent(new Event('change', {bubbles: true}));
+            return 'fallback-last-check. opts:' + info.join('|');
         }""")
         progress(f"  ✅ 応募必要項目: {result}", "info")
-        rand_delay(0.2, 0.4)
+        rand_delay(0.3, 0.6)
     except Exception as e:
         progress(f"  ⚠️ 応募必要項目 失敗: {e}", "warn")
 
@@ -1197,26 +1254,33 @@ def fill_kyujinbox_form(page, job, company_name):
     if company_phone:
         progress(f"  📞 電話番号入力: {company_phone}", "info")
         try:
-            # まず「電話番号を入力必須にする」チェックボックスをONにする
-            page.evaluate("""() => {
+            # 「電話番号を入力必須にする」チェックボックスをONにする
+            cb_result = page.evaluate("""() => {
                 const cb = document.querySelector('input[name="isPhoneNumberRequired"]');
-                if (!cb) return;
-                if (!cb.checked) {
-                    const label = cb.closest('label') || cb.nextElementSibling
-                        || document.querySelector('label[for="' + cb.id + '"]');
-                    if (label) { label.click(); return; }
-                    const setter = Object.getOwnPropertyDescriptor(
-                        window.HTMLInputElement.prototype, 'checked').set;
-                    setter.call(cb, true);
-                    cb.dispatchEvent(new Event('change', {bubbles: true}));
-                }
+                if (!cb) return 'not found';
+                if (cb.checked) return 'already checked';
+                const label = cb.closest('label') || cb.nextElementSibling
+                    || document.querySelector('label[for="' + cb.id + '"]');
+                if (label) { label.click(); return 'label clicked'; }
+                cb.scrollIntoView({block: 'center'});
+                const setter = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype, 'checked').set;
+                setter.call(cb, true);
+                cb.dispatchEvent(new Event('change', {bubbles: true}));
+                return 'setter forced';
             }""")
-            rand_delay(0.2, 0.3)
-        except Exception:
-            pass
-        # 電話番号を入力
-        fill_text(page, 'input[name="applicationPhoneNumber"]', company_phone, timeout=3000)
-        rand_delay(0.1, 0.2)
+            progress(f"  📞 電話必須チェック: {cb_result}", "info")
+            # Vueがチェックボックス状態を更新してphoneフィールドを表示するまで待つ
+            rand_delay(0.8, 1.2)
+        except Exception as e:
+            progress(f"  ⚠️ 電話必須チェック失敗: {e}", "warn")
+        # 電話番号を入力（Vueがフィールドを表示するまで最大5秒待つ）
+        ok = fill_text(page, 'input[name="applicationPhoneNumber"]', company_phone, timeout=5000)
+        if ok:
+            progress(f"  ✅ 電話番号入力完了", "info")
+        else:
+            progress(f"  ⚠️ 電話番号フィールドが見つかりません", "warn")
+        rand_delay(0.2, 0.4)
     else:
         progress(f"  📞 電話番号なし（Web応募のみ）", "info")
         try:
@@ -1275,6 +1339,50 @@ def fill_kyujinbox_form(page, job, company_name):
         char_values=CHAR_VALUES,
         company_phone=company_phone,
     )
+    rand_delay(1.0, 1.5)
+
+    # ---- 必須フィールドの最終確認・再入力 ----
+    # Vueのパッチ後にDOMの値が空になっていたら再入力する
+    try:
+        empty_fields = page.evaluate("""() => {
+            const checks = [
+                {sel: 'input[name="title"]', name: 'title'},
+                {sel: 'textarea[name="description"]', name: 'description'},
+                {sel: 'select[name="jobType"]', name: 'jobType'},
+                {sel: 'select[name="prefVal"]', name: 'prefVal'},
+                {sel: 'select[name="payType"]', name: 'payType'},
+                {sel: 'input[name="payMin"]', name: 'payMin'},
+            ];
+            return checks.map(c => {
+                const el = document.querySelector(c.sel);
+                return {name: c.name, value: el ? el.value : null, found: !!el};
+            });
+        }""")
+        for f in empty_fields:
+            progress(f"  📊 {f['name']}: found={f['found']} value={repr((f['value'] or '')[:30])}", "info")
+    except Exception as e:
+        progress(f"  ⚠️ フィールド確認失敗: {e}", "warn")
+
+    # title が空なら再入力
+    try:
+        title_val = page.evaluate("() => { const el = document.querySelector('input[name=\"title\"]'); return el ? el.value : ''; }")
+        if not title_val or not title_val.strip():
+            progress(f"  ⚠️ タイトルが空のため再入力", "warn")
+            fill_text(page, 'input[name="title"]', job['title'])
+            rand_delay(0.3, 0.5)
+    except Exception:
+        pass
+
+    # description が空なら再入力
+    try:
+        desc_val = page.evaluate("() => { const el = document.querySelector('textarea[name=\"description\"]'); return el ? el.value : ''; }")
+        if not desc_val or not desc_val.strip():
+            progress(f"  ⚠️ 仕事内容が空のため再入力", "warn")
+            fill_text(page, 'textarea[name="description"]', job.get('description', ''))
+            rand_delay(0.3, 0.5)
+    except Exception:
+        pass
+
     rand_delay(0.5, 1.0)
 
     return selected_job_type_val, company_phone
