@@ -11,6 +11,7 @@ import io
 import time
 import random
 import re
+import threading
 from urllib.parse import parse_qs, urlencode, urlparse
 
 # Windows での文字化け対策
@@ -28,10 +29,20 @@ PREFECTURES = [
 ]
 
 def progress(message, level="info"):
-    print(json.dumps({"type": "progress", "message": message, "level": level}), flush=True)
+    print(json.dumps({"type": "progress", "message": str(message) if message is not None else "", "level": level}), flush=True)
 
 def rand_delay(min_s=1.5, max_s=4.0):
     time.sleep(random.uniform(min_s, max_s))
+
+def start_keepalive(interval=12):
+    """SSE接続が切れないよう定期的に進捗メッセージを送るスレッド"""
+    stop_event = threading.Event()
+    def _run():
+        while not stop_event.wait(interval):
+            progress("⏳ 処理中...", "info")
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return stop_event
 
 def extract_prefecture(location):
     """住所文字列から都道府県を抽出"""
@@ -732,10 +743,9 @@ def fill_kyujinbox_form(page, job, company_name):
     if catchcopy:
         for sel in ['input[name="catch"]', 'input[name="catchCopy"]', 'input[name="catchcopy"]',
                     'input[placeholder*="キャッチ"]', 'input[placeholder*="コピー"]']:
-            if fill_text(page, sel, catchcopy, timeout=3000):
+            if fill_text(page, sel, catchcopy, timeout=500):
                 progress(f"  ✅ catchcopy 入力: {catchcopy[:30]}", "info")
                 break
-        rand_delay(0.2, 0.5)
 
     # ---- 職種 (select[name="jobType"]) ----
     # 必須。空のままだと「公開する」ボタンが is-disab になる。
@@ -1189,6 +1199,9 @@ def main():
     if not headless:
         progress("🖥️ 有頭モードで起動 (HEADLESS=0)", "info")
 
+    # SSE接続維持のため12秒ごとにkeepAliveメッセージを送信
+    keepalive_stop = start_keepalive(12)
+
     with sync_playwright() as p:
         progress("🌐 ブラウザを起動しています...", "info")
         browser = p.chromium.launch(
@@ -1250,7 +1263,7 @@ def main():
             rand_delay(0.5, 1.2)
 
             page.click('button[type="submit"], input[type="submit"], .login-btn, form button')
-            rand_delay(3.0, 5.0)
+            rand_delay(1.5, 3.0)
             page.wait_for_load_state('networkidle', timeout=15000)
 
             current_url = page.url
@@ -1267,12 +1280,18 @@ def main():
 
             progress("✅ ログイン成功", "success")
 
-            post_url = find_post_url(page)
-            if not post_url:
-                progress("❌ 新規求人URLが取得できませんでした。管理画面で求人作成URLを確認してください", "error")
-                browser.close()
-                sys.exit(1)
-            progress(f"🔗 求人投稿ページ: {post_url}", "info")
+            # 環境変数で設定済みならURL探索をスキップ（33秒節約）
+            new_job_url_env = os.environ.get("KYUJINBOX_NEW_JOB_URL", "").strip()
+            if new_job_url_env:
+                post_url = new_job_url_env
+                progress(f"🔗 求人投稿ページ（設定済み）: {post_url}", "info")
+            else:
+                post_url = find_post_url(page)
+                if not post_url:
+                    progress("❌ 新規求人URLが取得できませんでした。管理画面で求人作成URLを確認してください", "error")
+                    browser.close()
+                    sys.exit(1)
+                progress(f"🔗 求人投稿ページ: {post_url}", "info")
 
             target_jobs = jobs[:batch]
             success_count = 0
@@ -1284,7 +1303,7 @@ def main():
                 try:
                     page.goto(post_url, timeout=30000)
                     page.wait_for_load_state('networkidle', timeout=15000)
-                    rand_delay(2.0, 4.0)
+                    rand_delay(1.0, 2.0)
 
                     actual_url = page.url
                     progress(f"📍 投稿フォームURL: {actual_url}", "info")
@@ -1443,6 +1462,7 @@ def main():
             sys.exit(1)
 
         browser.close()
+        keepalive_stop.set()
         progress(f"✅ {success_count}/{len(target_jobs)}件の投稿処理が完了しました", "success")
 
 if __name__ == "__main__":
