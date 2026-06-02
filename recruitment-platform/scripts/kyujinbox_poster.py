@@ -453,6 +453,147 @@ def dump_visible_inputs(page):
         progress(f"  フィールドダンプ失敗: {e}", "warn")
 
 
+PREF_IDS = {
+    '北海道':1,'青森県':2,'岩手県':3,'宮城県':4,'秋田県':5,'山形県':6,'福島県':7,
+    '茨城県':8,'栃木県':9,'群馬県':10,'埼玉県':11,'千葉県':12,'東京都':13,'神奈川県':14,
+    '新潟県':15,'富山県':16,'石川県':17,'福井県':18,'山梨県':19,'長野県':20,
+    '岐阜県':21,'静岡県':22,'愛知県':23,'三重県':24,
+    '滋賀県':25,'京都府':26,'大阪府':27,'兵庫県':28,'奈良県':29,'和歌山県':30,
+    '鳥取県':31,'島根県':32,'岡山県':33,'広島県':34,'山口県':35,
+    '徳島県':36,'香川県':37,'愛媛県':38,'高知県':39,
+    '福岡県':40,'佐賀県':41,'長崎県':42,'熊本県':43,'大分県':44,'宮崎県':45,'鹿児島県':46,'沖縄県':47,
+}
+
+
+def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_max, pref_id, char_values):
+    """
+    kyujin hidden フィールドの親Vueコンポーネントを見つけて
+    リアクティブ状態を直接パッチする。
+    DOM操作と組み合わせることで投稿成功率を大幅向上させる。
+    """
+    emp_type = job.get('employmentType') or job.get('employment_type', '')
+    emp_keywords = {
+        '正社員': '正社員', 'アルバイト': 'アルバイト・パート', 'パート': 'アルバイト・パート',
+        '契約社員': '契約社員', '業務委託': '業務委託', '派遣': '派遣社員',
+    }
+    emp_label = '業務委託'  # デフォルト
+    for k, v in emp_keywords.items():
+        if k in emp_type:
+            emp_label = v
+            break
+
+    desc      = job.get('description', '')
+    rewarding = job.get('rewarding', desc[:100] if desc else '')
+    quals     = job.get('qualifications', '')
+    transport = job.get('transportation', job.get('access', ''))
+    worktime  = job.get('worktimeHoliday', job.get('workTime', ''))
+    benefit   = job.get('salary', '')
+    title     = job.get('title', '')
+    location  = job.get('location', '')
+
+    patch_data = {
+        'title': title,
+        'description': desc,
+        'rewarding': rewarding,
+        'qualifications': quals,
+        'transportation': transport,
+        'worktimeHoliday': worktime,
+        'benefit': benefit,
+        'jobType': job_type_val,
+        'employTypes': [emp_label],
+        'characteristics': [int(v) for v in char_values],
+        'payType': pay_type_val,
+        'payMin': pay_min or None,
+        'payMax': pay_max or None,
+        'isPhoneNumberRequired': False,
+        'applicationPhoneNumber': '',
+        'workLocations': [{'prefectureId': pref_id, 'location': location}],
+    }
+
+    try:
+        result = page.evaluate("""(patch) => {
+            const msgs = [];
+
+            // kyujin hidden input の親をたどってVueインスタンスを探す
+            function findVueVm(startEl) {
+                let el = startEl;
+                for (let i = 0; i < 80; i++) {
+                    if (!el) break;
+                    // Vue2
+                    if (el.__vue__) {
+                        let vm = el.__vue__;
+                        // $parent をたどって kyujin プロパティを持つ最上位を探す
+                        while (vm.$parent) {
+                            if ('kyujin' in (vm.$parent.$data || {})) vm = vm.$parent;
+                            else break;
+                        }
+                        if ('kyujin' in (vm.$data || {})) return {type:'v2', vm};
+                    }
+                    // Vue3
+                    if (el.__vueParentComponent) {
+                        let comp = el.__vueParentComponent;
+                        for (let j = 0; j < 30; j++) {
+                            const s = comp.setupState || comp.ctx || {};
+                            if (s.kyujin !== undefined) return {type:'v3', comp, state: s};
+                            if (comp.parent) comp = comp.parent;
+                            else break;
+                        }
+                    }
+                    el = el.parentElement;
+                }
+                return null;
+            }
+
+            const kyujinInput = document.querySelector('input[name="kyujin"]');
+            if (!kyujinInput) { msgs.push('kyujin hidden field not found'); return msgs.join('; '); }
+
+            const found = findVueVm(kyujinInput);
+            if (!found) { msgs.push('vue vm not found'); return msgs.join('; '); }
+
+            const kyujinData = found.type === 'v2'
+                ? found.vm.$data.kyujin
+                : found.state.kyujin;
+
+            if (!kyujinData) { msgs.push('kyujin data null'); return msgs.join('; '); }
+
+            // パッチ適用
+            for (const [k, v] of Object.entries(patch)) {
+                try {
+                    if (v === null || v === undefined) continue;
+                    if (k === 'workLocations') {
+                        if (Array.isArray(kyujinData.workLocations) && kyujinData.workLocations.length > 0) {
+                            const wl = kyujinData.workLocations[0];
+                            if (wl) {
+                                if (v[0].prefectureId !== null) wl.prefectureId = v[0].prefectureId;
+                                if (v[0].location)              wl.location      = v[0].location;
+                                msgs.push('workLocations patched');
+                            }
+                        }
+                        continue;
+                    }
+                    const before = JSON.stringify(kyujinData[k]);
+                    if (found.type === 'v2') {
+                        found.vm.$set(kyujinData, k, v);
+                    } else {
+                        kyujinData[k] = v;
+                    }
+                    const after = JSON.stringify(kyujinData[k]);
+                    if (before !== after) msgs.push(k + '=' + after.slice(0, 40));
+                } catch(e) {
+                    msgs.push(k + ' ERR:' + e.message.slice(0, 30));
+                }
+            }
+
+            return msgs.join('; ') || 'no changes';
+        }""", patch_data)
+        progress(f"  🔧 Vue kyujinパッチ: {result}", "info")
+        rand_delay(0.5, 1.0)
+        return True
+    except Exception as e:
+        progress(f"  ⚠️ Vue kyujinパッチ失敗: {e}", "warn")
+        return False
+
+
 def fill_kyujinbox_form(page, job, company_name):
     """
     求人ボックスの求人フォームを埋める。
@@ -564,20 +705,35 @@ def fill_kyujinbox_form(page, job, company_name):
             raise Exception("jobType セレクトが見つかりません")
         opts = jt_el.query_selector_all('option')
         option_list = [(opt.get_attribute('value') or '', (opt.inner_text() or '').strip()) for opt in opts]
-        progress(f"  📋 jobType オプション({len(option_list)}件): {[t for v,t in option_list[:6]]}", "info")
+        # 全オプションを表示（ドライバー系カテゴリ特定のため）
+        progress(f"  📋 jobType 全オプション({len(option_list)}件):", "info")
+        for v, t in option_list:
+            if v:
+                progress(f"    value={v!r} text={t!r}", "info")
 
         chosen_val = None
         chosen_txt = None
 
-        # ① ラベル一致で選択
-        if job_type:
+        # ① ドライバー系キーワードで優先マッチ
+        DRIVER_KEYWORDS = ['ドライバー', '配送', '運送', '軽貨物', '宅配', '配達', 'デリバリー']
+        for kw in DRIVER_KEYWORDS:
+            for v, t in option_list:
+                if v and kw in t:
+                    chosen_val = v
+                    chosen_txt = t
+                    break
+            if chosen_val:
+                break
+
+        # ② DBのjobTypeラベルで一致を試みる
+        if not chosen_val and job_type:
             for v, t in option_list:
                 if v and (job_type in t or t in job_type):
                     chosen_val = v
                     chosen_txt = t
                     break
 
-        # ② フォールバック: 最初の有効なオプション
+        # ③ フォールバック: 最初の有効なオプション
         if not chosen_val:
             for v, t in option_list:
                 if v:
@@ -740,10 +896,17 @@ def fill_kyujinbox_form(page, job, company_name):
     # ---- 都道府県 (select[name="prefVal"]) ----
     location = job.get('location', '')
     pref = extract_prefecture(location)
+    pref_id = PREF_IDS.get(pref) if pref else None
     if pref:
         ok = select_option_safe(page, 'select[name="prefVal"]', label=pref, debug=True)
         if not ok:
-            progress(f"  ⚠️ 都道府県 '{pref}' の選択失敗", "warn")
+            # value（数値ID）で直接選択を試みる
+            if pref_id:
+                ok = select_option_safe(page, 'select[name="prefVal"]', value=str(pref_id), debug=False)
+            if not ok:
+                progress(f"  ⚠️ 都道府県 '{pref}' の選択失敗", "warn")
+            else:
+                progress(f"  ✅ 都道府県 value={pref_id} で選択", "info")
         rand_delay(0.3, 0.7)
 
     # ---- 住所テキスト (input[name="address"]) ----
@@ -906,6 +1069,21 @@ def fill_kyujinbox_form(page, job, company_name):
             rand_delay(0.2, 0.4)
     except Exception:
         pass
+
+    # ---- Vue リアクティブ状態の直接パッチ（最後の確実な手段）----
+    # DOM操作後にVueのリアクティブデータを直接更新して投稿データを保証する
+    pay_type, pay_min, pay_max = parse_salary(job.get('salary', ''))
+    pay_type_val = {'時給': 1, '日給': 2, '月給': 3, '年収': 4, '固定報酬': 5}.get(pay_type, 3)
+    patch_vue_kyujin_state(
+        page, job,
+        job_type_val=selected_job_type_val,
+        pay_type_val=pay_type_val,
+        pay_min=pay_min,
+        pay_max=pay_max,
+        pref_id=pref_id,
+        char_values=CHAR_VALUES,
+    )
+    rand_delay(0.5, 1.0)
 
     return selected_job_type_val
 
