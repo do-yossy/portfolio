@@ -416,6 +416,38 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                         target[k] = correct_v
                         modified.append(f"{k}={str(correct_v)[:15]}")
 
+                # ── 総当たり注入：内部キー名が標準名と違う場合に備え候補名を全て試す ──
+                # （存在し かつ 空のキーだけ埋めるので既存値は壊さない）
+                alias_map = {
+                    'company':         ['company', 'companyName', 'companyNm', 'workplace', 'workPlace',
+                                        'office', 'shopName', 'storeName', 'clientName', 'employer'],
+                    'title':           ['title', 'jobTitle', 'kyujinTitle', 'kyujinName', 'jobName'],
+                    'description':     ['description', 'jobDescription', 'detail', 'jobDetail',
+                                        'workContent', 'workDetail', 'business'],
+                    'qualifications':  ['qualifications', 'qualification', 'requirement', 'requirements',
+                                        'target', 'targetPerson', 'welcome', 'want', 'idealCandidate'],
+                    'transportation':  ['transportation', 'access', 'station', 'traffic', 'nearestStation'],
+                    'address':         ['address', 'workAddress', 'workLocation', 'addr', 'fullAddress', 'street'],
+                    'benefit':         ['benefit', 'salaryNote', 'payNote', 'salaryDetail', 'payDetail',
+                                        'salarySupplement', 'salaryComment', 'treatment', 'welfare'],
+                    'worktimeHoliday': ['worktimeHoliday', 'workTime', 'workingHours', 'workHours',
+                                        'holiday', 'worktime', 'shift', 'hours'],
+                    'howToApply':      ['howToApply', 'applyMethod', 'application', 'selection',
+                                        'selectionFlow', 'flow', 'applicationFlow'],
+                    'rewarding':       ['rewarding', 'appeal', 'attraction', 'point', 'merit', 'pr'],
+                    'payMin':          ['payMin', 'salaryMin', 'minSalary', 'payLower', 'lowerPay'],
+                    'payMax':          ['payMax', 'salaryMax', 'maxSalary', 'payUpper', 'upperPay'],
+                    'payType':         ['payType', 'salaryType', 'payKind'],
+                }
+                for logical, candidates in alias_map.items():
+                    val = full_payload.get(logical)
+                    if val is None or val == '':
+                        continue
+                    for cand in candidates:
+                        if cand in target and _is_empty_val(target.get(cand)):
+                            target[cand] = val
+                            modified.append(f"{cand}(={logical})")
+
                 # jobType は内側に無くても強制追加（最重要・必須項目）
                 cur_jt = str(target.get('jobType', '')).strip()
                 if cur_jt in ('', 'null', '0', 'None', 'undefined'):
