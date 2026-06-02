@@ -107,8 +107,14 @@ function cleanPhone(v) {
   if (/^\d+\.?\d*[Ee][+\-]?\d+$/.test(v)) return '';
   // 先頭の ' はExcelが数値化防止で付ける
   v = v.replace(/^'+/, '');
+  // +81 → 0（国際番号を国内形式に変換）
+  v = v.replace(/^\+81\s*/, '0');
+  // スペース・ハイフン・括弧・ドットを除去
   const digits = v.replace(/[\s\-\(\)\.]/g, '');
-  return digits.replace(/^\+81/, '0');
+  // 日本の携帯/固定は10〜11桁。10桁で先頭が7/8/9なら 0 を補完
+  // 例: 8014698497 → 08014698497
+  if (/^[789]\d{9}$/.test(digits)) return '0' + digits;
+  return digits;
 }
 
 function cleanName(v) {

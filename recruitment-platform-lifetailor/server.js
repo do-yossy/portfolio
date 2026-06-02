@@ -104,8 +104,10 @@ function cleanPhone(v) {
   v = String(v).trim();
   if (/^\d+\.?\d*[Ee][+\-]?\d+$/.test(v)) return '';
   v = v.replace(/^'+/, '');
+  v = v.replace(/^\+81\s*/, '0');
   const digits = v.replace(/[\s\-\(\)\.]/g, '');
-  return digits.replace(/^\+81/, '0');
+  if (/^[789]\d{9}$/.test(digits)) return '0' + digits;
+  return digits;
 }
 
 function cleanName(v) {
