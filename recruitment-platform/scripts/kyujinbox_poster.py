@@ -514,77 +514,126 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
         result = page.evaluate("""(patch) => {
             const msgs = [];
 
-            // kyujin hidden input の親をたどってVueインスタンスを探す
-            function findVueVm(startEl) {
-                let el = startEl;
-                for (let i = 0; i < 80; i++) {
-                    if (!el) break;
-                    // Vue2
-                    if (el.__vue__) {
-                        let vm = el.__vue__;
-                        // $parent をたどって kyujin プロパティを持つ最上位を探す
-                        while (vm.$parent) {
-                            if ('kyujin' in (vm.$parent.$data || {})) vm = vm.$parent;
-                            else break;
-                        }
-                        if ('kyujin' in (vm.$data || {})) return {type:'v2', vm};
+            // ── Vue2: DOM全スキャンでkyujinプロパティを持つVMを探す ──
+            function findVue2KyujinVm() {
+                for (const el of document.querySelectorAll('*')) {
+                    if (!el.__vue__) continue;
+                    // このelのVueルートへ
+                    let vm = el.__vue__;
+                    while (vm.$parent) vm = vm.$parent;
+                    // BFS でkyujinを持つコンポーネントを探す
+                    const queue = [vm];
+                    const visited = new Set();
+                    while (queue.length) {
+                        const curr = queue.shift();
+                        if (visited.has(curr)) continue;
+                        visited.add(curr);
+                        if (curr.$data && 'kyujin' in curr.$data) return curr;
+                        (curr.$children || []).forEach(c => queue.push(c));
                     }
-                    // Vue3
-                    if (el.__vueParentComponent) {
-                        let comp = el.__vueParentComponent;
-                        for (let j = 0; j < 30; j++) {
-                            const s = comp.setupState || comp.ctx || {};
-                            if (s.kyujin !== undefined) return {type:'v3', comp, state: s};
-                            if (comp.parent) comp = comp.parent;
-                            else break;
-                        }
-                    }
-                    el = el.parentElement;
                 }
                 return null;
             }
 
-            const kyujinInput = document.querySelector('input[name="kyujin"]');
-            if (!kyujinInput) { msgs.push('kyujin hidden field not found'); return msgs.join('; '); }
-
-            const found = findVueVm(kyujinInput);
-            if (!found) { msgs.push('vue vm not found'); return msgs.join('; '); }
-
-            const kyujinData = found.type === 'v2'
-                ? found.vm.$data.kyujin
-                : found.state.kyujin;
-
-            if (!kyujinData) { msgs.push('kyujin data null'); return msgs.join('; '); }
-
-            // パッチ適用
-            for (const [k, v] of Object.entries(patch)) {
-                try {
-                    if (v === null || v === undefined) continue;
-                    if (k === 'workLocations') {
-                        if (Array.isArray(kyujinData.workLocations) && kyujinData.workLocations.length > 0) {
-                            const wl = kyujinData.workLocations[0];
-                            if (wl) {
-                                if (v[0].prefectureId !== null) wl.prefectureId = v[0].prefectureId;
-                                if (v[0].location)              wl.location      = v[0].location;
-                                msgs.push('workLocations patched');
+            // ── Vue3: DOM全スキャン ──
+            function findVue3KyujinComp() {
+                for (const el of document.querySelectorAll('*')) {
+                    if (!el.__vueParentComponent) continue;
+                    let comp = el.__vueParentComponent;
+                    while (comp.parent) comp = comp.parent;
+                    // BFS
+                    const queue = [comp];
+                    const visited = new Set();
+                    while (queue.length) {
+                        const curr = queue.shift();
+                        if (visited.has(curr)) continue;
+                        visited.add(curr);
+                        for (const state of [curr.setupState, curr.ctx]) {
+                            if (state && typeof state === 'object' && state.kyujin !== undefined) {
+                                return {comp: curr, state};
                             }
                         }
-                        continue;
+                        // 子コンポーネントを追加
+                        const sub = curr.subTree;
+                        if (sub) {
+                            const walk = (vnode) => {
+                                if (!vnode) return;
+                                if (vnode.component) queue.push(vnode.component);
+                                if (Array.isArray(vnode.children)) vnode.children.forEach(walk);
+                            };
+                            walk(sub);
+                        }
                     }
-                    const before = JSON.stringify(kyujinData[k]);
-                    if (found.type === 'v2') {
-                        found.vm.$set(kyujinData, k, v);
-                    } else {
-                        kyujinData[k] = v;
+                }
+                return null;
+            }
+
+            // ── パッチ適用ヘルパー ──
+            function applyPatch(kyujinData, setFn) {
+                for (const [k, v] of Object.entries(patch)) {
+                    try {
+                        if (v === null || v === undefined) continue;
+                        if (k === 'workLocations') {
+                            if (Array.isArray(kyujinData.workLocations) && kyujinData.workLocations[0]) {
+                                const wl = kyujinData.workLocations[0];
+                                if (v[0].prefectureId !== null) wl.prefectureId = v[0].prefectureId;
+                                if (v[0].location) wl.location = v[0].location;
+                                msgs.push('wl.pref=' + v[0].prefectureId);
+                            }
+                            continue;
+                        }
+                        const before = JSON.stringify(kyujinData[k]);
+                        setFn(kyujinData, k, v);
+                        const after = JSON.stringify(kyujinData[k]);
+                        if (before !== after) msgs.push(k + '→' + after.slice(0, 25));
+                    } catch(e) {
+                        msgs.push(k + ' ERR:' + (e.message || '').slice(0, 20));
                     }
-                    const after = JSON.stringify(kyujinData[k]);
-                    if (before !== after) msgs.push(k + '=' + after.slice(0, 40));
-                } catch(e) {
-                    msgs.push(k + ' ERR:' + e.message.slice(0, 30));
                 }
             }
 
-            return msgs.join('; ') || 'no changes';
+            // ── Vue2 試行 ──
+            const v2vm = findVue2KyujinVm();
+            if (v2vm) {
+                const kd = v2vm.$data.kyujin;
+                applyPatch(kd, (obj, k, v) => v2vm.$set(obj, k, v));
+                // 電話番号も明示的にクリア
+                try { v2vm.$set(kd, 'applicationPhoneNumber', ''); } catch(e) {}
+                try { v2vm.$set(kd, 'isPhoneNumberRequired', false); } catch(e) {}
+                return 'v2: ' + (msgs.join('; ') || 'no-change');
+            }
+
+            // ── Vue3 試行 ──
+            const v3r = findVue3KyujinComp();
+            if (v3r) {
+                const kd = v3r.state.kyujin;
+                applyPatch(kd, (obj, k, v) => { obj[k] = v; });
+                try { kd.applicationPhoneNumber = ''; } catch(e) {}
+                try { kd.isPhoneNumberRequired = false; } catch(e) {}
+                return 'v3: ' + (msgs.join('; ') || 'no-change');
+            }
+
+            // ── 最終手段: kyujin hidden field を直接書き換え ──
+            const hf = document.querySelector('input[name="kyujin"]');
+            if (hf) {
+                try {
+                    const current = JSON.parse(hf.value || '{}');
+                    Object.assign(current, patch);
+                    current.applicationPhoneNumber = '';
+                    current.isPhoneNumberRequired = false;
+                    const setter = Object.getOwnPropertyDescriptor(
+                        window.HTMLInputElement.prototype, 'value')?.set;
+                    if (setter) setter.call(hf, JSON.stringify(current));
+                    hf.dispatchEvent(new Event('input', {bubbles: true}));
+                    hf.dispatchEvent(new Event('change', {bubbles: true}));
+                    msgs.push('hidden-field-patched');
+                    return 'fallback: ' + msgs.join('; ');
+                } catch(e) {
+                    return 'fallback-err: ' + e.message;
+                }
+            }
+
+            return 'not found (vue2=' + !!v2vm + ' vue3=' + !!v3r + ')';
         }""", patch_data)
         progress(f"  🔧 Vue kyujinパッチ: {result}", "info")
         rand_delay(0.5, 1.0)
@@ -1327,19 +1376,37 @@ def main():
                     else:
                         # URL変化なし or /new のまま → バリデーションエラー
                         try:
-                            body_text = page.inner_text('body')
-                            error_kw = ['必須', 'エラー', '入力してください', '選択してください',
-                                        '不正', '無効', 'ご確認ください', '正しく入力', '半角数字']
-                            lines = body_text.split('\n')
-                            err_lines = [l.strip() for l in lines
-                                         if l.strip() and any(kw in l for kw in error_kw)]
-                            if err_lines:
-                                progress(f"   ❌ ページ上のエラー文言:", "warn")
-                                for el in err_lines[:15]:
-                                    progress(f"      {el[:120]}", "warn")
+                            # Vue のエラーメッセージは専用クラスに入っていることが多い
+                            err_els = page.query_selector_all(
+                                '.c-form--error, .error-message, [class*="error"], '
+                                '[class*="Error"], .is-error, .form__error, .alert'
+                            )
+                            vue_errors = [e.inner_text().strip() for e in err_els
+                                          if e.inner_text().strip() and len(e.inner_text().strip()) < 60]
+                            if vue_errors:
+                                progress(f"   ❌ Vueバリデーションエラー:", "warn")
+                                for ve in vue_errors[:15]:
+                                    progress(f"      {ve}", "warn")
                             else:
-                                progress(f"   ⚠️ 送信後もフォームページ（エラー文言不明）", "warn")
-                                progress(f"   ページ冒頭テキスト(500字): {body_text[:500]}", "warn")
+                                # テキスト全文からエラーを探す（ヒントテキストを除外）
+                                body_text = page.inner_text('body')
+                                # 「数字とハイフン」などのヒント文言は除外
+                                HINT_TEXTS = ['数字とハイフンのみ', '例）', '※', 'お控えください',
+                                              '記入します', 'アップロード', '設定が可能']
+                                error_kw = ['必須', '選択してください', '職種区分を選択',
+                                            '雇用形態を選択', '都道府県を選択', '入力してください']
+                                lines = body_text.split('\n')
+                                err_lines = [l.strip() for l in lines
+                                             if l.strip()
+                                             and any(kw in l for kw in error_kw)
+                                             and not any(h in l for h in HINT_TEXTS)
+                                             and len(l.strip()) < 40]
+                                if err_lines:
+                                    progress(f"   ❌ フォームエラー文言:", "warn")
+                                    for el in err_lines[:10]:
+                                        progress(f"      {el[:80]}", "warn")
+                                else:
+                                    progress(f"   ⚠️ 送信後もフォームページ（エラー文言不明）", "warn")
                         except Exception as ex:
                             progress(f"   ⚠️ 送信後フォームページ（本文取得失敗: {ex}）", "warn")
 
