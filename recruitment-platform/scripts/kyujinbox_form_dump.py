@@ -89,11 +89,52 @@ def main():
 
         print("✅ ログイン成功")
 
-        # 対象URLへ移動
-        print(f"\n=== フォームページへ移動: {TARGET_URL} ===")
-        page.goto(TARGET_URL, timeout=30000)
+        # 求人一覧ページへ移動して「新規作成」ボタンを探す
+        LIST_URL = f"https://saiyo.kyujinbox.com/company/groups/{GROUP_ID}/jobs"
+        print(f"\n=== 求人一覧ページへ移動: {LIST_URL} ===")
+        page.goto(LIST_URL, timeout=30000)
         page.wait_for_load_state('networkidle', timeout=15000)
-        time.sleep(3)
+        time.sleep(2)
+
+        # 新規作成ボタンを探してクリック
+        new_job_url = None
+        for kw in ['新規求人', '求人を作成', '求人登録', '新規作成', '求人を出す', '掲載', '新規', '＋', '+']:
+            try:
+                el = page.locator(f'a:has-text("{kw}"), button:has-text("{kw}")').first
+                if el.count() > 0 and el.is_visible():
+                    href = el.get_attribute('href') or ''
+                    print(f"✅ ボタン発見: '{kw}' → href={href!r}")
+                    if href and href.startswith('http'):
+                        new_job_url = href
+                    elif href and href.startswith('/'):
+                        new_job_url = f"https://saiyo.kyujinbox.com{href}"
+                    else:
+                        el.click()
+                        page.wait_for_load_state('networkidle', timeout=10000)
+                        time.sleep(2)
+                        new_job_url = page.url
+                    break
+            except Exception:
+                pass
+
+        if not new_job_url:
+            # ページ内の全リンクを調査
+            print("⚠️ ボタンが見つかりません。ページ内リンクを調査...")
+            links = page.evaluate("""() =>
+                Array.from(document.querySelectorAll('a[href]')).map(a => ({
+                    text: a.textContent.trim().slice(0,30),
+                    href: a.href
+                }))
+            """)
+            for lnk in links:
+                print(f"  リンク: {lnk['text']!r} → {lnk['href']}")
+            new_job_url = TARGET_URL  # フォールバック
+
+        print(f"\n=== フォームページへ移動: {new_job_url} ===")
+        if page.url != new_job_url:
+            page.goto(new_job_url, timeout=30000)
+            page.wait_for_load_state('networkidle', timeout=15000)
+            time.sleep(3)
         print(f"現在URL: {page.url}")
         print(f"タイトル: {page.title()}")
 

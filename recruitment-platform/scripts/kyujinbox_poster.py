@@ -335,51 +335,66 @@ def _safe_unroute(page, handler):
 def find_post_url(page, group_id=None):
     """
     求人新規作成URLを特定する。
-    saiyo.kyujinbox.com のURL構造:
-      https://saiyo.kyujinbox.com/company/groups/G????-????-???/jobs/new
+    /jobs/new が404の場合は求人一覧ページのボタンからURLを取得する。
     """
-    current_url = page.url
-
-    # ① 環境変数 KYUJINBOX_GROUP_ID を最優先
     if not group_id:
         group_id = os.environ.get("KYUJINBOX_GROUP_ID", "").strip()
 
+    # グループIDがある場合は一覧ページから新規作成ボタンを探す
     if group_id:
-        url = f"https://saiyo.kyujinbox.com/company/groups/{group_id}/jobs/new"
-        progress(f"  📎 新規求人URL(env): {url}", "info")
-        return url
+        list_url = f"https://saiyo.kyujinbox.com/company/groups/{group_id}/jobs"
+        try:
+            page.goto(list_url, timeout=20000)
+            page.wait_for_load_state('networkidle', timeout=10000)
+            rand_delay(1.5, 2.5)
 
-    # ② 現在のページURLからグループIDを抽出
-    m = re.search(r'/company/groups/(G[\w-]+)', current_url)
-    if m:
-        gid = m.group(1)
-        url = f"https://saiyo.kyujinbox.com/company/groups/{gid}/jobs/new"
-        progress(f"  📎 新規求人URL(url抽出): {url}", "info")
-        return url
+            # 新規作成ボタン/リンクを探す
+            for kw in ['新規求人', '求人を作成', '求人登録', '新規作成', '求人を出す', '掲載', '新規', '＋']:
+                try:
+                    locator = page.locator(f'a:has-text("{kw}"), button:has-text("{kw}")')
+                    if locator.count() > 0:
+                        el = locator.first
+                        if el.is_visible():
+                            href = el.get_attribute('href') or ''
+                            if href.startswith('http'):
+                                progress(f"  📎 新規求人URL(ボタン): {href}", "info")
+                                return href
+                            elif href.startswith('/'):
+                                url = f"https://saiyo.kyujinbox.com{href}"
+                                progress(f"  📎 新規求人URL(ボタン): {url}", "info")
+                                return url
+                            else:
+                                # クリックしてURLを取得
+                                el.click()
+                                page.wait_for_load_state('networkidle', timeout=10000)
+                                rand_delay(1.0, 2.0)
+                                url = page.url
+                                progress(f"  📎 新規求人URL(クリック): {url}", "info")
+                                return url
+                except Exception:
+                    pass
 
-    # ③ ページ内リンクからグループIDを抽出
-    try:
-        links = page.query_selector_all('a[href]')
-        for link in links:
-            href = link.get_attribute('href') or ''
-            m = re.search(r'/company/groups/(G[\w-]+)', href)
-            if m:
-                gid = m.group(1)
-                url = f"https://saiyo.kyujinbox.com/company/groups/{gid}/jobs/new"
-                progress(f"  📎 新規求人URL(リンク抽出): {url}", "info")
-                return url
-            # 旧来のリンクテキスト検索
-            text = (link.inner_text() or '').strip()
-            if any(kw in text for kw in ['新規', '求人を作成', '求人を出す', '掲載申込']):
-                if href.startswith('http'):
-                    return href
-                elif href.startswith('/'):
-                    return f"https://saiyo.kyujinbox.com{href}"
-    except Exception:
-        pass
+            # ページ内の /jobs/ を含むリンクを探す
+            links = page.query_selector_all('a[href]')
+            for link in links:
+                href = link.get_attribute('href') or ''
+                if '/jobs/' in href and ('new' in href or 'create' in href or 'add' in href):
+                    url = href if href.startswith('http') else f"https://saiyo.kyujinbox.com{href}"
+                    progress(f"  📎 新規求人URL(リンク): {url}", "info")
+                    return url
 
-    progress("  ⚠️ グループIDが特定できません。KYUJINBOX_GROUP_ID を .env に設定してください", "warn")
-    return "https://saiyo.kyujinbox.com/company/jobs/new"
+            progress("  ⚠️ 新規求人ボタンが見つかりません。ページリンク一覧:", "warn")
+            for link in links[:20]:
+                href = link.get_attribute('href') or ''
+                txt = (link.inner_text() or '').strip()[:30]
+                if href:
+                    progress(f"    {txt!r} → {href}", "warn")
+
+        except Exception as e:
+            progress(f"  ⚠️ 一覧ページ取得失敗: {e}", "warn")
+
+    progress("  ⚠️ 新規求人URLを特定できませんでした", "error")
+    return ""
 
 
 def find_visible_selector(page, *selectors, timeout=5000):
@@ -986,6 +1001,10 @@ def main():
             progress("✅ ログイン成功", "success")
 
             post_url = find_post_url(page)
+            if not post_url:
+                progress("❌ 新規求人URLが取得できませんでした。管理画面で求人作成URLを確認してください", "error")
+                browser.close()
+                sys.exit(1)
             progress(f"🔗 求人投稿ページ: {post_url}", "info")
 
             target_jobs = jobs[:batch]
