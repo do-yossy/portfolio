@@ -1093,6 +1093,10 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const proc = spawn(PYTHON_CMD, [scriptPath], { env });
     let count = 0;
 
+    const indeedKeepalive = setInterval(() => {
+      if (!res.writableEnded) res.write(': keepalive\n\n');
+    }, 15000);
+
     proc.stdout.on('data', async data => {
       const lines = data.toString().split('\n').filter(l => l.trim());
       for (const line of lines) {
@@ -1117,6 +1121,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     });
 
     proc.on('close', async code => {
+      clearInterval(indeedKeepalive);
       const ok = code === 0;
       const msg = ok ? `✅ Indeed取込完了: ${count}件取得` : `❌ Indeed取込失敗（コード: ${code}）`;
       await Logs.create('indeed_scrape', ok ? 'success' : 'error', msg);
@@ -1130,7 +1135,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       res.end();
     });
 
-    req.on('close', () => { try { proc.kill(); } catch {} });
+    req.on('close', () => { clearInterval(indeedKeepalive); try { proc.kill(); } catch {} });
     return;
   }
 
@@ -1189,6 +1194,12 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
     sseSend(res, { message: `📋 求人ボックス向け求人 ${Math.min(batchSize, kbJobs.length)}件を投稿します...`, type: 'info' });
 
+    // SSE keepalive: prevent Cloudflare/proxy from closing idle SSE connections
+    // during long Playwright operations (form filling can take 30-60 seconds)
+    const keepalive = setInterval(() => {
+      if (!res.writableEnded) res.write(': keepalive\n\n');
+    }, 15000);
+
     proc.stdout.on('data', data => {
       const lines = data.toString().split('\n').filter(l => l.trim());
       for (const line of lines) {
@@ -1206,6 +1217,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     });
 
     proc.on('close', async code => {
+      clearInterval(keepalive);
       const ok = code === 0;
       const msg = ok ? '✅ 求人ボックス投稿完了' : `❌ 求人ボックス投稿失敗(exit ${code})`;
       await Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
@@ -1219,7 +1231,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       res.end();
     });
 
-    req.on('close', () => { try { proc.kill(); } catch {} });
+    req.on('close', () => { clearInterval(keepalive); try { proc.kill(); } catch {} });
     return;
   }
 
