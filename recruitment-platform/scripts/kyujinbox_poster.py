@@ -325,13 +325,29 @@ def click_submit_button(page):
         return False
 
 
-def setup_submit_interceptor(page, job_type_val, phone_clear=True):
+def _is_empty_val(v):
+    """空とみなす値か判定（0は数値として有効なので空扱いしない）"""
+    if v is None:
+        return True
+    if isinstance(v, str):
+        return v.strip() in ('', 'null', 'None', 'undefined')
+    if isinstance(v, (list, dict)):
+        return len(v) == 0
+    return False
+
+
+def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=None):
     """
-    フォーム送信POSTをインターセプトしてjobType・電話番号を強制修正する。
+    フォーム送信POSTをインターセプトして本文を正しいデータで上書きする。
     Vue.jsのreactive状態が未更新でも確実に正しい値をサーバーに送信できる。
+
+    full_payload: 求人の全フィールドを含むdict。POST本文の各キーが空の場合に注入する。
+                  本文に既に存在するキーのみ上書きし、未知のキーは追加しない
+                  （APIスキーマを壊さないため）。
     JSON・form-encoded 両方に対応。
     """
     intercepted = {'count': 0}
+    full_payload = full_payload or {}
 
     def handle(route):
         req = route.request
@@ -346,15 +362,38 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True):
             route.continue_()
             return
 
+        url_short = req.url.split('?')[0]
+        is_job_post = '/jobs' in url_short or '/job/' in url_short or 'draft' in url_short
+
         try:
             if 'application/json' in ct:
                 data = json.loads(body)
                 modified = []
 
+                # ── 求人投稿系POSTなら本文構造をログ出力（スキーマ把握用）──
+                if is_job_post and isinstance(data, dict):
+                    keys_preview = []
+                    for k in list(data.keys())[:60]:
+                        v = data[k]
+                        vs = json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
+                        keys_preview.append(f"{k}={str(vs)[:25]}")
+                    progress(f"  📦 POST本文[{url_short[-50:]}] keys: {', '.join(keys_preview)}", "info")
+
+                # ── 全フィールド注入：本文に存在し かつ 空のキーを正しい値で埋める ──
+                if is_job_post and isinstance(data, dict):
+                    for k, correct_v in full_payload.items():
+                        if correct_v is None or correct_v == '':
+                            continue
+                        if k in data and _is_empty_val(data.get(k)):
+                            data[k] = correct_v
+                            modified.append(f"{k}={str(correct_v)[:15]}")
+
+                # jobType は本文に無くても強制追加（最重要・必須項目）
                 cur_jt = str(data.get('jobType', '')).strip()
                 if cur_jt in ('', 'null', '0', 'None', 'undefined'):
                     data['jobType'] = job_type_val
-                    modified.append(f"jobType={job_type_val}")
+                    if 'jobType' not in [m.split('=')[0] for m in modified]:
+                        modified.append(f"jobType={job_type_val}")
 
                 if phone_clear:
                     if data.get('applicationPhoneNumber'):
@@ -367,7 +406,7 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True):
                 if modified:
                     intercepted['count'] += 1
                     new_body = json.dumps(data, ensure_ascii=False)
-                    progress(f"  🔧 POST修正(JSON) [{req.url.split('?')[0][-60:]}]: {', '.join(modified)}", "info")
+                    progress(f"  🔧 POST修正(JSON) [{url_short[-50:]}]: {', '.join(modified[:20])}", "info")
                     route.continue_(post_data=new_body)
                     return
 
@@ -398,15 +437,38 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True):
 
         route.continue_()
 
+    # ── 求人保存系APIのレスポンスをログ出力（成否確認用）──
+    def on_response(resp):
+        try:
+            url = resp.url.split('?')[0]
+            if ('/jobs' in url or '/job/' in url or 'draft' in url) and resp.request.method == 'POST':
+                status = resp.status
+                snippet = ''
+                try:
+                    txt = resp.text()
+                    snippet = txt[:200].replace('\n', ' ')
+                except Exception:
+                    snippet = '(本文取得不可)'
+                level = 'success' if 200 <= status < 300 else 'warn'
+                progress(f"  📨 APIレスポンス [{url[-50:]}] status={status} body={snippet}", level)
+        except Exception:
+            pass
+
     page.route('**', handle)
-    return intercepted, lambda: _safe_unroute(page, handle)
+    page.on('response', on_response)
+    return intercepted, lambda: _safe_unroute(page, handle, on_response)
 
 
-def _safe_unroute(page, handler):
+def _safe_unroute(page, handler, resp_handler=None):
     try:
         page.unroute('**', handler)
     except Exception:
         pass
+    if resp_handler:
+        try:
+            page.remove_listener('response', resp_handler)
+        except Exception:
+            pass
 
 
 def find_post_url(page, group_id=None):
@@ -1458,7 +1520,57 @@ def fill_kyujinbox_form(page, job, company_name):
 
     rand_delay(0.5, 1.0)
 
-    return selected_job_type_val, company_phone
+    # ---- POSTインターセプター用の完全ペイロードを構築 ----
+    # POST本文の各キーが空の場合に注入するため、DOM input名と同じキー名で用意する。
+    emp_type = job.get('employmentType') or job.get('employment_type', '')
+    emp_keywords = {
+        '正社員': '正社員', 'アルバイト': 'アルバイト・パート', 'パート': 'アルバイト・パート',
+        '契約社員': '契約社員', '業務委託': '業務委託', '派遣': '派遣社員',
+    }
+    emp_label = '正社員'
+    for k, v in emp_keywords.items():
+        if k in emp_type:
+            emp_label = v
+            break
+
+    tags = job.get('tags', [])
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except Exception:
+            tags = []
+    quals_text = ' / '.join(str(t) for t in tags)[:LIMIT_QUALIFICATIONS] if tags else ''
+
+    rewarding_p = (job.get('rewarding') or job.get('rewarding_text') or '').strip()[:LIMIT_REWARDING]
+    worktime_p  = (job.get('worktimeHoliday') or job.get('worktime_holiday') or job.get('workTime') or '').strip()[:LIMIT_WORKTIME]
+    transport_p = (job.get('transportation') or job.get('access') or '').strip()[:LIMIT_TRANSPORT]
+    how_to_apply_p = (job.get('how_to_apply') or job.get('howToApply') or
+                      "下記URLよりWebでご応募ください。書類選考後にご連絡いたします。").strip()
+
+    full_payload = {
+        'company':         company_name,
+        'title':           job.get('title', ''),
+        'jobType':         selected_job_type_val,
+        'description':     job.get('description', ''),
+        'rewarding':       rewarding_p,
+        'qualifications':  quals_text,
+        'prefVal':         pref_id,
+        'address':         location,
+        'transportation':  transport_p,
+        'payType':         pay_type_val,
+        'payMin':          pay_min or '',
+        'payMax':          pay_max or '',
+        'benefit':         job.get('salary', ''),
+        'worktimeHoliday': worktime_p,
+        'howToApply':      how_to_apply_p,
+        'employTypes':     [emp_label],
+        'characteristics': [int(v) for v in CHAR_VALUES],
+    }
+    if company_phone:
+        full_payload['applicationPhoneNumber'] = company_phone
+        full_payload['isPhoneNumberRequired'] = True
+
+    return selected_job_type_val, company_phone, full_payload
 
 
 def main():
@@ -1638,7 +1750,7 @@ def main():
                     dump_visible_inputs(page)
                     save_screenshot(page, f"post_form_{i}")
 
-                    selected_job_type_val, job_company_phone = fill_kyujinbox_form(page, job, company_name)
+                    selected_job_type_val, job_company_phone, full_payload = fill_kyujinbox_form(page, job, company_name)
                     rand_delay(0.8, 1.8)
 
                     # select値をJS確認（name or id どちらでも）
@@ -1669,8 +1781,8 @@ def main():
                     # ---- POSTインターセプター設定 ----
                     intercept_val = selected_job_type_val or '1'
                     phone_clear = not bool(job_company_phone)
-                    intercepted, unroute = setup_submit_interceptor(page, intercept_val, phone_clear=phone_clear)
-                    progress(f"  🔧 POSTインターセプター設定 (jobType={intercept_val}, phone_clear={phone_clear})", "info")
+                    intercepted, unroute = setup_submit_interceptor(page, intercept_val, phone_clear=phone_clear, full_payload=full_payload)
+                    progress(f"  🔧 POSTインターセプター設定 (jobType={intercept_val}, phone_clear={phone_clear}, payload={len(full_payload)}項目)", "info")
 
                     submitted = click_submit_button(page)
 
