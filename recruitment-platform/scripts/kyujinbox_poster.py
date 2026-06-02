@@ -1013,28 +1013,39 @@ def fill_kyujinbox_form(page, job, company_name):
     fill_text(page, 'textarea[name="benefit"]', salary_str)
     rand_delay(0.3, 0.6)
 
-    # 仕事のやりがい (rewarding) - あれば入力
-    rewarding = job.get('rewarding', job.get('description', ''))
-    if rewarding:
-        progress(f"  📝 やりがい入力中", "info")
-        fill_text(page, 'textarea[name="rewarding"]', rewarding)
-        rand_delay(0.3, 0.6)
+    # kyujinbox フィールドの文字数制限
+    LIMIT_REWARDING     = 130  # やりがい（上限140字）
+    LIMIT_WORKTIME      = 130  # 勤務時間・休日（上限140字）
+    LIMIT_TRANSPORT     = 130  # アクセス（上限140字）
+    LIMIT_QUALIFICATIONS= 130  # 応募資格（上限140字）
 
-    # 労働時間・休日 (worktimeHoliday)
-    worktime = job.get('worktimeHoliday', job.get('workTime', ''))
+    # 仕事のやりがい (rewarding) - 140文字以内に切り詰め
+    # DB は snake_case なので両方チェック。descriptionのフォールバックは使わない
+    rewarding = (job.get('rewarding') or job.get('rewarding_text') or '').strip()
+    if rewarding:
+        rewarding_trunc = rewarding[:LIMIT_REWARDING]
+        progress(f"  📝 やりがい入力中 ({len(rewarding)}→{len(rewarding_trunc)}字)", "info")
+        fill_text(page, 'textarea[name="rewarding"]', rewarding_trunc)
+        rand_delay(0.2, 0.4)
+
+    # 労働時間・休日 (worktimeHoliday) - DB snake_case: worktime_holiday
+    worktime = (job.get('worktimeHoliday') or job.get('worktime_holiday')
+                or job.get('workTime') or '').strip()
     if worktime:
-        progress(f"  📝 勤務時間・休日入力中", "info")
-        fill_text(page, 'textarea[name="worktimeHoliday"]', worktime)
-        rand_delay(0.3, 0.6)
+        worktime_trunc = worktime[:LIMIT_WORKTIME]
+        progress(f"  📝 勤務時間・休日入力中 ({len(worktime)}→{len(worktime_trunc)}字)", "info")
+        fill_text(page, 'textarea[name="worktimeHoliday"]', worktime_trunc)
+        rand_delay(0.2, 0.4)
 
     # アクセス (transportation)
-    transport = job.get('transportation', job.get('access', ''))
+    transport = (job.get('transportation') or job.get('access') or '').strip()
     if transport:
-        progress(f"  📝 アクセス情報入力中", "info")
-        fill_text(page, 'textarea[name="transportation"]', transport)
-        rand_delay(0.3, 0.6)
+        transport_trunc = transport[:LIMIT_TRANSPORT]
+        progress(f"  📝 アクセス情報入力中 ({len(transport)}→{len(transport_trunc)}字)", "info")
+        fill_text(page, 'textarea[name="transportation"]', transport_trunc)
+        rand_delay(0.2, 0.4)
 
-    # 応募資格
+    # 応募資格（タグから生成） - 140文字以内
     tags = job.get('tags', [])
     if isinstance(tags, str):
         try:
@@ -1042,10 +1053,10 @@ def fill_kyujinbox_form(page, job, company_name):
         except Exception:
             tags = []
     if tags:
-        progress(f"  📝 応募資格・タグ入力中", "info")
-        qual_text = ' / '.join(tags)
+        qual_text = ' / '.join(str(t) for t in tags)[:LIMIT_QUALIFICATIONS]
+        progress(f"  📝 応募資格・タグ入力中 ({len(qual_text)}字)", "info")
         fill_text(page, 'textarea[name="qualifications"]', qual_text)
-        rand_delay(0.3, 0.6)
+        rand_delay(0.2, 0.4)
 
     # ---- 特徴チェックボックス (characteristics) ----
     # 確認済みvalue: 未経験歓迎=1, 研修あり=19, 昇給あり=23, 社会保険完備=24, 週休2日制=43, 車通勤OK=52
@@ -1078,6 +1089,20 @@ def fill_kyujinbox_form(page, job, company_name):
         rand_delay(0.3, 0.6)
     except Exception as e:
         progress(f"  ⚠️ characteristics 失敗: {e}", "warn")
+
+    # ---- 応募方法 (howToApply) ----
+    # 電話番号をクリアする場合はWebからの応募方法を明記する（必須）
+    progress(f"  📝 応募方法入力中", "info")
+    how_to_apply = "下記URLよりWebでご応募ください。書類選考後にご連絡いたします。"
+    fill_text(page, 'textarea[name="howToApply"]', how_to_apply, timeout=3000)
+    rand_delay(0.2, 0.4)
+
+    # ---- 担当者情報 (relation) ----
+    try:
+        select_option_safe(page, 'select[name="relation"]', value='2', timeout=3000)
+        rand_delay(0.1, 0.3)
+    except Exception:
+        pass
 
     # ---- 電話番号 ----
     # DOM操作でクリアする（インターセプターでもバックアップ対応）
