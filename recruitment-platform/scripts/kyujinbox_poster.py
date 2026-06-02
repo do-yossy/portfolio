@@ -762,15 +762,22 @@ def publish_draft(page, draft_url):
                 pub.click()
                 progress("  ⚠️ is-disab除去後にクリック（公開可否は要確認）", "warn")
                 rand_delay(2.0, 3.0)
-                # 確認ダイアログのOKも押す（force click）
-                for _a in range(10):
+                # 確認ダイアログのOKも押す（mouse.click）
+                for _a in range(12):
                     try:
-                        ok_l = page.locator('button.c-button--blue:has-text("OK")')
-                        if ok_l.count() == 0:
-                            ok_l = page.locator('button:has-text("OK")')
-                        if ok_l.count() > 0:
-                            ok_l.first.click(force=True)
-                            progress("  ✅ 確認ダイアログ「OK」force click(is-disab後)", "success")
+                        pos = page.evaluate("""() => {
+                            const btns = Array.from(document.querySelectorAll('button'));
+                            for (const b of btns.filter(b => (b.textContent||'').trim()==='OK')) {
+                                const r = b.getBoundingClientRect();
+                                const s = window.getComputedStyle(b);
+                                if (r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && s.opacity!=='0')
+                                    return {x: r.left+r.width/2, y: r.top+r.height/2};
+                            }
+                            return null;
+                        }""")
+                        if pos:
+                            page.mouse.click(pos['x'], pos['y'])
+                            progress("  ✅ 確認ダイアログ「OK」mouse.click(is-disab後)", "success")
                             break
                     except Exception:
                         pass
@@ -795,31 +802,46 @@ def publish_draft(page, draft_url):
         rand_delay(2.0, 3.0)
 
         # ── 確認ダイアログ「求人を公開します。」→ OK をクリック ──
-        # force=True でPlaywrightの実クリック（isTrusted=true）を使う。
-        # JS .click() は isTrusted=false でVueに無視される可能性があるため使わない。
+        # 8個あるOKボタンのうち実際に画面に表示されているものの座標を取得し
+        # page.mouse.click(x, y) で信頼されたマウスイベントを発火する。
         ok_clicked = False
-        for _attempt in range(10):
+        for _attempt in range(12):
             try:
-                # blue ボタン優先で探す
-                ok_loc = page.locator('button.c-button--blue:has-text("OK")')
-                if ok_loc.count() == 0:
-                    ok_loc = page.locator('button:has-text("OK")')
-                if ok_loc.count() > 0:
-                    # スクリーンショットで状態確認
+                # 画面に実際に表示されているOKボタンの座標を取得
+                pos = page.evaluate("""() => {
+                    const btns = Array.from(document.querySelectorAll('button'));
+                    const okBtns = btns.filter(b => (b.textContent || '').trim() === 'OK');
+                    for (const b of okBtns) {
+                        const r = b.getBoundingClientRect();
+                        const s = window.getComputedStyle(b);
+                        if (r.width > 0 && r.height > 0
+                                && s.display !== 'none'
+                                && s.visibility !== 'hidden'
+                                && s.opacity !== '0') {
+                            return {x: r.left + r.width / 2, y: r.top + r.height / 2,
+                                    w: r.width, h: r.height, cls: b.className};
+                        }
+                    }
+                    return null;
+                }""")
+                if pos:
                     if _attempt == 0:
-                        save_screenshot(page, f'before_ok_click')
-                    ok_loc.first.scroll_into_view_if_needed()
-                    rand_delay(0.2, 0.4)
-                    ok_loc.first.click(force=True)
-                    progress(f"  ✅ 確認ダイアログ「OK」force click成功 (試行{_attempt+1})", "success")
+                        save_screenshot(page, 'before_ok_click')
+                    progress(f"  🖱️ OKボタン座標: ({pos['x']:.0f}, {pos['y']:.0f}) cls={pos['cls']}", "info")
+                    page.mouse.click(pos['x'], pos['y'])
+                    progress(f"  ✅ 確認ダイアログ「OK」mouse.click成功 (試行{_attempt+1})", "success")
                     ok_clicked = True
                     break
+                else:
+                    if _attempt == 0:
+                        progress("  ⏳ ダイアログ表示待機中...", "info")
             except Exception as e:
                 progress(f"  ⚠️ OKクリック試行{_attempt+1}失敗: {e}", "warn")
             rand_delay(0.5, 1.0)
 
         if not ok_clicked:
-            progress("  ⚠️ 確認ダイアログのOKが見つかりませんでした（公開できていない可能性）", "warn")
+            progress("  ⚠️ 確認ダイアログのOKが画面上に見つかりませんでした", "warn")
+            save_screenshot(page, 'ok_not_found')
 
         rand_delay(3.0, 5.0)
         try:
