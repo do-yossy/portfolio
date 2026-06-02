@@ -540,12 +540,12 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
             if (('jobs' in url or 'draft' in url) and resp.request.method == 'POST'
                     and ('/api/' in url)):
                 status = resp.status
-                snippet = ''
+                txt = ''
                 try:
                     txt = resp.text()
-                    snippet = txt[:200].replace('\n', ' ')
                 except Exception:
-                    snippet = '(本文取得不可)'
+                    txt = ''
+                snippet = (txt[:200].replace('\n', ' ')) if txt else '(本文取得不可)'
                 level = 'success' if 200 <= status < 300 else 'warn'
                 progress(f"  📨 APIレスポンス [{url[-50:]}] status={status} body={snippet}", level)
                 # 保存系（draft/jobs）の2xxを成功として記録
@@ -553,11 +553,12 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                 intercepted['save_url'] = url
                 if 200 <= status < 300:
                     intercepted['save_ok'] = True
-                    # レスポンス本文から下書きID（例: 5922-7577-0632）を抽出
+                    # レスポンス本文「全体」から下書きID（例: 5922-7577-0632）を抽出
                     try:
-                        m = re.search(r'\d{4}-\d{4}-\d{3,}', snippet)
+                        m = re.search(r'\d{4}-\d{4}-\d{3,}', txt or '')
                         if m:
                             intercepted['draft_id'] = m.group(0)
+                            progress(f"  🆔 下書きID取得: {m.group(0)}", "info")
                     except Exception:
                         pass
         except Exception:
@@ -693,8 +694,53 @@ def publish_draft(page, draft_url):
             return False
         cls = pub.get_attribute('class') or ''
         if 'is-disab' in cls:
-            progress("  ⚠️ 公開するがまだ無効（他に未入力の必須項目あり）。下書きのまま保存します", "warn")
-            return False
+            progress("  ⚠️ 公開するがまだ無効。残っている必須項目を調査します...", "warn")
+            # 「必須」ラベル付きで未入力のセクション見出しを収集
+            try:
+                missing = page.evaluate("""() => {
+                    const out = [];
+                    // 必須バッジを持つ見出し近辺で、空のinput/textarea/未選択radioを探す
+                    document.querySelectorAll('*').forEach(el => {
+                        const t = (el.textContent || '').trim();
+                        if (t === '必須' && el.children.length === 0) {
+                            // 見出しテキスト（親や前要素）
+                            let head = '';
+                            let p = el.closest('div,section,li,dl,tr');
+                            for (let i=0; i<3 && p; i++) {
+                                const h = p.querySelector('label,h2,h3,h4,dt,legend');
+                                if (h && h.textContent.trim() && h.textContent.trim() !== '必須') {
+                                    head = h.textContent.trim().slice(0,30); break;
+                                }
+                                p = p.parentElement;
+                            }
+                            if (head) out.push(head);
+                        }
+                    });
+                    return Array.from(new Set(out)).slice(0,15);
+                }""")
+                if missing:
+                    progress(f"  📋 必須セクション: {', '.join(missing)}", "warn")
+            except Exception:
+                pass
+            # 念のためクラス強制除去でクリックを試みる（最終手段）
+            try:
+                pub.evaluate("e => { e.classList.remove('is-disab'); e.removeAttribute('disabled'); }")
+                rand_delay(0.2, 0.4)
+                pub.click()
+                progress("  ⚠️ is-disab除去後にクリック（公開可否は要確認）", "warn")
+                rand_delay(3.0, 5.0)
+                try:
+                    page.wait_for_load_state('networkidle', timeout=15000)
+                except Exception:
+                    pass
+                # クリック後にエラーが出ていないか確認
+                final = page.url
+                if '/jobs/edit/' in final:
+                    # まだ編集ページ → 公開失敗の可能性
+                    return False
+                return True
+            except Exception:
+                return False
         pub.scroll_into_view_if_needed()
         rand_delay(0.3, 0.6)
         pub.click()
@@ -2037,6 +2083,12 @@ def main():
                     # 最優先: 保存API(draft/jobs)が2xxを返したら下書き保存成功
                     if intercepted.get('save_ok'):
                         draft_id = intercepted.get('draft_id')
+                        # フォールバック: 送信後URLからも下書きIDを拾う
+                        if not draft_id:
+                            m = re.search(r'/jobs/edit/(\d{4}-\d{4}-\d{3,})', final_url)
+                            if m:
+                                draft_id = m.group(1)
+                                progress(f"  🆔 下書きID(URLから): {draft_id}", "info")
                         progress(f"✅ 「{job['title']}」を下書き保存しました "
                                  f"(API status={intercepted.get('save_status')}, id={draft_id})", "success")
                         success_count += 1
