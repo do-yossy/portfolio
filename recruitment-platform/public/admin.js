@@ -235,7 +235,7 @@ function startScrapeIndeed() {
   );
 }
 
-// ── Kyujinbox Post ──
+// ── Kyujinbox Post (polling - replaces SSE which times out through Cloudflare) ──
 function startPostKyujinbox() {
   const batchSize = document.getElementById('kb-batch-size')?.value || '5';
   confirmAction(
@@ -243,9 +243,49 @@ function startPostKyujinbox() {
     async () => {
       const vpnOk = await refreshVpn();
       if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
-      runSSE(`/api/post/kyujinbox?limit=${batchSize}`, 'progress-kyujinbox', 'btn-post-kyujinbox', d => {
-        toast(d.message, d.success ? 'success' : 'error');
-      });
+
+      const box = openProgress('progress-kyujinbox');
+      const btn = document.getElementById('btn-post-kyujinbox');
+      if (btn) { btn.disabled = true; btn.dataset.origText = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> 実行中...'; }
+      appendLog(box, '処理を開始しています...', 'info');
+
+      let sessionId = null;
+      try {
+        const r = await fetch('/api/post/kyujinbox', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: batchSize })
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          appendLog(box, d.error || 'サーバーエラーが発生しました', 'error');
+          if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+          return;
+        }
+        sessionId = d.sessionId;
+      } catch (e) {
+        appendLog(box, 'サーバーへの接続に失敗しました: ' + e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+        return;
+      }
+
+      let fromIdx = 0;
+      const timer = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/post/kyujinbox/poll?id=${sessionId}&from=${fromIdx}`);
+          if (!r.ok) return;
+          const d = await r.json();
+          for (const entry of d.logs) {
+            appendLog(box, entry.message, entry.type || 'info');
+          }
+          fromIdx = d.total;
+          if (d.done) {
+            clearInterval(timer);
+            if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+            toast(d.success ? '求人ボックスへの投稿が完了しました' : '投稿が失敗しました', d.success ? 'success' : 'error');
+          }
+        } catch { /* ignore transient network errors */ }
+      }, 2000);
     }
   );
 }

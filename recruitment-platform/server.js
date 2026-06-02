@@ -540,6 +540,18 @@ async function computeDashboardStats(company = null) {
   };
 }
 
+// ── Polling sessions (kyujinbox / stanby long-running jobs) ──
+// Replaces SSE which drops through Cloudflare after ~75 s
+const postSessions = new Map();
+function createSession() {
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const session = { logs: [], done: false, success: false, createdAt: Date.now() };
+  postSessions.set(id, session);
+  // Auto-cleanup after 15 min
+  setTimeout(() => postSessions.delete(id), 15 * 60 * 1000);
+  return { id, session };
+}
+
 // ── Router ─────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -1144,23 +1156,18 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
-  // ── API: Kyujinbox Post (SSE) ──
-  if (pathname === '/api/post/kyujinbox' && method === 'GET') {
-    sseInit(res);
-
-    sseSend(res, { message: 'VPN接続を確認しています...', type: 'info' });
+  // ── API: Kyujinbox Post (Polling: POST to start, GET poll) ──
+  // Replaced SSE which drops through Cloudflare Tunnel at ~75 s
+  if (pathname === '/api/post/kyujinbox' && method === 'POST') {
     const vpnOk = await checkVPN();
     if (!vpnOk) {
-      sseSend(res, { message: '❌ VPN未接続です。処理を中止します。', type: 'error', done: true, success: false });
       await Logs.create('kyujinbox_post', 'error', 'VPN未接続');
-      res.end();
-      return;
+      return sendJSON(res, 400, { error: '❌ VPN未接続です。処理を中止します。' });
     }
 
-    const batchSize = Math.min(parseInt(query.limit || '5', 10), 10);
+    const startBody = await parseJSON(req);
+    const batchSize = Math.min(parseInt(startBody.limit || '5', 10), 10);
     const allJobs   = await Jobs.findAll(true);
-    // 求人ボックス媒体が割り当てられた求人を優先、なければ全公開求人
-    // target_media は '求人ボックス'（旧）または 'kyujinbox'（英語）のどちらも受け付ける
     let kbJobs = allJobs.filter(j => {
       const m = JSON.parse(j.target_media || '[]');
       return m.includes('求人ボックス') || m.includes('kyujinbox');
@@ -1168,76 +1175,86 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     if (kbJobs.length === 0) kbJobs = allJobs;
 
     if (kbJobs.length === 0) {
-      sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
-      res.end();
-      return;
+      return sendJSON(res, 400, { error: '⚠️ 公開中の求人がありません' });
     }
 
-    const scriptPath = path.join(SCRIPTS_DIR, 'kyujinbox_poster.py');
-    if (!fs.existsSync(scriptPath)) {
-      sseSend(res, { message: '⚠️ 投稿スクリプトが見つかりません（scripts/kyujinbox_poster.py）', type: 'warn' });
-      sseSend(res, { message: 'デモモード: 投稿シミュレーションを実行します...', type: 'info' });
-      const target = kbJobs[0];
-      sseSend(res, { message: `🔑 求人ボックスにログイン中...`, type: 'info' });
-      await new Promise(r => setTimeout(r, 800));
-      sseSend(res, { message: `📝 「${target.title}」を投稿中...`, type: 'info' });
-      await new Promise(r => setTimeout(r, 1200));
-      sseSend(res, { message: `✅ 「${target.title}」を投稿しました`, type: 'success' });
-      await Logs.create('kyujinbox_post', 'success', `求人ボックス投稿（デモ）: ${target.title}`);
-      sseSend(res, { message: `✅ 完了: 1件投稿しました（デモモード）`, type: 'success', done: true, success: true });
-      res.end();
-      return;
-    }
+    const { id, session } = createSession();
+    const pushLog = (message, type = 'info') => {
+      session.logs.push({ message: String(message ?? ''), type });
+    };
 
-    const jobsJson = JSON.stringify(kbJobs.slice(0, batchSize));
-    const proc = spawn(PYTHON_CMD, [scriptPath], {
-      env: { ...process.env, KYUJINBOX_BATCH_SIZE: String(batchSize) },
-      stdin: 'pipe'
-    });
-    proc.stdin.write(jobsJson);
-    proc.stdin.end();
+    sendJSON(res, 200, { ok: true, sessionId: id });
 
-    sseSend(res, { message: `📋 求人ボックス向け求人 ${Math.min(batchSize, kbJobs.length)}件を投稿します...`, type: 'info' });
-
-    // SSE keepalive: prevent Cloudflare/proxy from closing idle SSE connections
-    // during long Playwright operations (form filling can take 30-60 seconds)
-    const keepalive = setInterval(() => {
-      if (!res.writableEnded) sseSend(res, { type: 'ping' });
-    }, 15000);
-
-    proc.stdout.on('data', data => {
-      const lines = data.toString().split('\n').filter(l => l.trim());
-      for (const line of lines) {
-        try {
-          const obj = JSON.parse(line);
-          sseSend(res, { message: obj.message, type: obj.level || 'info' });
-        } catch {
-          sseSend(res, { message: line, type: 'info' });
-        }
+    // Run Python poster asynchronously (response already sent)
+    (async () => {
+      const scriptPath = path.join(SCRIPTS_DIR, 'kyujinbox_poster.py');
+      if (!fs.existsSync(scriptPath)) {
+        pushLog('⚠️ 投稿スクリプトが見つかりません（scripts/kyujinbox_poster.py）', 'warn');
+        pushLog('デモモード: 投稿シミュレーションを実行します...', 'info');
+        const target = kbJobs[0];
+        pushLog('🔑 求人ボックスにログイン中...', 'info');
+        await new Promise(r => setTimeout(r, 800));
+        pushLog(`📝 「${target.title}」を投稿中...`, 'info');
+        await new Promise(r => setTimeout(r, 1200));
+        pushLog(`✅ 「${target.title}」を投稿しました`, 'success');
+        await Logs.create('kyujinbox_post', 'success', `求人ボックス投稿（デモ）: ${target.title}`);
+        pushLog('✅ 完了: 1件投稿しました（デモモード）', 'success');
+        session.done = true; session.success = true;
+        return;
       }
-    });
 
-    proc.stderr.on('data', data => {
-      sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
-    });
-
-    proc.on('close', async code => {
-      clearInterval(keepalive);
-      const ok = code === 0;
-      const msg = ok ? '✅ 求人ボックス投稿完了' : `❌ 求人ボックス投稿失敗(exit ${code})`;
-      await Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
-      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
-      sseSend(res, {
-        message: ok ? '✅ 求人ボックスへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
-        type: ok ? 'success' : 'error',
-        done: true,
-        success: ok
+      pushLog(`📋 求人ボックス向け求人 ${Math.min(batchSize, kbJobs.length)}件を投稿します...`, 'info');
+      const jobsJson = JSON.stringify(kbJobs.slice(0, batchSize));
+      const proc = spawn(PYTHON_CMD, [scriptPath], {
+        env: { ...process.env, KYUJINBOX_BATCH_SIZE: String(batchSize) }
       });
-      res.end();
-    });
+      proc.stdin.write(jobsJson);
+      proc.stdin.end();
 
-    req.on('close', () => { clearInterval(keepalive); try { proc.kill(); } catch {} });
+      proc.stdout.on('data', data => {
+        const lines = data.toString().split('\n').filter(l => l.trim());
+        for (const line of lines) {
+          try {
+            const obj = JSON.parse(line);
+            pushLog(obj.message, obj.level || 'info');
+          } catch {
+            pushLog(line, 'info');
+          }
+        }
+      });
+
+      proc.stderr.on('data', data => {
+        const txt = data.toString().trim();
+        if (txt) pushLog(`⚠️ ${txt}`, 'warn');
+      });
+
+      proc.on('close', async code => {
+        const ok = code === 0;
+        const msg = ok ? '✅ 求人ボックス投稿完了' : `❌ 求人ボックス投稿失敗(exit ${code})`;
+        await Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
+        notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
+        pushLog(
+          ok ? '✅ 求人ボックスへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
+          ok ? 'success' : 'error'
+        );
+        session.done = true; session.success = ok;
+      });
+    })();
     return;
+  }
+
+  // ── API: Kyujinbox Post Poll ──
+  if (pathname === '/api/post/kyujinbox/poll' && method === 'GET') {
+    const sid = query.id;
+    const from = parseInt(query.from || '0', 10);
+    const session = postSessions.get(sid);
+    if (!session) return sendJSON(res, 404, { error: 'session not found' });
+    return sendJSON(res, 200, {
+      logs: session.logs.slice(from),
+      total: session.logs.length,
+      done: session.done,
+      success: session.success,
+    });
   }
 
   if (pathname === '/api/post/stanby' && method === 'GET') {
