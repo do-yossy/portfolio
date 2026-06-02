@@ -580,10 +580,14 @@ function createSession() {
 // ── Router ─────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
-  const parsed = url.parse(req.url, true);
-  const pathname = decodeURIComponent(parsed.pathname);
   const method = req.method;
-  const query = parsed.query;
+  let pathname = '/';
+  let query = {};
+  try {
+  const parsed = url.parse(req.url, true);
+  query = parsed.query;
+  try { pathname = decodeURIComponent(parsed.pathname); }
+  catch { pathname = parsed.pathname || '/'; }  // 不正な%エンコードでも落とさない
 
   // ── Static files ──
   if (pathname === '/styles.css' || pathname === '/admin.js') {
@@ -1547,6 +1551,26 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       <a href="/">トップへ戻る</a>
     </body></html>`);
   }
+  } catch (err) {
+    // 1件のリクエストエラーでサーバー全体を落とさない
+    console.error(`[handler error] ${method} ${pathname}:`, err);
+    try {
+      if (!res.headersSent) {
+        if (pathname.startsWith('/api/')) sendError(res, 500, 'サーバー内部エラー');
+        else send(res, 500, '<html><body style="font-family:sans-serif;text-align:center;padding:80px"><h2>500</h2><p>サーバー内部エラー</p></body></html>');
+      } else {
+        res.end();
+      }
+    } catch (_) { /* ignore */ }
+  }
+});
+
+// プロセスレベルの安全網: 予期せぬ例外でサーバーが落ちないようにする
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
 });
 
 server.listen(PORT, () => {
