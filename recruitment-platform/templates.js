@@ -22,8 +22,8 @@ function adminLayout(title, content, active = 'dashboard') {
 <body class="admin-layout">
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <h1>SEO採用<br>プラットフォーム</h1>
-    <span>管理画面</span>
+    <h1>合同会社<br>ニクール</h1>
+    <span>採用管理画面</span>
   </div>
   <nav>${nav}</nav>
   <div class="sidebar-footer"><a href="/admin/logout" style="color:var(--text-muted);font-size:12px;text-decoration:none">🚪 ログアウト</a></div>
@@ -69,7 +69,7 @@ ${jsonld}
 <body class="pub-body">
 <header class="pub-header">
   <div class="pub-header-inner">
-    <a href="/jobs" class="pub-header-logo">採用情報</a>
+    <a href="/jobs" class="pub-header-logo">合同会社ニクール 採用情報</a>
     <nav class="pub-header-nav">
       <a href="/jobs">求人一覧</a>
     </nav>
@@ -125,7 +125,7 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [] }) {
   <div>
     <div class="page-header">
       <h2>ダッシュボード</h2>
-      <p>採用プラットフォームの管理・操作</p>
+      <p>合同会社ニクール 採用管理システム</p>
     </div>
   </div>
   <span id="vpn-badge" class="vpn-badge vpn-checking" onclick="refreshVpn()" title="クリックで再確認">
@@ -494,7 +494,7 @@ function jobsListPage(jobs, search = '') {
   <div class="jobs-grid">${cards}</div>
 </div>`;
 
-  return publicLayout('求人情報一覧 | 採用サイト', content, {
+  return publicLayout('求人情報一覧 | 合同会社ニクール', content, {
     description: '東京・大阪の求人情報一覧。介護、営業、エンジニアなど多数掲載。'
   });
 }
@@ -517,7 +517,7 @@ function jobDetailPage(job) {
     "datePosted": (job.published_at || job.created_at || '').slice(0,10),
     "validThrough": job.expires_at ? job.expires_at.slice(0,10) : "",
     "employmentType": mapEmploymentType(job.employment_type),
-    "hiringOrganization": { "@type": "Organization", "name": "採用企業" },
+    "hiringOrganization": { "@type": "Organization", "name": "合同会社ニクール" },
     "jobLocation": {
       "@type": "Place",
       "address": {
@@ -787,7 +787,7 @@ function loginPage(error = '') {
 <div class="login-wrap">
   <div class="login-card">
     <div class="login-logo">
-      <h1>SEO採用プラットフォーム</h1>
+      <h1>合同会社ニクール</h1>
       <p>管理画面へのログイン</p>
     </div>
     ${error ? `<div class="login-error">⚠️ ${esc(error)}</div>` : ''}
