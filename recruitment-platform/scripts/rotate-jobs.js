@@ -52,25 +52,8 @@ async function main() {
 
   console.log(`\n📊 現在: 公開 ${published.length}件 / 非公開 ${unpublished.length}件 / 合計 ${all.length}件`);
 
-  // ── Step 0: 公開数が TARGET_ACTIVE を超えている場合は即時トリミング（古い順）
-  const trimList = [];
-  if (published.length > TARGET_ACTIVE) {
-    const excess = published.length - TARGET_ACTIVE;
-    const trimCandidates = [...published]
-      .sort((a, b) => (a.published_at || a.created_at || '') < (b.published_at || b.created_at || '') ? -1 : 1);
-    trimCandidates.slice(0, excess).forEach(j => trimList.push(j));
-    console.log(`\n✂️  超過分を非公開化 ${trimList.length}件（${published.length}件 → ${TARGET_ACTIVE}件）:`);
-    for (const job of trimList) {
-      await Jobs.update(job.id, { isPublished: false });
-      console.log(`  ✅ 非公開: ${job.title}`);
-    }
-  }
-
-  // トリミング後の公開リストを再計算
-  const publishedAfterTrim = published.filter(j => !trimList.find(t => t.id === j.id));
-
   // ── Step 1: ROTATE_AFTER_DAYS 以上掲載中の求人を古い順に ROTATE_COUNT 件非公開化
-  const toUnpublish = publishedAfterTrim
+  const toUnpublish = published
     .filter(j => (j.published_at || j.created_at || '') < cutoff)
     .sort((a, b) => (a.published_at || a.created_at || '') < (b.published_at || b.created_at || '') ? -1 : 1)
     .slice(0, ROTATE_COUNT);
@@ -86,7 +69,7 @@ async function main() {
   }
 
   // ── Step 2: 現在の公開数を再計算
-  const currentActive  = publishedAfterTrim.length - toUnpublish.length;
+  const currentActive  = published.length - toUnpublish.length;
   const needToPublish  = Math.max(0, TARGET_ACTIVE - currentActive);
   const actualPublish  = Math.min(needToPublish, toUnpublish.length, unpublished.length + toUnpublish.length);
 
