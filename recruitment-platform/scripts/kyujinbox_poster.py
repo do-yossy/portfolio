@@ -761,16 +761,24 @@ def publish_draft(page, draft_url):
                 rand_delay(0.2, 0.4)
                 pub.click()
                 progress("  ⚠️ is-disab除去後にクリック（公開可否は要確認）", "warn")
-                rand_delay(1.5, 2.5)
-                # 確認ダイアログのOKも押す
-                try:
-                    page.wait_for_selector('button:has-text("OK")', timeout=8000, state='visible')
-                    rand_delay(0.3, 0.6)
-                    page.locator('button:has-text("OK")').last.click()
-                    progress("  ✅ 確認ダイアログ「OK」をクリックしました（is-disab後）", "success")
-                    rand_delay(3.0, 5.0)
-                except Exception:
-                    rand_delay(2.0, 3.0)
+                rand_delay(2.0, 3.0)
+                # 確認ダイアログのOKも押す（JS直接クリック）
+                for _a in range(10):
+                    try:
+                        r = page.evaluate("""() => {
+                            const btns = Array.from(document.querySelectorAll('button'));
+                            const ok = btns.find(b => (b.textContent||'').trim()==='OK' && (b.className||'').includes('blue'))
+                                     || btns.find(b => (b.textContent||'').trim()==='OK');
+                            if (ok) { ok.click(); return 'ok'; }
+                            return 'not-found';
+                        }""")
+                        if r != 'not-found':
+                            progress("  ✅ 確認ダイアログ「OK」クリック(is-disab後)", "success")
+                            break
+                    except Exception:
+                        pass
+                    rand_delay(0.5, 1.0)
+                rand_delay(3.0, 5.0)
                 try:
                     page.wait_for_load_state('networkidle', timeout=15000)
                 except Exception:
@@ -787,27 +795,44 @@ def publish_draft(page, draft_url):
         rand_delay(0.3, 0.6)
         pub.click()
         progress("  ✅ 公開するをクリックしました", "info")
-        rand_delay(1.5, 2.5)
+        rand_delay(2.0, 3.0)
 
         # ── 確認ダイアログ「求人を公開します。」→ OK をクリック ──
-        try:
-            ok_btn = page.locator('button:has-text("OK"), button:has-text("ＯＫ"), button:has-text("はい"), button:has-text("公開する"):visible').last
-            # ダイアログが出るまで少し待機（モーダルアニメーション）
-            page.wait_for_selector('button:has-text("OK")', timeout=8000, state='visible')
-            rand_delay(0.3, 0.6)
-            page.locator('button:has-text("OK")').last.click()
-            progress("  ✅ 確認ダイアログ「OK」をクリックしました", "success")
-            rand_delay(3.0, 5.0)
-        except Exception as e:
-            progress(f"  ⚠️ 確認ダイアログが見つからないかOKクリック失敗: {e}", "warn")
-            rand_delay(2.0, 3.0)
+        # Playwrightの可視性チェック(wait_for_selector visible)はCSSアニメーション等で
+        # 誤判定するため、JavaScriptで直接クリックする（可視性チェックなし）
+        ok_clicked = False
+        for _attempt in range(10):
+            try:
+                result = page.evaluate("""() => {
+                    const btns = Array.from(document.querySelectorAll('button'));
+                    // 青いOKボタン優先（確認ダイアログの決定ボタン）
+                    const blueOk = btns.find(b =>
+                        (b.textContent || '').trim() === 'OK' &&
+                        (b.className || '').includes('blue'));
+                    if (blueOk) { blueOk.click(); return 'blue-ok'; }
+                    // 任意のOKボタン
+                    const anyOk = btns.find(b => (b.textContent || '').trim() === 'OK');
+                    if (anyOk) { anyOk.click(); return 'any-ok'; }
+                    return 'not-found';
+                }""")
+                if result != 'not-found':
+                    progress(f"  ✅ 確認ダイアログ「OK」クリック成功: {result}", "success")
+                    ok_clicked = True
+                    break
+            except Exception:
+                pass
+            rand_delay(0.5, 1.0)
 
+        if not ok_clicked:
+            progress("  ⚠️ 確認ダイアログのOKが見つかりませんでした（公開できていない可能性）", "warn")
+
+        rand_delay(3.0, 5.0)
         try:
             page.wait_for_load_state('networkidle', timeout=15000)
         except Exception:
             pass
         progress("  🎉 公開処理完了", "success")
-        return True
+        return ok_clicked
     except Exception as e:
         progress(f"  ⚠️ 公開処理エラー: {e}", "warn")
         return False
