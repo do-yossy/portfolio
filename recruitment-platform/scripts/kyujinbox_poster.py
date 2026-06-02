@@ -370,15 +370,21 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                 data = json.loads(body)
                 modified = []
 
-                # ── kyujinbox本文は {kyujin: "<JSON文字列>", token: "..."} 構造 ──
-                # フォームデータは data['kyujin'] の中にJSON文字列として入れ子になっている。
-                # その文字列をパースして中身を書き換える必要がある。
+                # ── kyujinbox本文は {kyujin: <データ>, token: "..."} 構造 ──
+                # data['kyujin'] は JSON文字列の場合とオブジェクトの場合の両方がある。
+                # どちらでもフォームデータ本体を target として取り出す。
                 inner = None
-                if isinstance(data, dict) and isinstance(data.get('kyujin'), str):
-                    try:
-                        inner = json.loads(data['kyujin'])
-                    except Exception:
-                        inner = None
+                inner_is_string = False
+                if isinstance(data, dict):
+                    kj = data.get('kyujin')
+                    if isinstance(kj, str):
+                        try:
+                            inner = json.loads(kj)
+                            inner_is_string = True
+                        except Exception:
+                            inner = None
+                    elif isinstance(kj, dict):
+                        inner = kj  # すでにオブジェクト（このまま書き換えれば data に反映される）
 
                 # 注入対象: 入れ子があればその中、なければトップレベル（フラット）
                 target = inner if isinstance(inner, dict) else (data if isinstance(data, dict) else None)
@@ -448,6 +454,32 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                             target[cand] = val
                             modified.append(f"{cand}(={logical})")
 
+                # ── 自動生成の薄い内容を充実版で上書き（給与補足）──
+                if 'benefit' in target and full_payload.get('benefit'):
+                    if target.get('benefit') != full_payload['benefit']:
+                        target['benefit'] = full_payload['benefit']
+                        modified.append('benefit(override)')
+
+                # ── ネスト・特殊フィールドの注入（実構造に基づく確定マッピング）──
+                # 勤務先住所: workLocations[0].location が null だと都道府県止まりになる
+                wl = target.get('workLocations')
+                loc_val = full_payload.get('_location') or full_payload.get('address')
+                if isinstance(wl, list) and wl and isinstance(wl[0], dict) and loc_val:
+                    if _is_empty_val(wl[0].get('location')):
+                        wl[0]['location'] = loc_val
+                        modified.append('workLocations.location')
+                # 勤務先名（会社情報ブロック）
+                emp = target.get('employer')
+                if isinstance(emp, dict) and full_payload.get('company'):
+                    if _is_empty_val(emp.get('companyName')):
+                        emp['companyName'] = full_payload['company']
+                        modified.append('employer.companyName')
+                # 応募選考必要項目: resumeRequired (3 = 基本情報＋職務経歴)
+                if 'resumeRequired' in target and full_payload.get('resumeRequired') is not None:
+                    if target.get('resumeRequired') != full_payload['resumeRequired']:
+                        target['resumeRequired'] = full_payload['resumeRequired']
+                        modified.append(f"resumeRequired={full_payload['resumeRequired']}")
+
                 # jobType は内側に無くても強制追加（最重要・必須項目）
                 cur_jt = str(target.get('jobType', '')).strip()
                 if cur_jt in ('', 'null', '0', 'None', 'undefined'):
@@ -465,8 +497,9 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
 
                 if modified:
                     intercepted['count'] += 1
-                    # 入れ子だった場合は再度JSON文字列化して戻す
-                    if isinstance(inner, dict):
+                    # kyujin が文字列で来た場合のみ再度JSON文字列化して戻す。
+                    # オブジェクトで来た場合は target が data['kyujin'] への参照なので不要。
+                    if inner_is_string and isinstance(inner, dict):
                         data['kyujin'] = json.dumps(inner, ensure_ascii=False)
                     new_body = json.dumps(data, ensure_ascii=False)
                     progress(f"  🔧 POST修正(JSON) [{url_short[-50:]}]: {', '.join(modified[:25])}", "info")
@@ -1602,13 +1635,31 @@ def fill_kyujinbox_form(page, job, company_name):
             tags = json.loads(tags)
         except Exception:
             tags = []
-    quals_text = ' / '.join(str(t) for t in tags)[:LIMIT_QUALIFICATIONS] if tags else ''
+
+    # 対象となる方（応募資格）: DBのqualifications優先 → タグ → 職種別デフォルト
+    quals_text = (job.get('qualifications') or '').strip()
+    if not quals_text and tags:
+        quals_text = ' / '.join(str(t) for t in tags)
+    if not quals_text:
+        quals_text = ('未経験・経験者ともに歓迎！要普通自動車免許（AT限定可）。'
+                      '学歴不問・ブランクOK。長期で安定して働きたい方、'
+                      '自分のペースで稼ぎたい方を歓迎します。')
+    quals_text = quals_text[:LIMIT_QUALIFICATIONS]
 
     rewarding_p = (job.get('rewarding') or job.get('rewarding_text') or '').strip()[:LIMIT_REWARDING]
     worktime_p  = (job.get('worktimeHoliday') or job.get('worktime_holiday') or job.get('workTime') or '').strip()[:LIMIT_WORKTIME]
     transport_p = (job.get('transportation') or job.get('access') or '').strip()[:LIMIT_TRANSPORT]
     how_to_apply_p = (job.get('how_to_apply') or job.get('howToApply') or
-                      "下記URLよりWebでご応募ください。書類選考後にご連絡いたします。").strip()
+                      "WEBの応募フォームよりご応募ください。応募後、担当者より2〜3営業日以内に"
+                      "お電話またはメールでご連絡します。面接日程を調整のうえ、面接（1回）を実施します。").strip()
+
+    # 給与補足（benefit）: 給与＋補足を充実させる
+    salary_str = (job.get('salary') or '').strip()
+    benefit_text = salary_str
+    if benefit_text:
+        benefit_text += ('\n※上記はあくまで一例です。経験・能力を考慮して決定します。\n'
+                         '・昇給あり／交通費規定支給／各種社会保険完備\n'
+                         '・試用期間あり（期間中の給与・待遇変更なし）')
 
     full_payload = {
         'company':         company_name,
@@ -1619,15 +1670,17 @@ def fill_kyujinbox_form(page, job, company_name):
         'qualifications':  quals_text,
         'prefVal':         pref_id,
         'address':         location,
+        '_location':       location,          # workLocations[0].location 用（フル住所）
         'transportation':  transport_p,
         'payType':         pay_type_val,
         'payMin':          pay_min or '',
         'payMax':          pay_max or '',
-        'benefit':         job.get('salary', ''),
+        'benefit':         benefit_text,
         'worktimeHoliday': worktime_p,
         'howToApply':      how_to_apply_p,
         'employTypes':     [emp_label],
         'characteristics': [int(v) for v in CHAR_VALUES],
+        'resumeRequired':  3,                 # 応募選考必要項目: 3 = 基本情報＋職務経歴
     }
     if company_phone:
         full_payload['applicationPhoneNumber'] = company_phone
