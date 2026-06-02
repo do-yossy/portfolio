@@ -398,15 +398,40 @@ function adminApplicantsPage(applicants, filter = 'all') {
 <div class="header-row">
   <h2>応募者管理</h2>
   <div class="btn-group">
-    <button id="btn-import" class="btn btn-ghost" onclick="triggerCSVImport()">📂 CSVをインポート</button>
-    <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVFile(this)">
     <button id="btn-csv-export" class="btn btn-ghost" onclick="exportCSV()">📤 CA対応リスト出力</button>
   </div>
 </div>
-<div id="drop-zone" class="drop-zone mb-16" onclick="triggerCSVImport()">
+
+<div class="card mb-16">
+  <div class="action-section-title">📥 媒体別CSVインポート（重複チェック自動実行）</div>
+  <div class="media-import-grid">
+    <div class="media-import-item">
+      <div class="media-import-label indeed">🔎 Indeed</div>
+      <button class="btn btn-ghost btn-sm" onclick="triggerMediaCSV('indeed')">CSVインポート</button>
+      <input type="file" id="csv-indeed" accept=".csv" style="display:none" onchange="handleMediaCSV(this,'indeed')">
+    </div>
+    <div class="media-import-item">
+      <div class="media-import-label kyujinbox">📦 求人ボックス</div>
+      <button class="btn btn-ghost btn-sm" onclick="triggerMediaCSV('kyujinbox')">CSVインポート</button>
+      <input type="file" id="csv-kyujinbox" accept=".csv" style="display:none" onchange="handleMediaCSV(this,'kyujinbox')">
+    </div>
+    <div class="media-import-item">
+      <div class="media-import-label stanby">🔷 スタンバイ</div>
+      <button class="btn btn-ghost btn-sm" onclick="triggerMediaCSV('stanby')">CSVインポート</button>
+      <input type="file" id="csv-stanby" accept=".csv" style="display:none" onchange="handleMediaCSV(this,'stanby')">
+    </div>
+    <div class="media-import-item">
+      <div class="media-import-label google">🔍 Googleしごと検索</div>
+      <span class="text-sm text-muted">応募フォームから自動取得</span>
+    </div>
+  </div>
+  <div id="import-result" class="import-result hidden"></div>
+</div>
+
+<div id="drop-zone" class="drop-zone mb-16" onclick="triggerMediaCSV('indeed')">
   <div class="drop-zone-icon">📄</div>
   <p>CSVファイルをドロップまたはクリックで選択</p>
-  <p class="text-sm" style="margin-top:4px">氏名・電話・メール・応募媒体のカラムを含むCSVを対応</p>
+  <p class="text-sm" style="margin-top:4px">Indeed・求人ボックス・スタンバイのCSVに対応・重複チェック自動実行</p>
 </div>
 <div class="filter-row">${chips}</div>
 <div class="card">

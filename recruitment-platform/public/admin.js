@@ -187,7 +187,43 @@ function startPostStanby() {
 
 // ── CSV Import ──
 function triggerCSVImport() {
-  document.getElementById('csv-file-input').click();
+  document.getElementById('csv-file-input') && document.getElementById('csv-file-input').click();
+}
+
+// ── 媒体別CSVインポート ──
+function triggerMediaCSV(media) {
+  const el = document.getElementById('csv-' + media);
+  if (el) el.click();
+}
+
+async function handleMediaCSV(input, media) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const mediaNames = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ' };
+  const resultEl = document.getElementById('import-result');
+  if (resultEl) { resultEl.className = 'import-result'; resultEl.textContent = `${mediaNames[media]} のCSVを処理中...`; }
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('media', media);
+
+  try {
+    const r = await fetch('/api/import/csv?media=' + media, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    const msg = `✅ ${mediaNames[media]}: ${d.imported}件取込・${d.duplicates}件重複検出`;
+    if (resultEl) { resultEl.className = 'import-result success'; resultEl.textContent = msg; }
+    toast(msg, 'success');
+    setTimeout(() => location.reload(), 2000);
+  } catch (e) {
+    const msg = `❌ ${mediaNames[media]} 取込失敗: ` + e.message;
+    if (resultEl) { resultEl.className = 'import-result error'; resultEl.textContent = msg; }
+    toast(msg, 'error');
+  } finally {
+    input.value = '';
+  }
 }
 
 async function handleCSVFile(input) {
