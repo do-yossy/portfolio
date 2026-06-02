@@ -370,43 +370,60 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                 data = json.loads(body)
                 modified = []
 
-                # ── 求人投稿系POSTなら本文構造をログ出力（スキーマ把握用）──
-                if is_job_post and isinstance(data, dict):
-                    keys_preview = []
-                    for k in list(data.keys())[:60]:
-                        v = data[k]
-                        vs = json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
-                        keys_preview.append(f"{k}={str(vs)[:25]}")
-                    progress(f"  📦 POST本文[{url_short[-50:]}] keys: {', '.join(keys_preview)}", "info")
+                # ── kyujinbox本文は {kyujin: "<JSON文字列>", token: "..."} 構造 ──
+                # フォームデータは data['kyujin'] の中にJSON文字列として入れ子になっている。
+                # その文字列をパースして中身を書き換える必要がある。
+                inner = None
+                if isinstance(data, dict) and isinstance(data.get('kyujin'), str):
+                    try:
+                        inner = json.loads(data['kyujin'])
+                    except Exception:
+                        inner = None
 
-                # ── 全フィールド注入：本文に存在し かつ 空のキーを正しい値で埋める ──
-                if is_job_post and isinstance(data, dict):
-                    for k, correct_v in full_payload.items():
-                        if correct_v is None or correct_v == '':
-                            continue
-                        if k in data and _is_empty_val(data.get(k)):
-                            data[k] = correct_v
-                            modified.append(f"{k}={str(correct_v)[:15]}")
+                # 注入対象: 入れ子があればその中、なければトップレベル（フラット）
+                target = inner if isinstance(inner, dict) else (data if isinstance(data, dict) else None)
 
-                # jobType は本文に無くても強制追加（最重要・必須項目）
-                cur_jt = str(data.get('jobType', '')).strip()
+                if target is None:
+                    route.continue_()
+                    return
+
+                # ── 求人投稿系POSTなら内側の全キー名をログ出力（スキーマ把握用）──
+                if is_job_post:
+                    all_keys = list(target.keys())
+                    progress(f"  📦 kyujin内側キー({len(all_keys)}件): {', '.join(all_keys)}", "info")
+                    empty_keys = [k for k in all_keys if _is_empty_val(target.get(k))]
+                    progress(f"  📦 空のキー: {', '.join(empty_keys)}", "info")
+
+                # ── 全フィールド注入：内側に存在し かつ 空のキーを正しい値で埋める ──
+                for k, correct_v in full_payload.items():
+                    if correct_v is None or correct_v == '':
+                        continue
+                    if k in target and _is_empty_val(target.get(k)):
+                        target[k] = correct_v
+                        modified.append(f"{k}={str(correct_v)[:15]}")
+
+                # jobType は内側に無くても強制追加（最重要・必須項目）
+                cur_jt = str(target.get('jobType', '')).strip()
                 if cur_jt in ('', 'null', '0', 'None', 'undefined'):
-                    data['jobType'] = job_type_val
+                    target['jobType'] = job_type_val
                     if 'jobType' not in [m.split('=')[0] for m in modified]:
                         modified.append(f"jobType={job_type_val}")
 
                 if phone_clear:
-                    if data.get('applicationPhoneNumber'):
-                        data['applicationPhoneNumber'] = ''
+                    if target.get('applicationPhoneNumber'):
+                        target['applicationPhoneNumber'] = ''
                         modified.append('phone cleared')
-                    if data.get('isPhoneNumberRequired'):
-                        data['isPhoneNumberRequired'] = False
+                    if target.get('isPhoneNumberRequired'):
+                        target['isPhoneNumberRequired'] = False
                         modified.append('phoneRequired=false')
 
                 if modified:
                     intercepted['count'] += 1
+                    # 入れ子だった場合は再度JSON文字列化して戻す
+                    if isinstance(inner, dict):
+                        data['kyujin'] = json.dumps(inner, ensure_ascii=False)
                     new_body = json.dumps(data, ensure_ascii=False)
-                    progress(f"  🔧 POST修正(JSON) [{url_short[-50:]}]: {', '.join(modified[:20])}", "info")
+                    progress(f"  🔧 POST修正(JSON) [{url_short[-50:]}]: {', '.join(modified[:25])}", "info")
                     route.continue_(post_data=new_body)
                     return
 
