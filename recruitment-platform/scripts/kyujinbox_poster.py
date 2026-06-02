@@ -681,8 +681,10 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
                 return 'v3[' + v3r.key + ']: ' + (msgs.join('; ') || 'no-change');
             }
 
-            // ── 最終手段: 全 input[name] / textarea[name] に native setter で値をセット ──
+            // ── 最終手段: 全フィールドに native setter + InputEvent で Vue 通知 ──
             let domCount = 0;
+
+            // テキスト系フィールド
             const domMap = {
                 title: 'input[name="title"]',
                 description: 'textarea[name="description"]',
@@ -705,9 +707,33 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
                     const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
                     if (setter) setter.call(el, v);
                     else el.value = v;
-                    ['input', 'change', 'blur'].forEach(t =>
-                        el.dispatchEvent(new Event(t, {bubbles: true, composed: true}))
-                    );
+                    el.dispatchEvent(new InputEvent('input', {bubbles: true, cancelable: true, composed: true, inputType: 'insertText'}));
+                    el.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+                    el.dispatchEvent(new Event('blur', {bubbles: true, composed: true}));
+                    domCount++;
+                } catch(e) {}
+            }
+
+            // セレクト系フィールド（Vue reactive に必須）
+            const selectMap = [
+                {sel: 'select[name="jobType"]',  val: String(patch.jobType || '')},
+                {sel: 'select[name="prefVal"]',   val: patch.workLocations?.[0]?.prefectureId != null
+                                                        ? String(patch.workLocations[0].prefectureId) : null},
+                {sel: 'select[name="payType"]',   val: patch.payType != null ? String(patch.payType) : null},
+            ];
+            for (const {sel, val} of selectMap) {
+                if (!val) continue;
+                const el = document.querySelector(sel);
+                if (!el) continue;
+                try {
+                    const setter = Object.getOwnPropertyDescriptor(
+                        window.HTMLSelectElement.prototype, 'value')?.set;
+                    if (setter) setter.call(el, val);
+                    else el.value = val;
+                    el.dispatchEvent(new Event('focus',  {bubbles: true, composed: true}));
+                    el.dispatchEvent(new Event('input',  {bubbles: true, composed: true}));
+                    el.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+                    el.dispatchEvent(new Event('blur',   {bubbles: true, composed: true}));
                     domCount++;
                 } catch(e) {}
             }
@@ -1179,8 +1205,12 @@ def fill_kyujinbox_form(page, job, company_name):
         progress(f"  ⚠️ characteristics 失敗: {e}", "warn")
 
     # ---- 応募方法 (howToApply) ----
+    # DB の how_to_apply フィールドを優先し、未設定ならデフォルト文言を使用
+    how_to_apply = (
+        job.get('how_to_apply') or job.get('howToApply') or
+        "下記URLよりWebでご応募ください。書類選考後にご連絡いたします。"
+    ).strip()
     progress(f"  📝 応募方法入力中", "info")
-    how_to_apply = "下記URLよりWebでご応募ください。書類選考後にご連絡いたします。"
     fill_text(page, 'textarea[name="howToApply"]', how_to_apply, timeout=3000)
     rand_delay(0.2, 0.4)
 

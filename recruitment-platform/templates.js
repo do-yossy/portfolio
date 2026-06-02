@@ -465,6 +465,26 @@ function jobModalHTML() {
       <textarea id="jf-description" rows="6" placeholder="仕事内容を入力してください"></textarea>
       <div id="ai-gen-status" class="text-sm text-muted mt-8" style="display:none"></div>
     </div>
+    <details class="form-group" style="margin-top:4px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px">
+      <summary style="font-weight:600;cursor:pointer;color:#1e40af">求人ボックス必須項目（展開して入力）</summary>
+      <p class="text-sm text-muted" style="margin:6px 0 12px">求人ボックスへ自動投稿するには以下の項目が必要です。各130文字以内。</p>
+      <div class="form-group">
+        <label>やりがい <span class="req">*</span><span class="text-muted text-sm">（例: 多くのお客様に喜ばれるやりがいのある仕事です / 130字以内）</span></label>
+        <textarea id="jf-rewarding" rows="3" maxlength="140" placeholder="例: 毎日多くのお客様に感謝されるやりがいのある仕事です。未経験でも研修で成長できます。"></textarea>
+      </div>
+      <div class="form-group">
+        <label>勤務時間・休日 <span class="req">*</span><span class="text-muted text-sm">（130字以内）</span></label>
+        <textarea id="jf-worktime" rows="3" maxlength="140" placeholder="例: 9:00〜18:00（実働8時間）　週休2日制（土日祝）　年間休日120日"></textarea>
+      </div>
+      <div class="form-group">
+        <label>アクセス <span class="req">*</span><span class="text-muted text-sm">（130字以内）</span></label>
+        <textarea id="jf-transportation" rows="2" maxlength="140" placeholder="例: JR大阪駅より徒歩5分、または車通勤OK（駐車場完備）"></textarea>
+      </div>
+      <div class="form-group">
+        <label>応募方法</label>
+        <textarea id="jf-how-to-apply" rows="2" placeholder="例: 下記URLよりWebでご応募ください。書類選考後にご連絡いたします。"></textarea>
+      </div>
+    </details>
     <div class="form-group" style="margin-top:4px">
       <label style="font-weight:600;display:block;margin-bottom:8px">配信媒体 <span class="text-muted text-sm" style="font-weight:400">（1媒体のみ・重複掲載を防ぎます）</span></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px">

@@ -376,6 +376,10 @@ function showJobModal(job) {
   document.getElementById('jf-catchcopy').value   = job ? (job.catchcopy || '') : '';
   document.getElementById('jf-description').value = job ? job.description : '';
   document.getElementById('jf-tags').value        = job ? (JSON.parse(job.tags || '[]')).join(', ') : '';
+  const rfEl = document.getElementById('jf-rewarding');      if (rfEl) rfEl.value = job ? (job.rewarding || '') : '';
+  const wfEl = document.getElementById('jf-worktime');       if (wfEl) wfEl.value = job ? (job.worktime_holiday || '') : '';
+  const tfEl = document.getElementById('jf-transportation');  if (tfEl) tfEl.value = job ? (job.transportation || '') : '';
+  const hfEl = document.getElementById('jf-how-to-apply');   if (hfEl) hfEl.value = job ? (job.how_to_apply || '') : '';
   document.getElementById('jf-published').checked = job ? !!job.is_published : false;
   const existingMedia = job ? (JSON.parse(job.target_media || '[]')[0] || '') : '';
   document.querySelectorAll('[name="jf-media"]').forEach(r => { r.checked = r.value === existingMedia; });
@@ -399,6 +403,10 @@ async function saveJob() {
     employmentType: document.getElementById('jf-employment').value,
     catchcopy:      document.getElementById('jf-catchcopy')?.value || '',
     description:    document.getElementById('jf-description').value,
+    rewarding:      document.getElementById('jf-rewarding')?.value || '',
+    worktimeHoliday: document.getElementById('jf-worktime')?.value || '',
+    transportation:  document.getElementById('jf-transportation')?.value || '',
+    howToApply:     document.getElementById('jf-how-to-apply')?.value || '',
     tags,
     isPublished:    document.getElementById('jf-published').checked,
     targetMedia:    (() => { const r = document.querySelector('[name="jf-media"]:checked'); return r && r.value ? [r.value] : []; })(),

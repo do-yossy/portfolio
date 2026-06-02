@@ -781,19 +781,17 @@ ${jobUrls}
 
     const system = `あなたは採用広告のコピーライターです。指定された職種・勤務地・雇用形態の求人情報をJSON形式で生成してください。
 必ず以下のJSON形式のみを返してください（マークダウン・コードブロック不要）：
-{"title":"求人タイトル","catchcopy":"キャッチコピー","description":"仕事内容","tags":["タグ1","タグ2","タグ3","タグ4"]}
+{"title":"求人タイトル","catchcopy":"キャッチコピー","description":"仕事内容","rewarding":"やりがい","worktimeHoliday":"勤務時間・休日","transportation":"アクセス","tags":["タグ1","タグ2","タグ3","タグ4"]}
 
 title: 「具体的な職種名 勤務地エリア名」の形式。例「介護士（正社員）東京・新宿」
 catchcopy: 求職者の目を引く短いコピー20〜35文字。例「未経験OK！研修充実で安心スタート」
 description: 以下の構成で400〜600文字：
-◆仕事内容
-（主な業務を3〜5点の箇条書き）
-
-◆職場環境
-（職場の雰囲気・設備・福利厚生）
-
-◆こんな方歓迎
-（求める人物像・必要スキル・歓迎条件）
+◆仕事内容（主な業務を3〜5点の箇条書き）
+◆職場環境（雰囲気・設備・福利厚生）
+◆こんな方歓迎（求める人物像・必要スキル・歓迎条件）
+rewarding: 仕事のやりがい・魅力を120文字以内で。例「お客様の笑顔が直接見られる仕事です。未経験でも研修で確実にスキルアップできます。」
+worktimeHoliday: 勤務時間と休日を120文字以内で。例「9:00〜18:00（実働8時間）週休2日制（土日祝）年間休日120日以上」
+transportation: 最寄り駅からのアクセスと交通手段を100文字以内で。例「JR○○駅より徒歩5分。車通勤OK（駐車場完備）」
 tags: Googleしごと検索・求人媒体で求職者が検索するキーワードを4〜5個。`;
 
     const combos = [];
@@ -822,16 +820,19 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
           const assignedMedia = mediaList.length > 0 ? [mediaList[i % mediaList.length]] : [];
           await Jobs.create({
-            title:          json.title       || `${t} ${shortLoc}`,
-            catchcopy:      json.catchcopy   || '',
-            location:       normLocation(l),
+            title:           json.title          || `${t} ${shortLoc}`,
+            catchcopy:       json.catchcopy       || '',
+            location:        normLocation(l),
             salary,
-            jobType:        t,
-            employmentType: empType,
-            description:    json.description || '',
-            tags:           json.tags        || [],
-            targetMedia:    assignedMedia,
-            isPublished:    false,
+            jobType:         t,
+            employmentType:  empType,
+            description:     json.description    || '',
+            rewarding:       json.rewarding       || '',
+            worktimeHoliday: json.worktimeHoliday || '',
+            transportation:  json.transportation  || '',
+            tags:            json.tags            || [],
+            targetMedia:     assignedMedia,
+            isPublished:     false,
           });
           successCount++;
           sseSend(res, { message: `✅ 保存: ${json.title}`, type: 'success', current: i + 1, total });
