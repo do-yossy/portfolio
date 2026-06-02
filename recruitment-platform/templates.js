@@ -116,7 +116,10 @@ function nl2br(str) {
 }
 
 // ── Admin Dashboard ──
-function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], todayKyujinbox = 0, todayStanby = 0, indeedRepostCount = 0, siteUrl = '', co = 'sq' }) {
+function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], todayKyujinbox = 0, todayStanby = 0, indeedRepostCount = 0, siteUrl = '', co = 'sq',
+  TARGET_ACTIVE = parseInt(process.env.ROTATE_TARGET || '25', 10),
+  ROTATE_AFTER_DAYS = parseInt(process.env.ROTATE_DAYS || '14', 10),
+}) {
   // BAN risk helper
   function banLevel(count, warn, danger) {
     if (count >= danger) return 'ban-danger';
@@ -245,6 +248,17 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
         <button class="btn btn-primary" onclick="showJobModal(null)">＋ 求人を登録する</button>
         <a href="/admin/jobs" class="btn btn-ghost">求人一覧を見る</a>
       </div>
+    </div>
+
+    <div class="action-section mt-16">
+      <div class="action-section-title">🔄 求人ローテーション <span class="text-muted text-sm">（常時${TARGET_ACTIVE}件維持・${ROTATE_AFTER_DAYS}日で交代）</span></div>
+      <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px">
+        <button class="btn btn-primary" onclick="runRotation()" id="btn-rotate">
+          🔄 今すぐローテーション実行
+        </button>
+        <span class="text-sm text-muted">月・水・金 9時に自動実行</span>
+      </div>
+      <div id="rotation-result" class="text-sm" style="margin-top:8px;white-space:pre-wrap;background:#f8fafc;border-radius:6px;padding:8px;display:none"></div>
     </div>
 
     <div class="action-section mt-16">

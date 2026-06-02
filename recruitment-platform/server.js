@@ -1377,6 +1377,28 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
+  // ── 求人ローテーション（手動実行）──
+  if (pathname === '/api/admin/rotate-jobs' && method === 'POST') {
+    const scriptPath = path.join(SCRIPTS_DIR, 'rotate-jobs.js');
+    if (!fs.existsSync(scriptPath)) {
+      sendJSON(res, 400, { error: 'rotate-jobs.js が見つかりません' });
+      return;
+    }
+    const proc = spawn(process.execPath, ['--experimental-sqlite', scriptPath], {
+      env: { ...process.env },
+      cwd: path.join(__dirname),
+    });
+    let out = '';
+    proc.stdout.on('data', d => { out += d.toString(); });
+    proc.stderr.on('data', d => { out += d.toString(); });
+    proc.on('close', async code => {
+      const ok = code === 0;
+      await Logs.create('rotate_jobs', ok ? 'success' : 'error', out.slice(-500));
+      sendJSON(res, ok ? 200 : 500, { ok, output: out });
+    });
+    return;
+  }
+
   // ── 404 ──
   if (pathname.startsWith('/api/')) {
     sendError(res, 404, 'Not Found');

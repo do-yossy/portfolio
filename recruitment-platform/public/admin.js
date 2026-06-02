@@ -176,6 +176,25 @@ async function exportCSV(company) {
 }
 
 // ── Indeed Scrape ──
+async function runRotation() {
+  const btn = document.getElementById('btn-rotate');
+  const result = document.getElementById('rotation-result');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 実行中...'; }
+  if (result) { result.style.display = 'block'; result.textContent = '実行中...'; }
+  try {
+    const res = await fetch('/api/admin/rotate-jobs', { method: 'POST' });
+    const data = await res.json();
+    if (result) result.textContent = data.output || (data.ok ? '完了' : 'エラー');
+    showToast(data.ok ? 'ローテーション完了' : 'エラーが発生しました', data.ok ? 'success' : 'error');
+    if (data.ok) setTimeout(() => location.reload(), 2000);
+  } catch (e) {
+    if (result) result.textContent = 'エラー: ' + e.message;
+    showToast('通信エラー', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 今すぐローテーション実行'; }
+  }
+}
+
 function startScrapeIndeed() {
   confirmAction(
     'Indeedから応募者データを取得します。\nVPN接続を確認してから実行してください。\n実行しますか？',
