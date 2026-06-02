@@ -1061,36 +1061,40 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── API: CSV Export ──
   if (pathname === '/api/export/csv' && method === 'GET') {
-    const exportCo = query.company || query.co || co;
-    // type / filter どちらの名前でも受け付ける（'new' | 'monthly' | 'ng'）
-    const filter = query.filter || query.type || '';
-    const month  = query.month  || '';   // 'YYYY-MM'
-    let applicants, includeCompany;
-    if (exportCo === 'all') {
-      // 全会社合算 (両社のデータをマージ)
-      applicants = await Applicants.findAll({ company: null });
-      includeCompany = true;
+    // 注: 現行ハンドラでは query = parsed.query。parsedUrl は存在しないので使わない。
+    const type  = query.type   || query.filter  || 'all';
+    const month = query.month  || '';
+    // 新リスト出力ボタンは co=、既存ボタンは company= を送る。'all' は全社合算。
+    const coParam = query.co || query.company || '';
+    let applicants = await Applicants.findAll();
+    if (coParam && coParam !== 'all') {
+      applicants = applicants.filter(a => (a.company || '') === coParam);
+    }
+    let filtered, label;
+    if (type === 'new') {
+      filtered = applicants.filter(a => ['新規', '未対応'].includes(a.status));
+      label = '新規リスト';
+    } else if (type === 'monthly') {
+      filtered = month ? applicants.filter(a => (a.applied_at || '').startsWith(month)) : applicants;
+      label = month ? `全応募者_${month}` : '全応募者';
+    } else if (type === 'ng') {
+      filtered = applicants.filter(a => {
+        const isNG = ['NG', '見送り', '不採用'].includes(a.status);
+        const inMonth = month ? (a.applied_at || '').startsWith(month) : true;
+        return isNG && inMonth;
+      });
+      label = month ? `NGリスト_${month}` : 'NGリスト';
     } else {
-      applicants = await Applicants.findAll({ company: exportCo });
-      includeCompany = false;
+      filtered = applicants;
+      label = (coParam && coParam !== 'all') ? coParam : 'all';
     }
-    // ── リスト出力フィルタ ──
-    let label = exportCo === 'all' ? 'all' : exportCo;
-    if (filter === 'new') {
-      applicants = applicants.filter(a => a.status === '新規');
-      label += '-new';
-    } else if (filter === 'monthly') {
-      applicants = applicants.filter(a => (a.applied_at || '').slice(0, 7) === month);
-      label += `-${month}`;
-    } else if (filter === 'ng') {
-      applicants = applicants.filter(a =>
-        a.status === 'NG' && (!month || (a.applied_at || '').slice(0, 7) === month));
-      label += month ? `-ng-${month}` : '-ng';
-    }
-    const csv = generateCSV(applicants, includeCompany);
+    // 単一会社に絞った場合は会社列不要。全社/リスト出力では会社列を含める。
+    const includeCompany = !(coParam && coParam !== 'all');
+    const csv = generateCSV(filtered, includeCompany);
+    const filename = `${label}_${new Date().toISOString().slice(0, 10)}.csv`;
     res.writeHead(200, {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="ca-list-${label}-${new Date().toISOString().slice(0,10)}.csv"`
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`
     });
     res.end('﻿' + csv); // BOM for Excel
     return;
