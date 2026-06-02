@@ -659,6 +659,39 @@ def click_radio_by_label(page, keywords):
     return 'not found'
 
 
+def find_draft_url_by_title(page, title):
+    """求人一覧ページから、タイトルが一致する求人の編集URLを探す。
+    保存直後は一覧（.../jobs）にリダイレクトされるため、そこから下書きの編集URLを取得する。
+    """
+    try:
+        try:
+            page.wait_for_load_state('networkidle', timeout=10000)
+        except Exception:
+            pass
+        rand_delay(1.0, 2.0)
+        key = (title or '')[:16]
+        url = page.evaluate("""(key) => {
+            const links = Array.from(document.querySelectorAll('a[href*="/jobs/edit/"]'));
+            if (!links.length) return '';
+            // ① タイトル一致する行のリンク
+            if (key) {
+                for (const a of links) {
+                    const row = a.closest('tr,li,article,div');
+                    const txt = row ? (row.textContent || '') : '';
+                    if (txt.includes(key)) return a.href;
+                }
+            }
+            // ② 先頭（最新）のリンク
+            return links[0].href;
+        }""", key)
+        if url:
+            progress(f"  🔎 一覧から下書きURLを取得: {url}", "info")
+        return url or ''
+    except Exception as e:
+        progress(f"  ⚠️ 一覧からの下書きURL取得失敗: {e}", "warn")
+        return ''
+
+
 def publish_draft(page, draft_url):
     """保存済み下書きを開き直し、必要項目ラジオを実クリックで選択して「公開する」を押す。
     下書き再読込でVueに保存データがロードされるため、ラジオの実クリックでVueが確実に更新され、
@@ -2092,17 +2125,23 @@ def main():
                         progress(f"✅ 「{job['title']}」を下書き保存しました "
                                  f"(API status={intercepted.get('save_status')}, id={draft_id})", "success")
                         success_count += 1
-                        # ── 下書きを開き直して公開を試みる ──
+                        # ── 下書きの編集URLを特定 ──
+                        draft_url = ''
                         if draft_id:
                             base = actual_url.split('/jobs/edit')[0]
                             draft_url = f"{base}/jobs/edit/{draft_id}"
+                        else:
+                            # 保存後は一覧へ遷移するので、一覧からタイトル一致で編集URLを探す
+                            draft_url = find_draft_url_by_title(page, job['title'])
+                        # ── 下書きを開き直して公開を試みる ──
+                        if draft_url:
                             published = publish_draft(page, draft_url)
                             if published:
                                 progress(f"🎉 「{job['title']}」を公開しました", "success")
                             else:
                                 progress(f"📝 「{job['title']}」は下書きとして保存済み（公開は手動でお願いします）", "info")
                         else:
-                            progress(f"  ℹ️ 下書きIDを取得できず自動公開はスキップ（下書きは保存済み）", "info")
+                            progress(f"  ℹ️ 下書きの編集URLを特定できず自動公開はスキップ（下書きは保存済み）", "info")
                     elif went_edit or has_job_id or went_draft:
                         label = "一時保存" if not went_edit else "投稿"
                         progress(f"✅ 「{job['title']}」を{label}しました (URL: {final_url})", "success")
