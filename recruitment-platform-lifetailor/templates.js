@@ -22,7 +22,7 @@ function adminLayout(title, content, active = 'dashboard') {
 <body class="admin-layout">
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <h1>SEO採用<br>プラットフォーム</h1>
+    <h1>株式会社<br>Life Tailor</h1>
     <span>管理画面</span>
   </div>
   <nav>${nav}</nav>
@@ -225,6 +225,14 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [] }) {
       </div>
       <div id="progress-stanby-wrap" class="progress-wrap hidden">
         <div id="progress-stanby" class="progress-box"></div>
+      </div>
+      <div class="btn-group mt-8">
+        <button id="btn-post-indeed" class="btn btn-primary" onclick="startPostIndeed()">
+          🔎 Indeed に求人を掲載する
+        </button>
+      </div>
+      <div id="progress-indeed-wrap" class="progress-wrap hidden">
+        <div id="progress-indeed" class="progress-box"></div>
       </div>
     </div>
   </div>
@@ -468,6 +476,7 @@ function adminLogsPage(logs) {
   const actionLabel = {
     kyujinbox_post: '求人ボックス投稿',
     stanby_post: 'スタンバイ投稿',
+    indeed_post: 'Indeed掲載',
     indeed_scrape: 'Indeedスクレイピング',
     xml_generate: 'XML生成',
     csv_import: 'CSVインポート'
@@ -827,7 +836,7 @@ function loginPage(error = '') {
 <div class="login-wrap">
   <div class="login-card">
     <div class="login-logo">
-      <h1>SEO採用プラットフォーム</h1>
+      <h1>株式会社Life Tailor</h1>
       <p>管理画面へのログイン</p>
     </div>
     ${error ? `<div class="login-error">⚠️ ${esc(error)}</div>` : ''}

@@ -95,7 +95,6 @@ function parseCSV(text) {
 function cleanCell(v) {
   if (!v) return '';
   v = String(v).trim();
-  // Excel式エラー・空扱い
   if (/^#(REF|N\/A|VALUE|DIV\/0|NAME|NULL|NUM)!?$/i.test(v)) return '';
   return v;
 }
@@ -103,23 +102,16 @@ function cleanCell(v) {
 function cleanPhone(v) {
   if (!v) return '';
   v = String(v).trim();
-  // Excelの指数表記（8.19056E+11等）は電話番号として使えないため除外
   if (/^\d+\.?\d*[Ee][+\-]?\d+$/.test(v)) return '';
-  // 先頭の ' はExcelが数値化防止で付ける
   v = v.replace(/^'+/, '');
-  // +81 → 0（国際番号を国内形式に変換）
   v = v.replace(/^\+81\s*/, '0');
-  // スペース・ハイフン・括弧・ドットを除去
   const digits = v.replace(/[\s\-\(\)\.]/g, '');
-  // 日本の携帯/固定は10〜11桁。10桁で先頭が7/8/9なら 0 を補完
-  // 例: 8014698497 → 08014698497
   if (/^[789]\d{9}$/.test(digits)) return '0' + digits;
   return digits;
 }
 
 function cleanName(v) {
   if (!v) return '';
-  // 「氏名（ふりがな）」形式からふりがな部分を除去
   return v.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
 }
 
@@ -175,8 +167,8 @@ function mapCSVRow(row, mediaHint) {
   }
 
   return {
-    name:        col(['氏名','name','名前','お名前','姓名']),
-    phone:       col(['電話番号','phone','tel','電話','携帯']),
+    name:        cleanName(col(['氏名','name','名前','お名前','姓名'])),
+    phone:       cleanPhone(col(['電話番号','phone','tel','電話','携帯'])),
     email:       col(['メール','email','mail','メールアドレス']),
     age:         col(['年齢','age']),
     address:     col(['住所','address','addr']),
@@ -707,12 +699,10 @@ ${jobUrls}
     let csvText = '';
 
     function decodeBuffer(b) {
-      // UTF-8（BOM付き含む）を最初に試みる
       try {
         const d = new TextDecoder('utf-8', { fatal: true });
         return d.decode(b).replace(/^﻿/, '');
       } catch (_) {}
-      // Shift-JIS / CP932 を試みる
       try {
         const d = new TextDecoder('shift_jis');
         return d.decode(b);
@@ -757,26 +747,20 @@ ${jobUrls}
   // ── API: CSV Export ──
   if (pathname === '/api/export/csv' && method === 'GET') {
     const type  = parsedUrl.query.type  || 'all';
-    const month = parsedUrl.query.month || '';   // 例: "2026-05"
+    const month = parsedUrl.query.month || '';
     const co    = parsedUrl.query.co    || '';
 
     let applicants = await Applicants.findAll();
     if (co) applicants = applicants.filter(a => (a.company_id || '') === co);
 
     let filtered, label;
-
     if (type === 'new') {
-      // ① 新規リスト: 新規・未対応
       filtered = applicants.filter(a => ['新規','未対応'].includes(a.status));
       label = '新規リスト';
     } else if (type === 'monthly') {
-      // ② 月次全応募者
-      filtered = month
-        ? applicants.filter(a => (a.applied_at || '').startsWith(month))
-        : applicants;
+      filtered = month ? applicants.filter(a => (a.applied_at || '').startsWith(month)) : applicants;
       label = month ? `全応募者_${month}` : '全応募者';
     } else if (type === 'ng') {
-      // ③ 月次NGリスト: NG・見送り
       filtered = applicants.filter(a => {
         const isNG = ['NG','見送り','不採用'].includes(a.status);
         const inMonth = month ? (a.applied_at || '').startsWith(month) : true;
@@ -957,6 +941,65 @@ ${jobUrls}
       notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
       sseSend(res, {
         message: ok ? '✅ 求人ボックスへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
+        type: ok ? 'success' : 'error',
+        done: true,
+        success: ok
+      });
+      res.end();
+    });
+
+    req.on('close', () => { try { proc.kill(); } catch {} });
+    return;
+  }
+
+  if (pathname === '/api/post/indeed' && method === 'GET') {
+    sseInit(res);
+
+    const jobs = await Jobs.findAll(true);
+    if (jobs.length === 0) {
+      sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
+      res.end();
+      return;
+    }
+
+    const scriptPath = path.join(SCRIPTS_DIR, 'indeed_job_poster.py');
+    if (!fs.existsSync(scriptPath)) {
+      sseSend(res, { message: '⚠️ 投稿スクリプトが見つかりません（scripts/indeed_job_poster.py）', type: 'warn', done: true, success: false });
+      res.end();
+      return;
+    }
+
+    const jobsJson = JSON.stringify(jobs.slice(0, 5));
+    const proc = spawn('python3', [scriptPath], {
+      env: { ...process.env },
+      stdin: 'pipe'
+    });
+    proc.stdin.write(jobsJson);
+    proc.stdin.end();
+
+    proc.stdout.on('data', data => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try {
+          const obj = JSON.parse(line);
+          sseSend(res, { message: obj.message, type: obj.level || 'info' });
+        } catch {
+          sseSend(res, { message: line, type: 'info' });
+        }
+      }
+    });
+
+    proc.stderr.on('data', data => {
+      sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
+    });
+
+    proc.on('close', async code => {
+      const ok = code === 0;
+      const msg = ok ? '✅ Indeed掲載完了' : `❌ Indeed掲載失敗(exit ${code})`;
+      await Logs.create('indeed_post', ok ? 'success' : 'error', msg);
+      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
+      sseSend(res, {
+        message: ok ? '✅ Indeed への掲載が完了しました' : `❌ 掲載が失敗しました（コード: ${code}）`,
         type: ok ? 'success' : 'error',
         done: true,
         success: ok
