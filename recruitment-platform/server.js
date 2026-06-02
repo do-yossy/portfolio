@@ -115,18 +115,43 @@ function mapCSVRow(row) {
   const col = (keys) => {
     for (const k of keys) {
       const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
-      if (v) return v;
+      if (v && v.trim()) return v.trim();
     }
     return '';
   };
+
+  // 名前から括弧内のふりがなを除去: "中谷 吏温（なかたに りおん）" → "中谷 吏温"
+  const rawName = col(['氏名','name','名前','お名前','姓名']);
+  const cleanName = rawName.replace(/[（(][^）)]*[）)]/g, '').trim();
+
+  // 電話番号を正規化: "80 1469 8497" → "080-1469-8497"
+  let rawPhone = col(['電話番号','phone','tel','電話','携帯']);
+  rawPhone = rawPhone.replace(/[\s\-ー−]/g, '');
+  if (rawPhone && /^[789]/.test(rawPhone)) rawPhone = '0' + rawPhone;
+  const phone = rawPhone.replace(/^(\d{2,3})(\d{4})(\d{4})$/, '$1-$2-$3');
+
+  // 応募日: "3月1日" → 当年の日付文字列
+  let appliedAt = col(['応募日','applied_at','応募日時','日付']);
+  const m = appliedAt.match(/^(\d{1,2})月(\d{1,2})日$/);
+  if (m) {
+    const year = new Date().getFullYear();
+    appliedAt = `${year}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+  }
+
+  // 住所: 列名「対応」に住所が入っているケースにも対応
+  const address = col(['住所','address','addr','対応']);
+
+  // 媒体: 職種名か応募媒体を参照
+  const sourceMedia = col(['媒体','source_media','応募媒体','media','職種名']) || 'CSV取込';
+
   return {
-    name:        col(['氏名','name','名前','お名前','姓名']),
-    phone:       col(['電話番号','phone','tel','電話','携帯']),
+    name:        cleanName,
+    phone,
     email:       col(['メール','email','mail','メールアドレス']),
     age:         col(['年齢','age']),
-    address:     col(['住所','address','addr']),
-    sourceMedia: col(['媒体','source_media','応募媒体','media']) || 'CSV取込',
-    appliedAt:   col(['応募日','applied_at','応募日時','日付']),
+    address,
+    sourceMedia,
+    appliedAt,
   };
 }
 
@@ -980,6 +1005,28 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   if (pathname === '/api/import/csv' && method === 'POST') {
     const buf = await readBody(req);
     const ct = req.headers['content-type'] || '';
+    // Shift-JIS / UTF-8 自動検出デコード
+    function decodeCsvBuffer(rawBuf) {
+      // UTF-8 BOM チェック
+      if (rawBuf[0] === 0xEF && rawBuf[1] === 0xBB && rawBuf[2] === 0xBF) {
+        return rawBuf.slice(3).toString('utf8');
+      }
+      // ASCII範囲外バイトをチェックして Shift-JIS かどうか判定
+      let hasSjisBytes = false;
+      for (let i = 0; i < rawBuf.length - 1; i++) {
+        const b = rawBuf[i];
+        if ((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xFC)) {
+          hasSjisBytes = true; break;
+        }
+      }
+      if (hasSjisBytes) {
+        try {
+          return new TextDecoder('shift_jis').decode(rawBuf);
+        } catch (e) {}
+      }
+      return rawBuf.toString('utf8');
+    }
+
     let csvText = '';
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=([^;]+)/);
@@ -987,9 +1034,9 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
       const filePart = parts.find(p => p.header.includes('filename'));
       if (!filePart) { sendError(res, 400, 'ファイルが見つかりません'); return; }
-      csvText = filePart.content.toString('utf8');
+      csvText = decodeCsvBuffer(filePart.content);
     } else {
-      csvText = buf.toString('utf8');
+      csvText = decodeCsvBuffer(buf);
     }
 
     const rows = parseCSV(csvText);

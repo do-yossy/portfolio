@@ -131,12 +131,15 @@ def human_type(page, selector, text, timeout=15000):
         time.sleep(random.uniform(0.02, 0.06))
 
 def fill_text(page, selector, value, timeout=8000):
-    """テキスト/テキストエリアを fill() で埋める（失敗時は無視）"""
+    """テキスト/テキストエリアを fill() で埋める（Tab押下でVue blur更新）"""
     try:
         el = page.wait_for_selector(selector, timeout=timeout)
         el.click()
+        rand_delay(0.05, 0.1)
         el.fill(value)
-        rand_delay(0.2, 0.5)
+        # Tab キー押下で blur イベントを発生させ Vue v-model.lazy を更新する
+        el.press('Tab')
+        rand_delay(0.1, 0.2)
         return True
     except Exception:
         return False
@@ -148,7 +151,8 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
         if label:
             try:
                 el.select_option(label=label)
-                rand_delay(0.2, 0.5)
+                el.press('Tab')
+                rand_delay(0.2, 0.4)
                 return True
             except Exception:
                 pass
@@ -159,8 +163,9 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
                     if label in txt or txt in label:
                         val = opt.get_attribute('value') or ''
                         el.select_option(value=val)
+                        el.press('Tab')
                         progress(f"    select 部分一致: '{txt}' (value={val})", "info")
-                        rand_delay(0.2, 0.5)
+                        rand_delay(0.2, 0.4)
                         return True
             except Exception:
                 pass
@@ -176,7 +181,8 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
                     pass
         elif value:
             el.select_option(value=value)
-            rand_delay(0.2, 0.5)
+            el.press('Tab')
+            rand_delay(0.2, 0.4)
             return True
         return False
     except Exception:
@@ -476,36 +482,36 @@ PREF_IDS = {
 }
 
 
-def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_max, pref_id, char_values):
+def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_max, pref_id, char_values, company_phone=''):
     """
-    kyujin hidden フィールドの親Vueコンポーネントを見つけて
-    リアクティブ状態を直接パッチする。
-    DOM操作と組み合わせることで投稿成功率を大幅向上させる。
+    Vue コンポーネントのリアクティブ状態を直接パッチする。
+    プロパティ名 'kyujin' に限らず、フォームフィールドを含む任意のデータオブジェクトを探す。
     """
     emp_type = job.get('employmentType') or job.get('employment_type', '')
     emp_keywords = {
         '正社員': '正社員', 'アルバイト': 'アルバイト・パート', 'パート': 'アルバイト・パート',
         '契約社員': '契約社員', '業務委託': '業務委託', '派遣': '派遣社員',
     }
-    emp_label = '業務委託'  # デフォルト
+    emp_label = '業務委託'
     for k, v in emp_keywords.items():
         if k in emp_type:
             emp_label = v
             break
 
     desc      = job.get('description', '')
-    rewarding = job.get('rewarding', desc[:100] if desc else '')
+    rewarding = (job.get('rewarding') or job.get('rewarding_text') or '').strip()
     quals     = job.get('qualifications', '')
-    transport = job.get('transportation', job.get('access', ''))
-    worktime  = job.get('worktimeHoliday', job.get('workTime', ''))
+    transport = (job.get('transportation') or job.get('access') or '').strip()
+    worktime  = (job.get('worktimeHoliday') or job.get('worktime_holiday') or job.get('workTime') or '').strip()
     benefit   = job.get('salary', '')
     title     = job.get('title', '')
     location  = job.get('location', '')
+    use_phone = bool(company_phone)
 
     patch_data = {
         'title': title,
         'description': desc,
-        'rewarding': rewarding,
+        'rewarding': rewarding or desc[:100],
         'qualifications': quals,
         'transportation': transport,
         'worktimeHoliday': worktime,
@@ -516,43 +522,64 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
         'payType': pay_type_val,
         'payMin': pay_min or None,
         'payMax': pay_max or None,
-        'isPhoneNumberRequired': False,
-        'applicationPhoneNumber': '',
+        'isPhoneNumberRequired': use_phone,
+        'applicationPhoneNumber': company_phone,
         'workLocations': [{'prefectureId': pref_id, 'location': location}],
     }
 
     try:
         result = page.evaluate("""(patch) => {
             const msgs = [];
+            const FORM_FIELDS = ['title', 'description', 'jobType'];
 
-            // ── Vue2: DOM全スキャンでkyujinプロパティを持つVMを探す ──
-            function findVue2KyujinVm() {
+            // フォームデータを持つオブジェクトかどうか判定（プロパティ名問わず）
+            function looksLikeFormData(obj) {
+                if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+                return FORM_FIELDS.filter(f => f in obj).length >= 2;
+            }
+
+            // ── Vue2: フォームデータを持つVMをBFSで探す ──
+            function findVue2FormVm() {
+                const seen = new Set();
                 for (const el of document.querySelectorAll('*')) {
                     if (!el.__vue__) continue;
-                    // このelのVueルートへ
                     let vm = el.__vue__;
                     while (vm.$parent) vm = vm.$parent;
-                    // BFS でkyujinを持つコンポーネントを探す
+                    if (seen.has(vm)) continue;
+                    seen.add(vm);
                     const queue = [vm];
                     const visited = new Set();
                     while (queue.length) {
                         const curr = queue.shift();
                         if (visited.has(curr)) continue;
                         visited.add(curr);
-                        if (curr.$data && 'kyujin' in curr.$data) return curr;
+                        if (curr.$data) {
+                            // プロパティ名 'kyujin' を優先
+                            if (looksLikeFormData(curr.$data.kyujin)) {
+                                return {vm: curr, key: 'kyujin', data: curr.$data.kyujin};
+                            }
+                            // 次に全プロパティを走査
+                            for (const [k, v] of Object.entries(curr.$data)) {
+                                if (looksLikeFormData(v)) {
+                                    return {vm: curr, key: k, data: v};
+                                }
+                            }
+                        }
                         (curr.$children || []).forEach(c => queue.push(c));
                     }
                 }
                 return null;
             }
 
-            // ── Vue3: DOM全スキャン ──
-            function findVue3KyujinComp() {
+            // ── Vue3: フォームデータを持つコンポーネントをBFSで探す ──
+            function findVue3FormComp() {
+                const seen = new Set();
                 for (const el of document.querySelectorAll('*')) {
                     if (!el.__vueParentComponent) continue;
                     let comp = el.__vueParentComponent;
                     while (comp.parent) comp = comp.parent;
-                    // BFS
+                    if (seen.has(comp)) continue;
+                    seen.add(comp);
                     const queue = [comp];
                     const visited = new Set();
                     while (queue.length) {
@@ -560,11 +587,17 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
                         if (visited.has(curr)) continue;
                         visited.add(curr);
                         for (const state of [curr.setupState, curr.ctx]) {
-                            if (state && typeof state === 'object' && state.kyujin !== undefined) {
-                                return {comp: curr, state};
+                            if (!state || typeof state !== 'object') continue;
+                            // 'kyujin' キーを優先
+                            if (looksLikeFormData(state.kyujin)) {
+                                return {comp: curr, key: 'kyujin', data: state.kyujin};
+                            }
+                            for (const [k, v] of Object.entries(state)) {
+                                if (looksLikeFormData(v)) {
+                                    return {comp: curr, key: k, data: v};
+                                }
                             }
                         }
-                        // 子コンポーネントを追加
                         const sub = curr.subTree;
                         if (sub) {
                             const walk = (vnode) => {
@@ -580,77 +613,96 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
             }
 
             // ── パッチ適用ヘルパー ──
-            function applyPatch(kyujinData, setFn) {
+            function applyPatch(formData, setFn) {
                 for (const [k, v] of Object.entries(patch)) {
                     try {
                         if (v === null || v === undefined) continue;
                         if (k === 'workLocations') {
-                            if (Array.isArray(kyujinData.workLocations) && kyujinData.workLocations[0]) {
-                                const wl = kyujinData.workLocations[0];
+                            if (Array.isArray(formData.workLocations) && formData.workLocations[0]) {
+                                const wl = formData.workLocations[0];
                                 if (v[0].prefectureId !== null) wl.prefectureId = v[0].prefectureId;
                                 if (v[0].location) wl.location = v[0].location;
                                 msgs.push('wl.pref=' + v[0].prefectureId);
                             }
                             continue;
                         }
-                        const before = JSON.stringify(kyujinData[k]);
-                        setFn(kyujinData, k, v);
-                        const after = JSON.stringify(kyujinData[k]);
-                        if (before !== after) msgs.push(k + '→' + after.slice(0, 25));
+                        const before = JSON.stringify(formData[k]);
+                        setFn(formData, k, v);
+                        const after = JSON.stringify(formData[k]);
+                        if (before !== after) msgs.push(k + '→' + after.slice(0, 20));
                     } catch(e) {
-                        msgs.push(k + ' ERR:' + (e.message || '').slice(0, 20));
+                        msgs.push(k + '_ERR:' + (e.message || '').slice(0, 15));
                     }
                 }
             }
 
             // ── Vue2 試行 ──
-            const v2vm = findVue2KyujinVm();
-            if (v2vm) {
-                const kd = v2vm.$data.kyujin;
-                applyPatch(kd, (obj, k, v) => v2vm.$set(obj, k, v));
-                // 電話番号も明示的にクリア
-                try { v2vm.$set(kd, 'applicationPhoneNumber', ''); } catch(e) {}
-                try { v2vm.$set(kd, 'isPhoneNumberRequired', false); } catch(e) {}
-                return 'v2: ' + (msgs.join('; ') || 'no-change');
+            const v2r = findVue2FormVm();
+            if (v2r) {
+                applyPatch(v2r.data, (obj, k, v) => v2r.vm.$set(obj, k, v));
+                return 'v2[' + v2r.key + ']: ' + (msgs.join('; ') || 'no-change');
             }
 
             // ── Vue3 試行 ──
-            const v3r = findVue3KyujinComp();
+            const v3r = findVue3FormComp();
             if (v3r) {
-                const kd = v3r.state.kyujin;
-                applyPatch(kd, (obj, k, v) => { obj[k] = v; });
-                try { kd.applicationPhoneNumber = ''; } catch(e) {}
-                try { kd.isPhoneNumberRequired = false; } catch(e) {}
-                return 'v3: ' + (msgs.join('; ') || 'no-change');
+                applyPatch(v3r.data, (obj, k, v) => { obj[k] = v; });
+                return 'v3[' + v3r.key + ']: ' + (msgs.join('; ') || 'no-change');
             }
 
-            // ── 最終手段: kyujin hidden field を直接書き換え ──
+            // ── 最終手段: 全 input[name] / textarea[name] に native setter で値をセット ──
+            let domCount = 0;
+            const domMap = {
+                title: 'input[name="title"]',
+                description: 'textarea[name="description"]',
+                rewarding: 'textarea[name="rewarding"]',
+                qualifications: 'textarea[name="qualifications"]',
+                transportation: 'textarea[name="transportation"]',
+                worktimeHoliday: 'textarea[name="worktimeHoliday"]',
+                benefit: 'textarea[name="benefit"]',
+                howToApply: 'textarea[name="howToApply"]',
+            };
+            for (const [k, sel] of Object.entries(domMap)) {
+                const v = patch[k];
+                if (!v) continue;
+                const el = document.querySelector(sel);
+                if (!el) continue;
+                try {
+                    const proto = el.tagName === 'TEXTAREA'
+                        ? window.HTMLTextAreaElement.prototype
+                        : window.HTMLInputElement.prototype;
+                    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+                    if (setter) setter.call(el, v);
+                    else el.value = v;
+                    ['input', 'change', 'blur'].forEach(t =>
+                        el.dispatchEvent(new Event(t, {bubbles: true, composed: true}))
+                    );
+                    domCount++;
+                } catch(e) {}
+            }
+
+            // hidden field フォールバック
             const hf = document.querySelector('input[name="kyujin"]');
             if (hf) {
                 try {
                     const current = JSON.parse(hf.value || '{}');
                     Object.assign(current, patch);
-                    current.applicationPhoneNumber = '';
-                    current.isPhoneNumberRequired = false;
                     const setter = Object.getOwnPropertyDescriptor(
                         window.HTMLInputElement.prototype, 'value')?.set;
                     if (setter) setter.call(hf, JSON.stringify(current));
                     hf.dispatchEvent(new Event('input', {bubbles: true}));
                     hf.dispatchEvent(new Event('change', {bubbles: true}));
-                    msgs.push('hidden-field-patched');
-                    return 'fallback: ' + msgs.join('; ');
-                } catch(e) {
-                    return 'fallback-err: ' + e.message;
-                }
+                    msgs.push('kyujin-hf');
+                } catch(e) {}
             }
 
-            return 'not found (vue2=' + !!v2vm + ' vue3=' + !!v3r + ')';
+            return 'dom-fallback: fields=' + domCount + ' ' + msgs.join('; ');
         }""", patch_data)
-        progress(f"  🔧 Vue kyujinパッチ: {result}", "info")
+        progress(f"  🔧 Vue状態パッチ: {result}", "info")
         rand_delay(0.5, 1.0)
         return True
     except Exception as e:
-        progress(f"  ⚠️ Vue kyujinパッチ失敗: {e}", "warn")
+        progress(f"  ⚠️ Vue状態パッチ失敗: {e}", "warn")
         return False
 
 
@@ -1091,7 +1143,6 @@ def fill_kyujinbox_form(page, job, company_name):
         progress(f"  ⚠️ characteristics 失敗: {e}", "warn")
 
     # ---- 応募方法 (howToApply) ----
-    # 電話番号をクリアする場合はWebからの応募方法を明記する（必須）
     progress(f"  📝 応募方法入力中", "info")
     how_to_apply = "下記URLよりWebでご応募ください。書類選考後にご連絡いたします。"
     fill_text(page, 'textarea[name="howToApply"]', how_to_apply, timeout=3000)
@@ -1104,15 +1155,74 @@ def fill_kyujinbox_form(page, job, company_name):
     except Exception:
         pass
 
-    # ---- 電話番号 ----
-    # DOM操作でクリアする（インターセプターでもバックアップ対応）
+    # ---- 応募必要項目 (applicationInfo) ----
+    # 既存求人と同じく「基本情報+職務経歴」を選択する（必須項目）
     try:
-        phone_req_cb = page.query_selector('input[name="isPhoneNumberRequired"]')
-        if phone_req_cb and phone_req_cb.is_checked():
-            # ラベルクリックで Vue reactive に反映させる
+        result = page.evaluate("""() => {
+            // radio[name="applicationInfo"] を探す
+            const radios = document.querySelectorAll('input[name="applicationInfo"]');
+            if (radios.length) {
+                // 「基本情報+職務経歴」のラジオを探す（通常 value=2 か 3）
+                const keywords = ['基本情報+職務経歴', '基本情報＋職務経歴', '職務経歴'];
+                for (const r of radios) {
+                    const lbl = r.closest('label') || document.querySelector('label[for="' + r.id + '"]')
+                              || r.nextElementSibling;
+                    const txt = lbl ? lbl.textContent.trim() : '';
+                    if (keywords.some(k => txt.includes(k))) {
+                        if (lbl) { lbl.click(); return 'clicked: ' + txt; }
+                        r.checked = true;
+                        r.dispatchEvent(new Event('change', {bubbles: true}));
+                        return 'checked: ' + txt;
+                    }
+                }
+                // フォールバック: 最後のラジオをクリック（最も詳細な選択肢が多い）
+                const last = radios[radios.length - 1];
+                const lbl = last.closest('label') || document.querySelector('label[for="' + last.id + '"]');
+                if (lbl) { lbl.click(); return 'fallback-last: ' + lbl.textContent.trim().slice(0,30); }
+                last.checked = true;
+                last.dispatchEvent(new Event('change', {bubbles: true}));
+                return 'fallback-last-check';
+            }
+            return 'not found';
+        }""")
+        progress(f"  ✅ 応募必要項目: {result}", "info")
+        rand_delay(0.2, 0.4)
+    except Exception as e:
+        progress(f"  ⚠️ 応募必要項目 失敗: {e}", "warn")
+
+    # ---- 電話番号 ----
+    # 環境変数 KYUJINBOX_PHONE が設定されていれば入力して必須化
+    # 未設定の場合はチェックを外しWeb応募のみにする
+    company_phone = os.environ.get("KYUJINBOX_PHONE", "").strip()
+    if company_phone:
+        progress(f"  📞 電話番号入力: {company_phone}", "info")
+        try:
+            # まず「電話番号を入力必須にする」チェックボックスをONにする
             page.evaluate("""() => {
                 const cb = document.querySelector('input[name="isPhoneNumberRequired"]');
                 if (!cb) return;
+                if (!cb.checked) {
+                    const label = cb.closest('label') || cb.nextElementSibling
+                        || document.querySelector('label[for="' + cb.id + '"]');
+                    if (label) { label.click(); return; }
+                    const setter = Object.getOwnPropertyDescriptor(
+                        window.HTMLInputElement.prototype, 'checked').set;
+                    setter.call(cb, true);
+                    cb.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+            }""")
+            rand_delay(0.2, 0.3)
+        except Exception:
+            pass
+        # 電話番号を入力
+        fill_text(page, 'input[name="applicationPhoneNumber"]', company_phone, timeout=3000)
+        rand_delay(0.1, 0.2)
+    else:
+        progress(f"  📞 電話番号なし（Web応募のみ）", "info")
+        try:
+            page.evaluate("""() => {
+                const cb = document.querySelector('input[name="isPhoneNumberRequired"]');
+                if (!cb || !cb.checked) return;
                 const label = cb.closest('label') || cb.nextElementSibling
                     || document.querySelector('label[for="' + cb.id + '"]');
                 if (label) { label.click(); return; }
@@ -1121,28 +1231,17 @@ def fill_kyujinbox_form(page, job, company_name):
                 setter.call(cb, false);
                 cb.dispatchEvent(new Event('change', {bubbles: true}));
             }""")
-            rand_delay(0.2, 0.4)
-    except Exception:
-        pass
-
-    try:
-        result = page.evaluate("""() => {
-            const tel = document.querySelector('input[name="applicationPhoneNumber"]');
-            if (!tel) return 'not found';
-            const before = tel.value;
-            // native setter で強制クリア
-            const setter = Object.getOwnPropertyDescriptor(
-                window.HTMLInputElement.prototype, 'value').set;
-            setter.call(tel, '');
-            ['input','change'].forEach(t =>
-                tel.dispatchEvent(new Event(t, {bubbles: true}))
-            );
-            return 'cleared from: ' + before;
-        }""")
-        if 'cleared' in result:
-            progress(f"  🔧 電話番号クリア: {result}", "info")
-    except Exception:
-        pass
+            rand_delay(0.2, 0.3)
+        except Exception:
+            pass
+        try:
+            tel = page.query_selector('input[name="applicationPhoneNumber"]')
+            if tel:
+                tel_el = page.wait_for_selector('input[name="applicationPhoneNumber"]', timeout=3000)
+                tel_el.fill('')
+                tel_el.press('Tab')
+        except Exception:
+            pass
 
     # ---- 同意チェックボックス ----
     try:
@@ -1163,9 +1262,9 @@ def fill_kyujinbox_form(page, job, company_name):
         pass
 
     # ---- Vue リアクティブ状態の直接パッチ（最後の確実な手段）----
-    # DOM操作後にVueのリアクティブデータを直接更新して投稿データを保証する
     pay_type, pay_min, pay_max = parse_salary(job.get('salary', ''))
     pay_type_val = {'時給': 1, '日給': 2, '月給': 3, '年収': 4, '固定報酬': 5}.get(pay_type, 3)
+    company_phone = os.environ.get("KYUJINBOX_PHONE", "").strip()
     patch_vue_kyujin_state(
         page, job,
         job_type_val=selected_job_type_val,
@@ -1174,10 +1273,11 @@ def fill_kyujinbox_form(page, job, company_name):
         pay_max=pay_max,
         pref_id=pref_id,
         char_values=CHAR_VALUES,
+        company_phone=company_phone,
     )
     rand_delay(0.5, 1.0)
 
-    return selected_job_type_val
+    return selected_job_type_val, company_phone
 
 
 def main():
@@ -1357,7 +1457,7 @@ def main():
                     dump_visible_inputs(page)
                     save_screenshot(page, f"post_form_{i}")
 
-                    selected_job_type_val = fill_kyujinbox_form(page, job, company_name)
+                    selected_job_type_val, job_company_phone = fill_kyujinbox_form(page, job, company_name)
                     rand_delay(0.8, 1.8)
 
                     # select値をJS確認（name or id どちらでも）
@@ -1386,10 +1486,10 @@ def main():
                     save_screenshot(page, f"before_submit_{i}")
 
                     # ---- POSTインターセプター設定 ----
-                    # Vue reactive が未更新でも jobType・電話番号を強制修正
                     intercept_val = selected_job_type_val or '1'
-                    intercepted, unroute = setup_submit_interceptor(page, intercept_val, phone_clear=True)
-                    progress(f"  🔧 POSTインターセプター設定 (jobType={intercept_val})", "info")
+                    phone_clear = not bool(job_company_phone)
+                    intercepted, unroute = setup_submit_interceptor(page, intercept_val, phone_clear=phone_clear)
+                    progress(f"  🔧 POSTインターセプター設定 (jobType={intercept_val}, phone_clear={phone_clear})", "info")
 
                     submitted = click_submit_button(page)
 
