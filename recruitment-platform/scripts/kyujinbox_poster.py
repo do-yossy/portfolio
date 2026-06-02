@@ -346,7 +346,7 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                   （APIスキーマを壊さないため）。
     JSON・form-encoded 両方に対応。
     """
-    intercepted = {'count': 0}
+    intercepted = {'count': 0, 'save_ok': False, 'save_status': None, 'save_url': ''}
     full_payload = full_payload or {}
 
     def handle(route):
@@ -533,11 +533,12 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
 
         route.continue_()
 
-    # ── 求人保存系APIのレスポンスをログ出力（成否確認用）──
+    # ── 求人保存系APIのレスポンスをログ出力＋成否記録 ──
     def on_response(resp):
         try:
             url = resp.url.split('?')[0]
-            if ('/jobs' in url or '/job/' in url or 'draft' in url) and resp.request.method == 'POST':
+            if (('jobs' in url or 'draft' in url) and resp.request.method == 'POST'
+                    and ('/api/' in url)):
                 status = resp.status
                 snippet = ''
                 try:
@@ -547,6 +548,11 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                     snippet = '(本文取得不可)'
                 level = 'success' if 200 <= status < 300 else 'warn'
                 progress(f"  📨 APIレスポンス [{url[-50:]}] status={status} body={snippet}", level)
+                # 保存系（draft/jobs）の2xxを成功として記録
+                intercepted['save_status'] = status
+                intercepted['save_url'] = url
+                if 200 <= status < 300:
+                    intercepted['save_ok'] = True
         except Exception:
             pass
 
@@ -1902,33 +1908,40 @@ def main():
 
                     submitted = click_submit_button(page)
 
-                    # インターセプター解除
-                    unroute()
-
                     if not submitted:
+                        unroute()
                         progress(f"⚠️ 「{job['title']}」: 送信ボタンが見つかりませんでした", "warn")
                         save_screenshot(page, f"no_submit_{i}")
                         continue
 
-                    progress(f"  📊 POST修正回数: {intercepted['count']}", "info")
-
+                    # 保存APIのレスポンスが届くまで待つ（解除前に待機しないと取りこぼす）
                     rand_delay(3.0, 6.0)
-                    page.wait_for_load_state('networkidle', timeout=15000)
+                    try:
+                        page.wait_for_load_state('networkidle', timeout=15000)
+                    except Exception:
+                        pass
+
+                    # インターセプター解除（レスポンス取得後）
+                    unroute()
+
+                    progress(f"  📊 POST修正回数: {intercepted['count']} / 保存API status={intercepted.get('save_status')}", "info")
 
                     final_url = page.url
                     progress(f"📍 送信後URL: {final_url}", "info")
                     save_screenshot(page, f"after_submit_{i}")
 
                     url_changed = final_url != actual_url
-                    # kyujinbox のジョブIDは 5922-7577-XXXX 形式（英数字ハイフン）
-                    # /new → /edit/5922-7577-XXXX へのリダイレクトを成功と判定
-                    was_new = '/jobs/new' in actual_url or '/jobs/edit' in actual_url
                     went_edit = '/jobs/edit/' in final_url
                     has_job_id = bool(re.search(r'/jobs/edit/[\w-]+', final_url))
-                    # 一時保存も成功: /draft/ や /jobs/ トップへの遷移
                     went_draft = '/draft' in final_url or (url_changed and '/jobs' in final_url and 'login' not in final_url)
 
-                    if went_edit or has_job_id or went_draft:
+                    # 最優先: 保存API(draft/jobs)が2xxを返したら成功（下書き保存成功）
+                    if intercepted.get('save_ok'):
+                        progress(f"✅ 「{job['title']}」を下書き保存しました "
+                                 f"(API status={intercepted.get('save_status')}) "
+                                 f"※公開はkyujinbox管理画面から", "success")
+                        success_count += 1
+                    elif went_edit or has_job_id or went_draft:
                         label = "一時保存" if not went_edit else "投稿"
                         progress(f"✅ 「{job['title']}」を{label}しました (URL: {final_url})", "success")
                         success_count += 1
