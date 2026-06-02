@@ -580,6 +580,84 @@ def _safe_unroute(page, handler, resp_handler=None):
             pass
 
 
+def _norm_label(s):
+    return (s or '').replace(' ', '').replace('　', '').replace('+', '＋').strip()
+
+
+def _radio_label_text(r):
+    """ラジオに対応するラベルテキストを取得（label[for]/親label/近傍）"""
+    try:
+        return r.evaluate("""el => {
+            let t = '';
+            if (el.id) {
+                const l = document.querySelector('label[for="' + el.id + '"]');
+                if (l) t = l.textContent;
+            }
+            if (!t) {
+                const l = el.closest('label')
+                      || (el.parentElement && el.parentElement.closest('label'));
+                if (l) t = l.textContent;
+            }
+            if (!t && el.nextElementSibling) t = el.nextElementSibling.textContent;
+            if (!t && el.parentElement) t = el.parentElement.textContent;
+            return t || '';
+        }""") or ''
+    except Exception:
+        return ''
+
+
+def _check_radio(page, r):
+    """ラジオを本物のクリックで選択（Vue更新）"""
+    try:
+        r.scroll_into_view_if_needed()
+    except Exception:
+        pass
+    try:
+        r.check(force=True)
+        return True
+    except Exception:
+        try:
+            rid = r.get_attribute('id') or ''
+            if rid and page.locator(f'label[for="{rid}"]').count():
+                page.locator(f'label[for="{rid}"]').first.click()
+            else:
+                r.click(force=True)
+            return True
+        except Exception:
+            return False
+
+
+def click_radio_by_label(page, keywords):
+    """ラベルテキストが keywords に一致するラジオを Playwright の本物のクリックで選択する。
+    完全一致を優先し、無ければ部分一致でフォールバックする。
+    （「基本情報」と「基本情報＋職務経歴」を取り違えないため完全一致を優先）
+    戻り値: 'clicked:...' or 'not found'
+    """
+    try:
+        radios = page.locator('input[type="radio"]')
+        n = radios.count()
+    except Exception:
+        n = 0
+    labels = []
+    for idx in range(n):
+        labels.append((idx, _norm_label(_radio_label_text(radios.nth(idx)))))
+
+    norm_kw = [_norm_label(k) for k in keywords if k]
+    # ① 完全一致
+    for kw in norm_kw:
+        for idx, lab in labels:
+            if lab == kw:
+                if _check_radio(page, radios.nth(idx)):
+                    return f'clicked(exact):{lab[:24]}'
+    # ② 部分一致
+    for kw in norm_kw:
+        for idx, lab in labels:
+            if kw and kw in lab:
+                if _check_radio(page, radios.nth(idx)):
+                    return f'clicked(partial):{lab[:24]}'
+    return 'not found'
+
+
 def publish_draft(page, draft_url):
     """保存済み下書きを開き直し、必要項目ラジオを実クリックで選択して「公開する」を押す。
     下書き再読込でVueに保存データがロードされるため、ラジオの実クリックでVueが確実に更新され、
@@ -600,36 +678,10 @@ def publish_draft(page, draft_url):
         page.evaluate("window.scrollTo(0, 0)")
         rand_delay(0.5, 1.0)
 
-        # ── 必要項目「基本情報＋職務経歴」ラジオを実クリック（Vue更新）──
-        clicked = False
+        # ── 必要項目「基本情報」ラジオを実クリック（完全一致・Vue更新）──
         try:
-            radios = page.locator('input[type="radio"]')
-            n = radios.count()
-            for idx in range(n):
-                r = radios.nth(idx)
-                rid = r.get_attribute('id') or ''
-                txt = ''
-                if rid:
-                    lbl = page.locator(f'label[for="{rid}"]')
-                    if lbl.count():
-                        txt = (lbl.first.inner_text() or '')
-                txt_norm = txt.replace(' ', '').replace('　', '')
-                if '職務経歴' in txt_norm:
-                    try:
-                        r.scroll_into_view_if_needed()
-                        r.click(force=True)
-                    except Exception:
-                        # ラベルクリックにフォールバック
-                        page.locator(f'label[for="{rid}"]').first.click()
-                    progress(f"  ✅ 必要項目クリック: {txt.strip()[:24]}", "info")
-                    clicked = True
-                    break
-            if not clicked:
-                lbl = page.locator('label:has-text("職務経歴")')
-                if lbl.count():
-                    lbl.first.click()
-                    progress("  ✅ 必要項目ラベルクリック(職務経歴)", "info")
-                    clicked = True
+            result = click_radio_by_label(page, ['基本情報'])
+            progress(f"  ✅ 必要項目(基本情報): {result}", "info")
         except Exception as e:
             progress(f"  ⚠️ 必要項目クリック失敗: {e}", "warn")
         rand_delay(1.0, 1.5)
@@ -1513,58 +1565,13 @@ def fill_kyujinbox_form(page, job, company_name):
     except Exception:
         pass
 
-    # ---- 応募必要項目 (applicationInfo) ----
-    # 「基本情報+職務経歴」を選択する（必須項目）
+    # ---- 応募必要項目: 「基本情報」を選択（必須項目・完全一致で誤選択防止）----
     try:
-        result = page.evaluate("""() => {
-            const radios = document.querySelectorAll('input[name="applicationInfo"]');
-            if (!radios.length) return 'not found';
-
-            // まずスクロールしてセクションを表示（Vue lazy render 対策）
-            radios[0].scrollIntoView({block: 'center'});
-
-            // すべてのラジオとラベルをダンプ（デバッグ用）
-            const info = Array.from(radios).map(r => {
-                const lbl = r.closest('label') || document.querySelector('label[for="' + r.id + '"]')
-                          || r.nextElementSibling;
-                return r.value + ':' + (lbl ? lbl.textContent.trim().slice(0,20) : '?');
-            });
-
-            // 「基本情報+職務経歴」または最も詳しいオプションを選択
-            const keywords = ['基本情報+職務経歴', '基本情報＋職務経歴', '職務経歴', '基本情報'];
-            for (const kw of keywords) {
-                for (const r of radios) {
-                    const lbl = r.closest('label') || document.querySelector('label[for="' + r.id + '"]')
-                              || r.nextElementSibling;
-                    const txt = lbl ? lbl.textContent.trim() : '';
-                    if (txt.includes(kw)) {
-                        if (lbl) { lbl.click(); return 'clicked: ' + txt + ' [opts:' + info.join('|') + ']'; }
-                        r.checked = true;
-                        r.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
-                        return 'forced: ' + txt;
-                    }
-                }
-            }
-            // value=2 か value=3 を直接試す（基本情報+職務経歴は通常このvalue）
-            for (const v of ['3', '2']) {
-                const r = Array.from(radios).find(r => r.value === v);
-                if (r) {
-                    const lbl = r.closest('label') || document.querySelector('label[for="' + r.id + '"]');
-                    if (lbl) { lbl.click(); return 'by-value-' + v + ': ' + lbl.textContent.trim().slice(0,20); }
-                    r.checked = true;
-                    r.dispatchEvent(new Event('change', {bubbles: true}));
-                    return 'by-value-forced-' + v;
-                }
-            }
-            // 最終フォールバック: 最後のラジオ（最も詳細な選択肢）
-            const last = radios[radios.length - 1];
-            const lbl = last.closest('label') || document.querySelector('label[for="' + last.id + '"]');
-            if (lbl) { lbl.click(); return 'fallback-last: ' + lbl.textContent.trim().slice(0,30); }
-            last.checked = true;
-            last.dispatchEvent(new Event('change', {bubbles: true}));
-            return 'fallback-last-check. opts:' + info.join('|');
-        }""")
-        progress(f"  ✅ 応募必要項目: {result}", "info")
+        # Vue遅延描画対策で一度スクロール
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        rand_delay(0.4, 0.8)
+        result = click_radio_by_label(page, ['基本情報'])
+        progress(f"  ✅ 応募必要項目(基本情報): {result}", "info")
         rand_delay(0.3, 0.6)
     except Exception as e:
         progress(f"  ⚠️ 応募必要項目 失敗: {e}", "warn")
@@ -1778,7 +1785,7 @@ def fill_kyujinbox_form(page, job, company_name):
         'howToApply':      how_to_apply_p,
         'employTypes':     [emp_label],
         'characteristics': [int(v) for v in CHAR_VALUES],
-        'resumeRequired':  3,                 # 応募選考必要項目: 3 = 基本情報＋職務経歴
+        'resumeRequired':  2,                 # 応募選考必要項目: 2 = 基本情報
     }
     if company_phone:
         full_payload['applicationPhoneNumber'] = company_phone
