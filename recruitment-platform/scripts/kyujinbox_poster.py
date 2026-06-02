@@ -387,12 +387,26 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                     route.continue_()
                     return
 
-                # ── 求人投稿系POSTなら内側の全キー名をログ出力（スキーマ把握用）──
+                # ── 求人投稿系POSTなら内側の全キー名＋現在値をログ出力（スキーマ把握用）──
                 if is_job_post:
                     all_keys = list(target.keys())
                     progress(f"  📦 kyujin内側キー({len(all_keys)}件): {', '.join(all_keys)}", "info")
-                    empty_keys = [k for k in all_keys if _is_empty_val(target.get(k))]
-                    progress(f"  📦 空のキー: {', '.join(empty_keys)}", "info")
+                    # 各キーの現在値を出力（UIラベルとの対応・空判定のため）
+                    for k in all_keys:
+                        v = target.get(k)
+                        vs = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
+                        mark = '∅' if _is_empty_val(v) else '●'
+                        progress(f"     {mark} {k} = {str(vs)[:45]}", "info")
+                    # 全文をファイルにも保存（確実な共有用）
+                    try:
+                        script_dir = os.path.dirname(os.path.abspath(__file__))
+                        logs_dir = os.path.join(script_dir, '..', 'logs')
+                        os.makedirs(logs_dir, exist_ok=True)
+                        with open(os.path.join(logs_dir, 'kyujin_inner.json'), 'w', encoding='utf-8') as f:
+                            json.dump(target, f, ensure_ascii=False, indent=2)
+                        progress("  📦 内側JSON全文を logs/kyujin_inner.json に保存しました", "info")
+                    except Exception:
+                        pass
 
                 # ── 全フィールド注入：内側に存在し かつ 空のキーを正しい値で埋める ──
                 for k, correct_v in full_payload.items():
