@@ -397,8 +397,17 @@ function adminApplicantsPage(applicants, filter = 'all') {
   const content = `
 <div class="header-row">
   <h2>応募者管理</h2>
-  <div class="btn-group">
-    <button id="btn-csv-export" class="btn btn-ghost" onclick="exportCSV()">📤 CA対応リスト出力</button>
+</div>
+
+<div class="card mb-16">
+  <div class="action-section-title">📤 リスト出力</div>
+  <div class="btn-group flex-wrap">
+    <button class="btn btn-primary btn-sm" onclick="exportList('new')">① 新規リスト出力</button>
+    <div class="flex items-center gap-8">
+      <input type="month" id="export-month" class="input-sm" value="${new Date().toISOString().slice(0,7)}">
+      <button class="btn btn-ghost btn-sm" onclick="exportList('monthly')">② 月次全応募者出力</button>
+      <button class="btn btn-warning btn-sm" onclick="exportList('ng')">③ 月次NGリスト出力</button>
+    </div>
   </div>
 </div>
 

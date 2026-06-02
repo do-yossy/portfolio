@@ -142,6 +142,28 @@ async function exportCSV() {
   }
 }
 
+// ── リスト出力 ──
+async function exportList(type) {
+  const month = document.getElementById('export-month')?.value || '';
+  const co = new URLSearchParams(location.search).get('co') || '';
+  const labels = { new: '新規リスト', monthly: `全応募者_${month}`, ng: `NGリスト_${month}` };
+  try {
+    let url = `/api/export/csv?type=${type}`;
+    if (month && (type === 'monthly' || type === 'ng')) url += `&month=${month}`;
+    if (co) url += `&co=${co}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(await r.text());
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${labels[type]}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    toast(`${labels[type]}をダウンロードしました`, 'success');
+  } catch {
+    toast('CSV出力に失敗しました', 'error');
+  }
+}
+
 // ── Indeed Scrape ──
 function startScrapeIndeed() {
   confirmAction(

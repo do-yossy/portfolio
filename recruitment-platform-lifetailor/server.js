@@ -232,15 +232,14 @@ ${items}
 }
 
 // CSV export
-function generateCSV(applicants) {
+function generateCSV(applicants, includeDuplicates = false) {
   const headers = ['氏名','電話番号','メールアドレス','年齢','住所','応募媒体','応募日時','ステータス','応募求人','重複フラグ'];
-  const rows = applicants
-    .filter(a => !a.is_duplicate) // exclude duplicates for CA list
-    .map(a => [
-      a.name, a.phone, a.email, a.age||'', a.address||'',
-      a.source_media, (a.applied_at||'').slice(0,16).replace('T',' '),
-      a.status, a.job_titles||'', a.is_duplicate ? '重複' : ''
-    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+  const list = includeDuplicates ? applicants : applicants.filter(a => !a.is_duplicate);
+  const rows = list.map(a => [
+    a.name, a.phone, a.email, a.age||'', a.address||'',
+    a.source_media, (a.applied_at||'').slice(0,16).replace('T',' '),
+    a.status, a.job_titles||'', a.is_duplicate ? '重複' : ''
+  ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
   return [headers.join(','), ...rows].join('\n');
 }
 
@@ -747,13 +746,39 @@ ${jobUrls}
 
   // ── API: CSV Export ──
   if (pathname === '/api/export/csv' && method === 'GET') {
-    const applicants = await Applicants.findAll();
-    const csv = generateCSV(applicants);
+    const type  = parsedUrl.query.type  || 'all';
+    const month = parsedUrl.query.month || '';
+    const co    = parsedUrl.query.co    || '';
+
+    let applicants = await Applicants.findAll();
+    if (co) applicants = applicants.filter(a => (a.company_id || '') === co);
+
+    let filtered, label;
+    if (type === 'new') {
+      filtered = applicants.filter(a => ['新規','未対応'].includes(a.status));
+      label = '新規リスト';
+    } else if (type === 'monthly') {
+      filtered = month ? applicants.filter(a => (a.applied_at || '').startsWith(month)) : applicants;
+      label = month ? `全応募者_${month}` : '全応募者';
+    } else if (type === 'ng') {
+      filtered = applicants.filter(a => {
+        const isNG = ['NG','見送り','不採用'].includes(a.status);
+        const inMonth = month ? (a.applied_at || '').startsWith(month) : true;
+        return isNG && inMonth;
+      });
+      label = month ? `NGリスト_${month}` : 'NGリスト';
+    } else {
+      filtered = applicants;
+      label = 'all';
+    }
+
+    const csv = generateCSV(filtered, type !== 'all');
+    const filename = `${label}_${new Date().toISOString().slice(0,10)}.csv`;
     res.writeHead(200, {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="ca-list-${new Date().toISOString().slice(0,10)}.csv"`
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`
     });
-    res.end('﻿' + csv); // BOM for Excel
+    res.end('﻿' + csv);
     return;
   }
 
