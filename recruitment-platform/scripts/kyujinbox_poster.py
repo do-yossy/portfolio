@@ -346,7 +346,7 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                   （APIスキーマを壊さないため）。
     JSON・form-encoded 両方に対応。
     """
-    intercepted = {'count': 0, 'save_ok': False, 'save_status': None, 'save_url': ''}
+    intercepted = {'count': 0, 'save_ok': False, 'save_status': None, 'save_url': '', 'draft_id': None}
     full_payload = full_payload or {}
 
     def handle(route):
@@ -553,6 +553,13 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                 intercepted['save_url'] = url
                 if 200 <= status < 300:
                     intercepted['save_ok'] = True
+                    # レスポンス本文から下書きID（例: 5922-7577-0632）を抽出
+                    try:
+                        m = re.search(r'\d{4}-\d{4}-\d{3,}', snippet)
+                        if m:
+                            intercepted['draft_id'] = m.group(0)
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -571,6 +578,84 @@ def _safe_unroute(page, handler, resp_handler=None):
             page.remove_listener('response', resp_handler)
         except Exception:
             pass
+
+
+def publish_draft(page, draft_url):
+    """保存済み下書きを開き直し、必要項目ラジオを実クリックで選択して「公開する」を押す。
+    下書き再読込でVueに保存データがロードされるため、ラジオの実クリックでVueが確実に更新され、
+    全必須項目が揃って「公開する」が有効化される。
+    戻り値: 公開成功なら True
+    """
+    try:
+        progress(f"  🚀 下書きを開いて公開を試みます: {draft_url}", "info")
+        page.goto(draft_url, timeout=30000)
+        try:
+            page.wait_for_load_state('networkidle', timeout=15000)
+        except Exception:
+            pass
+        rand_delay(2.0, 3.0)
+        # 全セクション描画のためスクロール
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        rand_delay(1.5, 2.5)
+        page.evaluate("window.scrollTo(0, 0)")
+        rand_delay(0.5, 1.0)
+
+        # ── 必要項目「基本情報＋職務経歴」ラジオを実クリック（Vue更新）──
+        clicked = False
+        try:
+            radios = page.locator('input[type="radio"]')
+            n = radios.count()
+            for idx in range(n):
+                r = radios.nth(idx)
+                rid = r.get_attribute('id') or ''
+                txt = ''
+                if rid:
+                    lbl = page.locator(f'label[for="{rid}"]')
+                    if lbl.count():
+                        txt = (lbl.first.inner_text() or '')
+                txt_norm = txt.replace(' ', '').replace('　', '')
+                if '職務経歴' in txt_norm:
+                    try:
+                        r.scroll_into_view_if_needed()
+                        r.click(force=True)
+                    except Exception:
+                        # ラベルクリックにフォールバック
+                        page.locator(f'label[for="{rid}"]').first.click()
+                    progress(f"  ✅ 必要項目クリック: {txt.strip()[:24]}", "info")
+                    clicked = True
+                    break
+            if not clicked:
+                lbl = page.locator('label:has-text("職務経歴")')
+                if lbl.count():
+                    lbl.first.click()
+                    progress("  ✅ 必要項目ラベルクリック(職務経歴)", "info")
+                    clicked = True
+        except Exception as e:
+            progress(f"  ⚠️ 必要項目クリック失敗: {e}", "warn")
+        rand_delay(1.0, 1.5)
+
+        # ── 「公開する」ボタン ──
+        pub = page.locator('button:has-text("公開する")').last
+        if pub.count() == 0:
+            progress("  ⚠️ 公開するボタンが見つかりません", "warn")
+            return False
+        cls = pub.get_attribute('class') or ''
+        if 'is-disab' in cls:
+            progress("  ⚠️ 公開するがまだ無効（他に未入力の必須項目あり）。下書きのまま保存します", "warn")
+            return False
+        pub.scroll_into_view_if_needed()
+        rand_delay(0.3, 0.6)
+        pub.click()
+        progress("  ✅ 公開するをクリックしました", "info")
+        rand_delay(3.0, 5.0)
+        try:
+            page.wait_for_load_state('networkidle', timeout=15000)
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        progress(f"  ⚠️ 公開処理エラー: {e}", "warn")
+        return False
 
 
 def find_post_url(page, group_id=None):
@@ -1642,15 +1727,22 @@ def fill_kyujinbox_form(page, job, company_name):
         except Exception:
             tags = []
 
-    # 対象となる方（応募資格）: DBのqualifications優先 → タグ → 職種別デフォルト
+    # 対象となる方（応募資格）: 免許など必要資格の情報のみ（簡潔に）
     quals_text = (job.get('qualifications') or '').strip()
-    if not quals_text and tags:
-        quals_text = ' / '.join(str(t) for t in tags)
     if not quals_text:
-        quals_text = ('未経験・経験者ともに歓迎！要普通自動車免許（AT限定可）。'
-                      '学歴不問・ブランクOK。長期で安定して働きたい方、'
-                      '自分のペースで稼ぎたい方を歓迎します。')
+        title_jt = (job.get('title', '') + (job.get('jobType') or job.get('job_type', '')))
+        if re.search(r'ドライバー|配送|宅配|軽貨物|配達|運送', title_jt):
+            quals_text = '普通自動車免許（AT限定可）　※要普通自動車免許'
+        else:
+            quals_text = '学歴不問　未経験者歓迎'
     quals_text = quals_text[:LIMIT_QUALIFICATIONS]
+
+    # 勤務地の市区町村（都道府県プルダウンの横の入力欄用）
+    pref_name = extract_prefecture(location) or ''
+    city_text = location
+    if pref_name and pref_name in city_text:
+        city_text = city_text.split(pref_name, 1)[1]
+    city_text = re.sub(r'[（(].*$', '', city_text).strip()  # 括弧以降を除去
 
     rewarding_p = (job.get('rewarding') or job.get('rewarding_text') or '').strip()[:LIMIT_REWARDING]
     worktime_p  = (job.get('worktimeHoliday') or job.get('worktime_holiday') or job.get('workTime') or '').strip()[:LIMIT_WORKTIME]
@@ -1675,8 +1767,8 @@ def fill_kyujinbox_form(page, job, company_name):
         'rewarding':       rewarding_p,
         'qualifications':  quals_text,
         'prefVal':         pref_id,
-        'address':         location,
-        '_location':       location,          # workLocations[0].location 用（フル住所）
+        'address':         city_text,         # 都道府県の横の入力欄＝市区町村
+        '_location':       city_text,         # workLocations[0].location 用（市区町村）
         'transportation':  transport_p,
         'payType':         pay_type_val,
         'payMin':          pay_min or '',
@@ -1935,12 +2027,23 @@ def main():
                     has_job_id = bool(re.search(r'/jobs/edit/[\w-]+', final_url))
                     went_draft = '/draft' in final_url or (url_changed and '/jobs' in final_url and 'login' not in final_url)
 
-                    # 最優先: 保存API(draft/jobs)が2xxを返したら成功（下書き保存成功）
+                    # 最優先: 保存API(draft/jobs)が2xxを返したら下書き保存成功
                     if intercepted.get('save_ok'):
+                        draft_id = intercepted.get('draft_id')
                         progress(f"✅ 「{job['title']}」を下書き保存しました "
-                                 f"(API status={intercepted.get('save_status')}) "
-                                 f"※公開はkyujinbox管理画面から", "success")
+                                 f"(API status={intercepted.get('save_status')}, id={draft_id})", "success")
                         success_count += 1
+                        # ── 下書きを開き直して公開を試みる ──
+                        if draft_id:
+                            base = actual_url.split('/jobs/edit')[0]
+                            draft_url = f"{base}/jobs/edit/{draft_id}"
+                            published = publish_draft(page, draft_url)
+                            if published:
+                                progress(f"🎉 「{job['title']}」を公開しました", "success")
+                            else:
+                                progress(f"📝 「{job['title']}」は下書きとして保存済み（公開は手動でお願いします）", "info")
+                        else:
+                            progress(f"  ℹ️ 下書きIDを取得できず自動公開はスキップ（下書きは保存済み）", "info")
                     elif went_edit or has_job_id or went_draft:
                         label = "一時保存" if not went_edit else "投稿"
                         progress(f"✅ 「{job['title']}」を{label}しました (URL: {final_url})", "success")
