@@ -1053,10 +1053,15 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
 
     const rows = parseCSV(csvText);
-    let imported = 0, duplicates = 0;
+    let imported = 0, duplicates = 0, skipped = 0;
+    const skipReasons = [];
     for (const row of rows) {
       const mapped = mapCSVRow(row);
-      if (!mapped.name || (!mapped.phone && !mapped.email)) continue;
+      if (!mapped.name || (!mapped.phone && !mapped.email)) {
+        skipped++;
+        if (skipReasons.length < 3) skipReasons.push(`name="${mapped.name}" phone="${mapped.phone}" email="${mapped.email}"`);
+        continue;
+      }
       const dupId = await checkDuplicate(mapped);
       await Applicants.create({
         ...mapped,
@@ -1066,8 +1071,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       });
       if (dupId) duplicates++; else imported++;
     }
-    await Logs.create('csv_import', 'success', `CSV取込: ${imported}件新規, ${duplicates}件重複`);
-    sendJSON(res, 200, { ok: true, imported, duplicates, total: imported + duplicates });
+    await Logs.create('csv_import', 'success', `CSV取込: ${imported}件新規, ${duplicates}件重複, ${skipped}件スキップ`);
+    sendJSON(res, 200, { ok: true, imported, duplicates, skipped, skipReasons, total: imported + duplicates, rows: rows.length });
     return;
   }
 

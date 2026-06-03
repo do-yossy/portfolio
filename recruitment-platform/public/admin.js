@@ -356,7 +356,9 @@ async function handleCSVFile(input) {
     const r = await fetch('/api/import/csv', { method: 'POST', body: fd });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
-    toast(`${d.imported}件取込・${d.duplicates}件重複`, 'success');
+    const msg = `${d.imported}件取込・${d.duplicates}件重複` + (d.skipped ? `・${d.skipped}件スキップ(計${d.rows}行)` : '');
+    toast(msg, d.imported > 0 ? 'success' : 'warn');
+    if (d.skipped > 0 && d.skipReasons?.length) console.warn('スキップ理由:', d.skipReasons);
     setTimeout(() => location.reload(), 1500);
   } catch (e) {
     toast('CSV取込に失敗: ' + e.message, 'error');
