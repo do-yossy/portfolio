@@ -107,6 +107,15 @@ try { db.exec('ALTER TABLE applicants ADD COLUMN call_count INTEGER DEFAULT 0');
 try { db.exec(`ALTER TABLE applicants ADD COLUMN applied_month TEXT DEFAULT ''`); } catch {}    // 'YYYY-MM'
 try { db.exec(`ALTER TABLE applicants ADD COLUMN last_called_at TEXT DEFAULT ''`); } catch {}   // 最終架電日
 
+// Migration v3: CSV詳細カラム（求人ボックス・Indeed 両フォーマット対応）
+try { db.exec(`ALTER TABLE applicants ADD COLUMN gender TEXT DEFAULT ''`); } catch {}           // 性別
+try { db.exec(`ALTER TABLE applicants ADD COLUMN birth_date TEXT DEFAULT ''`); } catch {}       // 生年月日
+try { db.exec(`ALTER TABLE applicants ADD COLUMN current_job TEXT DEFAULT ''`); } catch {}      // 現在の職業
+try { db.exec(`ALTER TABLE applicants ADD COLUMN job_title TEXT DEFAULT ''`); } catch {}        // 求人タイトル
+try { db.exec(`ALTER TABLE applicants ADD COLUMN experience TEXT DEFAULT ''`); } catch {}       // 関連のある経験
+try { db.exec(`ALTER TABLE applicants ADD COLUMN education TEXT DEFAULT ''`); } catch {}        // 学歴
+try { db.exec(`ALTER TABLE applicants ADD COLUMN work_location TEXT DEFAULT ''`); } catch {}    // 勤務地
+
 // Migration v2: 既存応募者の applied_month / media をバックフィル
 try {
   db.exec(`UPDATE applicants SET applied_month = substr(applied_at, 1, 7) WHERE (applied_month IS NULL OR applied_month = '') AND applied_at IS NOT NULL AND applied_at != ''`);
@@ -303,8 +312,8 @@ const Applicants = {
     const appliedMonth = (appliedAt || '').slice(0, 7); // 'YYYY-MM'
     const media = data.media || '';
     db.prepare(`
-      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, data.name, data.phone, data.email,
       data.age ? parseInt(data.age) : null,
@@ -321,6 +330,13 @@ const Applicants = {
       parseInt(data.callCount || data.call_count || 0),
       appliedMonth,
       data.lastCalledAt || data.last_called_at || '',
+      data.gender || '',
+      data.birthDate || data.birth_date || '',
+      data.currentJob || data.current_job || '',
+      data.jobTitle || data.job_title || '',
+      data.experience || '',
+      data.education || '',
+      data.workLocation || data.work_location || '',
       ts, ts
     );
     return Applicants.findById(id);
@@ -535,7 +551,7 @@ const Ops = {
   },
 
   // 会社×媒体でフィルタした応募者一覧
-  listCalls({ company, media, status, month, archived } = {}) {
+  listCalls({ company, media, status, month, archived, search } = {}) {
     const conds = [];
     const vals = [];
     if (company && company !== 'all') { conds.push('company = ?'); vals.push(company); }
@@ -544,6 +560,10 @@ const Ops = {
     if (month && month !== 'all')     { conds.push('applied_month = ?'); vals.push(month); }
     if (archived === true)  conds.push('is_archived = 1');
     if (archived === false) conds.push('is_archived = 0');
+    if (search) {
+      conds.push('(name LIKE ? OR phone LIKE ? OR email LIKE ? OR address LIKE ? OR job_title LIKE ?)');
+      vals.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    }
     let q = 'SELECT * FROM applicants';
     if (conds.length) q += ' WHERE ' + conds.join(' AND ');
     q += ' ORDER BY applied_at DESC, created_at DESC';

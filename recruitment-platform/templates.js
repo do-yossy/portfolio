@@ -1366,13 +1366,20 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
     const sections = sectionsOrder.filter(s => (groups[s] || []).length).map(s => {
       const rows = groups[s].map(a => `
         <tr>
-          <td>${esc(a.name)}</td>
-          <td>${esc(a.phone)}</td>
+          <td class="name-col">${esc(a.name || '')}</td>
+          <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
+          <td>${esc(a.email || '')}</td>
+          <td>${esc(a.gender || '')}</td>
+          <td>${a.age || ''}</td>
+          <td>${esc(a.address || '')}</td>
+          <td>${esc(a.job_title || '')}</td>
+          <td>${esc(a.current_job || '')}</td>
+          <td>${esc(a.education || '')}</td>
           <td>${companyName(a.company)}</td>
           <td>${esc(mediaName(a.media))}</td>
-          <td>${esc((a.applied_at || '').slice(0, 10))}</td>
+          <td style="white-space:nowrap">${esc((a.applied_at || '').slice(0, 10))}</td>
           <td class="num">${a.call_count || 0}</td>
-          <td>${esc((a.last_called_at || '').slice(0, 10))}</td>
+          <td style="white-space:nowrap">${esc((a.last_called_at || '').slice(0, 10))}</td>
           <td>${esc(a.notes || '')}</td>
         </tr>`).join('');
       return `
@@ -1380,7 +1387,11 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <summary><span class="dot" style="background:${CALL_STATUS_COLORS[s] || '#999'}"></span>${sectionLabels[s] || s} <span class="count">${groups[s].length}件</span></summary>
           <div class="table-scroll">
             <table class="data-table">
-              <thead><tr><th>名前</th><th>電話番号</th><th>会社</th><th>媒体</th><th>応募日</th><th>架電回数</th><th>最終架電</th><th>メモ</th></tr></thead>
+              <thead><tr>
+                <th class="name-col">名前</th><th>電話番号</th><th>メール</th><th>性別</th><th>年齢</th>
+                <th>居住地</th><th>求人タイトル</th><th>現在の職業</th><th>学歴</th>
+                <th>会社</th><th>媒体</th><th>応募日</th><th>架電回数</th><th>最終架電</th><th>メモ</th>
+              </tr></thead>
               <tbody>${rows}</tbody>
             </table>
           </div>
@@ -1544,42 +1555,53 @@ function postModalHtml(co) {
 // ══════════════════════════════════════════════════════════════
 // 架電リストページ（会社タブ × 媒体サブタブ）
 // ══════════════════════════════════════════════════════════════
-function callsPage({ co = 'sq', media = 'indeed', applicants = [] } = {}) {
+function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter = 'all', search = '' } = {}) {
   const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
+  const baseHref = (c, m) => `/admin/calls?co=${c}&media=${m}`;
 
   const companyTabs = COMPANIES_ORDER.map(c =>
-    `<a href="/admin/calls?co=${c}&media=${media}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`
+    `<a href="${baseHref(c, media)}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`
   ).join('');
 
   const mediaTabs = OPS_MEDIA.map(m =>
-    `<a href="/admin/calls?co=${co}&media=${m.id}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`
+    `<a href="${baseHref(co, m.id)}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`
   ).join('');
 
   const countOpts = n => Array.from({ length: 11 }, (_, i) =>
     `<option value="${i}"${i === (n || 0) ? ' selected' : ''}>${i}</option>`).join('');
   const statusOpts = cur => CALL_STATUSES_LIST.map(s =>
     `<option value="${s}"${s === cur ? ' selected' : ''}>${s}</option>`).join('');
+  const statusFilterOpts = [{ v: 'all', l: '全ての対応状況' }, ...CALL_STATUSES_LIST.map(s => ({ v: s, l: s }))].map(o =>
+    `<option value="${o.v}"${o.v === statusFilter ? ' selected' : ''}>${o.l}</option>`).join('');
 
+  const NCOLS = 17;
   const rows = applicants.length ? applicants.map((a, i) => `
-    <tr data-id="${a.id}" data-status="${esc(a.status)}" style="background:${(CALL_STATUS_COLORS[a.status] || '#fff')}15">
+    <tr data-id="${esc(a.id)}" data-status="${esc(a.status || '')}" style="background:${(CALL_STATUS_COLORS[a.status] || '#fff')}15">
       <td class="num">${i + 1}</td>
-      <td>${esc(a.name)}${a.is_duplicate ? ' <span class="dup-badge">重複</span>' : ''}</td>
-      <td>${esc(a.phone)}</td>
+      <td class="name-col">${esc(a.name || '')}${a.is_duplicate ? ' <span class="dup-badge">重複</span>' : ''}</td>
+      <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
+      <td>${esc(a.email || '')}</td>
+      <td>${esc(a.gender || '')}</td>
+      <td style="white-space:nowrap">${esc(a.birth_date || '')}</td>
       <td class="num">${a.age || ''}</td>
-      <td>${esc((a.applied_at || '').slice(0, 10))}</td>
-      <td class="job-cell" title="${esc(a.notes_job || a.address || '')}">${esc(a.address || '')}</td>
-      <td><select class="call-count-sel" onchange="callUpdate('${a.id}','call_count',this.value)">${countOpts(a.call_count)}</select></td>
-      <td><select class="call-status-sel" onchange="callUpdate('${a.id}','status',this.value)">${statusOpts(a.status)}</select></td>
-      <td><input class="call-memo" value="${esc(a.notes || '')}" onblur="callUpdate('${a.id}','notes',this.value)" placeholder="メモ"></td>
-      <td>${esc((a.updated_at || '').slice(0, 10))}</td>
-    </tr>`).join('') : `<tr><td colspan="10" class="empty">この媒体の応募者はいません。CSVをインポートしてください。</td></tr>`;
+      <td>${esc(a.address || '')}</td>
+      <td>${esc(a.current_job || '')}</td>
+      <td>${esc(a.job_title || '')}</td>
+      <td class="exp-cell" title="${esc(a.experience || '')}">${esc((a.experience || '').slice(0, 30))}${(a.experience || '').length > 30 ? '…' : ''}</td>
+      <td>${esc(a.education || '')}</td>
+      <td style="white-space:nowrap">${esc((a.applied_at || '').slice(0, 10))}</td>
+      <td><select class="call-count-sel" onchange="callUpdate('${esc(a.id)}','call_count',this.value)">${countOpts(a.call_count)}</select></td>
+      <td><select class="call-status-sel" onchange="callUpdate('${esc(a.id)}','status',this.value)">${statusOpts(a.status)}</select></td>
+      <td style="white-space:nowrap">${esc((a.last_called_at || '').slice(0, 10))}</td>
+      <td><input class="call-memo" value="${esc(a.notes || '')}" onblur="callUpdate('${esc(a.id)}','notes',this.value)" placeholder="メモ"></td>
+    </tr>`).join('') : `<tr><td colspan="${NCOLS}" class="empty">この媒体の応募者はいません。CSVをインポートしてください。</td></tr>`;
 
   const content = `
     <div class="page-head">
       <h1>📞 架電リスト</h1>
       <div class="head-actions">
         <button class="btn btn-secondary btn-sm" onclick="callImport()">⬆ CSVインポート</button>
-        <a href="/api/ops/calls/export" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全社・媒体別）</a>
+        <a href="/api/ops/calls/export" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全社）</a>
         <button class="btn btn-ghost btn-sm" onclick="callCheckDup()">♻️ 重複チェック</button>
       </div>
     </div>
@@ -1587,11 +1609,20 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [] } = {}) {
     <div class="call-media-tabs">${mediaTabs}</div>
     <section class="card">
       <div class="card-head">
-        <h2>${companyName(co)} / ${mediaName(media)} <span class="count">${applicants.length}件</span></h2>
+        <h2>${companyName(co)} / ${mediaName(media)} <span class="count" id="calls-count">${applicants.length}件</span></h2>
+      </div>
+      <div class="filter-bar" style="padding:0 0 12px">
+        <input type="text" id="cf-search" class="filter-input" placeholder="名前・電話・住所・求人名で検索..." value="${esc(search)}" oninput="callsLocalFilter()">
+        <select id="cf-status" class="filter-select" onchange="callsLocalFilter()">${statusFilterOpts}</select>
       </div>
       <div class="table-scroll">
-        <table class="data-table calls-table">
-          <thead><tr><th>#</th><th>名前</th><th>電話番号</th><th>年齢</th><th>応募日</th><th>居住地</th><th>架電回数</th><th>対応状況</th><th>メモ</th><th>更新日</th></tr></thead>
+        <table class="data-table calls-table" id="calls-table">
+          <thead><tr>
+            <th class="num">#</th><th class="name-col">名前</th><th>電話番号</th><th>メール</th>
+            <th>性別</th><th>生年月日</th><th>年齢</th><th>居住地</th>
+            <th>現在の職業</th><th>求人タイトル</th><th>経験</th><th>学歴</th>
+            <th>応募日</th><th>架電回数</th><th>対応状況</th><th>最終架電</th><th>メモ</th>
+          </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>

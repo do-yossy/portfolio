@@ -718,8 +718,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .past-section .table-scroll { padding:0 8px 12px; }
 
 /* フィルターバー */
-.filter-bar { display:flex; gap:10px; flex-wrap:wrap; }
+.filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 .filter-select { padding:8px 12px; border:1px solid var(--border); border-radius:6px; background:#fff; font-size:14px; }
+.filter-input { padding:8px 12px; border:1px solid var(--border); border-radius:6px; background:#fff; font-size:14px; min-width:220px; flex:1; max-width:360px; }
+.name-col { min-width:100px; font-weight:600; }
+.exp-cell { max-width:180px; overflow:hidden; text-overflow:ellipsis; }
 
 /* フォームグリッド（モーダル） */
 .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0; }

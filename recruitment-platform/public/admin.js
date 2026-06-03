@@ -756,20 +756,40 @@ function opsPastFilter() {
 async function callUpdate(id, field, value) {
   const body = {};
   body[field] = value;
-  const res = await fetch(`/api/ops/calls/${id}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  });
-  if (res.ok) {
-    const data = await res.json();
-    // 行の背景色をステータスに合わせて更新
-    if (field === 'status') {
-      const colors = { '新規':'#3b82f6','架電済(不通)':'#eab308','対応中':'#06b6d4','対応終了':'#16a34a','断られた':'#94a3b8','辞退':'#94a3b8','重複':'#cbd5e1' };
-      const tr = document.querySelector(`tr[data-id="${id}"]`);
-      if (tr) tr.style.background = (colors[value] || '#fff') + '15';
-    }
-    toast('更新しました', 'success');
-  } else toast('更新に失敗しました', 'error');
+  try {
+    const res = await fetch(`/api/ops/calls/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      if (field === 'status') {
+        const colors = { '新規':'#3b82f6','架電済(不通)':'#eab308','対応中':'#06b6d4','対応終了':'#16a34a','断られた':'#94a3b8','辞退':'#94a3b8','重複':'#cbd5e1' };
+        const tr = document.querySelector(`tr[data-id="${id}"]`);
+        if (tr) { tr.style.background = (colors[value] || '#fff') + '15'; tr.dataset.status = value; }
+        callsLocalFilter();
+      }
+      toast('更新しました', 'success');
+    } else toast('更新に失敗しました', 'error');
+  } catch (e) { toast('通信エラー', 'error'); }
 }
+
+function callsLocalFilter() {
+  const searchTerm = (document.getElementById('cf-search')?.value || '').toLowerCase().trim();
+  const statusVal  = document.getElementById('cf-status')?.value || 'all';
+  const tbody = document.querySelector('#calls-table tbody');
+  if (!tbody) return;
+  let visible = 0;
+  for (const tr of tbody.querySelectorAll('tr[data-id]')) {
+    const text   = (tr.textContent || '').toLowerCase();
+    const status = tr.dataset.status || '';
+    const matchS = !searchTerm || text.includes(searchTerm);
+    const matchT = statusVal === 'all' || status === statusVal;
+    tr.style.display = (matchS && matchT) ? '' : 'none';
+    if (matchS && matchT) visible++;
+  }
+  const countEl = document.getElementById('calls-count');
+  if (countEl) countEl.textContent = `${visible}件`;
+}
+
 function callImport() { document.getElementById('call-import-modal').classList.remove('hidden'); }
 function callCloseImport() {
   document.getElementById('call-import-modal').classList.add('hidden');
@@ -777,8 +797,8 @@ function callCloseImport() {
 }
 async function callDoImport() {
   const company = document.getElementById('ci-company').value;
-  const media = document.getElementById('ci-media').value;
-  const file = document.getElementById('ci-file').files[0];
+  const media   = document.getElementById('ci-media').value;
+  const file    = document.getElementById('ci-file').files[0];
   if (!file) return toast('CSVファイルを選択してください', 'warn');
   const fd = new FormData();
   fd.append('company', company);
@@ -786,26 +806,34 @@ async function callDoImport() {
   fd.append('file', file);
   const resultEl = document.getElementById('ci-result');
   resultEl.innerHTML = '<p>取込中...</p>';
-  const res = await fetch('/api/ops/calls/import', { method: 'POST', body: fd });
-  const d = await res.json();
-  if (d.ok) {
-    resultEl.innerHTML = `<p class="ok">✅ ${d.imported}件取込・${d.duplicates}件重複` +
-      (d.skipped ? `・${d.skipped}件スキップ` : '') + `（計${d.rows}行）</p>`;
-    toast(`${d.imported}件取り込みました`, d.imported > 0 ? 'success' : 'warn');
-    setTimeout(() => location.reload(), 1200);
-  } else {
-    resultEl.innerHTML = `<p class="err">取込に失敗しました</p>`;
+  try {
+    const res = await fetch('/api/ops/calls/import', { method: 'POST', body: fd });
+    let d;
+    try { d = await res.json(); } catch { throw new Error(`サーバーエラー (HTTP ${res.status})`); }
+    if (d.ok) {
+      resultEl.innerHTML = `<p style="color:#16a34a">✅ ${d.imported}件取込・${d.duplicates}件重複` +
+        (d.skipped ? `・${d.skipped}件スキップ` : '') + `（CSVの行数: ${d.rows}行）</p>` +
+        (d.skipReasons?.length ? `<p style="color:#b45309;font-size:12px">スキップ理由: ${d.skipReasons.join('、')}</p>` : '');
+      toast(`${d.imported}件取り込みました`, d.imported > 0 ? 'success' : 'warn');
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      resultEl.innerHTML = `<p style="color:#dc2626">❌ 取込に失敗しました: ${d.error || '不明なエラー'}</p>`;
+      toast('取込に失敗しました', 'error');
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<p style="color:#dc2626">❌ エラー: ${e.message}</p>`;
     toast('取込に失敗しました', 'error');
   }
 }
 function callCheckDup() {
   confirmAction('全データを横断し、電話番号またはメールアドレスが一致する応募者を「重複」にします（会社・媒体は問いません）。よろしいですか？', async () => {
-    const res = await fetch('/api/ops/check-dup', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    const d = await res.json();
-    if (d.ok) { toast(`${d.flagged}件を重複にしました`, 'success'); setTimeout(() => location.reload(), 1000); }
-    else toast('重複チェックに失敗しました', 'error');
+    try {
+      const res = await fetch('/api/ops/check-dup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      const d = await res.json();
+      if (d.ok) { toast(`${d.flagged}件を重複にしました`, 'success'); setTimeout(() => location.reload(), 1000); }
+      else toast('重複チェックに失敗しました', 'error');
+    } catch (e) { toast('通信エラー', 'error'); }
   });
 }

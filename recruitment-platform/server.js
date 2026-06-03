@@ -151,19 +151,23 @@ function mapCSVRow(row) {
   if (rawPhone && /^[789]/.test(rawPhone)) rawPhone = '0' + rawPhone;
   const phone = rawPhone.replace(/^(\d{2,3})(\d{4})(\d{4})$/, '$1-$2-$3');
 
-  // 応募日: "3月1日" or "2026-06-02" など
+  // 応募日: "3月1日" or "2026-06-02" or "2026/06/02" など
   let appliedAt = col(['応募日','applied_at','応募日時','日付']);
   const m = appliedAt.match(/^(\d{1,2})月(\d{1,2})日$/);
   if (m) {
     const year = new Date().getFullYear();
     appliedAt = `${year}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+  } else {
+    // 2026/06/02 → 2026-06-02
+    appliedAt = appliedAt.replace(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/, (_, y, mo, d) =>
+      `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
   }
 
   // 住所: Indeed形式の '応募者の居住地' にも対応
-  const address = col(['住所','address','addr','対応','応募者の居住地']);
+  const address = col(['住所','address','addr','対応','応募者の居住地','居住地']);
 
   // 媒体: '応募経路'(Indeed) も参照
-  const sourceMedia = col(['媒体','source_media','応募媒体','media','応募経路','職種名']) || 'CSV取込';
+  const sourceMedia = col(['媒体','source_media','応募媒体','media','応募経路']) || 'CSV取込';
 
   // ステータス: Indeed '書類審査済み'/'選考待ち'・求人ボックス '未対応' → すべて '新規' に正規化
   const rawStatus = col(['ステータス','選考ステータス','status']);
@@ -181,6 +185,14 @@ function mapCSVRow(row) {
     sourceMedia,
     appliedAt,
     status,
+    // 追加フィールド（求人ボックス・Indeed 両対応）
+    gender:      col(['性別','gender']),
+    birthDate:   col(['生年月日','birth_date','birthdate']),
+    currentJob:  col(['現在の職業','current_job','現職','職業']),
+    jobTitle:    col(['求人タイトル','job_title','職種名','求人名']),
+    experience:  col(['関連のある経験','experience','経験','職歴']),
+    education:   col(['学歴','education']),
+    workLocation:col(['勤務地','work_location','勤務先エリア']),
   };
 }
 
@@ -1003,8 +1015,14 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   if (pathname === '/admin/calls' && method === 'GET') {
     const callCo = query.co || co;
     const callMedia = query.media || 'indeed';
-    const applicants = await Ops.listCalls({ company: callCo, media: callMedia });
-    send(res, 200, T.callsPage({ co: callCo, media: callMedia, applicants }));
+    const callStatus = query.status || 'all';
+    const callSearch = query.search || '';
+    const applicants = await Ops.listCalls({
+      company: callCo, media: callMedia,
+      status: callStatus !== 'all' ? callStatus : undefined,
+      search: callSearch || undefined,
+    });
+    send(res, 200, T.callsPage({ co: callCo, media: callMedia, applicants, statusFilter: callStatus, search: callSearch }));
     return;
   }
 
@@ -1143,10 +1161,12 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const all = await Ops.listCalls({ company: fCompany, media: fMedia, status: fStatus, month: fMonth });
     const mediaLabel = id => { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '不明'); };
 
-    const HEADERS = ['媒体', '名前', '電話番号', 'メールアドレス', '年齢', '居住地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
+    const HEADERS = ['媒体', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
     const rowFor = a => [
       mediaLabel(a.media), a.name || '', a.phone || '', a.email || '',
-      a.age || '', a.address || '', (a.applied_at || '').slice(0, 10),
+      a.gender || '', a.birth_date || '', a.age || '', a.address || '',
+      a.current_job || '', a.job_title || '', a.experience || '', a.education || '', a.work_location || '',
+      (a.applied_at || '').slice(0, 10),
       a.call_count || 0, a.status || '', (a.last_called_at || '').slice(0, 10),
       a.is_duplicate ? '重複' : '', (a.notes || '').replace(/[\r\n]+/g, ' '),
     ];
