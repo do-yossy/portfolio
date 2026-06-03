@@ -130,18 +130,18 @@ const COMPANY_LIST = ['SQ', 'BG', 'PE', 'LT'];
 const MEDIA_LIST   = ['Indeed', '求人ボックス', 'スタンバイ', 'Googleしごと検索'];
 
 const SUISHO_HEADERS = [
-  '推薦日', 'ステータス', '会社', '媒体', 'アカウント', '対象案件', '応募案件',
+  '推薦日', 'ステータス', '会社', '応募媒体', 'アカウント', '対象案件', '応募案件',
   '氏名', '読み方', '年齢', '生年月日', '性別', '最終学歴',
   '最寄駅', '通勤時間', '希望職種・動機', '経験', '雇用形態',
   '希望入社日', '他社並行', '電話番号', 'メールアドレス', '住所', '備考',
   'オンライン面談', '面談候補日①', '面談候補日②', '面談候補日③',
   '面談日確定', '面談結果', 'メモ',
 ];
-// 0:推薦日 1:ステータス 2:会社 3:媒体 4:アカウント ... 24:オンライン面談 ... 29:面談結果
 const SUISHO_COL = { status: 1, company: 2, media: 3, online: 24, result: 29 };
 
-const SEISA_HEADERS = [
-  '精査日', '会社', '媒体', 'アカウント', '対象案件', '応募案件',
+// 案件精査・面談依頼で共通の列定義
+const SEISA_BASE_HEADERS = [
+  '会社', '応募媒体', 'アカウント', '対象案件', '応募案件',
   '氏名', '読み方', '年齢', '生年月日', '性別', '最終学歴',
   '最寄駅', '通勤時間(分)', '希望職種・動機', '経験', '雇用形態',
   '希望入社日', '他社並行', '電話番号', 'メールアドレス', '住所', '備考',
@@ -151,8 +151,24 @@ const SEISA_HEADERS = [
   '運転免許', '安全運転(事故・点数)', '健康状態(疾患・既往歴)',
   '精査結果', 'メモ',
 ];
-// 0:精査日 1:会社 2:媒体 3:アカウント ... 23:オンライン面談 ... 30:運転免許 33:精査結果
+const SEISA_HEADERS  = ['精査日',    ...SEISA_BASE_HEADERS];
+const MENTAN_HEADERS = ['面談依頼日', ...SEISA_BASE_HEADERS];
+
+// 先頭の日付列の次から: company=1, media=2, online=23, license=30, result=33
 const SEISA_COL = { company: 1, media: 2, online: 23, license: 30, seisaResult: 33 };
+
+async function applySeisaFormat(gsheets, props, title) {
+  const headers = title === '面談依頼' ? MENTAN_HEADERS : SEISA_HEADERS;
+  await gsheets.writeValues(title, [headers.slice()]);
+  await gsheets.styleHeader(props.sheetId, headers.length);
+  await gsheets.setDropdowns(props.sheetId, [
+    { colIndex: SEISA_COL.company,     list: COMPANY_LIST },
+    { colIndex: SEISA_COL.media,       list: MEDIA_LIST },
+    { colIndex: SEISA_COL.online,      list: ['◯', '✕', '要確認'] },
+    { colIndex: SEISA_COL.license,     list: ['有', '無', '要確認'] },
+    { colIndex: SEISA_COL.seisaResult, list: ['推薦OK', '保留', '見送り', '再精査'] },
+  ]);
+}
 
 async function initRecruitmentSheets({ gsheets, Logs }) {
   const created = [];
@@ -174,18 +190,13 @@ async function initRecruitmentSheets({ gsheets, Logs }) {
 
   // ── 案件精査シート ───────────────────────────────────────
   const seisaProps = await gsheets.ensureTab('案件精査');
-  await gsheets.writeValues('案件精査', [SEISA_HEADERS.slice()]);
-  try {
-    await gsheets.styleHeader(seisaProps.sheetId, SEISA_HEADERS.length);
-    await gsheets.setDropdowns(seisaProps.sheetId, [
-      { colIndex: SEISA_COL.company,     list: COMPANY_LIST },
-      { colIndex: SEISA_COL.media,       list: MEDIA_LIST },
-      { colIndex: SEISA_COL.online,      list: ['◯', '✕', '要確認'] },
-      { colIndex: SEISA_COL.license,     list: ['有', '無', '要確認'] },
-      { colIndex: SEISA_COL.seisaResult, list: ['推薦OK', '保留', '見送り', '再精査'] },
-    ]);
-  } catch (_) { /* 書式エラーはデータに影響しない */ }
+  try { await applySeisaFormat(gsheets, seisaProps, '案件精査'); } catch (_) {}
   created.push('案件精査');
+
+  // ── 面談依頼シート ───────────────────────────────────────
+  const mentanProps = await gsheets.ensureTab('面談依頼');
+  try { await applySeisaFormat(gsheets, mentanProps, '面談依頼'); } catch (_) {}
+  created.push('面談依頼');
 
   if (Logs) await Logs.create('sheets_init_recruitment', 'success', `推薦管理・案件精査シートを作成しました（${created.join('・')}）`);
   return { created };
