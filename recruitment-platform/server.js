@@ -212,6 +212,12 @@ function mapOpsCSVRow(row, company, media) {
   return { ...base, company, media, callCount: cc, status: base.status || '新規' };
 }
 
+// 会社ID → 正式社名（スクリプトの COMPANY_NAME 用）
+function companyFullName(id) {
+  const c = OPS_COMPANIES.find(x => x.id === id);
+  return c ? c.name : (process.env.COMPANY_NAME || '株式会社Social Quality');
+}
+
 // 新規応募者タブ統計
 async function opsNewStats() {
   const { db } = require('./db');
@@ -934,8 +940,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     if (!requireAuth(req, res)) return;
   }
 
-  // Company context: ?co=sq (default) or ?co=lt
-  const co = (query.co === 'lt') ? 'lt' : 'sq';
+  // Company context: ?co=sq|bg|pe|lt（デフォルト sq）
+  const co = ['sq', 'bg', 'pe', 'lt'].includes(query.co) ? query.co : 'sq';
 
   // ── Admin: Dashboard ──
   if (pathname === '/admin' && method === 'GET') {
@@ -971,6 +977,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     if (tab === 'posts') {
       data.posts = await MediaPosts.findAll({});
       data.postsCross = await MediaPosts.crossTab();
+      data.siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
+      try { data.indeedRepostCount = (await computeDashboardStats(co)).indeedRepostCount || 0; } catch { data.indeedRepostCount = 0; }
     } else if (tab === 'new') {
       data.applicantsCross = await Ops.crossTab({});
       data.todayTargets = await Ops.todayCallTargets();
@@ -1278,9 +1286,9 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
   if (pathname === '/api/feed/stanby' && method === 'GET') {
-    const jobs = await Jobs.findAll(true);
+    const jobs = await Jobs.findAll({ onlyPublished: true, company: query.company || null });
     const xml = generateStanbyXML(jobs);
-    await Logs.create('xml_generate', 'success', `スタンバイXML生成: ${jobs.length}件`);
+    await Logs.create('xml_generate', 'success', `スタンバイXML生成${query.company ? '(' + query.company + ')' : ''}: ${jobs.length}件`);
     res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': 'attachment; filename="stanby-feed.xml"' });
     res.end(xml);
     return;
@@ -1525,7 +1533,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
     const startBody = await parseJSON(req);
     const batchSize = Math.min(parseInt(startBody.limit || '5', 10), 10);
-    const allJobs   = await Jobs.findAll(true);
+    const kbCompany = startBody.company || null;
+    const allJobs   = await Jobs.findAll({ onlyPublished: true, company: kbCompany });
     let kbJobs = allJobs.filter(j => {
       const m = JSON.parse(j.target_media || '[]');
       return m.includes('求人ボックス') || m.includes('kyujinbox');
@@ -1784,8 +1793,10 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       sendJSON(res, 400, { error: 'rotate-jobs.js が見つかりません' });
       return;
     }
-    const proc = spawn(process.execPath, ['--experimental-sqlite', scriptPath], {
-      env: { ...process.env },
+    const rbody = await parseJSON(req);
+    const rCompany = rbody.company || 'sq';
+    const proc = spawn(process.execPath, ['--experimental-sqlite', scriptPath, '--company', rCompany], {
+      env: { ...process.env, COMPANY_ID: rCompany, COMPANY_NAME: companyFullName(rCompany) },
       cwd: path.join(__dirname),
     });
     let out = '';
@@ -1809,12 +1820,13 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const body = await parseJSON(req);
     const target = body.target || 'all'; // 'kyujinbox' | 'stanby' | 'all'
     const count  = parseInt(body.count || '0', 10);
-    const extraArgs = [];
+    const aiCompany = body.company || 'sq';
+    const extraArgs = ['--company', aiCompany];
     if (target !== 'all') extraArgs.push('--target', target);
     if (count > 0) extraArgs.push('--count', String(count));
 
     const proc = spawn(process.execPath, ['--experimental-sqlite', scriptPath, ...extraArgs], {
-      env: { ...process.env },
+      env: { ...process.env, COMPANY_ID: aiCompany, COMPANY_NAME: companyFullName(aiCompany) },
       cwd: path.join(__dirname),
     });
     let out = '';

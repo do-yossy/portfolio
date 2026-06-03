@@ -1224,7 +1224,7 @@ function privacyPolicyPage() {
 // ══════════════════════════════════════════════════════════════
 // 運用管理ページ（3タブ）
 // ══════════════════════════════════════════════════════════════
-function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applicantsCross = {}, todayTargets = {}, stats = {}, pastApplicants = [], months = [], filter = {} } = {}) {
+function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applicantsCross = {}, todayTargets = {}, stats = {}, pastApplicants = [], months = [], filter = {}, siteUrl = '', indeedRepostCount = 0 } = {}) {
   const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
 
   const tabBar = `
@@ -1307,7 +1307,8 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
             <tbody>${postRows}</tbody>
           </table>
         </div>
-      </section>`;
+      </section>
+      ${opsAutomationPanel(co, siteUrl, indeedRepostCount)}`;
   }
 
   // ── Tab B: 新規応募者 ──
@@ -1406,6 +1407,93 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
     ${tab === 'posts' ? postModalHtml(co) : ''}`;
 
   return adminLayout(PAGE_TITLES[tab] || '掲載管理', content, tab, co);
+}
+
+// 掲載管理タブ内の「自動掲載・媒体運用」パネル（会社サブタブで切替）
+function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
+  const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
+  const company = COMPANIES[co] || COMPANIES.sq;
+  const coTabs = COMPANIES_ORDER.map(c =>
+    `<a href="/admin/ops?tab=posts&co=${c}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`
+  ).join('');
+
+  return `
+  <section class="card">
+    <div class="card-head"><h2>🤖 自動掲載・媒体運用</h2></div>
+    <p class="muted" style="margin:-4px 0 12px">会社ごとに求人の自動生成・ローテーション・各媒体への掲載を管理します。</p>
+    <div class="call-co-tabs">${coTabs}</div>
+    <p class="muted" style="margin:8px 0 16px">対象会社: <strong style="color:${company.color}">${company.full}</strong></p>
+
+    <div class="action-section">
+      <div class="action-section-title">🤖 AI求人自動生成 <span class="text-muted text-sm">（軽配送エリア別・30日で自動削除）</span></div>
+      <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px">
+        <label style="font-size:12px;color:#64748b;white-space:nowrap">媒体:</label>
+        <select id="ai-gen-target" class="form-input" style="width:130px;padding:4px 8px;font-size:13px">
+          <option value="all">全媒体</option>
+          <option value="kyujinbox">求人ボックス</option>
+          <option value="stanby">スタンバイ</option>
+        </select>
+        <label style="font-size:12px;color:#64748b;white-space:nowrap">件数:</label>
+        <select id="ai-gen-count" class="form-input" style="width:70px;padding:4px 8px;font-size:13px">
+          <option value="0">自動</option>
+          <option value="5">5件</option>
+          <option value="10">10件</option>
+          <option value="25">25件</option>
+        </select>
+        <button class="btn btn-primary" onclick="runAIGenerate('${co}')" id="btn-ai-generate" style="background:#7c3aed;border-color:#7c3aed">🤖 AI求人を生成する</button>
+        <span class="text-sm text-muted">毎日7:30に自動実行</span>
+      </div>
+      <div id="ai-gen-result" class="text-sm" style="margin-top:8px;white-space:pre-wrap;background:#f8fafc;border-radius:6px;padding:8px;display:none"></div>
+    </div>
+
+    <div class="action-section mt-16">
+      <div class="action-section-title">🔄 求人ローテーション <span class="text-muted text-sm">（常時稼働数を維持・期限超過で交代）</span></div>
+      <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px">
+        <button class="btn btn-primary" onclick="runRotation('${co}')" id="btn-rotate">🔄 今すぐローテーション実行</button>
+        <span class="text-sm text-muted">月・水・金 9時に自動実行</span>
+      </div>
+      <div id="rotation-result" class="text-sm" style="margin-top:8px;white-space:pre-wrap;background:#f8fafc;border-radius:6px;padding:8px;display:none"></div>
+    </div>
+
+    <div class="action-section mt-16">
+      <div class="action-section-title">📡 媒体運用</div>
+
+      <div class="media-op-section">
+        <div class="media-op-label">求人ボックス <span class="text-muted text-sm">（スクレイピング投稿・VPN必須）</span></div>
+        <div class="btn-group" style="align-items:center">
+          <label style="font-size:12px;color:#64748b;white-space:nowrap">1回の投稿数:</label>
+          <select id="kb-batch-size" class="form-input" style="width:70px;padding:4px 8px;font-size:13px">
+            <option value="3">3件</option>
+            <option value="5" selected>5件</option>
+            <option value="8">8件</option>
+            <option value="10">10件</option>
+          </select>
+          <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox('${co}')">🚀 求人ボックスに投稿する</button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">目標25件/日 → 5件 × 5回（数時間おきに実行）</div>
+        <div id="progress-kyujinbox-wrap" class="progress-wrap hidden"><div id="progress-kyujinbox" class="progress-box"></div></div>
+      </div>
+
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">スタンバイ <span class="text-muted text-sm">（XMLフィード自動連携）</span></div>
+        <div class="feed-url-row">
+          <code class="feed-url-code" id="feed-url-stanby">${siteUrl}/api/feed/stanby?company=${co}</code>
+          <button class="btn btn-ghost btn-sm" onclick="copyFeedUrl('stanby','${co}')">コピー</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadXML('stanby','${co}')">DL</button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">このURLをスタンバイ管理画面の「XMLフィード」に登録してください</div>
+      </div>
+
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">Indeed <span class="text-muted text-sm">（手動掲載・3日ごとに再掲載）</span></div>
+        <div class="btn-group">
+          <button id="btn-post-indeed" class="btn btn-warning btn-sm" onclick="startPostIndeed('${co}')">🚀 Indeed に掲載する</button>
+          ${indeedRepostCount > 0 ? `<span class="badge" style="background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:20px;font-size:12px">🔴 ${indeedRepostCount}件が再掲載期限超過</span>` : '<span style="font-size:12px;color:#16a34a">✅ 全件OK</span>'}
+        </div>
+        <div id="progress-indeed-post-wrap" class="progress-wrap hidden"><div id="progress-indeed-post" class="progress-box"></div></div>
+      </div>
+    </div>
+  </section>`;
 }
 
 function postModalHtml(co) {

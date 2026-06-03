@@ -65,6 +65,11 @@ const STANBY_COUNT = countArg && targetArg === 'stanby'
   : parseInt(process.env.AI_STANBY_COUNT || '16', 10);
 
 const COMPANY_NAME = process.env.COMPANY_NAME || '株式会社Social Quality';
+// 会社ID（sq/bg/pe/lt）— jobs.company に格納し、掲載管理の会社別表示でフィルタ可能にする
+const COMPANY_ID = process.env.COMPANY_ID
+  || args.find(a => a.startsWith('--company='))?.split('=')[1]
+  || (args.includes('--company') ? args[args.indexOf('--company') + 1] : null)
+  || 'sq';
 const EXPIRES_DAYS = parseInt(process.env.AI_EXPIRES_DAYS || '30', 10);
 
 // ── Anthropic API helper ───────────────────────────────────
@@ -221,7 +226,7 @@ async function generateJob(area, media, idx, total) {
     isPublished:    true,
     targetMedia:    [media],
     expiresAt,
-    company:        COMPANY_NAME,
+    company:        COMPANY_ID,
     // キャッシュキー（重複防止用）
     _areaKey:       area.city + area.area,
   };

@@ -34,6 +34,12 @@ const fs   = require('fs');
 
 const { Jobs } = require('../db-factory');
 
+const args = process.argv.slice(2);
+// 会社ID（sq/bg/pe/lt）— 指定があればその会社の求人のみローテーション
+const COMPANY_ID = process.env.COMPANY_ID
+  || args.find(a => a.startsWith('--company='))?.split('=')[1]
+  || (args.includes('--company') ? args[args.indexOf('--company') + 1] : null);
+
 const TARGET_ACTIVE    = parseInt(process.env.ROTATE_TARGET  || '25', 10);
 const ROTATE_COUNT     = parseInt(process.env.ROTATE_COUNT   || '8',  10);
 const ROTATE_AFTER_DAYS= parseInt(process.env.ROTATE_DAYS    || '14', 10);
@@ -43,10 +49,10 @@ async function main() {
   const nowIso   = now.toISOString();
   const cutoff   = new Date(now - ROTATE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-  console.log(`\n📅 求人ローテーション開始 ${nowIso.slice(0,10)}`);
+  console.log(`\n📅 求人ローテーション開始 ${nowIso.slice(0,10)}${COMPANY_ID ? ` [会社: ${COMPANY_ID}]` : ''}`);
   console.log(`   設定: 常時${TARGET_ACTIVE}件維持 / ${ROTATE_AFTER_DAYS}日で交代 / 1回${ROTATE_COUNT}件`);
 
-  const all      = await Jobs.findAll();        // 全求人（公開・非公開含む）
+  const all      = await Jobs.findAll(COMPANY_ID ? { company: COMPANY_ID } : {}); // 対象会社の全求人（公開・非公開含む）
   const published= all.filter(j => j.is_published);
   const unpublished = all.filter(j => !j.is_published);
 

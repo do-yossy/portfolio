@@ -124,7 +124,7 @@ function runSSE(url, boxId, btnId, onDone) {
 }
 
 // ── XML Download ──
-function copyFeedUrl(type) {
+function copyFeedUrl(type, co) {
   const el = document.getElementById('feed-url-' + type);
   if (!el) return;
   navigator.clipboard.writeText(el.textContent.trim()).then(() => {
@@ -133,12 +133,12 @@ function copyFeedUrl(type) {
   }).catch(() => toast('コピーに失敗しました', 'error'));
 }
 
-async function downloadXML(type) {
+async function downloadXML(type, co) {
   const btn = document.getElementById('btn-xml-' + type);
   const label = type === 'kyujinbox' ? '求人ボックス' : 'スタンバイ';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 生成中...'; }
   try {
-    const r = await fetch('/api/feed/' + type);
+    const r = await fetch('/api/feed/' + type + (co ? `?company=${co}` : ''));
     if (!r.ok) throw new Error();
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
@@ -199,13 +199,17 @@ async function exportList(type) {
 }
 
 // ── Indeed Scrape ──
-async function runRotation() {
+async function runRotation(co) {
   const btn = document.getElementById('btn-rotate');
   const result = document.getElementById('rotation-result');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 実行中...'; }
   if (result) { result.style.display = 'block'; result.textContent = '実行中...'; }
   try {
-    const res = await fetch('/api/admin/rotate-jobs', { method: 'POST' });
+    const res = await fetch('/api/admin/rotate-jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: co }),
+    });
     const data = await res.json();
     if (result) result.textContent = data.output || (data.ok ? '完了' : 'エラー');
     showToast(data.ok ? 'ローテーション完了' : 'エラーが発生しました', data.ok ? 'success' : 'error');
@@ -218,7 +222,7 @@ async function runRotation() {
   }
 }
 
-async function runAIGenerate() {
+async function runAIGenerate(co) {
   const btn    = document.getElementById('btn-ai-generate');
   const result = document.getElementById('ai-gen-result');
   const target = document.getElementById('ai-gen-target')?.value || 'all';
@@ -229,7 +233,7 @@ async function runAIGenerate() {
     const res = await fetch('/api/admin/generate-jobs-ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target, count }),
+      body: JSON.stringify({ target, count, company: co }),
     });
     const data = await res.json();
     if (result) result.textContent = data.output || (data.ok ? '完了' : 'エラー');
@@ -258,7 +262,7 @@ function startScrapeIndeed() {
 }
 
 // ── Kyujinbox Post (polling - replaces SSE which times out through Cloudflare) ──
-function startPostKyujinbox() {
+function startPostKyujinbox(co) {
   const batchSize = document.getElementById('kb-batch-size')?.value || '5';
   confirmAction(
     `求人ボックスに${batchSize}件を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？`,
@@ -276,7 +280,7 @@ function startPostKyujinbox() {
         const r = await fetch('/api/post/kyujinbox', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ limit: batchSize })
+          body: JSON.stringify({ limit: batchSize, company: co })
         });
         const d = await r.json();
         if (!r.ok || !d.ok) {
@@ -327,13 +331,13 @@ function startPostStanby() {
 }
 
 // ── Indeed Post ──
-function startPostIndeed() {
+function startPostIndeed(co) {
   confirmAction(
     'Indeed に求人を掲載します。\nVPN接続を確認してから実行してください。\n実行しますか？',
     async () => {
       const vpnOk = await refreshVpn();
       if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
-      runSSE('/api/post/indeed', 'progress-indeed-post', 'btn-post-indeed', d => {
+      runSSE('/api/post/indeed' + (co ? `?company=${co}` : ''), 'progress-indeed-post', 'btn-post-indeed', d => {
         toast(d.message, d.success ? 'success' : 'error');
       });
     }
