@@ -25,9 +25,7 @@ const CALL_STATUS_COLORS = {
 };
 
 function adminLayout(title, content, active = 'posts', co = 'sq') {
-  const company = COMPANIES[co] || COMPANIES.sq;
-
-  // per-section hrefs that carry the current company
+  // per-section hrefs that carry the current company through navigation
   const pageHref = {
     posts:     (c) => `/admin/ops?tab=posts&co=${c}`,
     new:       (c) => `/admin/ops?tab=new&co=${c}`,
@@ -39,13 +37,6 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     site:      ()  => '/jobs',
   };
   const getHref = (key, c) => pageHref[key] ? pageHref[key](c) : `/admin/ops?tab=posts&co=${c}`;
-
-  // company switcher: same section, different company
-  const coTabs = COMPANIES_ORDER.map(c => {
-    const comp = COMPANIES[c];
-    const isActive = c === co;
-    return `<a href="${getHref(active, c)}" class="co-tab${isActive ? ' co-tab-active' : ''}" style="--co-color:${comp.color}" title="${comp.full}">${comp.label}</a>`;
-  }).join('');
 
   const nav = [
     { key: 'posts',     icon: '📋', label: '掲載管理' },
@@ -66,14 +57,12 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
 <title>${title} | 採用管理</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body class="admin-layout" style="--co-color:${company.color}">
+<body class="admin-layout">
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div class="sidebar-system-name">採用管理システム</div>
-    <div class="sidebar-co-badge" style="background:${company.color}">${company.label}</div>
-    <div class="sidebar-co-full">${esc(company.full)}</div>
+    <h1>採用管理システム</h1>
+    <span>運用・架電管理</span>
   </div>
-  <div class="co-tabs">${coTabs}</div>
   <nav>${nav}</nav>
   <div class="sidebar-footer"><a href="/admin/logout" style="color:var(--text-muted);font-size:12px;text-decoration:none">🚪 ログアウト</a></div>
 </aside>
