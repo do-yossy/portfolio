@@ -101,6 +101,39 @@ try { db.exec('ALTER TABLE jobs ADD COLUMN how_to_apply TEXT DEFAULT ""'); } cat
 // Migration: is_archived フラグ（重複チェック用に保持するが出力対象外）
 try { db.exec('ALTER TABLE applicants ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0'); } catch {}
 
+// Migration v2: 架電運用管理カラム
+try { db.exec(`ALTER TABLE applicants ADD COLUMN media TEXT DEFAULT ''`); } catch {}            // 'indeed'/'kyujinbox'/'stanby'/'google'
+try { db.exec('ALTER TABLE applicants ADD COLUMN call_count INTEGER DEFAULT 0'); } catch {}     // 架電回数 0〜10
+try { db.exec(`ALTER TABLE applicants ADD COLUMN applied_month TEXT DEFAULT ''`); } catch {}    // 'YYYY-MM'
+try { db.exec(`ALTER TABLE applicants ADD COLUMN last_called_at TEXT DEFAULT ''`); } catch {}   // 最終架電日
+
+// Migration v2: 既存応募者の applied_month / media をバックフィル
+try {
+  db.exec(`UPDATE applicants SET applied_month = substr(applied_at, 1, 7) WHERE (applied_month IS NULL OR applied_month = '') AND applied_at IS NOT NULL AND applied_at != ''`);
+  // source_media から media 推定（Indeed/求人ボックス/スタンバイ/Google/direct→google）
+  db.exec(`UPDATE applicants SET media = 'indeed'    WHERE (media IS NULL OR media = '') AND (source_media LIKE '%ndeed%')`);
+  db.exec(`UPDATE applicants SET media = 'kyujinbox' WHERE (media IS NULL OR media = '') AND (source_media LIKE '%求人ボックス%' OR source_media LIKE '%kyujinbox%')`);
+  db.exec(`UPDATE applicants SET media = 'stanby'    WHERE (media IS NULL OR media = '') AND (source_media LIKE '%スタンバイ%' OR source_media LIKE '%stanby%' OR source_media LIKE '%engage%')`);
+  db.exec(`UPDATE applicants SET media = 'google'    WHERE (media IS NULL OR media = '') AND (source_media = 'direct' OR source_media LIKE '%oogle%' OR source_media LIKE '%しごと%')`);
+} catch {}
+
+// Migration v2: 媒体掲載日報テーブル
+db.exec(`
+  CREATE TABLE IF NOT EXISTS media_posts (
+    id           TEXT PRIMARY KEY,
+    company_id   TEXT NOT NULL,
+    media        TEXT NOT NULL,
+    job_title    TEXT NOT NULL,
+    post_date    TEXT DEFAULT '',
+    expire_date  TEXT DEFAULT '',
+    status       TEXT DEFAULT '掲載中',
+    applicant_count INTEGER DEFAULT 0,
+    notes        TEXT DEFAULT '',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+  );
+`);
+
 function now() {
   return new Date().toISOString();
 }
@@ -266,21 +299,28 @@ const Applicants = {
     const ts = now();
     const nPhone = normalizePhone(data.phone);
     const nEmail = normalizeEmail(data.email);
+    const appliedAt = data.appliedAt || data.applied_at || ts;
+    const appliedMonth = (appliedAt || '').slice(0, 7); // 'YYYY-MM'
+    const media = data.media || '';
     db.prepare(`
-      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, data.name, data.phone, data.email,
       data.age ? parseInt(data.age) : null,
       data.address || '',
       data.sourceMedia || data.source_media || 'direct',
-      data.appliedAt || data.applied_at || ts,
+      appliedAt,
       data.status || '新規',
       data.isDuplicate || data.is_duplicate ? 1 : 0,
       data.duplicateOfId || data.duplicate_of_id || null,
       data.notes || '',
       nPhone, nEmail,
       data.company || 'sq',
+      media,
+      parseInt(data.callCount || data.call_count || 0),
+      appliedMonth,
+      data.lastCalledAt || data.last_called_at || '',
       ts, ts
     );
     return Applicants.findById(id);
@@ -449,4 +489,163 @@ const Analytics = {
   }
 };
 
-module.exports = { db, Jobs, Applicants, Applications, Logs, Analytics, generateId };
+// ── 運用管理マスタ定数 ────────────────────────────────────────
+const COMPANIES = [
+  { id: 'sq', name: '株式会社SocialQuality', short: 'SQ' },
+  { id: 'bg', name: '株式会社Bigeyes',       short: 'BG' },
+  { id: 'pe', name: '合同会社ピープル',        short: 'PE' },
+  { id: 'lt', name: '株式会社lifeTaylor',     short: 'LT' },
+];
+const MEDIA = [
+  { id: 'indeed',   name: 'Indeed' },
+  { id: 'kyujinbox', name: '求人ボックス' },
+  { id: 'stanby',   name: 'スタンバイ' },
+  { id: 'google',   name: 'Googleしごと検索' },
+];
+// 架電対応状況
+const CALL_STATUSES = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];
+// 「今日架電を行う」対象ステータス（終了系を除く）
+const ACTIVE_CALL_STATUSES = ['新規', '架電済(不通)', '対応中'];
+
+// ── 架電運用：Applicants 拡張メソッド ──────────────────────────
+const Ops = {
+  // 架電状況の更新（架電回数・ステータス・メモ）
+  updateCall(id, { callCount, status, notes } = {}) {
+    const ts = now();
+    const fields = [];
+    const vals = [];
+    if (callCount !== undefined) { fields.push('call_count = ?'); vals.push(parseInt(callCount) || 0); }
+    if (status !== undefined)    { fields.push('status = ?');     vals.push(status); }
+    if (notes !== undefined)     { fields.push('notes = ?');      vals.push(notes); }
+    if (callCount !== undefined && (parseInt(callCount) || 0) > 0) {
+      fields.push('last_called_at = ?'); vals.push(ts);
+    }
+    if (!fields.length) return Applicants.findById(id);
+    fields.push('updated_at = ?');
+    vals.push(ts, id);
+    db.prepare(`UPDATE applicants SET ${fields.join(', ')} WHERE id = ?`).run(...vals);
+    return Applicants.findById(id);
+  },
+
+  // 会社×媒体でフィルタした応募者一覧
+  listCalls({ company, media, status, month, archived } = {}) {
+    const conds = [];
+    const vals = [];
+    if (company && company !== 'all') { conds.push('company = ?'); vals.push(company); }
+    if (media && media !== 'all')     { conds.push('media = ?');   vals.push(media); }
+    if (status && status !== 'all')   { conds.push('status = ?');  vals.push(status); }
+    if (month && month !== 'all')     { conds.push('applied_month = ?'); vals.push(month); }
+    if (archived === true)  conds.push('is_archived = 1');
+    if (archived === false) conds.push('is_archived = 0');
+    let q = 'SELECT * FROM applicants';
+    if (conds.length) q += ' WHERE ' + conds.join(' AND ');
+    q += ' ORDER BY applied_at DESC, created_at DESC';
+    return db.prepare(q).all(...vals);
+  },
+
+  // 会社×媒体クロス集計（新規応募者タブ・掲載管理タブ用）
+  crossTab({ activeOnly = false, todayOnly = false } = {}) {
+    const conds = [];
+    const vals = [];
+    if (activeOnly) conds.push(`status IN (${ACTIVE_CALL_STATUSES.map(() => '?').join(',')})`), vals.push(...ACTIVE_CALL_STATUSES);
+    if (todayOnly) { conds.push('created_at >= ?'); vals.push(new Date().toISOString().slice(0, 10) + 'T00:00:00Z'); }
+    let q = 'SELECT company, media, COUNT(*) as c FROM applicants';
+    if (conds.length) q += ' WHERE ' + conds.join(' AND ');
+    q += ' GROUP BY company, media';
+    const rows = db.prepare(q).all(...vals);
+    // {company: {media: count}}
+    const table = {};
+    for (const c of COMPANIES) { table[c.id] = {}; for (const m of MEDIA) table[c.id][m.id] = 0; }
+    for (const r of rows) {
+      if (table[r.company] && r.media) table[r.company][r.media] = r.c;
+    }
+    return table;
+  },
+
+  // 「今日架電を行う」対象件数（会社別）
+  todayCallTargets() {
+    const rows = db.prepare(`
+      SELECT company, COUNT(*) as c FROM applicants
+      WHERE is_archived = 0 AND status IN (${ACTIVE_CALL_STATUSES.map(() => '?').join(',')})
+      GROUP BY company
+    `).all(...ACTIVE_CALL_STATUSES);
+    const out = {};
+    for (const c of COMPANIES) out[c.id] = 0;
+    let total = 0;
+    for (const r of rows) { if (out[r.company] !== undefined) out[r.company] = r.c; total += r.c; }
+    return { byCompany: out, total };
+  },
+
+  // 応募月の一覧（過去応募者タブのフィルター用）
+  appliedMonths() {
+    return db.prepare(`SELECT DISTINCT applied_month FROM applicants WHERE applied_month != '' ORDER BY applied_month DESC`)
+      .all().map(r => r.applied_month);
+  },
+};
+
+// ── 媒体掲載日報 ────────────────────────────────────────────
+const MediaPosts = {
+  findAll({ company, media, status } = {}) {
+    const conds = [];
+    const vals = [];
+    if (company && company !== 'all') { conds.push('company_id = ?'); vals.push(company); }
+    if (media && media !== 'all')     { conds.push('media = ?');      vals.push(media); }
+    if (status && status !== 'all')   { conds.push('status = ?');     vals.push(status); }
+    let q = 'SELECT * FROM media_posts';
+    if (conds.length) q += ' WHERE ' + conds.join(' AND ');
+    q += ' ORDER BY post_date DESC, created_at DESC';
+    return db.prepare(q).all(...vals);
+  },
+  findById(id) {
+    return db.prepare('SELECT * FROM media_posts WHERE id = ?').get(id);
+  },
+  create(data) {
+    const id = generateId();
+    const ts = now();
+    db.prepare(`
+      INSERT INTO media_posts (id, company_id, media, job_title, post_date, expire_date, status, applicant_count, notes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, data.company_id || data.company || 'sq', data.media || 'indeed',
+      data.job_title || data.jobTitle || '',
+      data.post_date || data.postDate || '',
+      data.expire_date || data.expireDate || '',
+      data.status || '掲載中',
+      parseInt(data.applicant_count || data.applicantCount || 0),
+      data.notes || '', ts, ts
+    );
+    return MediaPosts.findById(id);
+  },
+  update(id, data) {
+    const ts = now();
+    const allowed = ['company_id', 'media', 'job_title', 'post_date', 'expire_date', 'status', 'applicant_count', 'notes'];
+    const fields = [];
+    const vals = [];
+    for (const k of allowed) {
+      const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+      const v = data[k] !== undefined ? data[k] : data[camel];
+      if (v !== undefined) { fields.push(`${k} = ?`); vals.push(v); }
+    }
+    if (!fields.length) return MediaPosts.findById(id);
+    fields.push('updated_at = ?');
+    vals.push(ts, id);
+    db.prepare(`UPDATE media_posts SET ${fields.join(', ')} WHERE id = ?`).run(...vals);
+    return MediaPosts.findById(id);
+  },
+  remove(id) {
+    db.prepare('DELETE FROM media_posts WHERE id = ?').run(id);
+  },
+  // 会社×媒体の掲載中件数クロス集計
+  crossTab() {
+    const rows = db.prepare(`SELECT company_id, media, COUNT(*) as c FROM media_posts WHERE status = '掲載中' GROUP BY company_id, media`).all();
+    const table = {};
+    for (const c of COMPANIES) { table[c.id] = {}; for (const m of MEDIA) table[c.id][m.id] = 0; }
+    for (const r of rows) { if (table[r.company_id] && r.media) table[r.company_id][r.media] = r.c; }
+    return table;
+  },
+};
+
+module.exports = {
+  db, Jobs, Applicants, Applications, Logs, Analytics, generateId,
+  Ops, MediaPosts, COMPANIES, MEDIA, CALL_STATUSES, ACTIVE_CALL_STATUSES,
+};

@@ -2,13 +2,34 @@
 
 const COMPANIES = {
   sq: { label: 'Social Quality', full: '株式会社Social Quality', color: '#7c3aed' },
+  bg: { label: 'Bigeyes',        full: '株式会社Bigeyes',        color: '#ea580c' },
+  pe: { label: 'ピープル',        full: '合同会社ピープル',        color: '#16a34a' },
   lt: { label: 'Life Tailor',    full: '株式会社Life Tailor',    color: '#0891b2' },
+};
+
+// 運用管理の媒体マスタ
+const OPS_MEDIA = [
+  { id: 'indeed',    name: 'Indeed' },
+  { id: 'kyujinbox', name: '求人ボックス' },
+  { id: 'stanby',    name: 'スタンバイ' },
+  { id: 'google',    name: 'Googleしごと検索' },
+];
+const CALL_STATUS_COLORS = {
+  '新規':        '#3b82f6',
+  '架電済(不通)': '#eab308',
+  '対応中':       '#06b6d4',
+  '対応終了':     '#16a34a',
+  '断られた':     '#94a3b8',
+  '辞退':         '#94a3b8',
+  '重複':         '#cbd5e1',
 };
 
 function adminLayout(title, content, active = 'dashboard', co = 'sq') {
   const company = COMPANIES[co] || COMPANIES.sq;
   const nav = [
     { href: '/admin', icon: '🏠', label: 'ダッシュボード', key: 'dashboard' },
+    { href: '/admin/ops', icon: '📊', label: '運用管理', key: 'ops' },
+    { href: '/admin/calls', icon: '📞', label: '架電リスト', key: 'calls' },
     { href: '/admin/jobs', icon: '💼', label: '求人管理', key: 'jobs' },
     { href: '/admin/applicants', icon: '👥', label: '応募者管理', key: 'applicants' },
     { href: '/admin/analytics', icon: '📈', label: '分析・レポート', key: 'analytics' },
@@ -1206,4 +1227,285 @@ function privacyPolicyPage() {
   });
 }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, privacyPolicyPage, esc };
+// ══════════════════════════════════════════════════════════════
+// 運用管理ページ（3タブ）
+// ══════════════════════════════════════════════════════════════
+function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applicantsCross = {}, todayTargets = {}, stats = {}, pastApplicants = [], months = [], filter = {} } = {}) {
+  const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
+
+  const tabBar = `
+    <div class="ops-tabs">
+      <a href="/admin/ops?co=${co}&tab=posts" class="ops-tab ${tab === 'posts' ? 'active' : ''}">📋 掲載管理</a>
+      <a href="/admin/ops?co=${co}&tab=new" class="ops-tab ${tab === 'new' ? 'active' : ''}">🆕 新規応募者</a>
+      <a href="/admin/ops?co=${co}&tab=past" class="ops-tab ${tab === 'past' ? 'active' : ''}">📚 過去応募者</a>
+    </div>`;
+
+  // ── クロス集計表の共通レンダラ ──
+  const crossTable = (data, label) => {
+    const totalsByMedia = {}; OPS_MEDIA.forEach(m => totalsByMedia[m.id] = 0);
+    let grand = 0;
+    const rows = COMPANIES_ORDER.map(cid => {
+      let rowTotal = 0;
+      const cells = OPS_MEDIA.map(m => {
+        const v = (data[cid] && data[cid][m.id]) || 0;
+        rowTotal += v; totalsByMedia[m.id] += v; grand += v;
+        return `<td class="num${v === 0 ? ' zero' : ''}">${v}</td>`;
+      }).join('');
+      return `<tr><th>${companyName(cid)}</th>${cells}<td class="num total">${rowTotal}</td></tr>`;
+    }).join('');
+    const footCells = OPS_MEDIA.map(m => `<td class="num total">${totalsByMedia[m.id]}</td>`).join('');
+    return `
+      <table class="cross-table">
+        <thead><tr><th>${label}</th>${OPS_MEDIA.map(m => `<th>${m.name}</th>`).join('')}<th>合計</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><th>合計</th>${footCells}<td class="num total">${grand}</td></tr></tfoot>
+      </table>`;
+  };
+
+  let body = '';
+
+  // ── Tab A: 掲載管理 ──
+  if (tab === 'posts') {
+    const postRows = posts.length ? posts.map(p => `
+      <tr>
+        <td>${companyName(p.company_id)}</td>
+        <td>${esc(mediaName(p.media))}</td>
+        <td>${esc(p.job_title)}</td>
+        <td>${esc(p.post_date || '-')}</td>
+        <td>${esc(p.expire_date || '-')}</td>
+        <td><span class="status-badge">${esc(p.status)}</span></td>
+        <td class="num">${p.applicant_count}</td>
+        <td>${esc(p.notes || '')}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="opsEditPost('${p.id}')">編集</button>
+            <button class="btn btn-ghost btn-sm" onclick="opsDeletePost('${p.id}')">削除</button></td>
+      </tr>`).join('') : `<tr><td colspan="9" class="empty">掲載情報がありません。「＋掲載を追加」から登録してください。</td></tr>`;
+
+    body = `
+      <section class="card">
+        <h2>媒体別 × 会社別 掲載中件数</h2>
+        ${crossTable(postsCross, '会社＼媒体')}
+      </section>
+      <section class="card">
+        <div class="card-head">
+          <h2>掲載一覧</h2>
+          <button class="btn btn-primary btn-sm" onclick="opsAddPost()">＋掲載を追加</button>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr><th>会社</th><th>媒体</th><th>求人タイトル</th><th>掲載日</th><th>期限</th><th>状態</th><th>応募数</th><th>メモ</th><th>操作</th></tr></thead>
+            <tbody>${postRows}</tbody>
+          </table>
+        </div>
+      </section>`;
+  }
+
+  // ── Tab B: 新規応募者 ──
+  if (tab === 'new') {
+    const targetRows = COMPANIES_ORDER.map(cid =>
+      `<tr><th>${companyName(cid)}</th><td class="num">${(todayTargets.byCompany && todayTargets.byCompany[cid]) || 0}</td></tr>`
+    ).join('');
+    body = `
+      <section class="stat-cards">
+        <div class="stat-card"><div class="stat-label">本日の新規応募</div><div class="stat-value">${stats.todayNew || 0}</div></div>
+        <div class="stat-card"><div class="stat-label">今週の新規応募</div><div class="stat-value">${stats.weekNew || 0}</div></div>
+        <div class="stat-card"><div class="stat-label">本日架電対象（全体）</div><div class="stat-value">${(todayTargets.total) || 0}</div></div>
+        <div class="stat-card"><div class="stat-label">未対応合計</div><div class="stat-value">${stats.activeTotal || 0}</div></div>
+      </section>
+      <section class="card">
+        <h2>会社別 × 媒体別 新規応募数</h2>
+        ${crossTable(applicantsCross, '会社＼媒体')}
+      </section>
+      <section class="card">
+        <h2>本日架電を行う件数（会社別）</h2>
+        <p class="muted">「新規」「架電済(不通)」「対応中」の合計（対応終了・断られた・辞退は除く）</p>
+        <table class="cross-table" style="max-width:360px">
+          <thead><tr><th>会社</th><th>架電対象件数</th></tr></thead>
+          <tbody>${targetRows}</tbody>
+          <tfoot><tr><th>合計</th><td class="num total">${todayTargets.total || 0}</td></tr></tfoot>
+        </table>
+        <div style="margin-top:16px">
+          <a href="/admin/calls?co=${co}" class="btn btn-primary">📞 架電リストを開く</a>
+        </div>
+      </section>`;
+  }
+
+  // ── Tab C: 過去応募者 ──
+  if (tab === 'past') {
+    const sel = (name, options, current) => `
+      <select name="${name}" class="filter-select" onchange="opsPastFilter()">
+        ${options.map(o => `<option value="${o.v}"${o.v === current ? ' selected' : ''}>${o.l}</option>`).join('')}
+      </select>`;
+    const companyOpts = [{ v: 'all', l: '全ての会社' }, ...COMPANIES_ORDER.map(c => ({ v: c, l: companyName(c) }))];
+    const mediaOpts = [{ v: 'all', l: '全ての媒体' }, ...OPS_MEDIA.map(m => ({ v: m.id, l: m.name }))];
+    const statusOpts = [{ v: 'all', l: '全ての対応状況' }, ...CALL_STATUSES_LIST.map(s => ({ v: s, l: s }))];
+    const monthOpts = [{ v: 'all', l: '全ての応募月' }, ...months.map(m => ({ v: m, l: m }))];
+
+    // 対応状況別にグルーピング
+    const groups = {};
+    CALL_STATUSES_LIST.forEach(s => groups[s] = []);
+    pastApplicants.forEach(a => { (groups[a.status] || (groups[a.status] = [])).push(a); });
+
+    const sectionsOrder = ['架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複', '新規'];
+    const sectionLabels = {
+      '架電済(不通)': '🔁 再架電リスト（不通）', '対応中': '🔵 対応中',
+      '対応終了': '✅ 対応終了', '断られた': '⛔ 断られた', '辞退': '🚫 辞退',
+      '重複': '♻️ 重複', '新規': '🆕 新規（未架電）',
+    };
+    const sections = sectionsOrder.filter(s => (groups[s] || []).length).map(s => {
+      const rows = groups[s].map(a => `
+        <tr>
+          <td>${esc(a.name)}</td>
+          <td>${esc(a.phone)}</td>
+          <td>${companyName(a.company)}</td>
+          <td>${esc(mediaName(a.media))}</td>
+          <td>${esc((a.applied_at || '').slice(0, 10))}</td>
+          <td class="num">${a.call_count || 0}</td>
+          <td>${esc((a.last_called_at || '').slice(0, 10))}</td>
+          <td>${esc(a.notes || '')}</td>
+        </tr>`).join('');
+      return `
+        <details class="past-section" open>
+          <summary><span class="dot" style="background:${CALL_STATUS_COLORS[s] || '#999'}"></span>${sectionLabels[s] || s} <span class="count">${groups[s].length}件</span></summary>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead><tr><th>名前</th><th>電話番号</th><th>会社</th><th>媒体</th><th>応募日</th><th>架電回数</th><th>最終架電</th><th>メモ</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </details>`;
+    }).join('');
+
+    body = `
+      <section class="card">
+        <form id="past-filter" class="filter-bar">
+          ${sel('company', companyOpts, filter.company || 'all')}
+          ${sel('media', mediaOpts, filter.media || 'all')}
+          ${sel('status', statusOpts, filter.status || 'all')}
+          ${sel('month', monthOpts, filter.month || 'all')}
+        </form>
+      </section>
+      ${sections || `<section class="card"><p class="empty">該当する応募者がいません。</p></section>`}`;
+  }
+
+  const content = `
+    <div class="page-head"><h1>📊 運用管理</h1></div>
+    ${tabBar}
+    ${body}
+    ${tab === 'posts' ? postModalHtml(co) : ''}`;
+
+  return adminLayout('運用管理', content, 'ops', co);
+}
+
+function postModalHtml(co) {
+  const mediaOpts = OPS_MEDIA.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+  const coOpts = COMPANIES_ORDER.map(c => `<option value="${c}"${c === co ? ' selected' : ''}>${COMPANIES[c].label}</option>`).join('');
+  return `
+  <div id="post-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="post-modal-title">掲載を追加</h3>
+      <input type="hidden" id="pm-id">
+      <div class="form-grid">
+        <label>会社<select id="pm-company">${coOpts}</select></label>
+        <label>媒体<select id="pm-media">${mediaOpts}</select></label>
+        <label class="full">求人タイトル<input type="text" id="pm-title"></label>
+        <label>掲載日<input type="date" id="pm-post-date"></label>
+        <label>期限<input type="date" id="pm-expire-date"></label>
+        <label>状態<select id="pm-status"><option>掲載中</option><option>審査中</option><option>停止</option></select></label>
+        <label>応募数<input type="number" id="pm-count" value="0" min="0"></label>
+        <label class="full">メモ<input type="text" id="pm-notes"></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="opsCloseModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="opsSavePost()">保存</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 架電リストページ（会社タブ × 媒体サブタブ）
+// ══════════════════════════════════════════════════════════════
+function callsPage({ co = 'sq', media = 'indeed', applicants = [] } = {}) {
+  const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
+
+  const companyTabs = COMPANIES_ORDER.map(c =>
+    `<a href="/admin/calls?co=${c}&media=${media}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`
+  ).join('');
+
+  const mediaTabs = OPS_MEDIA.map(m =>
+    `<a href="/admin/calls?co=${co}&media=${m.id}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`
+  ).join('');
+
+  const countOpts = n => Array.from({ length: 11 }, (_, i) =>
+    `<option value="${i}"${i === (n || 0) ? ' selected' : ''}>${i}</option>`).join('');
+  const statusOpts = cur => CALL_STATUSES_LIST.map(s =>
+    `<option value="${s}"${s === cur ? ' selected' : ''}>${s}</option>`).join('');
+
+  const rows = applicants.length ? applicants.map((a, i) => `
+    <tr data-id="${a.id}" data-status="${esc(a.status)}" style="background:${(CALL_STATUS_COLORS[a.status] || '#fff')}15">
+      <td class="num">${i + 1}</td>
+      <td>${esc(a.name)}${a.is_duplicate ? ' <span class="dup-badge">重複</span>' : ''}</td>
+      <td>${esc(a.phone)}</td>
+      <td class="num">${a.age || ''}</td>
+      <td>${esc((a.applied_at || '').slice(0, 10))}</td>
+      <td class="job-cell" title="${esc(a.notes_job || a.address || '')}">${esc(a.address || '')}</td>
+      <td><select class="call-count-sel" onchange="callUpdate('${a.id}','call_count',this.value)">${countOpts(a.call_count)}</select></td>
+      <td><select class="call-status-sel" onchange="callUpdate('${a.id}','status',this.value)">${statusOpts(a.status)}</select></td>
+      <td><input class="call-memo" value="${esc(a.notes || '')}" onblur="callUpdate('${a.id}','notes',this.value)" placeholder="メモ"></td>
+      <td>${esc((a.updated_at || '').slice(0, 10))}</td>
+    </tr>`).join('') : `<tr><td colspan="10" class="empty">この媒体の応募者はいません。CSVをインポートしてください。</td></tr>`;
+
+  const content = `
+    <div class="page-head">
+      <h1>📞 架電リスト</h1>
+      <div class="head-actions">
+        <button class="btn btn-secondary btn-sm" onclick="callImport()">⬆ CSVインポート</button>
+        <a href="/api/ops/calls/export?co=${co}&media=${media}" class="btn btn-ghost btn-sm">⬇ CSV出力</a>
+        <button class="btn btn-ghost btn-sm" onclick="callCheckDup()">♻️ 重複チェック</button>
+      </div>
+    </div>
+    <div class="call-co-tabs">${companyTabs}</div>
+    <div class="call-media-tabs">${mediaTabs}</div>
+    <section class="card">
+      <div class="card-head">
+        <h2>${companyName(co)} / ${mediaName(media)} <span class="count">${applicants.length}件</span></h2>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table calls-table">
+          <thead><tr><th>#</th><th>名前</th><th>電話番号</th><th>年齢</th><th>応募日</th><th>居住地</th><th>架電回数</th><th>対応状況</th><th>メモ</th><th>更新日</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </section>
+    ${callImportModalHtml(co, media)}`;
+
+  return adminLayout('架電リスト', content, 'calls', co);
+}
+
+function callImportModalHtml(co, media) {
+  const coOpts = COMPANIES_ORDER.map(c => `<option value="${c}"${c === co ? ' selected' : ''}>${COMPANIES[c].label}</option>`).join('');
+  const mediaOpts = OPS_MEDIA.map(m => `<option value="${m.id}"${m.id === media ? ' selected' : ''}>${m.name}</option>`).join('');
+  return `
+  <div id="call-import-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>CSVインポート</h3>
+      <div class="form-grid">
+        <label>会社<select id="ci-company">${coOpts}</select></label>
+        <label>媒体<select id="ci-media">${mediaOpts}</select></label>
+        <label class="full">CSVファイル<input type="file" id="ci-file" accept=".csv"></label>
+      </div>
+      <div id="ci-result" class="import-result"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="callCloseImport()">閉じる</button>
+        <button class="btn btn-primary" onclick="callDoImport()">取込実行</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 運用テンプレ用のヘルパ定数
+const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt'];
+const CALL_STATUSES_LIST = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];
+function mediaName(id) { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
+
+module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, privacyPolicyPage, esc, opsPage, callsPage };

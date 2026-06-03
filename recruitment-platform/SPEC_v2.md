@@ -391,7 +391,64 @@ LT         1        0          1        2       4
 
 ---
 
-## 7. 確認事項（実装前に教えてください）
+## 7. 確認事項への回答（確定）
+
+| # | 項目 | 決定 |
+|---|------|------|
+| 1 | ログイン | **全社共通1パスワード**（現状維持） |
+| 2 | 掲載費 | **不要**（cost列は作らない） |
+| 3 | 架電者名 | **記録しない**（call_logs.operator は不要） |
+| 4 | スタンバイCSV | **Indeed(engage)タブと同じ形式**（名前・電話番号・日付・職種名） |
+| 5 | 今日架電を行う数 | **新規 + 架電済だが未終了の人**。スプレッドシートで「対応終了」を選択した人は除外 |
+| 6 | 既存applicantsとの統合 | **まとめて管理**（既存 `applicants` テーブルを拡張して統合・新テーブルは作らない） |
+| 7 | Bigeyes | **全社稼働中**（SQ/BG/PE/LT すべて） |
+
+### 設計変更（統合方針）
+
+「まとめて管理」のため、**新規 `call_applicants` テーブルは作らず、既存 `applicants` テーブルを拡張**する：
+
+```sql
+-- applicants に追加するカラム（マイグレーション）
+ALTER TABLE applicants ADD COLUMN media TEXT DEFAULT '';         -- 'indeed'/'kyujinbox'/'stanby'/'google'
+ALTER TABLE applicants ADD COLUMN call_count INTEGER DEFAULT 0;  -- 架電回数 0〜10
+ALTER TABLE applicants ADD COLUMN applied_month TEXT DEFAULT ''; -- 'YYYY-MM'
+ALTER TABLE applicants ADD COLUMN last_called_at TEXT DEFAULT ''; -- 最終架電日
+```
+
+- `company`（既存・sq/lt）を **sq/bg/pe/lt** に拡張
+- `status`（既存）を **架電対応状況**として流用：
+  `新規 / 架電済(不通) / 対応中 / 対応終了 / 断られた / 辞退 / 重複`
+- `notes`（既存）を **架電メモ**として流用
+- `is_archived`（既存）= 過去応募者フラグ
+
+**今日架電を行う数の定義**:
+`status IN ('新規','架電済(不通)','対応中') AND is_archived=0`
+（＝「対応終了」「断られた」「辞退」「重複」以外）
+
+### 作成するテーブル（掲載管理のみ新規）
+
+```sql
+CREATE TABLE media_posts (
+  id           TEXT PRIMARY KEY,
+  company_id   TEXT NOT NULL,        -- 'sq'/'bg'/'pe'/'lt'
+  media        TEXT NOT NULL,        -- 'indeed'/'kyujinbox'/'stanby'/'google'
+  job_title    TEXT NOT NULL,
+  post_date    TEXT,
+  expire_date  TEXT,
+  status       TEXT DEFAULT '掲載中',
+  applicant_count INTEGER DEFAULT 0,
+  notes        TEXT DEFAULT '',
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL
+);
+```
+
+会社マスタはコード内定数（sq/bg/pe/lt）で持つ（テーブル不要）。
+
+---
+
+## （旧）7. 確認事項
+
 
 1. **ログイン**: 現状と同じ1つのパスワードで全社共通でよいか？  
    　→ 社ごとにアカウントを分けるか？

@@ -26,7 +26,8 @@ const { spawn } = require('child_process');
   });
 })();
 
-const { Jobs, Applicants, Applications, Logs, Analytics } = require('./db-factory');
+const { Jobs, Applicants, Applications, Logs, Analytics, Ops, MediaPosts } = require('./db-factory');
+const { COMPANIES: OPS_COMPANIES, MEDIA: OPS_MEDIA, CALL_STATUSES } = require('./db');
 const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize');
 const { notify } = require('./lib/notify');
 const { requireAuth, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
@@ -161,6 +162,45 @@ function mapCSVRow(row) {
     appliedAt,
     status,
   };
+}
+
+// 運用管理用CSVマッパー（会社・媒体を指定、Indeed分割氏名にも対応）
+function mapOpsCSVRow(row, company, media) {
+  const base = mapCSVRow(row);
+  const col = (keys) => {
+    for (const k of keys) {
+      const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
+      if (v && v.trim()) return v.trim();
+    }
+    return '';
+  };
+  // Indeedダウンロード形式: 氏名（姓）＋氏名（名）
+  if (!base.name) {
+    const sei = col(['氏名（姓）','姓','sei']);
+    const mei = col(['氏名（名）','名','mei']);
+    const joined = `${sei} ${mei}`.trim();
+    if (joined) base.name = joined.replace(/[（(][^）)]*[）)]/g, '').trim();
+  }
+  // engage形式の「氏名」単体や「名前」
+  if (!base.name) base.name = col(['氏名','名前']).replace(/[（(][^）)]*[）)]/g, '').trim();
+  // 居住地（engage形式）
+  if (!base.address) base.address = col(['応募者の居住地','居住地','都道府県']);
+  // 架電回数（engageシートに既存値がある場合）
+  let cc = col(['架電回数','call_count']);
+  cc = /^\d+$/.test(cc) ? parseInt(cc) : 0;
+
+  return { ...base, company, media, callCount: cc, status: base.status || '新規' };
+}
+
+// 新規応募者タブ統計
+async function opsNewStats() {
+  const { db } = require('./db');
+  const today = new Date().toISOString().slice(0, 10);
+  const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
+  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE created_at >= ?`).get(today + 'T00:00:00Z').c;
+  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE created_at >= ?`).get(monday + 'T00:00:00Z').c;
+  const activeTotal = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND status IN ('新規','架電済(不通)','対応中')`).get().c;
+  return { todayNew, weekNew, activeTotal };
 }
 
 // SSE helpers
@@ -913,6 +953,42 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
+  // ── Admin: 運用管理ページ（3タブ）──
+  if (pathname === '/admin/ops' && method === 'GET') {
+    const tab = query.tab || 'posts';
+    const data = { tab, co };
+    if (tab === 'posts') {
+      data.posts = await MediaPosts.findAll({});
+      data.postsCross = await MediaPosts.crossTab();
+    } else if (tab === 'new') {
+      data.applicantsCross = await Ops.crossTab({});
+      data.todayTargets = await Ops.todayCallTargets();
+      data.stats = await opsNewStats();
+    } else if (tab === 'past') {
+      const filter = {
+        company: query.company || 'all', media: query.media || 'all',
+        status: query.status || 'all', month: query.month || 'all',
+      };
+      data.filter = filter;
+      data.months = await Ops.appliedMonths();
+      data.pastApplicants = await Ops.listCalls({
+        company: filter.company, media: filter.media,
+        status: filter.status, month: filter.month,
+      });
+    }
+    send(res, 200, T.opsPage(data));
+    return;
+  }
+
+  // ── Admin: 架電リストページ ──
+  if (pathname === '/admin/calls' && method === 'GET') {
+    const callCo = query.co || co;
+    const callMedia = query.media || 'indeed';
+    const applicants = await Ops.listCalls({ company: callCo, media: callMedia });
+    send(res, 200, T.callsPage({ co: callCo, media: callMedia, applicants }));
+    return;
+  }
+
   // ── Admin: Analytics page ──
   if (pathname === '/admin/analytics' && method === 'GET') {
     const data = {
@@ -936,6 +1012,139 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       topJobs: await Analytics.topJobs(10),
       weekly:  await Analytics.weeklySummary()
     });
+    return;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // 運用管理 API
+  // ══════════════════════════════════════════════════════════
+
+  // ── 掲載日報 CRUD ──
+  if (pathname === '/api/ops/posts' && method === 'GET') {
+    sendJSON(res, 200, await MediaPosts.findAll({ company: query.company, media: query.media, status: query.status }));
+    return;
+  }
+  if (pathname === '/api/ops/posts' && method === 'POST') {
+    const body = await parseJSON(req);
+    if (!body.job_title && !body.jobTitle) { sendError(res, 400, '求人タイトルは必須です'); return; }
+    sendJSON(res, 201, await MediaPosts.create(body));
+    return;
+  }
+  const postMatch = pathname.match(/^\/api\/ops\/posts\/([^/]+)$/);
+  if (postMatch) {
+    const id = postMatch[1];
+    if (method === 'PUT') {
+      const body = await parseJSON(req);
+      sendJSON(res, 200, await MediaPosts.update(id, body));
+      return;
+    }
+    if (method === 'DELETE') {
+      await MediaPosts.remove(id);
+      sendJSON(res, 200, { ok: true });
+      return;
+    }
+  }
+
+  // ── 架電ステータス更新 ──
+  const callMatch = pathname.match(/^\/api\/ops\/calls\/([^/]+)$/);
+  if (callMatch && method === 'PUT') {
+    const body = await parseJSON(req);
+    const updated = await Ops.updateCall(callMatch[1], {
+      callCount: body.call_count !== undefined ? body.call_count : body.callCount,
+      status:    body.status,
+      notes:     body.notes,
+    });
+    sendJSON(res, 200, updated || { ok: true });
+    return;
+  }
+
+  // ── 新規応募者タブ統計 ──
+  if (pathname === '/api/ops/stats' && method === 'GET') {
+    sendJSON(res, 200, await opsNewStats());
+    return;
+  }
+
+  // ── CSVインポート（会社・媒体指定）──
+  if (pathname === '/api/ops/calls/import' && method === 'POST') {
+    function decodeCsvBuffer(rawBuf) {
+      if (rawBuf[0] === 0xEF && rawBuf[1] === 0xBB && rawBuf[2] === 0xBF) return rawBuf.slice(3).toString('utf8');
+      try { return new TextDecoder('utf-8', { fatal: true }).decode(rawBuf); }
+      catch (e) { try { return new TextDecoder('shift_jis').decode(rawBuf); } catch (e2) {} return rawBuf.toString('utf8'); }
+    }
+    const ct = req.headers['content-type'] || '';
+    const buf = await readBody(req);
+    let csvText = '', importCompany = co, importMedia = 'indeed';
+    if (ct.includes('multipart/form-data')) {
+      const boundaryMatch = ct.match(/boundary=(.+)$/);
+      const parts = parseMultipart(buf, boundaryMatch[1].trim());
+      for (const p of parts) {
+        if (/name="company"/.test(p.header)) importCompany = p.content.toString('utf8').trim();
+        else if (/name="media"/.test(p.header)) importMedia = p.content.toString('utf8').trim();
+        else if (/filename=/.test(p.header)) csvText = decodeCsvBuffer(p.content);
+      }
+    } else {
+      csvText = decodeCsvBuffer(buf);
+      importCompany = query.company || co;
+      importMedia = query.media || 'indeed';
+    }
+
+    const rows = parseCSV(csvText);
+    let imported = 0, duplicates = 0, skipped = 0;
+    const skipReasons = [];
+    for (const row of rows) {
+      const mapped = mapOpsCSVRow(row, importCompany, importMedia);
+      if (!mapped.name || (!mapped.phone && !mapped.email)) { skipped++; skipReasons.push('名前/連絡先なし'); continue; }
+      const nPhone = normalizePhone(mapped.phone);
+      const nEmail = normalizeEmail(mapped.email);
+      const dupId = await Applicants.findDuplicate(nPhone, nEmail);
+      if (dupId) {
+        duplicates++;
+        // 重複は記録しつつ重複フラグを立てて取り込む（架電対象外にする）
+        await Applicants.create({ ...mapped, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        continue;
+      }
+      await Applicants.create(mapped);
+      imported++;
+    }
+    await Logs.create('ops_csv_import', 'success', `${importCompany}/${importMedia}: ${imported}件取込・${duplicates}件重複`);
+    sendJSON(res, 200, { ok: true, imported, duplicates, skipped, skipReasons: skipReasons.slice(0, 5), rows: rows.length });
+    return;
+  }
+
+  // ── CSV出力（会社・媒体・ステータス別）──
+  if (pathname === '/api/ops/calls/export' && method === 'GET') {
+    const list = await Ops.listCalls({
+      company: query.co || query.company, media: query.media,
+      status: query.status, month: query.month,
+    });
+    const header = ['会社', '媒体', '名前', '電話番号', 'メール', '年齢', '居住地', '応募日', '架電回数', '対応状況', 'メモ'];
+    const companyLabel = id => { const c = OPS_COMPANIES.find(x => x.id === id); return c ? c.short : id; };
+    const mediaLabel = id => { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : id; };
+    const csvRows = list.map(a => [
+      companyLabel(a.company), mediaLabel(a.media), a.name, a.phone, a.email,
+      a.age || '', a.address || '', (a.applied_at || '').slice(0, 10),
+      a.call_count || 0, a.status, (a.notes || '').replace(/[\r\n,]/g, ' '),
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+    const csv = '﻿' + [header.join(','), ...csvRows].join('\r\n');
+    res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="calls_${query.co || 'all'}_${query.media || 'all'}.csv"` });
+    res.end(csv);
+    return;
+  }
+
+  // ── 重複チェック（既存データと照合）──
+  if (pathname === '/api/ops/check-dup' && method === 'POST') {
+    const body = await parseJSON(req);
+    const list = await Ops.listCalls({ company: body.company, media: body.media });
+    let flagged = 0;
+    const seen = new Map(); // normalized_phone -> first id
+    for (const a of list) {
+      const key = a.normalized_phone || a.normalized_email;
+      if (!key) continue;
+      if (seen.has(key)) {
+        if (!a.is_duplicate) { await Ops.updateCall(a.id, { status: '重複' }); flagged++; }
+      } else seen.set(key, a.id);
+    }
+    sendJSON(res, 200, { ok: true, flagged });
     return;
   }
 

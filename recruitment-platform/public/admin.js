@@ -676,3 +676,135 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// ══════════════════════════════════════════════════════════════
+// 運用管理（掲載日報）
+// ══════════════════════════════════════════════════════════════
+function opsAddPost() {
+  document.getElementById('post-modal-title').textContent = '掲載を追加';
+  document.getElementById('pm-id').value = '';
+  document.getElementById('pm-title').value = '';
+  document.getElementById('pm-post-date').value = '';
+  document.getElementById('pm-expire-date').value = '';
+  document.getElementById('pm-count').value = '0';
+  document.getElementById('pm-notes').value = '';
+  document.getElementById('post-modal').classList.remove('hidden');
+}
+async function opsEditPost(id) {
+  const res = await fetch('/api/ops/posts');
+  const posts = await res.json();
+  const p = posts.find(x => x.id === id);
+  if (!p) return toast('掲載が見つかりません', 'error');
+  document.getElementById('post-modal-title').textContent = '掲載を編集';
+  document.getElementById('pm-id').value = p.id;
+  document.getElementById('pm-company').value = p.company_id;
+  document.getElementById('pm-media').value = p.media;
+  document.getElementById('pm-title').value = p.job_title;
+  document.getElementById('pm-post-date').value = p.post_date || '';
+  document.getElementById('pm-expire-date').value = p.expire_date || '';
+  document.getElementById('pm-status').value = p.status;
+  document.getElementById('pm-count').value = p.applicant_count;
+  document.getElementById('pm-notes').value = p.notes || '';
+  document.getElementById('post-modal').classList.remove('hidden');
+}
+function opsCloseModal() { document.getElementById('post-modal').classList.add('hidden'); }
+async function opsSavePost() {
+  const id = document.getElementById('pm-id').value;
+  const body = {
+    company_id: document.getElementById('pm-company').value,
+    media: document.getElementById('pm-media').value,
+    job_title: document.getElementById('pm-title').value,
+    post_date: document.getElementById('pm-post-date').value,
+    expire_date: document.getElementById('pm-expire-date').value,
+    status: document.getElementById('pm-status').value,
+    applicant_count: parseInt(document.getElementById('pm-count').value) || 0,
+    notes: document.getElementById('pm-notes').value,
+  };
+  if (!body.job_title) return toast('求人タイトルを入力してください', 'warn');
+  const url = id ? `/api/ops/posts/${id}` : '/api/ops/posts';
+  const method = id ? 'PUT' : 'POST';
+  const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.ok) { toast('保存しました', 'success'); location.reload(); }
+  else toast('保存に失敗しました', 'error');
+}
+function opsDeletePost(id) {
+  confirmAction('この掲載情報を削除しますか？', async () => {
+    const res = await fetch(`/api/ops/posts/${id}`, { method: 'DELETE' });
+    if (res.ok) { toast('削除しました', 'success'); location.reload(); }
+    else toast('削除に失敗しました', 'error');
+  });
+}
+// 過去応募者フィルター
+function opsPastFilter() {
+  const f = document.getElementById('past-filter');
+  const params = new URLSearchParams(location.search);
+  params.set('tab', 'past');
+  ['company', 'media', 'status', 'month'].forEach(name => {
+    const el = f.querySelector(`[name="${name}"]`);
+    if (el) params.set(name, el.value);
+  });
+  location.search = params.toString();
+}
+
+// ══════════════════════════════════════════════════════════════
+// 架電リスト
+// ══════════════════════════════════════════════════════════════
+async function callUpdate(id, field, value) {
+  const body = {};
+  body[field] = value;
+  const res = await fetch(`/api/ops/calls/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (res.ok) {
+    const data = await res.json();
+    // 行の背景色をステータスに合わせて更新
+    if (field === 'status') {
+      const colors = { '新規':'#3b82f6','架電済(不通)':'#eab308','対応中':'#06b6d4','対応終了':'#16a34a','断られた':'#94a3b8','辞退':'#94a3b8','重複':'#cbd5e1' };
+      const tr = document.querySelector(`tr[data-id="${id}"]`);
+      if (tr) tr.style.background = (colors[value] || '#fff') + '15';
+    }
+    toast('更新しました', 'success');
+  } else toast('更新に失敗しました', 'error');
+}
+function callImport() { document.getElementById('call-import-modal').classList.remove('hidden'); }
+function callCloseImport() {
+  document.getElementById('call-import-modal').classList.add('hidden');
+  document.getElementById('ci-result').innerHTML = '';
+}
+async function callDoImport() {
+  const company = document.getElementById('ci-company').value;
+  const media = document.getElementById('ci-media').value;
+  const file = document.getElementById('ci-file').files[0];
+  if (!file) return toast('CSVファイルを選択してください', 'warn');
+  const fd = new FormData();
+  fd.append('company', company);
+  fd.append('media', media);
+  fd.append('file', file);
+  const resultEl = document.getElementById('ci-result');
+  resultEl.innerHTML = '<p>取込中...</p>';
+  const res = await fetch('/api/ops/calls/import', { method: 'POST', body: fd });
+  const d = await res.json();
+  if (d.ok) {
+    resultEl.innerHTML = `<p class="ok">✅ ${d.imported}件取込・${d.duplicates}件重複` +
+      (d.skipped ? `・${d.skipped}件スキップ` : '') + `（計${d.rows}行）</p>`;
+    toast(`${d.imported}件取り込みました`, d.imported > 0 ? 'success' : 'warn');
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    resultEl.innerHTML = `<p class="err">取込に失敗しました</p>`;
+    toast('取込に失敗しました', 'error');
+  }
+}
+function callCheckDup() {
+  const params = new URLSearchParams(location.search);
+  const company = params.get('co') || 'sq';
+  const media = params.get('media') || 'indeed';
+  confirmAction('この会社・媒体内で重複している応募者を「重複」ステータスにします。よろしいですか？', async () => {
+    const res = await fetch('/api/ops/check-dup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company, media }),
+    });
+    const d = await res.json();
+    if (d.ok) { toast(`${d.flagged}件を重複にしました`, 'success'); setTimeout(() => location.reload(), 1000); }
+    else toast('重複チェックに失敗しました', 'error');
+  });
+}
