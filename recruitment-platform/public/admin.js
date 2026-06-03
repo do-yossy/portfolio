@@ -919,6 +919,7 @@ async function sheetsPush() {
     const d = await r.json();
     if (d.ok) {
       toast(`${d.appended}件をスプレッドシートに追記しました`, d.appended > 0 ? 'success' : 'info');
+      if (d.warnings && d.warnings.length) toast('注意: ' + d.warnings.join(' / '), 'warn');
       const link = document.getElementById('sheets-open');
       if (link && d.url) { link.href = d.url; link.style.display = ''; }
     } else { toast('反映に失敗: ' + (d.error || '不明なエラー'), 'error'); }

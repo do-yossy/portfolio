@@ -25,6 +25,7 @@ function applicantToSheetRow(a, mediaLabel) {
 async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList }) {
   const mediaLabel = id => { const m = mediaList.find(x => x.id === id); return m ? m.name : (id || '不明'); };
   let appended = 0, tabs = 0;
+  const warnings = [];
   for (const co of companies) {
     const list = (await Ops.listCalls({ company: co.id })).filter(a => !a.is_duplicate);
     const title = co.short || co.name || co.id;
@@ -33,20 +34,29 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const hasHeader = existing.length > 0;
     const existingIds = new Set(existing.slice(hasHeader ? 1 : 0).map(r => r[SHEET_COL.id]).filter(Boolean));
 
+    // ヘッダが無ければ書き込む
     if (!hasHeader) {
       await gsheets.writeValues(title, [SHEET_HEADERS]);
+    }
+    // 書式・プルダウンは毎回（冪等）適用。既存タブも自動で修復される。
+    // 失敗してもデータ反映は止めず、警告として収集する。
+    try {
       await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
       await gsheets.setDropdowns(props.sheetId, [
         { colIndex: SHEET_COL.callCount, list: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] },
         { colIndex: SHEET_COL.status, list: statuses },
       ]);
+    } catch (e) {
+      warnings.push(`${title}: 書式/プルダウン設定に失敗 (${e.message || e})`);
     }
+
     const newRows = list.filter(a => !existingIds.has(a.id)).map(a => applicantToSheetRow(a, mediaLabel));
     if (newRows.length) { await gsheets.appendValues(title, newRows); appended += newRows.length; }
     tabs++;
   }
-  if (Logs) await Logs.create('sheets_push', 'success', `${appended}件を共有スプレッドシートに追記（${tabs}タブ）`);
-  return { appended, tabs };
+  if (Logs) await Logs.create('sheets_push', warnings.length ? 'success' : 'success',
+    `${appended}件を共有スプレッドシートに追記（${tabs}タブ）` + (warnings.length ? ` ※${warnings.join(' / ')}` : ''));
+  return { appended, tabs, warnings };
 }
 
 // スプレッドシート → DB（IDで突合し対応状況・架電回数・メモを更新）

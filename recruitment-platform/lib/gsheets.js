@@ -173,13 +173,14 @@ async function appendValues(title, values) {
 
 // 指定タブの列にプルダウン（データ入力規則）を設定。
 //   validations: [{ colIndex, list, startRow=1 }]  startRowは0始まり(=ヘッダ除外で1)
-async function setDropdowns(tabSheetId, validations, endRow = 5000) {
+// endRowIndex は省略し、列全体（startRow以降）に適用する。
+// これにより新規シートの行数（既定1000行）に依存せず、追記された行にも自動で効く。
+async function setDropdowns(tabSheetId, validations) {
   const requests = validations.map(v => ({
     setDataValidation: {
       range: {
         sheetId: tabSheetId,
         startRowIndex: v.startRow != null ? v.startRow : 1,
-        endRowIndex: endRow,
         startColumnIndex: v.colIndex,
         endColumnIndex: v.colIndex + 1,
       },
