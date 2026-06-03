@@ -1387,14 +1387,33 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
         </details>`;
     }).join('');
 
+    // 現在の絞り込みに合わせたスプレッドシート出力リンク
+    const exportQS = new URLSearchParams();
+    if (filter.company && filter.company !== 'all') exportQS.set('company', filter.company);
+    if (filter.media   && filter.media   !== 'all') exportQS.set('media',   filter.media);
+    if (filter.status  && filter.status  !== 'all') exportQS.set('status',  filter.status);
+    if (filter.month   && filter.month   !== 'all') exportQS.set('month',   filter.month);
+    const exportHref = '/api/ops/calls/export' + (exportQS.toString() ? `?${exportQS.toString()}` : '');
+    const activeFilters = [
+      filter.company && filter.company !== 'all' ? companyName(filter.company) : null,
+      filter.media   && filter.media   !== 'all' ? mediaName(filter.media)     : null,
+      filter.status  && filter.status  !== 'all' ? filter.status               : null,
+      filter.month   && filter.month   !== 'all' ? filter.month                : null,
+    ].filter(Boolean);
+
     body = `
       <section class="card">
+        <div class="card-head">
+          <h2>絞り込み</h2>
+          <a href="${exportHref}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力${activeFilters.length ? '（絞り込み中）' : '（全件）'}</a>
+        </div>
         <form id="past-filter" class="filter-bar">
           ${sel('company', companyOpts, filter.company || 'all')}
           ${sel('media', mediaOpts, filter.media || 'all')}
           ${sel('status', statusOpts, filter.status || 'all')}
           ${sel('month', monthOpts, filter.month || 'all')}
         </form>
+        ${activeFilters.length ? `<p class="muted" style="margin:10px 0 0">抽出条件: ${activeFilters.map(esc).join(' / ')}</p>` : ''}
       </section>
       ${sections || `<section class="card"><p class="empty">該当する応募者がいません。</p></section>`}`;
   }

@@ -1130,11 +1130,17 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
-  // ── CSV出力（会社・媒体・ステータス別）──
-  // ── 架電リスト スプレッドシート出力（会社=タブ・媒体=セクション）──
+  // ── スプレッドシート出力（会社=タブ・媒体=セクション）──
+  // フィルタ（company / media / status / month）に合わせて抽出。
+  // フィルタ無し＝全社フルブック（架電リストの出力）、フィルタ有り＝絞り込み（過去応募者の出力）。
   if (pathname === '/api/ops/calls/export' && method === 'GET') {
-    // 全会社・全媒体を1つのブックに（会社ごとにタブ、タブ内で媒体ごとにセクション）
-    const all = await Ops.listCalls({ status: query.status, month: query.month });
+    const fCompany = (query.company && query.company !== 'all') ? query.company
+                   : (query.co && query.co !== 'all') ? query.co : null;
+    const fMedia   = (query.media && query.media !== 'all') ? query.media : null;
+    const fStatus  = (query.status && query.status !== 'all') ? query.status : null;
+    const fMonth   = (query.month && query.month !== 'all') ? query.month : null;
+
+    const all = await Ops.listCalls({ company: fCompany, media: fMedia, status: fStatus, month: fMonth });
     const mediaLabel = id => { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '不明'); };
 
     const HEADERS = ['媒体', '名前', '電話番号', 'メールアドレス', '年齢', '居住地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
@@ -1145,38 +1151,44 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       a.is_duplicate ? '重複' : '', (a.notes || '').replace(/[\r\n]+/g, ' '),
     ];
 
-    const sheets = OPS_COMPANIES.map(co => {
+    // 出力対象の会社・媒体（フィルタで絞られていればその分のみ）
+    const companies = fCompany ? OPS_COMPANIES.filter(c => c.id === fCompany) : OPS_COMPANIES;
+    const mediaList = fMedia   ? OPS_MEDIA.filter(m => m.id === fMedia)       : OPS_MEDIA;
+
+    const sheets = companies.map(co => {
       const coApps = all.filter(a => a.company === co.id);
       const rows = [];
-      // ヘッダー行（スタイル付き）
       rows.push(HEADERS.map(h => ({ v: h, style: 'header' })));
       if (!coApps.length) {
-        rows.push(['応募者がいません', '', '', '', '', '', '', '', '', '', '', '']);
+        rows.push(['該当する応募者がいません', '', '', '', '', '', '', '', '', '', '', '']);
       } else {
-        // 媒体ごとにセクション化
-        for (const m of OPS_MEDIA) {
+        for (const m of mediaList) {
           const grp = coApps.filter(a => a.media === m.id);
           if (!grp.length) continue;
           rows.push([{ v: `▼ ${m.name}（${grp.length}件）`, style: 'section' },
             ...Array(HEADERS.length - 1).fill({ v: '', style: 'section' })]);
           grp.forEach(a => rows.push(rowFor(a)));
         }
-        // 媒体未設定の応募者
-        const noMedia = coApps.filter(a => !OPS_MEDIA.some(m => m.id === a.media));
-        if (noMedia.length) {
-          rows.push([{ v: `▼ その他・媒体未設定（${noMedia.length}件）`, style: 'section' },
-            ...Array(HEADERS.length - 1).fill({ v: '', style: 'section' })]);
-          noMedia.forEach(a => rows.push(rowFor(a)));
+        // 媒体未設定（媒体フィルタが無いときのみ表示）
+        if (!fMedia) {
+          const noMedia = coApps.filter(a => !OPS_MEDIA.some(m => m.id === a.media));
+          if (noMedia.length) {
+            rows.push([{ v: `▼ その他・媒体未設定（${noMedia.length}件）`, style: 'section' },
+              ...Array(HEADERS.length - 1).fill({ v: '', style: 'section' })]);
+            noMedia.forEach(a => rows.push(rowFor(a)));
+          }
         }
       }
       return { name: co.short || co.id, rows };
     });
 
-    const buf = buildXlsx(sheets);
+    const buf = buildXlsx(sheets.length ? sheets : [{ name: 'data', rows: [HEADERS.map(h => ({ v: h, style: 'header' }))] }]);
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const parts = [fCompany, fMedia, fStatus, fMonth].filter(Boolean).join('_');
+    const fname = `applicants_${stamp}${parts ? '_' + parts : ''}.xlsx`;
     res.writeHead(200, {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="calllist_${stamp}.xlsx"`,
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(fname)}"`,
       'Content-Length': buf.length,
     });
     res.end(buf);
