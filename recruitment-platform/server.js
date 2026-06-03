@@ -1222,6 +1222,11 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const mediaLabel = id => { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '不明'); };
 
     const HEADERS = ['媒体', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
+    // O列=架電回数（index14）, P列=対応状況（index15） のドロップダウン
+    const CALL_VALIDATIONS = [
+      { sqref: 'O2:O10000', list: ['1','2','3','4','5','6','7','8','9','10'] },
+      { sqref: 'P2:P10000', list: ['新規','架電済(不通)','対応中','対応終了','断られた','辞退','重複'] },
+    ];
     const rowFor = a => [
       mediaLabel(a.media), a.name || '', a.phone || '', a.email || '',
       a.gender || '', a.birth_date || '', a.age || '', a.address || '',
@@ -1259,10 +1264,10 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
           }
         }
       }
-      return { name: co.short || co.id, rows };
+      return { name: co.short || co.id, rows, validations: CALL_VALIDATIONS };
     });
 
-    const buf = buildXlsx(sheets.length ? sheets : [{ name: 'data', rows: [HEADERS.map(h => ({ v: h, style: 'header' }))] }]);
+    const buf = buildXlsx(sheets.length ? sheets : [{ name: 'data', rows: [HEADERS.map(h => ({ v: h, style: 'header' }))], validations: CALL_VALIDATIONS }]);
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const parts = [activeOnly ? '架電対象' : null, fCompany, fMedia, fStatus, fMonth].filter(Boolean).join('_');
     const fname = `applicants_${stamp}${parts ? '_' + parts : ''}.xlsx`;

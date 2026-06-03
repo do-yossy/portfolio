@@ -48,7 +48,8 @@ function sanitizeSheetName(name, idx) {
   return s.slice(0, 31);
 }
 
-function sheetXml(rows) {
+// validations: [{ sqref, list }]  例: { sqref: 'O2:O10000', list: ['1','2','3'] }
+function sheetXml(rows, validations) {
   const lines = [];
   rows.forEach((row, r) => {
     const cells = row.map((cell, c) => {
@@ -66,10 +67,20 @@ function sheetXml(rows) {
     }).join('');
     lines.push(`<row r="${r + 1}">${cells}</row>`);
   });
+
+  let dvXml = '';
+  if (validations && validations.length > 0) {
+    const dvItems = validations.map(dv => {
+      const formula = '"' + dv.list.join(',') + '"';
+      return `<dataValidation type="list" allowBlank="1" showDropDown="0" sqref="${xmlEsc(dv.sqref)}"><formula1>${formula}</formula1></dataValidation>`;
+    }).join('');
+    dvXml = `<dataValidations count="${validations.length}">${dvItems}</dataValidations>`;
+  }
+
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <sheetData>${lines.join('')}</sheetData>
-</worksheet>`;
+${dvXml}</worksheet>`;
 }
 
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -129,7 +140,7 @@ ${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.open
   files.push(['xl/styles.xml', STYLES_XML]);
 
   sheets.forEach((s, i) => {
-    files.push([`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s.rows || [])]);
+    files.push([`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s.rows || [], s.validations)]);
   });
 
   return zipStore(files);
