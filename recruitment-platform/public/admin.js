@@ -795,13 +795,10 @@ async function callDoImport() {
   }
 }
 function callCheckDup() {
-  const params = new URLSearchParams(location.search);
-  const company = params.get('co') || 'sq';
-  const media = params.get('media') || 'indeed';
-  confirmAction('この会社・媒体内で重複している応募者を「重複」ステータスにします。よろしいですか？', async () => {
+  confirmAction('全データを横断し、電話番号またはメールアドレスが一致する応募者を「重複」にします（会社・媒体は問いません）。よろしいですか？', async () => {
     const res = await fetch('/api/ops/check-dup', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company, media }),
+      body: JSON.stringify({}),
     });
     const d = await res.json();
     if (d.ok) { toast(`${d.flagged}件を重複にしました`, 'success'); setTimeout(() => location.reload(), 1000); }

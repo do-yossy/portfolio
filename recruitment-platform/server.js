@@ -1175,18 +1175,35 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
-  // ── 重複チェック（既存データと照合）──
+  // ── 重複チェック（全データ横断・電話番号 or メールが一致したら重複）──
+  // 表記揺れは normalized_phone / normalized_email で吸収済み。
+  // 会社・媒体を問わず、どちらか一方でも一致すれば後から応募した方を「重複」にする。
   if (pathname === '/api/ops/check-dup' && method === 'POST') {
-    const body = await parseJSON(req);
-    const list = await Ops.listCalls({ company: body.company, media: body.media });
+    const all = await Ops.listCalls({}); // 全件
+    // 応募日時の昇順（早い方を「元データ」、後から来た方を重複に）
+    all.sort((a, b) => String(a.applied_at || a.created_at || '').localeCompare(String(b.applied_at || b.created_at || '')));
+
+    const phoneMap = new Map(); // normalized_phone -> 元データ id
+    const emailMap = new Map(); // normalized_email -> 元データ id
     let flagged = 0;
-    const seen = new Map(); // normalized_phone -> first id
-    for (const a of list) {
-      const key = a.normalized_phone || a.normalized_email;
-      if (!key) continue;
-      if (seen.has(key)) {
-        if (!a.is_duplicate) { await Ops.updateCall(a.id, { status: '重複' }); flagged++; }
-      } else seen.set(key, a.id);
+
+    for (const a of all) {
+      const p = a.normalized_phone || '';
+      const e = a.normalized_email || '';
+      // 電話 or メールのどちらかが既出なら重複
+      let originalId = null;
+      if (p && phoneMap.has(p)) originalId = phoneMap.get(p);
+      if (!originalId && e && emailMap.has(e)) originalId = emailMap.get(e);
+
+      if (originalId) {
+        if (!a.is_duplicate) { await Ops.markDuplicate(a.id, originalId); flagged++; }
+        // この応募者の連絡先も元データに紐付けて登録（連鎖一致に対応）
+        if (p && !phoneMap.has(p)) phoneMap.set(p, originalId);
+        if (e && !emailMap.has(e)) emailMap.set(e, originalId);
+      } else {
+        if (p) phoneMap.set(p, a.id);
+        if (e) emailMap.set(e, a.id);
+      }
     }
     sendJSON(res, 200, { ok: true, flagged });
     return;

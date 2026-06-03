@@ -527,6 +527,13 @@ const Ops = {
     return Applicants.findById(id);
   },
 
+  // 重複としてマーク（is_duplicate・duplicate_of_id・status を一括設定）
+  markDuplicate(id, originalId = null) {
+    db.prepare(`UPDATE applicants SET is_duplicate = 1, duplicate_of_id = ?, status = '重複', updated_at = ? WHERE id = ?`)
+      .run(originalId, now(), id);
+    return Applicants.findById(id);
+  },
+
   // 会社×媒体でフィルタした応募者一覧
   listCalls({ company, media, status, month, archived } = {}) {
     const conds = [];
