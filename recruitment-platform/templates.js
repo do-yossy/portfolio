@@ -1399,7 +1399,10 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
       <section class="card">
         <div class="card-head">
           <h2>絞り込み <span class="count" id="past-total">${pastApplicants.length}件</span></h2>
-          <a id="past-export" href="${exportHref}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全件）</a>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="callImport()" title="過去応募者データ（CSV / Excel）を取り込む">📥 過去応募者を取り込む</button>
+            <a id="past-export" href="${exportHref}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全件）</a>
+          </div>
         </div>
         <form id="past-filter" class="filter-bar">
           ${sel('company', companyOpts, filter.company || 'all')}
@@ -1412,7 +1415,8 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
       <div id="past-results">
         ${sections}
         <section class="card" id="past-empty" style="display:none"><p class="empty">該当する応募者がいません。</p></section>
-      </div>`;
+      </div>
+      ${callImportModalHtml(co, OPS_MEDIA[0].id)}`;
   }
 
   const PAGE_TITLES = { posts: '📋 掲載管理', new: '🆕 新規応募', past: '📚 過去応募者' };
