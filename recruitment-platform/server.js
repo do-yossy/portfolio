@@ -1564,7 +1564,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
 
     const startBody = await parseJSON(req);
-    const batchSize = Math.min(parseInt(startBody.limit || '5', 10), 10);
+    const batchSize = Math.min(parseInt(startBody.limit || '25', 10), 25);
     const kbCompany = startBody.company || null;
     const allJobs   = await Jobs.findAll({ onlyPublished: true, company: kbCompany });
     let kbJobs = allJobs.filter(j => {
@@ -1664,81 +1664,105 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     });
   }
 
-  if (pathname === '/api/post/stanby' && method === 'GET') {
-    sseInit(res);
-
-    sseSend(res, { message: 'VPN接続を確認しています...', type: 'info' });
+  // ── スタンバイ投稿（ポーリング方式・ボタン1回で16件）──
+  if (pathname === '/api/post/stanby' && method === 'POST') {
     const vpnOk = await checkVPN();
     if (!vpnOk) {
-      sseSend(res, { message: '❌ VPN未接続です。処理を中止します。', type: 'error', done: true, success: false });
       await Logs.create('stanby_post', 'error', 'VPN未接続');
-      res.end();
-      return;
+      return sendJSON(res, 400, { error: '❌ VPN未接続です。処理を中止します。' });
     }
 
-    const jobs = await Jobs.findAll(true);
-    if (jobs.length === 0) {
-      sseSend(res, { message: '⚠️ 公開中の求人がありません', type: 'warn', done: true, success: false });
-      res.end();
-      return;
-    }
-
-    const scriptPath = path.join(SCRIPTS_DIR, 'stanby_poster.py');
-    if (!fs.existsSync(scriptPath)) {
-      sseSend(res, { message: '⚠️ 投稿スクリプトが見つかりません（scripts/stanby_poster.py）', type: 'warn' });
-      sseSend(res, { message: 'デモモード: 投稿シミュレーションを実行します...', type: 'info' });
-      const target = jobs[0];
-      sseSend(res, { message: `🔑 スタンバイにログイン中...`, type: 'info' });
-      await new Promise(r => setTimeout(r, 800));
-      sseSend(res, { message: `📝 「${target.title}」を投稿中...`, type: 'info' });
-      await new Promise(r => setTimeout(r, 1200));
-      sseSend(res, { message: `✅ 「${target.title}」を投稿しました`, type: 'success' });
-      await Logs.create('stanby_post', 'success', `スタンバイ投稿（デモ）: ${target.title}`);
-      sseSend(res, { message: `✅ 完了: 1件投稿しました（デモモード）`, type: 'success', done: true, success: true });
-      res.end();
-      return;
-    }
-
-    const stanbyJobsJson = JSON.stringify(jobs.slice(0, 3)); // max 3 per run
-    const stanbyProc = spawn(PYTHON_CMD, [scriptPath], {
-      env: { ...process.env },
-      stdin: 'pipe'
+    const startBody = await parseJSON(req);
+    const batchSize = Math.min(parseInt(startBody.limit || '16', 10), 16);
+    const sbCompany = startBody.company || null;
+    const allJobs   = await Jobs.findAll({ onlyPublished: true, company: sbCompany });
+    let sbJobs = allJobs.filter(j => {
+      const m = JSON.parse(j.target_media || '[]');
+      return m.includes('スタンバイ') || m.includes('stanby');
     });
-    stanbyProc.stdin.write(stanbyJobsJson);
-    stanbyProc.stdin.end();
+    if (sbJobs.length === 0) sbJobs = allJobs;
 
-    stanbyProc.stdout.on('data', data => {
-      const lines = data.toString().split('\n').filter(l => l.trim());
-      for (const line of lines) {
-        try {
-          const obj = JSON.parse(line);
-          sseSend(res, { message: obj.message, type: obj.level || 'info' });
-        } catch {
-          sseSend(res, { message: line, type: 'info' });
-        }
+    if (sbJobs.length === 0) {
+      return sendJSON(res, 400, { error: '⚠️ 公開中の求人がありません' });
+    }
+
+    const { id, session } = createSession();
+    const pushLog = (message, type = 'info') => {
+      session.logs.push({ message: String(message ?? ''), type });
+    };
+
+    sendJSON(res, 200, { ok: true, sessionId: id });
+
+    (async () => {
+      const scriptPath = path.join(SCRIPTS_DIR, 'stanby_poster.py');
+      if (!fs.existsSync(scriptPath)) {
+        pushLog('⚠️ 投稿スクリプトが見つかりません（scripts/stanby_poster.py）', 'warn');
+        pushLog('デモモード: 投稿シミュレーションを実行します...', 'info');
+        const target = sbJobs[0];
+        pushLog('🔑 スタンバイにログイン中...', 'info');
+        await new Promise(r => setTimeout(r, 800));
+        pushLog(`📝 「${target.title}」を投稿中...`, 'info');
+        await new Promise(r => setTimeout(r, 1200));
+        pushLog(`✅ 「${target.title}」を投稿しました`, 'success');
+        await Logs.create('stanby_post', 'success', `スタンバイ投稿（デモ）: ${target.title}`);
+        pushLog('✅ 完了: 1件投稿しました（デモモード）', 'success');
+        session.done = true; session.success = true;
+        return;
       }
-    });
 
-    stanbyProc.stderr.on('data', data => {
-      sseSend(res, { message: `⚠️ ${data.toString().trim()}`, type: 'warn' });
-    });
-
-    stanbyProc.on('close', async code => {
-      const ok = code === 0;
-      const msg = ok ? '✅ スタンバイ投稿完了' : `❌ スタンバイ投稿失敗(exit ${code})`;
-      await Logs.create('stanby_post', ok ? 'success' : 'error', msg);
-      notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
-      sseSend(res, {
-        message: ok ? '✅ スタンバイへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`,
-        type: ok ? 'success' : 'error',
-        done: true,
-        success: ok
+      pushLog(`📋 スタンバイ向け求人 ${Math.min(batchSize, sbJobs.length)}件を投稿します...`, 'info');
+      const jobsJson = JSON.stringify(sbJobs.slice(0, batchSize));
+      const proc = spawn(PYTHON_CMD, [scriptPath], {
+        env: { ...process.env, STANBY_BATCH_SIZE: String(batchSize) }
       });
-      res.end();
-    });
+      proc.stdin.write(jobsJson);
+      proc.stdin.end();
 
-    req.on('close', () => { try { stanbyProc.kill(); } catch {} });
+      proc.stdout.on('data', data => {
+        const lines = data.toString().split('\n').filter(l => l.trim());
+        for (const line of lines) {
+          try { const obj = JSON.parse(line); pushLog(obj.message, obj.level || 'info'); }
+          catch { pushLog(line, 'info'); }
+        }
+      });
+
+      proc.stderr.on('data', data => {
+        const txt = data.toString().trim();
+        if (txt) pushLog(`⚠️ ${txt}`, 'warn');
+      });
+
+      proc.on('error', err => {
+        pushLog(`❌ プロセス起動失敗: ${err.message}`, 'error');
+        session.done = true; session.success = false;
+      });
+
+      proc.on('close', async code => {
+        const ok = code === 0;
+        const msg = ok ? '✅ スタンバイ投稿完了' : `❌ スタンバイ投稿失敗(exit ${code})`;
+        await Logs.create('stanby_post', ok ? 'success' : 'error', msg);
+        notify(msg, { emoji: ok ? ':rocket:' : ':x:' }).catch(() => {});
+        pushLog(ok ? '✅ スタンバイへの投稿が完了しました' : `❌ 投稿が失敗しました（コード: ${code}）`, ok ? 'success' : 'error');
+        session.done = true; session.success = ok;
+      });
+    })().catch(err => {
+      pushLog(`❌ 内部エラー: ${err.message}`, 'error');
+      session.done = true; session.success = false;
+    });
     return;
+  }
+
+  // ── スタンバイ投稿ポーリング ──
+  if (pathname === '/api/post/stanby/poll' && method === 'GET') {
+    const sid = query.id;
+    const from = parseInt(query.from || '0', 10);
+    const session = postSessions.get(sid);
+    if (!session) return sendJSON(res, 404, { error: 'session not found' });
+    return sendJSON(res, 200, {
+      logs: session.logs.slice(from),
+      total: session.logs.length,
+      done: session.done,
+      success: session.success,
+    });
   }
 
   if (pathname === '/api/post/indeed' && method === 'GET') {

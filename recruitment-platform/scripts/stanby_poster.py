@@ -23,20 +23,25 @@ def main():
         progress("⚠️ 投稿する求人データがありません", "warn")
         sys.exit(0)
 
+    # 1回の投稿件数（環境変数 STANBY_BATCH_SIZE で指定・デフォルト16件）
+    batch = int(os.environ.get("STANBY_BATCH_SIZE", str(len(jobs))))
+
     email    = os.environ.get("STANBY_EMAIL", "")
     password = os.environ.get("STANBY_PASSWORD", "")
 
     if not email or not password:
         progress("⚠️ 環境変数 STANBY_EMAIL / STANBY_PASSWORD が未設定です", "warn")
         progress("デモモードで動作します（実際の投稿は行いません）", "info")
-        for job in jobs[:3]:  # stanby allows up to 3 per run
+        target_jobs = jobs[:batch]
+        for i, job in enumerate(target_jobs):
             time.sleep(1.0)
             progress(f"📝 「{job['title']}」を投稿中...（シミュレーション）", "info")
             time.sleep(0.8)
             progress(f"✅ 「{job['title']}」を投稿しました（シミュレーション）", "success")
-            if jobs.index(job) < len(jobs[:3]) - 1:
+            if i < len(target_jobs) - 1:
                 progress("⏳ 次の投稿まで待機中（BAN回避）...", "info")
                 time.sleep(1.5)
+        progress(f"✅ {len(target_jobs)}件の投稿処理が完了しました（シミュレーション）", "success")
         sys.exit(0)
 
     try:
@@ -63,8 +68,8 @@ def main():
             page.click('button[type="submit"]')
             time.sleep(3)
 
-            # BAN avoidance: post max 3 jobs with delays
-            target_jobs = jobs[:3]
+            # BAN avoidance: post up to `batch` jobs with delays
+            target_jobs = jobs[:batch]
 
             for i, job in enumerate(target_jobs):
                 progress(f"📝 「{job['title']}」を投稿中...", "info")
@@ -102,7 +107,6 @@ def main():
             sys.exit(1)
 
         browser.close()
-        target_jobs = jobs[:3]
         progress(f"✅ {len(target_jobs)}件の投稿処理が完了しました", "success")
 
 if __name__ == "__main__":

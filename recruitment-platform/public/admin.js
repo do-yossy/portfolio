@@ -261,26 +261,26 @@ function startScrapeIndeed() {
   );
 }
 
-// ── Kyujinbox Post (polling - replaces SSE which times out through Cloudflare) ──
-function startPostKyujinbox(co) {
-  const batchSize = document.getElementById('kb-batch-size')?.value || '5';
+// ── 媒体投稿（ポーリング方式: Cloudflare のSSEタイムアウト回避）──
+// ボタン1回で1日分（求人ボックス25件 / スタンバイ16件）を一括投稿する共通処理
+function startMediaPost({ endpoint, limit, company, mediaLabel, progressId, btnId }) {
   confirmAction(
-    `求人ボックスに${batchSize}件を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？`,
+    `${mediaLabel}に${limit}件を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？`,
     async () => {
       const vpnOk = await refreshVpn();
       if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
 
-      const box = openProgress('progress-kyujinbox');
-      const btn = document.getElementById('btn-post-kyujinbox');
+      const box = openProgress(progressId);
+      const btn = document.getElementById(btnId);
       if (btn) { btn.disabled = true; btn.dataset.origText = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> 実行中...'; }
       appendLog(box, '処理を開始しています...', 'info');
 
       let sessionId = null;
       try {
-        const r = await fetch('/api/post/kyujinbox', {
+        const r = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ limit: batchSize, company: co })
+          body: JSON.stringify({ limit, company })
         });
         const d = await r.json();
         if (!r.ok || !d.ok) {
@@ -298,17 +298,15 @@ function startPostKyujinbox(co) {
       let fromIdx = 0;
       const timer = setInterval(async () => {
         try {
-          const r = await fetch(`/api/post/kyujinbox/poll?id=${sessionId}&from=${fromIdx}`);
+          const r = await fetch(`${endpoint}/poll?id=${sessionId}&from=${fromIdx}`);
           if (!r.ok) return;
           const d = await r.json();
-          for (const entry of d.logs) {
-            appendLog(box, entry.message, entry.type || 'info');
-          }
+          for (const entry of d.logs) appendLog(box, entry.message, entry.type || 'info');
           fromIdx = d.total;
           if (d.done) {
             clearInterval(timer);
             if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
-            toast(d.success ? '求人ボックスへの投稿が完了しました' : '投稿が失敗しました', d.success ? 'success' : 'error');
+            toast(d.success ? `${mediaLabel}への投稿が完了しました` : '投稿が失敗しました', d.success ? 'success' : 'error');
           }
         } catch { /* ignore transient network errors */ }
       }, 2000);
@@ -316,18 +314,20 @@ function startPostKyujinbox(co) {
   );
 }
 
-// ── Stanby Post ──
-function startPostStanby() {
-  confirmAction(
-    'スタンバイに求人を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？',
-    async () => {
-      const vpnOk = await refreshVpn();
-      if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
-      runSSE('/api/post/stanby', 'progress-stanby', 'btn-post-stanby', d => {
-        toast(d.message, d.success ? 'success' : 'error');
-      });
-    }
-  );
+// ── Kyujinbox Post（ボタン1回で25件）──
+function startPostKyujinbox(co) {
+  startMediaPost({
+    endpoint: '/api/post/kyujinbox', limit: 25, company: co,
+    mediaLabel: '求人ボックス', progressId: 'progress-kyujinbox', btnId: 'btn-post-kyujinbox',
+  });
+}
+
+// ── Stanby Post（ボタン1回で16件）──
+function startPostStanby(co) {
+  startMediaPost({
+    endpoint: '/api/post/stanby', limit: 16, company: co,
+    mediaLabel: 'スタンバイ', progressId: 'progress-stanby', btnId: 'btn-post-stanby',
+  });
 }
 
 // ── Indeed Post ──
