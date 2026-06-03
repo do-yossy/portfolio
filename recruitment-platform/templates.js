@@ -1511,13 +1511,16 @@ function postModalHtml(co) {
 function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter = 'all', search = '' } = {}) {
   const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
   const baseHref = (c, m) => `/admin/calls?co=${c}&media=${m}`;
+  const isAll = co === 'all';
 
-  const companyTabs = COMPANIES_ORDER.map(c =>
-    `<a href="${baseHref(c, media)}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`
-  ).join('');
+  const companyTabs = [
+    `<a href="/admin/calls?co=all&media=${media}" class="call-co-tab ${isAll ? 'active' : ''}">🏢 全社まとめ</a>`,
+    ...COMPANIES_ORDER.map(c =>
+      `<a href="${baseHref(c, media)}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`)
+  ].join('');
 
   const mediaTabs = OPS_MEDIA.map(m =>
-    `<a href="${baseHref(co, m.id)}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`
+    `<a href="${isAll ? '/admin/calls?co=all' : baseHref(co, m.id)}&media=${m.id}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`
   ).join('');
 
   const countOpts = n => Array.from({ length: 11 }, (_, i) =>
@@ -1527,10 +1530,13 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
   const statusFilterOpts = [{ v: 'all', l: '全ての対応状況' }, ...CALL_STATUSES_LIST.map(s => ({ v: s, l: s }))].map(o =>
     `<option value="${o.v}"${o.v === statusFilter ? ' selected' : ''}>${o.l}</option>`).join('');
 
-  const NCOLS = 17;
+  // 全社まとめ時は会社列を追加
+  const NCOLS = isAll ? 18 : 17;
+  const coCell = a => isAll ? `<td style="white-space:nowrap;font-size:12px"><span style="display:inline-block;background:${COMPANIES[a.company]?.color || '#94a3b8'};color:#fff;padding:1px 6px;border-radius:4px">${companyName(a.company)}</span></td>` : '';
   const rows = applicants.length ? applicants.map((a, i) => `
     <tr data-id="${esc(a.id)}" data-status="${esc(a.status || '')}" style="background:${(CALL_STATUS_COLORS[a.status] || '#fff')}15">
       <td class="num">${i + 1}</td>
+      ${coCell(a)}
       <td class="name-col">${esc(a.name || '')}${a.is_duplicate ? ' <span class="dup-badge">重複</span>' : ''}</td>
       <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
       <td>${esc(a.email || '')}</td>
@@ -1547,7 +1553,13 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       <td><select class="call-status-sel" onchange="callUpdate('${esc(a.id)}','status',this.value)">${statusOpts(a.status)}</select></td>
       <td style="white-space:nowrap">${esc((a.last_called_at || '').slice(0, 10))}</td>
       <td><input class="call-memo" value="${esc(a.notes || '')}" onblur="callUpdate('${esc(a.id)}','notes',this.value)" placeholder="メモ"></td>
-    </tr>`).join('') : `<tr><td colspan="${NCOLS}" class="empty">この媒体の応募者はいません。CSVをインポートしてください。</td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="${NCOLS}" class="empty">応募者はいません。CSVをインポートしてください。</td></tr>`;
+
+  const headingLabel = isAll
+    ? `全社まとめ / ${mediaName(media)}`
+    : `${companyName(co)} / ${mediaName(media)}`;
+  const exportCoParam = isAll ? '' : `&co=${esc(co)}`;
+  const morningExportHref = `/api/ops/calls/export?active=1&media=${esc(media)}${exportCoParam}`;
 
   const content = `
     <div class="page-head">
@@ -1555,7 +1567,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       <div class="head-actions">
         <button class="btn btn-warning btn-sm" onclick="callImportUpdate()" title="架電後にスプレッドシートで更新した対応状況・架電回数・メモをここから取り込む">📥 架電結果を取り込む</button>
         <button class="btn btn-secondary btn-sm" onclick="callImport()">⬆ 新規CSVインポート</button>
-        <a href="/api/ops/calls/export?active=1&co=${esc(co)}" class="btn btn-primary btn-sm" download>📞 朝の架電リスト出力</a>
+        <a href="${morningExportHref}" class="btn btn-primary btn-sm" download>📞 朝の架電リスト出力</a>
         <a href="/api/ops/calls/export" class="btn btn-ghost btn-sm" download>📊 全件出力</a>
         <button class="btn btn-ghost btn-sm" onclick="callCheckDup()">♻️ 重複チェック</button>
       </div>
@@ -1564,7 +1576,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
     <div class="call-media-tabs">${mediaTabs}</div>
     <section class="card">
       <div class="card-head">
-        <h2>${companyName(co)} / ${mediaName(media)} <span class="count" id="calls-count">${applicants.length}件</span></h2>
+        <h2>${headingLabel} <span class="count" id="calls-count">${applicants.length}件</span></h2>
       </div>
       <div class="filter-bar" style="padding:0 0 12px">
         <input type="text" id="cf-search" class="filter-input" placeholder="名前・電話・住所・求人名で検索..." value="${esc(search)}" oninput="callsLocalFilter()">
@@ -1573,7 +1585,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       <div class="table-scroll">
         <table class="data-table calls-table" id="calls-table">
           <thead><tr>
-            <th class="num">#</th><th class="name-col">名前</th><th>電話番号</th><th>メール</th>
+            <th class="num">#</th>${isAll ? '<th>会社</th>' : ''}<th class="name-col">名前</th><th>電話番号</th><th>メール</th>
             <th>性別</th><th>生年月日</th><th>年齢</th><th>居住地</th>
             <th>現在の職業</th><th>求人タイトル</th><th>経験</th><th>学歴</th>
             <th>応募日</th><th>架電回数</th><th>対応状況</th><th>最終架電</th><th>メモ</th>
@@ -1582,9 +1594,9 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
         </table>
       </div>
     </section>
-    ${callImportModalHtml(co, media)}`;
+    ${callImportModalHtml(isAll ? COMPANIES_ORDER[0] : co, media)}`;
 
-  return adminLayout('架電リスト', content, 'calls', co);
+  return adminLayout('架電リスト', content, 'calls', isAll ? COMPANIES_ORDER[0] : co);
 }
 
 function callImportModalHtml(co, media) {

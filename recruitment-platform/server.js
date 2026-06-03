@@ -1033,7 +1033,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const callStatus = query.status || 'all';
     const callSearch = query.search || '';
     const applicants = await Ops.listCalls({
-      company: callCo, media: callMedia,
+      company: callCo !== 'all' ? callCo : undefined,
+      media: callMedia,
       status: callStatus !== 'all' ? callStatus : undefined,
       search: callSearch || undefined,
     });
