@@ -741,13 +741,15 @@ function opsDeletePost(id) {
 // 過去応募者フィルター
 function opsPastFilter() {
   const f = document.getElementById('past-filter');
+  if (!f) return;
   const params = new URLSearchParams(location.search);
   params.set('tab', 'past');
   ['company', 'media', 'status', 'month'].forEach(name => {
     const el = f.querySelector(`[name="${name}"]`);
     if (el) params.set(name, el.value);
+    else params.delete(name);
   });
-  location.search = params.toString();
+  location.href = location.pathname + '?' + params.toString();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -790,10 +792,27 @@ function callsLocalFilter() {
   if (countEl) countEl.textContent = `${visible}件`;
 }
 
-function callImport() { document.getElementById('call-import-modal').classList.remove('hidden'); callImportModeHint(); }
+function callImport() {
+  const m = document.getElementById('call-import-modal');
+  if (!m) { toast('ページを再読み込みしてください', 'warn'); return; }
+  const modeEl = document.getElementById('ci-mode');
+  if (modeEl) modeEl.value = 'insert';
+  m.classList.remove('hidden');
+  callImportModeHint();
+}
+function callImportUpdate() {
+  const m = document.getElementById('call-import-modal');
+  if (!m) { toast('ページを再読み込みしてください', 'warn'); return; }
+  const modeEl = document.getElementById('ci-mode');
+  if (modeEl) modeEl.value = 'update';
+  m.classList.remove('hidden');
+  callImportModeHint();
+}
 function callCloseImport() {
-  document.getElementById('call-import-modal').classList.add('hidden');
-  document.getElementById('ci-result').innerHTML = '';
+  const m = document.getElementById('call-import-modal');
+  if (m) m.classList.add('hidden');
+  const r = document.getElementById('ci-result');
+  if (r) r.innerHTML = '';
 }
 function callImportModeHint() {
   const mode = document.getElementById('ci-mode')?.value || 'insert';
