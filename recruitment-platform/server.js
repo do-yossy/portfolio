@@ -919,17 +919,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── Admin: Dashboard ──
   if (pathname === '/admin' && method === 'GET') {
-    const stats = {
-      jobs: await Jobs.count({ company: co }),
-      today: await Applicants.todayCount({ company: co }),
-      duplicates: await Applicants.duplicateCount({ company: co })
-    };
-    const { banRisk, mediaBreakdown, todayKyujinbox, todayStanby, indeedRepostCount } = await computeDashboardStats(co);
-    const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
-    send(res, 200, T.dashboardPage({
-      stats, lastPost: await Logs.lastPostTime(), banRisk, mediaBreakdown,
-      todayKyujinbox, todayStanby, indeedRepostCount, siteUrl, co,
-    }));
+    res.writeHead(302, { Location: '/admin/ops?tab=posts' });
+    res.end();
     return;
   }
 

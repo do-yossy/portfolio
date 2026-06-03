@@ -24,38 +24,32 @@ const CALL_STATUS_COLORS = {
   '重複':         '#cbd5e1',
 };
 
-function adminLayout(title, content, active = 'dashboard', co = 'sq') {
-  const company = COMPANIES[co] || COMPANIES.sq;
+function adminLayout(title, content, active = 'posts', co = 'sq') {
   const nav = [
-    { href: '/admin', icon: '🏠', label: 'ダッシュボード', key: 'dashboard' },
-    { href: '/admin/ops', icon: '📊', label: '運用管理', key: 'ops' },
-    { href: '/admin/calls', icon: '📞', label: '架電リスト', key: 'calls' },
-    { href: '/admin/jobs', icon: '💼', label: '求人管理', key: 'jobs' },
-    { href: '/admin/applicants', icon: '👥', label: '応募者管理', key: 'applicants' },
-    { href: '/admin/analytics', icon: '📈', label: '分析・レポート', key: 'analytics' },
-    { href: '/admin/logs', icon: '📋', label: '投稿ログ', key: 'logs' },
-    { href: '/jobs', icon: '🌐', label: '求人サイトを見る', key: 'site' },
-  ].map(n => `<a href="${n.href}?co=${co}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
-
-  const companyTabs = Object.entries(COMPANIES).map(([key, c]) =>
-    `<a href="?co=${key}" class="co-tab${co === key ? ' co-tab-active' : ''}" data-co="${key}" style="${co === key ? `--co-color:${c.color}` : ''}">${c.label}</a>`
-  ).join('');
+    { href: '/admin/ops?tab=posts', icon: '📋', label: '掲載管理',     key: 'posts' },
+    { href: '/admin/ops?tab=new',   icon: '🆕', label: '新規応募',     key: 'new' },
+    { href: '/admin/ops?tab=past',  icon: '📚', label: '過去応募者',   key: 'past' },
+    { href: '/admin/calls',         icon: '📞', label: '架電リスト',   key: 'calls' },
+    { href: '/admin/jobs',          icon: '💼', label: '求人管理',     key: 'jobs' },
+    { href: '/admin/analytics',     icon: '📈', label: '分析・レポート', key: 'analytics' },
+    { href: '/admin/logs',          icon: '📋', label: '投稿ログ',     key: 'logs' },
+    { href: '/jobs',                icon: '🌐', label: '求人サイトを見る', key: 'site' },
+  ].map(n => `<a href="${n.href}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
 
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} | ${company.label} 採用管理</title>
+<title>${title} | 採用管理</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="admin-layout">
 <aside class="sidebar">
-  <div class="sidebar-logo" style="border-bottom:2px solid ${company.color}20">
-    <h1 style="font-size:13px;line-height:1.4">${company.full}</h1>
-    <span>採用管理システム</span>
+  <div class="sidebar-logo">
+    <h1>採用管理システム</h1>
+    <span>運用・架電管理</span>
   </div>
-  <div class="co-tabs">${companyTabs}</div>
   <nav>${nav}</nav>
   <div class="sidebar-footer"><a href="/admin/logout" style="color:var(--text-muted);font-size:12px;text-decoration:none">🚪 ログアウト</a></div>
 </aside>
@@ -1235,9 +1229,9 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
 
   const tabBar = `
     <div class="ops-tabs">
-      <a href="/admin/ops?co=${co}&tab=posts" class="ops-tab ${tab === 'posts' ? 'active' : ''}">📋 掲載管理</a>
-      <a href="/admin/ops?co=${co}&tab=new" class="ops-tab ${tab === 'new' ? 'active' : ''}">🆕 新規応募者</a>
-      <a href="/admin/ops?co=${co}&tab=past" class="ops-tab ${tab === 'past' ? 'active' : ''}">📚 過去応募者</a>
+      <a href="/admin/ops?tab=posts" class="ops-tab ${tab === 'posts' ? 'active' : ''}">📋 掲載管理</a>
+      <a href="/admin/ops?tab=new"   class="ops-tab ${tab === 'new'   ? 'active' : ''}">🆕 新規応募</a>
+      <a href="/admin/ops?tab=past"  class="ops-tab ${tab === 'past'  ? 'active' : ''}">📚 過去応募者</a>
     </div>`;
 
   // ── クロス集計表の共通レンダラ ──
@@ -1266,6 +1260,22 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
 
   // ── Tab A: 掲載管理 ──
   if (tab === 'posts') {
+    // Per-company totals from postsCross
+    const companyTotals = COMPANIES_ORDER.map(cid => {
+      const mediaData = postsCross[cid] || {};
+      const total = OPS_MEDIA.reduce((sum, m) => sum + (mediaData[m.id] || 0), 0);
+      return { cid, total, label: companyName(cid) };
+    });
+    const grandTotal = companyTotals.reduce((sum, c) => sum + c.total, 0);
+
+    const summaryCards = `
+      <section class="stat-cards">
+        <div class="stat-card"><div class="stat-label">掲載総数</div><div class="stat-value">${grandTotal}</div></div>
+        ${companyTotals.map(c =>
+          `<div class="stat-card"><div class="stat-label">${c.label}</div><div class="stat-value">${c.total}</div></div>`
+        ).join('')}
+      </section>`;
+
     const postRows = posts.length ? posts.map(p => `
       <tr>
         <td>${companyName(p.company_id)}</td>
@@ -1281,6 +1291,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
       </tr>`).join('') : `<tr><td colspan="9" class="empty">掲載情報がありません。「＋掲載を追加」から登録してください。</td></tr>`;
 
     body = `
+      ${summaryCards}
       <section class="card">
         <h2>媒体別 × 会社別 掲載中件数</h2>
         ${crossTable(postsCross, '会社＼媒体')}
@@ -1324,7 +1335,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <tfoot><tr><th>合計</th><td class="num total">${todayTargets.total || 0}</td></tr></tfoot>
         </table>
         <div style="margin-top:16px">
-          <a href="/admin/calls?co=${co}" class="btn btn-primary">📞 架電リストを開く</a>
+          <a href="/admin/calls" class="btn btn-primary">📞 架電リストを開く</a>
         </div>
       </section>`;
   }
@@ -1387,13 +1398,14 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
       ${sections || `<section class="card"><p class="empty">該当する応募者がいません。</p></section>`}`;
   }
 
+  const PAGE_TITLES = { posts: '📋 掲載管理', new: '🆕 新規応募', past: '📚 過去応募者' };
   const content = `
-    <div class="page-head"><h1>📊 運用管理</h1></div>
+    <div class="page-head"><h1>${PAGE_TITLES[tab] || '📋 掲載管理'}</h1></div>
     ${tabBar}
     ${body}
     ${tab === 'posts' ? postModalHtml(co) : ''}`;
 
-  return adminLayout('運用管理', content, 'ops', co);
+  return adminLayout(PAGE_TITLES[tab] || '掲載管理', content, tab, co);
 }
 
 function postModalHtml(co) {
@@ -1460,7 +1472,8 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [] } = {}) {
       <h1>📞 架電リスト</h1>
       <div class="head-actions">
         <button class="btn btn-secondary btn-sm" onclick="callImport()">⬆ CSVインポート</button>
-        <a href="/api/ops/calls/export?co=${co}&media=${media}" class="btn btn-ghost btn-sm">⬇ CSV出力</a>
+        <a href="/api/ops/calls/export?co=${co}&media=${media}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力</a>
+        <a href="/api/ops/calls/export" class="btn btn-ghost btn-sm" download>📥 全件CSV出力</a>
         <button class="btn btn-ghost btn-sm" onclick="callCheckDup()">♻️ 重複チェック</button>
       </div>
     </div>
