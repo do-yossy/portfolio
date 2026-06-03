@@ -1071,6 +1071,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     // 新リスト出力ボタンは co=、既存ボタンは company= を送る。'all' は全社合算。
     const coParam = query.co || query.company || '';
     let applicants = await Applicants.findAll();
+    // アーカイブ済み（重複チェック用に保持しているが出力対象外）を除外
+    applicants = applicants.filter(a => !a.is_archived);
     if (coParam && coParam !== 'all') {
       applicants = applicants.filter(a => (a.company || '') === coParam);
     }

@@ -98,6 +98,9 @@ try { db.exec('ALTER TABLE jobs ADD COLUMN worktime_holiday TEXT DEFAULT ""'); }
 try { db.exec('ALTER TABLE jobs ADD COLUMN transportation TEXT DEFAULT ""'); } catch {}
 try { db.exec('ALTER TABLE jobs ADD COLUMN how_to_apply TEXT DEFAULT ""'); } catch {}
 
+// Migration: is_archived フラグ（重複チェック用に保持するが出力対象外）
+try { db.exec('ALTER TABLE applicants ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0'); } catch {}
+
 function now() {
   return new Date().toISOString();
 }
