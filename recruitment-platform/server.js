@@ -1012,16 +1012,15 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       data.todayTargets = await Ops.todayCallTargets();
       data.stats = await opsNewStats();
     } else if (tab === 'past') {
+      // 絞り込みはクライアント側で即時に行うため、ここでは全件を渡す。
+      // URLパラメータはプルダウンの初期選択（ディープリンク）に使う。
       const filter = {
         company: query.company || 'all', media: query.media || 'all',
         status: query.status || 'all', month: query.month || 'all',
       };
       data.filter = filter;
       data.months = await Ops.appliedMonths();
-      data.pastApplicants = await Ops.listCalls({
-        company: filter.company, media: filter.media,
-        status: filter.status, month: filter.month,
-      });
+      data.pastApplicants = await Ops.listCalls({});
     }
     send(res, 200, T.opsPage(data));
     return;

@@ -1309,9 +1309,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
     body = `
       <section class="stat-cards">
         <div class="stat-card"><div class="stat-label">本日の新規応募</div><div class="stat-value">${stats.todayNew || 0}</div></div>
-        <div class="stat-card"><div class="stat-label">今週の新規応募</div><div class="stat-value">${stats.weekNew || 0}</div></div>
         <div class="stat-card"><div class="stat-label">本日架電対象（全体）</div><div class="stat-value">${(todayTargets.total) || 0}</div></div>
-        <div class="stat-card"><div class="stat-label">未対応合計</div><div class="stat-value">${stats.activeTotal || 0}</div></div>
       </section>
       <section class="card">
         <h2>会社別 × 媒体別 新規応募数</h2>
@@ -1355,7 +1353,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
     };
     const sections = sectionsOrder.filter(s => (groups[s] || []).length).map(s => {
       const rows = groups[s].map(a => `
-        <tr>
+        <tr data-company="${esc(a.company || '')}" data-media="${esc(a.media || '')}" data-status="${esc(a.status || '')}" data-month="${esc((a.applied_at || '').slice(0, 7))}">
           <td class="name-col">${esc(a.name || '')}</td>
           <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
           <td>${esc(a.email || '')}</td>
@@ -1373,8 +1371,8 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <td>${esc(a.notes || '')}</td>
         </tr>`).join('');
       return `
-        <details class="past-section" open>
-          <summary><span class="dot" style="background:${CALL_STATUS_COLORS[s] || '#999'}"></span>${sectionLabels[s] || s} <span class="count">${groups[s].length}件</span></summary>
+        <details class="past-section" open data-status="${esc(s)}">
+          <summary><span class="dot" style="background:${CALL_STATUS_COLORS[s] || '#999'}"></span>${sectionLabels[s] || s} <span class="count section-count">${groups[s].length}件</span></summary>
           <div class="table-scroll">
             <table class="data-table">
               <thead><tr>
@@ -1388,25 +1386,20 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
         </details>`;
     }).join('');
 
-    // 現在の絞り込みに合わせたスプレッドシート出力リンク
+    // 初期のスプレッドシート出力リンク（URLパラメータからのディープリンク用）。
+    // 以降は絞り込み操作に応じて opsPastFilter() が href を更新する。
     const exportQS = new URLSearchParams();
-    if (filter.company && filter.company !== 'all') exportQS.set('company', filter.company);
-    if (filter.media   && filter.media   !== 'all') exportQS.set('media',   filter.media);
-    if (filter.status  && filter.status  !== 'all') exportQS.set('status',  filter.status);
-    if (filter.month   && filter.month   !== 'all') exportQS.set('month',   filter.month);
+    if (filter.company !== 'all') exportQS.set('company', filter.company);
+    if (filter.media   !== 'all') exportQS.set('media',   filter.media);
+    if (filter.status  !== 'all') exportQS.set('status',  filter.status);
+    if (filter.month   !== 'all') exportQS.set('month',   filter.month);
     const exportHref = '/api/ops/calls/export' + (exportQS.toString() ? `?${exportQS.toString()}` : '');
-    const activeFilters = [
-      filter.company && filter.company !== 'all' ? companyName(filter.company) : null,
-      filter.media   && filter.media   !== 'all' ? mediaName(filter.media)     : null,
-      filter.status  && filter.status  !== 'all' ? filter.status               : null,
-      filter.month   && filter.month   !== 'all' ? filter.month                : null,
-    ].filter(Boolean);
 
     body = `
       <section class="card">
         <div class="card-head">
-          <h2>絞り込み</h2>
-          <a href="${exportHref}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力${activeFilters.length ? '（絞り込み中）' : '（全件）'}</a>
+          <h2>絞り込み <span class="count" id="past-total">${pastApplicants.length}件</span></h2>
+          <a id="past-export" href="${exportHref}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全件）</a>
         </div>
         <form id="past-filter" class="filter-bar">
           ${sel('company', companyOpts, filter.company || 'all')}
@@ -1414,9 +1407,12 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           ${sel('status', statusOpts, filter.status || 'all')}
           ${sel('month', monthOpts, filter.month || 'all')}
         </form>
-        ${activeFilters.length ? `<p class="muted" style="margin:10px 0 0">抽出条件: ${activeFilters.map(esc).join(' / ')}</p>` : ''}
+        <p class="muted" id="past-conditions" style="margin:10px 0 0;display:none"></p>
       </section>
-      ${sections || `<section class="card"><p class="empty">該当する応募者がいません。</p></section>`}`;
+      <div id="past-results">
+        ${sections}
+        <section class="card" id="past-empty" style="display:none"><p class="empty">該当する応募者がいません。</p></section>
+      </div>`;
   }
 
   const PAGE_TITLES = { posts: '📋 掲載管理', new: '🆕 新規応募', past: '📚 過去応募者' };

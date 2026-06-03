@@ -679,6 +679,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (fi && e.dataTransfer.files[0]) { fi.files = e.dataTransfer.files; handleCSVFile(fi); }
     });
   }
+  // 過去応募者ページ: URLパラメータ（ディープリンク）に応じて初回絞り込みを適用
+  if (document.getElementById('past-filter')) opsPastFilter();
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -738,18 +740,53 @@ function opsDeletePost(id) {
     else toast('削除に失敗しました', 'error');
   });
 }
-// 過去応募者フィルター
+// 過去応募者フィルター（クライアント側で即時に絞り込み・ページ遷移なし）
 function opsPastFilter() {
   const f = document.getElementById('past-filter');
   if (!f) return;
-  const params = new URLSearchParams(location.search);
-  params.set('tab', 'past');
-  ['company', 'media', 'status', 'month'].forEach(name => {
-    const el = f.querySelector(`[name="${name}"]`);
-    if (el) params.set(name, el.value);
-    else params.delete(name);
+  const getVal  = (n) => { const el = f.querySelector(`[name="${n}"]`); return el ? el.value : 'all'; };
+  const getText = (n) => { const el = f.querySelector(`[name="${n}"]`); return (el && el.value !== 'all') ? el.options[el.selectedIndex].text : null; };
+  const fc = getVal('company'), fm = getVal('media'), fs = getVal('status'), fmo = getVal('month');
+
+  let total = 0;
+  document.querySelectorAll('#past-results .past-section').forEach(sec => {
+    let shown = 0;
+    sec.querySelectorAll('tbody tr').forEach(tr => {
+      const ok = (fc === 'all'  || tr.dataset.company === fc)
+              && (fm === 'all'  || tr.dataset.media   === fm)
+              && (fs === 'all'  || tr.dataset.status  === fs)
+              && (fmo === 'all' || tr.dataset.month   === fmo);
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    const cnt = sec.querySelector('.section-count');
+    if (cnt) cnt.textContent = shown + '件';
+    sec.style.display = shown ? '' : 'none';
+    total += shown;
   });
-  location.href = location.pathname + '?' + params.toString();
+
+  const totalEl = document.getElementById('past-total');
+  if (totalEl) totalEl.textContent = total + '件';
+  const emptyEl = document.getElementById('past-empty');
+  if (emptyEl) emptyEl.style.display = total ? 'none' : '';
+
+  // スプレッドシート出力リンクと抽出条件表示を更新
+  const qs = new URLSearchParams();
+  if (fc !== 'all')  qs.set('company', fc);
+  if (fm !== 'all')  qs.set('media', fm);
+  if (fs !== 'all')  qs.set('status', fs);
+  if (fmo !== 'all') qs.set('month', fmo);
+  const a = document.getElementById('past-export');
+  if (a) {
+    a.href = '/api/ops/calls/export' + (qs.toString() ? '?' + qs.toString() : '');
+    a.textContent = qs.toString() ? '📊 スプレッドシート出力（絞り込み中）' : '📊 スプレッドシート出力（全件）';
+  }
+  const cond = document.getElementById('past-conditions');
+  if (cond) {
+    const labels = [getText('company'), getText('media'), getText('status'), getText('month')].filter(Boolean);
+    cond.textContent = labels.length ? '抽出条件: ' + labels.join(' / ') : '';
+    cond.style.display = labels.length ? '' : 'none';
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
