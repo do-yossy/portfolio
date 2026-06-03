@@ -1568,6 +1568,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
         <button class="btn btn-primary btn-sm" onclick="sheetsPush()" title="重複チェック済みの応募者を共有スプレッドシートに追記する">📤 スプレッドシートへ反映</button>
         <button class="btn btn-warning btn-sm" onclick="sheetsPull()" title="共有スプレッドシートで更新した対応状況・架電回数・メモをDBに取り込む">📥 スプレッドシートから取込</button>
         <a id="sheets-open" href="#" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="display:none">🔗 シートを開く</a>
+        <button class="btn btn-secondary btn-sm" onclick="sheetsInitRecruitment()" title="スプレッドシートに推薦管理・案件精査タブを作成（既存タブは上書きしません）">📋 推薦・案件精査シート作成</button>
         <span style="width:1px;height:24px;background:#e2e8f0;margin:0 2px"></span>
         <button class="btn btn-ghost btn-sm" onclick="callImport()" title="各媒体のCSV/Excelを取り込み（重複チェック付き）">⬆ CSV/Excel取込</button>
         <a href="${morningExportHref}" class="btn btn-ghost btn-sm" download>📞 朝の架電リスト(xlsx)</a>

@@ -122,4 +122,64 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
   return { updated, notFound, scanned };
 }
 
-module.exports = { SHEET_HEADERS, SHEET_COL, applicantToSheetRow, pushToSheets, pullFromSheets };
+// ─────────────────────────────────────────────────────────────
+// 推薦管理・案件精査シートの初期化
+// ─────────────────────────────────────────────────────────────
+
+const SUISHO_HEADERS = [
+  '推薦日', 'ステータス', 'アカウント', '対象案件', '応募案件',
+  '氏名', '読み方', '年齢', '生年月日', '性別', '最終学歴',
+  '最寄駅', '通勤時間', '希望職種・動機', '経験', '雇用形態',
+  '希望入社日', '他社並行', '電話番号', 'メールアドレス', '住所', '備考',
+  'オンライン面談', '面談候補日①', '面談候補日②', '面談候補日③',
+  '面談日確定', '面談結果', 'メモ',
+];
+const SUISHO_COL = { status: 1, online: 22, result: 27 };
+
+const SEISA_HEADERS = [
+  '精査日', 'アカウント', '対象案件', '応募案件',
+  '氏名', '読み方', '年齢', '生年月日', '性別', '最終学歴',
+  '最寄駅', '通勤時間(分)', '希望職種・動機', '経験', '雇用形態',
+  '希望入社日', '他社並行', '電話番号', 'メールアドレス', '住所', '備考',
+  'オンライン面談',
+  '面談候補日①', '面談候補日②', '面談候補日③',
+  '面談候補日④', '面談候補日⑤', '面談候補日⑥',
+  '運転免許', '安全運転(事故・点数)', '健康状態(疾患・既往歴)',
+  '精査結果', 'メモ',
+];
+const SEISA_COL = { online: 21, license: 28, seisaResult: 31 };
+
+async function initRecruitmentSheets({ gsheets, Logs }) {
+  const created = [];
+
+  // ── 推薦管理シート ───────────────────────────────────────
+  const suishoProps = await gsheets.ensureTab('推薦管理');
+  await gsheets.writeValues('推薦管理', [SUISHO_HEADERS.slice()]);
+  try {
+    await gsheets.styleHeader(suishoProps.sheetId, SUISHO_HEADERS.length);
+    await gsheets.setDropdowns(suishoProps.sheetId, [
+      { colIndex: SUISHO_COL.status, list: ['推薦前', '案件精査中', '推薦済み', '面談調整中', '面談確定', '面談済み', '内定', '入社', '不採用', '辞退', '見送り'] },
+      { colIndex: SUISHO_COL.online, list: ['◯', '✕', '要確認'] },
+      { colIndex: SUISHO_COL.result, list: ['合格', '不合格', '辞退', '見送り', '結果待ち'] },
+    ]);
+  } catch (_) { /* 書式エラーはデータに影響しない */ }
+  created.push('推薦管理');
+
+  // ── 案件精査シート ───────────────────────────────────────
+  const seisaProps = await gsheets.ensureTab('案件精査');
+  await gsheets.writeValues('案件精査', [SEISA_HEADERS.slice()]);
+  try {
+    await gsheets.styleHeader(seisaProps.sheetId, SEISA_HEADERS.length);
+    await gsheets.setDropdowns(seisaProps.sheetId, [
+      { colIndex: SEISA_COL.online,  list: ['◯', '✕', '要確認'] },
+      { colIndex: SEISA_COL.license, list: ['有', '無', '要確認'] },
+      { colIndex: SEISA_COL.seisaResult, list: ['推薦OK', '保留', '見送り', '再精査'] },
+    ]);
+  } catch (_) { /* 書式エラーはデータに影響しない */ }
+  created.push('案件精査');
+
+  if (Logs) await Logs.create('sheets_init_recruitment', 'success', `推薦管理・案件精査シートを作成しました（${created.join('・')}）`);
+  return { created };
+}
+
+module.exports = { SHEET_HEADERS, SHEET_COL, applicantToSheetRow, pushToSheets, pullFromSheets, initRecruitmentSheets };

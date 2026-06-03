@@ -34,7 +34,7 @@ const { requireAuth, login, destroySession, sessionCookie, parseCookies } = requ
 const { sendApplicationThanks, sendNewApplicantAlert } = require('./lib/mailer');
 const { buildXlsx, parseXlsx } = require('./lib/xlsx');
 const gsheets = require('./lib/gsheets');
-const { pushToSheets, pullFromSheets } = require('./lib/sheets-sync');
+const { pushToSheets, pullFromSheets, initRecruitmentSheets } = require('./lib/sheets-sync');
 const T = require('./templates');
 const { privacyPolicyPage } = T;
 
@@ -1322,6 +1322,22 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       sendJSON(res, 200, { ok: true, ...r, url: gsheets.sheetUrl() });
     } catch (e) {
       await Logs.create('sheets_pull', 'error', String(e.message || e));
+      sendJSON(res, 500, { ok: false, error: String(e.message || e) });
+    }
+    return;
+  }
+
+  // 推薦管理・案件精査シートを初期化（タブがなければ作成し、ヘッダ＋書式を設定）
+  if (pathname === '/api/ops/sheets/init-recruitment' && method === 'POST') {
+    if (!gsheets.isConfigured()) {
+      sendJSON(res, 400, { ok: false, error: 'Googleスプレッドシート連携が未設定です（GOOGLE_SERVICE_ACCOUNT_JSON / GOOGLE_SHEET_ID）' });
+      return;
+    }
+    try {
+      const r = await initRecruitmentSheets({ gsheets, Logs });
+      sendJSON(res, 200, { ok: true, ...r, url: gsheets.sheetUrl() });
+    } catch (e) {
+      await Logs.create('sheets_init_recruitment', 'error', String(e.message || e));
       sendJSON(res, 500, { ok: false, error: String(e.message || e) });
     }
     return;

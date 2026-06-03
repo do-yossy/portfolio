@@ -942,6 +942,22 @@ async function sheetsPull() {
   });
 }
 
+async function sheetsInitRecruitment() {
+  const st = await sheetsStatus();
+  if (!st.configured) { toast('Googleスプレッドシート連携が未設定です（設定方法はGOOGLE_SHEETS_SETUP.mdを参照）', 'warn'); return; }
+  confirmAction('スプレッドシートに「推薦管理」「案件精査」タブを作成します。既にタブがある場合はヘッダ行のみ更新されます。よろしいですか？', async () => {
+    toast('推薦・案件精査シートを作成中...', 'info');
+    try {
+      const r = await fetch('/api/ops/sheets/init-recruitment', { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) {
+        toast(`作成完了：${(d.created || []).join('・')}`, 'success');
+        if (d.url) { const a = document.getElementById('sheets-open'); if (a) { a.href = d.url; a.style.display = ''; } }
+      } else { toast('作成に失敗: ' + (d.error || '不明なエラー'), 'error'); }
+    } catch (e) { toast('通信エラー: ' + e.message, 'error'); }
+  });
+}
+
 function callCheckDup() {
   confirmAction('全データを横断し、電話番号またはメールアドレスが一致する応募者を「重複」にします（会社・媒体は問いません）。よろしいですか？', async () => {
     try {
