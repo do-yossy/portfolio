@@ -125,12 +125,15 @@ function mapCSVRow(row) {
   const cleanName = rawName.replace(/[（(][^）)]*[）)]/g, '').trim();
 
   // 電話番号を正規化: "80 1469 8497" → "080-1469-8497"
+  // Indeed形式の '+81 90...' も処理
   let rawPhone = col(['電話番号','phone','tel','電話','携帯']);
-  rawPhone = rawPhone.replace(/[\s\-ー−]/g, '');
+  rawPhone = rawPhone.replace(/^'+/, '').replace(/[\s\-ー−]/g, '');
+  if (rawPhone.startsWith('+81')) rawPhone = '0' + rawPhone.slice(3);
+  else if (rawPhone.startsWith('810')) rawPhone = '0' + rawPhone.slice(3);
   if (rawPhone && /^[789]/.test(rawPhone)) rawPhone = '0' + rawPhone;
   const phone = rawPhone.replace(/^(\d{2,3})(\d{4})(\d{4})$/, '$1-$2-$3');
 
-  // 応募日: "3月1日" → 当年の日付文字列
+  // 応募日: "3月1日" or "2026-06-02" など
   let appliedAt = col(['応募日','applied_at','応募日時','日付']);
   const m = appliedAt.match(/^(\d{1,2})月(\d{1,2})日$/);
   if (m) {
@@ -138,11 +141,15 @@ function mapCSVRow(row) {
     appliedAt = `${year}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
   }
 
-  // 住所: 列名「対応」に住所が入っているケースにも対応
-  const address = col(['住所','address','addr','対応']);
+  // 住所: Indeed形式の '応募者の居住地' にも対応
+  const address = col(['住所','address','addr','対応','応募者の居住地']);
 
-  // 媒体: 職種名か応募媒体を参照
-  const sourceMedia = col(['媒体','source_media','応募媒体','media','職種名']) || 'CSV取込';
+  // 媒体: '応募経路'(Indeed) も参照
+  const sourceMedia = col(['媒体','source_media','応募媒体','media','応募経路','職種名']) || 'CSV取込';
+
+  // ステータス: Indeed '書類審査済み'→'新規'、求人ボックス '選考ステータス' も参照
+  const rawStatus = col(['ステータス','選考ステータス','status']);
+  const status = rawStatus === '書類審査済み' || rawStatus === '選考待ち' ? '新規' : (rawStatus || '');
 
   return {
     name:        cleanName,
@@ -152,6 +159,7 @@ function mapCSVRow(row) {
     address,
     sourceMedia,
     appliedAt,
+    status,
   };
 }
 
@@ -1054,7 +1062,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         ...mapped,
         isDuplicate: !!dupId,
         duplicateOfId: dupId,
-        status: dupId ? '重複' : '新規'
+        status: dupId ? '重複' : (mapped.status || '新規')
       });
       if (dupId) duplicates++; else imported++;
     }
