@@ -438,6 +438,7 @@ async function saveJob() {
     tags,
     isPublished:    document.getElementById('jf-published').checked,
     targetMedia:    (() => { const r = document.querySelector('[name="jf-media"]:checked'); return r && r.value ? [r.value] : []; })(),
+    company:        document.getElementById('jobs-current-co')?.value || undefined,
   };
   const url    = id ? `/api/jobs/${id}` : '/api/jobs';
   const method = id ? 'PUT' : 'POST';

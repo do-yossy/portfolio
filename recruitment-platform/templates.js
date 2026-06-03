@@ -391,6 +391,11 @@ ${jobModalHTML()}
 
 // ── Admin Jobs ──
 function adminJobsPage(jobs, co = 'sq') {
+  const coKeys = Object.keys(COMPANIES);
+  const coTabs = coKeys.map(c =>
+    `<a href="/admin/jobs?co=${c}" class="call-co-tab ${c === co ? 'active' : ''}" style="${c === co ? 'background:' + COMPANIES[c].color + ';border-color:' + COMPANIES[c].color : ''}">${COMPANIES[c].label}</a>`
+  ).join('');
+
   const rows = jobs.length === 0
     ? `<tr><td colspan="7" class="empty-state"><p>求人が登録されていません</p></td></tr>`
     : jobs.map(j => {
@@ -420,7 +425,9 @@ function adminJobsPage(jobs, co = 'sq') {
     <button class="btn btn-primary" onclick="showJobModal(null)">＋ 求人を登録する</button>
   </div>
 </div>
+<div class="call-co-tabs">${coTabs}</div>
 <div class="card">
+  <div style="padding:10px 16px 2px;font-size:13px;color:#64748b">${COMPANIES[co]?.label || co} の求人 <strong>${jobs.length}件</strong></div>
   <div class="table-wrap">
     <table>
       <thead><tr>
@@ -431,6 +438,7 @@ function adminJobsPage(jobs, co = 'sq') {
     </table>
   </div>
 </div>
+<input type="hidden" id="jobs-current-co" value="${esc(co)}">
 ${jobModalHTML()}
 ${bulkModalHTML()}`;
   return adminLayout('求人管理', content, 'jobs', co);
