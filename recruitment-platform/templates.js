@@ -1425,8 +1425,13 @@ function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
 
   return `
   <section class="card">
-    <div class="card-head"><h2>📡 媒体運用</h2></div>
-    <p class="muted" style="margin:-4px 0 12px">会社ごとにボタン1回で1日分の求人を各媒体へ一括投稿します。</p>
+    <div class="card-head" style="align-items:center">
+      <h2>📡 媒体運用</h2>
+      <span id="vpn-badge" class="vpn-badge vpn-checking" onclick="refreshVpn()" title="クリックで再確認">
+        <span class="dot"></span> 確認中...
+      </span>
+    </div>
+    <p class="muted" style="margin:-4px 0 12px">各媒体への投稿には VPN 接続が必要です。上のランプが「接続中」であることを確認してから投稿してください。</p>
     <div class="call-co-tabs">${coTabs}</div>
     <p class="muted" style="margin:8px 0 16px">対象会社: <strong style="color:${company.color}">${company.full}</strong></p>
 
