@@ -41,6 +41,18 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
 const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
 
+// アセットのバージョン（admin.js / styles.css の更新時刻から算出）。
+// HTML 内の <script>/<link> に ?v=... として付与し、デプロイ後に
+// ブラウザが古いキャッシュを使い続ける問題を防ぐ。
+function computeAssetVersion() {
+  try {
+    const a = fs.statSync(path.join(PUBLIC_DIR, 'admin.js')).mtimeMs;
+    const c = fs.statSync(path.join(PUBLIC_DIR, 'styles.css')).mtimeMs;
+    return String(Math.floor(Math.max(a, c)));
+  } catch { return String(Date.now()); }
+}
+process.env.ASSET_VERSION = computeAssetVersion();
+
 // ── Utilities ──────────────────────────────────────────────
 
 function send(res, status, body, ct = 'text/html; charset=utf-8') {
@@ -683,7 +695,9 @@ const server = http.createServer(async (req, res) => {
     try {
       const content = fs.readFileSync(fp);
       const ct = pathname.endsWith('.css') ? 'text/css' : 'application/javascript';
-      send(res, 200, content, ct);
+      // 毎回サーバーに確認させ、古いJS/CSSをキャッシュから使い続けないようにする
+      res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'no-cache, must-revalidate' });
+      res.end(content);
     } catch { send(res, 404, 'Not Found'); }
     return;
   }

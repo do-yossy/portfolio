@@ -55,7 +55,7 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} | 採用管理</title>
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css?v=${process.env.ASSET_VERSION || '1'}">
 </head>
 <body class="admin-layout">
 <aside class="sidebar">
@@ -80,7 +80,7 @@ ${content}
   </div>
 </div>
 <div id="toast-container"></div>
-<script src="/admin.js"></script>
+<script src="/admin.js?v=${process.env.ASSET_VERSION || '1'}"></script>
 </body>
 </html>`;
 }
@@ -103,7 +103,7 @@ ${description ? `<meta name="description" content="${esc(description)}">` : ''}
 <meta property="og:url" content="${canonicalUrl}">
 ${description ? `<meta property="og:description" content="${esc(description)}">` : ''}
 ${jsonld}
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css?v=${process.env.ASSET_VERSION || '1'}">
 </head>
 <body class="pub-body">
 <header class="pub-header">
@@ -124,7 +124,7 @@ ${content}
   </div>
 </footer>
 <div id="toast-container"></div>
-<script src="/admin.js"></script>
+<script src="/admin.js?v=${process.env.ASSET_VERSION || '1'}"></script>
 </body>
 </html>`;
 }
