@@ -918,7 +918,8 @@ async function sheetsPush() {
     const r = await fetch('/api/ops/sheets/push', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      toast(`${d.appended}件をスプレッドシートに追記しました`, d.appended > 0 ? 'success' : 'info');
+      const n = (d.count != null ? d.count : d.appended) || 0;
+      toast(`${n}件をスプレッドシートに反映しました（媒体別）`, n > 0 ? 'success' : 'info');
       if (d.warnings && d.warnings.length) toast('注意: ' + d.warnings.join(' / '), 'warn');
       const link = document.getElementById('sheets-open');
       if (link && d.url) { link.href = d.url; link.style.display = ''; }

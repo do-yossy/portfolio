@@ -224,8 +224,26 @@ async function styleHeader(tabSheetId, numCols) {
   });
 }
 
+// 媒体見出し行（rowIndices: 0始まり）にグレー背景＋太字を設定
+async function styleSectionRows(tabSheetId, rowIndices, numCols) {
+  if (!rowIndices || !rowIndices.length) return;
+  const requests = rowIndices.map(r => ({
+    repeatCell: {
+      range: { sheetId: tabSheetId, startRowIndex: r, endRowIndex: r + 1, startColumnIndex: 0, endColumnIndex: numCols },
+      cell: {
+        userEnteredFormat: {
+          backgroundColor: { red: 0.886, green: 0.91, blue: 1 },
+          textFormat: { foregroundColor: { red: 0.18, green: 0.16, blue: 0.45 }, bold: true },
+        },
+      },
+      fields: 'userEnteredFormat(backgroundColor,textFormat)',
+    },
+  }));
+  await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests } });
+}
+
 module.exports = {
   isConfigured, sheetUrl, getAccessToken,
   getMeta, ensureTab, readValues, writeValues, appendValues,
-  setDropdowns, styleHeader, colLetter,
+  setDropdowns, styleHeader, styleSectionRows, colLetter,
 };

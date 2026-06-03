@@ -24,39 +24,75 @@ function applicantToSheetRow(a, mediaLabel) {
 // DB → スプレッドシート（会社ごとタブ。重複を除き、未登録IDのみ追記）
 async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList }) {
   const mediaLabel = id => { const m = mediaList.find(x => x.id === id); return m ? m.name : (id || '不明'); };
-  let appended = 0, tabs = 0;
+  let count = 0, tabs = 0;
   const warnings = [];
   for (const co of companies) {
     const list = (await Ops.listCalls({ company: co.id })).filter(a => !a.is_duplicate);
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
-    const existing = await gsheets.readValues(title);
-    const hasHeader = existing.length > 0;
-    const existingIds = new Set(existing.slice(hasHeader ? 1 : 0).map(r => r[SHEET_COL.id]).filter(Boolean));
 
-    // ヘッダが無ければ書き込む
-    if (!hasHeader) {
-      await gsheets.writeValues(title, [SHEET_HEADERS]);
+    // 既存シートから手入力済みの架電結果（ID→{callCount,status,notes}）を退避し、
+    // 組み直しても記入内容を失わないようにする。
+    const existing = await gsheets.readValues(title);
+    const prior = new Map();
+    for (const row of existing.slice(1)) {
+      const id = row[SHEET_COL.id];
+      if (id) prior.set(id, { callCount: row[SHEET_COL.callCount], status: row[SHEET_COL.status], notes: row[SHEET_COL.notes] });
     }
-    // 書式・プルダウンは毎回（冪等）適用。既存タブも自動で修復される。
-    // 失敗してもデータ反映は止めず、警告として収集する。
+
+    // 媒体ごとにグルーピング（未知の媒体は「その他」へ）
+    const groups = new Map();
+    for (const a of list) {
+      const key = mediaList.some(m => m.id === a.media) ? a.media : '__other__';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(a);
+    }
+
+    // レイアウト再構築: ヘッダ → [媒体見出し → 応募者行] × 媒体
+    const rows = [SHEET_HEADERS.slice()];
+    const sectionRowIdx = [];
+    const order = [...mediaList.map(m => m.id), '__other__'];
+    for (const key of order) {
+      const grp = groups.get(key);
+      if (!grp || !grp.length) continue;
+      const label = key === '__other__' ? 'その他・媒体未設定' : mediaLabel(key);
+      const sec = new Array(SHEET_HEADERS.length).fill('');
+      sec[1] = `▼ ${label}（${grp.length}件）`;   // 見出しはID列(A)を空にして取込でスキップさせる
+      sectionRowIdx.push(rows.length);               // 0始まりの行インデックス
+      rows.push(sec);
+      for (const a of grp) {
+        const row = applicantToSheetRow(a, mediaLabel);
+        const p = prior.get(a.id);                   // 手入力済みの架電結果を優先（取込前の編集を保持）
+        if (p) {
+          if (p.callCount !== undefined && p.callCount !== '') row[SHEET_COL.callCount] = String(p.callCount);
+          if (p.status) row[SHEET_COL.status] = p.status;
+          if (p.notes !== undefined && p.notes !== '') row[SHEET_COL.notes] = p.notes;
+        }
+        rows.push(row);
+        count++;
+      }
+    }
+
+    await gsheets.writeValues(title, rows);
+
+    // 書式・プルダウンは毎回（冪等）適用。失敗してもデータ反映は止めず警告に。
     try {
       await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
       await gsheets.setDropdowns(props.sheetId, [
         { colIndex: SHEET_COL.callCount, list: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] },
         { colIndex: SHEET_COL.status, list: statuses },
       ]);
+      if (sectionRowIdx.length && gsheets.styleSectionRows) {
+        await gsheets.styleSectionRows(props.sheetId, sectionRowIdx, SHEET_HEADERS.length);
+      }
     } catch (e) {
       warnings.push(`${title}: 書式/プルダウン設定に失敗 (${e.message || e})`);
     }
-
-    const newRows = list.filter(a => !existingIds.has(a.id)).map(a => applicantToSheetRow(a, mediaLabel));
-    if (newRows.length) { await gsheets.appendValues(title, newRows); appended += newRows.length; }
     tabs++;
   }
-  if (Logs) await Logs.create('sheets_push', warnings.length ? 'success' : 'success',
-    `${appended}件を共有スプレッドシートに追記（${tabs}タブ）` + (warnings.length ? ` ※${warnings.join(' / ')}` : ''));
-  return { appended, tabs, warnings };
+  if (Logs) await Logs.create('sheets_push', 'success',
+    `${count}件を共有スプレッドシートに反映（${tabs}タブ・媒体別）` + (warnings.length ? ` ※${warnings.join(' / ')}` : ''));
+  return { count, appended: count, tabs, warnings };
 }
 
 // スプレッドシート → DB（IDで突合し対応状況・架電回数・メモを更新）
