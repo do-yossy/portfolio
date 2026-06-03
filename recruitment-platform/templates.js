@@ -1472,8 +1472,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [] } = {}) {
       <h1>📞 架電リスト</h1>
       <div class="head-actions">
         <button class="btn btn-secondary btn-sm" onclick="callImport()">⬆ CSVインポート</button>
-        <a href="/api/ops/calls/export?co=${co}&media=${media}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力</a>
-        <a href="/api/ops/calls/export" class="btn btn-ghost btn-sm" download>📥 全件CSV出力</a>
+        <a href="/api/ops/calls/export" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全社・媒体別）</a>
         <button class="btn btn-ghost btn-sm" onclick="callCheckDup()">♻️ 重複チェック</button>
       </div>
     </div>

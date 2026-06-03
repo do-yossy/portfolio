@@ -32,6 +32,7 @@ const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize')
 const { notify } = require('./lib/notify');
 const { requireAuth, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
 const { sendApplicationThanks, sendNewApplicantAlert } = require('./lib/mailer');
+const { buildXlsx } = require('./lib/xlsx');
 const T = require('./templates');
 const { privacyPolicyPage } = T;
 
@@ -91,22 +92,38 @@ function parseMultipart(buf, boundary) {
   return parts;
 }
 
-// Parse CSV text into array of objects
+// Parse CSV text into array of objects（RFC-4180準拠: 引用フィールド内の改行・カンマ・""エスケープに対応）
 function parseCSV(text) {
-  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"(.*)"$/, '$1').trim());
-  return lines.slice(1).map(line => {
-    const vals = [];
-    let cur = ''; let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === '"') { inQ = !inQ; }
-      else if (line[i] === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
-      else cur += line[i];
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const records = [];
+  let field = '';
+  let row = [];
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } // エスケープされた引用符
+        else inQ = false;
+      } else field += ch;
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ',') { row.push(field); field = ''; }
+      else if (ch === '\n') { row.push(field); records.push(row); field = ''; row = []; }
+      else field += ch;
     }
-    vals.push(cur.trim());
+  }
+  // 末尾フィールド/行
+  if (field.length || row.length) { row.push(field); records.push(row); }
+
+  // 空行（全フィールド空）を除去
+  const cleaned = records.filter(r => r.some(c => c.trim() !== ''));
+  if (cleaned.length < 2) return [];
+
+  const headers = cleaned[0].map(h => h.trim().replace(/^"(.*)"$/, '$1').trim());
+  return cleaned.slice(1).map(r => {
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+    headers.forEach((h, i) => { obj[h] = (r[i] != null ? r[i].trim() : ''); });
     return obj;
   });
 }
@@ -148,9 +165,12 @@ function mapCSVRow(row) {
   // 媒体: '応募経路'(Indeed) も参照
   const sourceMedia = col(['媒体','source_media','応募媒体','media','応募経路','職種名']) || 'CSV取込';
 
-  // ステータス: Indeed '書類審査済み'→'新規'、求人ボックス '選考ステータス' も参照
+  // ステータス: Indeed '書類審査済み'/'選考待ち'・求人ボックス '未対応' → すべて '新規' に正規化
   const rawStatus = col(['ステータス','選考ステータス','status']);
-  const status = rawStatus === '書類審査済み' || rawStatus === '選考待ち' ? '新規' : (rawStatus || '');
+  const NEW_ALIASES = ['書類審査済み', '選考待ち', '未対応', '新規', '応募', '未着手'];
+  const VALID_CALL = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];
+  const status = NEW_ALIASES.includes(rawStatus) ? '新規'
+    : (VALID_CALL.includes(rawStatus) ? rawStatus : '新規');
 
   return {
     name:        cleanName,
@@ -1103,22 +1123,55 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   }
 
   // ── CSV出力（会社・媒体・ステータス別）──
+  // ── 架電リスト スプレッドシート出力（会社=タブ・媒体=セクション）──
   if (pathname === '/api/ops/calls/export' && method === 'GET') {
-    const list = await Ops.listCalls({
-      company: query.co || query.company, media: query.media,
-      status: query.status, month: query.month,
-    });
-    const header = ['会社', '媒体', '名前', '電話番号', 'メール', '年齢', '居住地', '応募日', '架電回数', '対応状況', 'メモ'];
-    const companyLabel = id => { const c = OPS_COMPANIES.find(x => x.id === id); return c ? c.short : id; };
-    const mediaLabel = id => { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : id; };
-    const csvRows = list.map(a => [
-      companyLabel(a.company), mediaLabel(a.media), a.name, a.phone, a.email,
+    // 全会社・全媒体を1つのブックに（会社ごとにタブ、タブ内で媒体ごとにセクション）
+    const all = await Ops.listCalls({ status: query.status, month: query.month });
+    const mediaLabel = id => { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '不明'); };
+
+    const HEADERS = ['媒体', '名前', '電話番号', 'メールアドレス', '年齢', '居住地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
+    const rowFor = a => [
+      mediaLabel(a.media), a.name || '', a.phone || '', a.email || '',
       a.age || '', a.address || '', (a.applied_at || '').slice(0, 10),
-      a.call_count || 0, a.status, (a.notes || '').replace(/[\r\n,]/g, ' '),
-    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
-    const csv = '﻿' + [header.join(','), ...csvRows].join('\r\n');
-    res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="calls_${query.co || 'all'}_${query.media || 'all'}.csv"` });
-    res.end(csv);
+      a.call_count || 0, a.status || '', (a.last_called_at || '').slice(0, 10),
+      a.is_duplicate ? '重複' : '', (a.notes || '').replace(/[\r\n]+/g, ' '),
+    ];
+
+    const sheets = OPS_COMPANIES.map(co => {
+      const coApps = all.filter(a => a.company === co.id);
+      const rows = [];
+      // ヘッダー行（スタイル付き）
+      rows.push(HEADERS.map(h => ({ v: h, style: 'header' })));
+      if (!coApps.length) {
+        rows.push(['応募者がいません', '', '', '', '', '', '', '', '', '', '', '']);
+      } else {
+        // 媒体ごとにセクション化
+        for (const m of OPS_MEDIA) {
+          const grp = coApps.filter(a => a.media === m.id);
+          if (!grp.length) continue;
+          rows.push([{ v: `▼ ${m.name}（${grp.length}件）`, style: 'section' },
+            ...Array(HEADERS.length - 1).fill({ v: '', style: 'section' })]);
+          grp.forEach(a => rows.push(rowFor(a)));
+        }
+        // 媒体未設定の応募者
+        const noMedia = coApps.filter(a => !OPS_MEDIA.some(m => m.id === a.media));
+        if (noMedia.length) {
+          rows.push([{ v: `▼ その他・媒体未設定（${noMedia.length}件）`, style: 'section' },
+            ...Array(HEADERS.length - 1).fill({ v: '', style: 'section' })]);
+          noMedia.forEach(a => rows.push(rowFor(a)));
+        }
+      }
+      return { name: co.short || co.id, rows };
+    });
+
+    const buf = buildXlsx(sheets);
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    res.writeHead(200, {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="calllist_${stamp}.xlsx"`,
+      'Content-Length': buf.length,
+    });
+    res.end(buf);
     return;
   }
 
