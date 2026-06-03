@@ -29,7 +29,7 @@ console.log('削除完了\n');
 // ── 共通定数 ──
 const SALARY = '月収41万円〜71万円';
 const JOB_TYPE = '軽貨物ドライバー';
-const EMP_TYPE = '業務委託';
+const EMP_TYPE = '正社員';
 const HOW_TO_APPLY = '下記URLよりWebでご応募ください。書類選考後、担当者よりご連絡いたします。面接は1回のみ・WEB面接も対応しております。';
 
 const CATCHCOPIES = [
@@ -38,20 +38,20 @@ const CATCHCOPIES = [
   '自分のペースで自由に稼ぐ！軽配送ドライバー大募集',
   '高収入・自由・一人作業！軽貨物配送で人生を変えよう',
   'ブランクOK・未経験OK！月収41万〜71万円の軽配送ドライバー',
-  '人間関係ゼロで稼ぐ！業務委託軽貨物ドライバー急募',
+  '人間関係ゼロで稼ぐ！正社員軽貨物ドライバー急募',
   '車に乗るだけで高収入！軽自動車1台で月収41万〜71万円',
   '転職・副業に最適！軽配送で月収41万〜71万円を実現しよう',
 ];
 
 const TAG_SETS = [
-  ['未経験OK', '高収入', '業務委託', 'AT限定OK'],
+  ['未経験OK', '高収入', '正社員', 'AT限定OK'],
   ['軽貨物', 'ドライバー', '月収41万〜', '自由な働き方'],
   ['普通免許OK', '未経験歓迎', '高収入', 'フレックス'],
-  ['業務委託', '稼げる仕事', 'ドライバー', '週休2日'],
+  ['正社員', '稼げる仕事', 'ドライバー', '週休2日'],
   ['高収入', '軽貨物', '未経験OK', 'インセンティブ'],
   ['配送ドライバー', '月収71万円可', '自由出勤', '普通免許'],
   ['未経験OK', '高時給', '軽配送', 'ブランクOK'],
-  ['業務委託', '高収入', '一人作業', 'キャリアUP'],
+  ['正社員', '高収入', '一人作業', 'キャリアUP'],
 ];
 
 const REWARDING_LIST = [
@@ -60,7 +60,7 @@ const REWARDING_LIST = [
   'エリアのルートを覚えるにつれて効率が上がり、収入も自然と増えていきます。自分の成長が数字に直結する、刺激的な仕事です。',
   '人間関係のストレスゼロ。黙々と作業できる方にとっては最高の職場環境。月収も安定して高水準を維持できます。',
   '配達先のお客様から直接「ありがとう」をもらえる場面も多く、仕事の充実感を感じられます。高収入と感謝の両方が得られます。',
-  '自分でコントロールできる仕事量と収入。努力が即時に反映される業務委託スタイルが人気の秘訣。月収71万円も現実の目標です。',
+  '自分でコントロールできる仕事量と収入。努力が即時に反映される正社員スタイルが人気の秘訣。月収71万円も現実の目標です。',
 ];
 
 const WORKTIME_LIST = [
@@ -285,7 +285,7 @@ function insertJob(locationData, variant, targetMedia) {
 
   const areaShort = locationData.area.split('（')[0].replace('大阪府', '大阪・').replace('東京都', '東京・').replace('神奈川県横浜市', '横浜・').replace('神奈川県川崎市', '川崎・').replace('神奈川県相模原市', '相模原・').replace('埼玉県', '埼玉・').replace('千葉県', '千葉・').replace('愛知県名古屋市', '名古屋・').replace('愛知県', '愛知・').replace('福岡県福岡市', '福岡・').replace('福岡県北九州市', '北九州・').replace('兵庫県神戸市', '神戸・').replace('京都府京都市', '京都・').replace('奈良県', '').replace('滋賀県', '').replace('静岡県', '').replace('北海道', '').replace('宮城県', '').replace('広島県', '').replace('岡山県', '').replace('新潟県', '').replace('長野県', '').replace('石川県', '').replace('熊本県', '').replace('鹿児島県', '').replace('沖縄県', '');
 
-  const title = `軽貨物ドライバー（業務委託）${areaShort}`;
+  const title = `軽貨物ドライバー（正社員）${areaShort}`;
   const catchcopy = CATCHCOPIES[variant % CATCHCOPIES.length];
   const tags = TAG_SETS[variant % TAG_SETS.length];
   const rewarding = REWARDING_LIST[variant % REWARDING_LIST.length];
