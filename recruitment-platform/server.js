@@ -601,7 +601,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── Root redirect ──
-  if (pathname === '/') { res.writeHead(302, { Location: '/jobs' }); res.end(); return; }
+  if (pathname === '/') { res.writeHead(302, { Location: '/jobs?co=sq' }); res.end(); return; }
 
   // ── Admin login ──
   if (pathname === '/admin/login' && method === 'GET') {
