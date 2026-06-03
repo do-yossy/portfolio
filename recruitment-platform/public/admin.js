@@ -682,6 +682,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // 過去応募者ページ: URLパラメータ（ディープリンク）に応じて初回絞り込みを適用
   if (document.getElementById('past-filter')) opsPastFilter();
+  // 架電リストページ: 共有スプレッドシートが設定済みなら「シートを開く」リンクを表示
+  if (document.getElementById('sheets-open')) sheetsStatus();
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -898,6 +900,46 @@ async function callDoImport() {
     toast('処理に失敗しました', 'error');
   }
 }
+// ── 共有スプレッドシート（Google Sheets）連携 ──
+async function sheetsStatus() {
+  try {
+    const r = await fetch('/api/ops/sheets/status');
+    const d = await r.json();
+    const link = document.getElementById('sheets-open');
+    if (link && d.configured && d.url) { link.href = d.url; link.style.display = ''; }
+    return d;
+  } catch { return { configured: false }; }
+}
+async function sheetsPush() {
+  const st = await sheetsStatus();
+  if (!st.configured) { toast('Googleスプレッドシート連携が未設定です（設定方法はGOOGLE_SHEETS_SETUP.mdを参照）', 'warn'); return; }
+  toast('スプレッドシートへ反映中...', 'info');
+  try {
+    const r = await fetch('/api/ops/sheets/push', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`${d.appended}件をスプレッドシートに追記しました`, d.appended > 0 ? 'success' : 'info');
+      const link = document.getElementById('sheets-open');
+      if (link && d.url) { link.href = d.url; link.style.display = ''; }
+    } else { toast('反映に失敗: ' + (d.error || '不明なエラー'), 'error'); }
+  } catch (e) { toast('通信エラー: ' + e.message, 'error'); }
+}
+async function sheetsPull() {
+  const st = await sheetsStatus();
+  if (!st.configured) { toast('Googleスプレッドシート連携が未設定です（設定方法はGOOGLE_SHEETS_SETUP.mdを参照）', 'warn'); return; }
+  confirmAction('共有スプレッドシートの内容（対応状況・架電回数・メモ）をDBに取り込みます。よろしいですか？', async () => {
+    toast('スプレッドシートから取込中...', 'info');
+    try {
+      const r = await fetch('/api/ops/sheets/pull', { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) {
+        toast(`${d.updated}件を更新しました` + (d.notFound ? `・${d.notFound}件は該当なし` : ''), d.updated > 0 ? 'success' : 'info');
+        setTimeout(() => location.reload(), 1500);
+      } else { toast('取込に失敗: ' + (d.error || '不明なエラー'), 'error'); }
+    } catch (e) { toast('通信エラー: ' + e.message, 'error'); }
+  });
+}
+
 function callCheckDup() {
   confirmAction('全データを横断し、電話番号またはメールアドレスが一致する応募者を「重複」にします（会社・媒体は問いません）。よろしいですか？', async () => {
     try {

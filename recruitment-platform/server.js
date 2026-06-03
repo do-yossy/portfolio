@@ -33,6 +33,8 @@ const { notify } = require('./lib/notify');
 const { requireAuth, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
 const { sendApplicationThanks, sendNewApplicantAlert } = require('./lib/mailer');
 const { buildXlsx, parseXlsx } = require('./lib/xlsx');
+const gsheets = require('./lib/gsheets');
+const { pushToSheets, pullFromSheets } = require('./lib/sheets-sync');
 const T = require('./templates');
 const { privacyPolicyPage } = T;
 
@@ -1278,6 +1280,50 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       'Content-Length': buf.length,
     });
     res.end(buf);
+    return;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 共有スプレッドシート（Google Sheets）連携
+  //   push : DB → スプレッドシート（会社ごとタブ・新規分のみ追記）
+  //   pull : スプレッドシート → DB（対応状況・架電回数・メモを更新）
+  // ══════════════════════════════════════════════════════════════
+
+  // 設定状況（UIの表示制御用）
+  if (pathname === '/api/ops/sheets/status' && method === 'GET') {
+    sendJSON(res, 200, { ok: true, configured: gsheets.isConfigured(), url: gsheets.isConfigured() ? gsheets.sheetUrl() : null });
+    return;
+  }
+
+  // DB → スプレッドシートへ反映（重複を除いた応募者を、未登録分だけ各社タブに追記）
+  if (pathname === '/api/ops/sheets/push' && method === 'POST') {
+    if (!gsheets.isConfigured()) {
+      sendJSON(res, 400, { ok: false, error: 'Googleスプレッドシート連携が未設定です（GOOGLE_SERVICE_ACCOUNT_JSON / GOOGLE_SHEET_ID）' });
+      return;
+    }
+    try {
+      const r = await pushToSheets({ gsheets, Ops, Logs, companies: OPS_COMPANIES, statuses: CALL_STATUSES, mediaList: OPS_MEDIA });
+      sendJSON(res, 200, { ok: true, ...r, url: gsheets.sheetUrl() });
+    } catch (e) {
+      await Logs.create('sheets_push', 'error', String(e.message || e));
+      sendJSON(res, 500, { ok: false, error: String(e.message || e) });
+    }
+    return;
+  }
+
+  // スプレッドシート → DB に取込（IDで突合し対応状況・架電回数・メモを更新）
+  if (pathname === '/api/ops/sheets/pull' && method === 'POST') {
+    if (!gsheets.isConfigured()) {
+      sendJSON(res, 400, { ok: false, error: 'Googleスプレッドシート連携が未設定です（GOOGLE_SERVICE_ACCOUNT_JSON / GOOGLE_SHEET_ID）' });
+      return;
+    }
+    try {
+      const r = await pullFromSheets({ gsheets, Ops, Applicants, Logs });
+      sendJSON(res, 200, { ok: true, ...r, url: gsheets.sheetUrl() });
+    } catch (e) {
+      await Logs.create('sheets_pull', 'error', String(e.message || e));
+      sendJSON(res, 500, { ok: false, error: String(e.message || e) });
+    }
     return;
   }
 
