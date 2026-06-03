@@ -371,6 +371,30 @@ const Applicants = {
     }
     return null;
   },
+  // 架電結果の反映用: 電話番号 or メールで既存応募者を検索（会社を優先一致）。
+  // 重複レコードより「元データ（is_duplicate=0）」を優先して返す。
+  findByContact(nPhone, nEmail, company = null) {
+    const pick = (rows) => {
+      if (!rows.length) return null;
+      if (company) {
+        const sameCo = rows.find(r => r.company === company && !r.is_duplicate)
+                    || rows.find(r => r.company === company);
+        if (sameCo) return sameCo;
+      }
+      return rows.find(r => !r.is_duplicate) || rows[0];
+    };
+    if (nPhone) {
+      const rows = db.prepare(`SELECT * FROM applicants WHERE normalized_phone = ? AND normalized_phone != ''`).all(nPhone);
+      const hit = pick(rows);
+      if (hit) return hit;
+    }
+    if (nEmail) {
+      const rows = db.prepare(`SELECT * FROM applicants WHERE normalized_email = ? AND normalized_email != ''`).all(nEmail);
+      const hit = pick(rows);
+      if (hit) return hit;
+    }
+    return null;
+  },
   todayCount({ company = null } = {}) {
     const today = new Date().toISOString().slice(0, 10);
     if (company && company !== 'all') {

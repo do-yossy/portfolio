@@ -1527,7 +1527,8 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       <h1>📞 架電リスト</h1>
       <div class="head-actions">
         <button class="btn btn-secondary btn-sm" onclick="callImport()">⬆ CSVインポート</button>
-        <a href="/api/ops/calls/export" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全社）</a>
+        <a href="/api/ops/calls/export?active=1" class="btn btn-primary btn-sm" download>📞 朝の架電リスト出力（対応中のみ）</a>
+        <a href="/api/ops/calls/export" class="btn btn-ghost btn-sm" download>📊 全件出力（全社）</a>
         <button class="btn btn-ghost btn-sm" onclick="callCheckDup()">♻️ 重複チェック</button>
       </div>
     </div>
@@ -1566,10 +1567,15 @@ function callImportModalHtml(co, media) {
     <div class="modal">
       <h3>CSVインポート</h3>
       <div class="form-grid">
+        <label class="full">取込モード<select id="ci-mode" onchange="callImportModeHint()">
+          <option value="insert">新規追加（応募者を取り込む）</option>
+          <option value="update">架電結果を反映（既存の対応状況・架電回数・メモを更新）</option>
+        </select></label>
         <label>会社<select id="ci-company">${coOpts}</select></label>
         <label>媒体<select id="ci-media">${mediaOpts}</select></label>
         <label class="full">CSVファイル<input type="file" id="ci-file" accept=".csv"></label>
       </div>
+      <p id="ci-mode-hint" class="muted" style="font-size:12px;margin:0 0 8px">新規の応募者CSVを取り込みます。電話番号・メールが既存と一致する場合は重複として記録します。</p>
       <div id="ci-result" class="import-result"></div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="callCloseImport()">閉じる</button>

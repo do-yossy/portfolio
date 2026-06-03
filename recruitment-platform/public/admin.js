@@ -790,39 +790,55 @@ function callsLocalFilter() {
   if (countEl) countEl.textContent = `${visible}件`;
 }
 
-function callImport() { document.getElementById('call-import-modal').classList.remove('hidden'); }
+function callImport() { document.getElementById('call-import-modal').classList.remove('hidden'); callImportModeHint(); }
 function callCloseImport() {
   document.getElementById('call-import-modal').classList.add('hidden');
   document.getElementById('ci-result').innerHTML = '';
 }
+function callImportModeHint() {
+  const mode = document.getElementById('ci-mode')?.value || 'insert';
+  const hint = document.getElementById('ci-mode-hint');
+  if (!hint) return;
+  hint.textContent = mode === 'update'
+    ? '架電後のリストを取り込み、電話番号・メールが一致する既存応募者の「対応状況・架電回数・メモ」を更新します（新規追加はしません）。'
+    : '新規の応募者CSVを取り込みます。電話番号・メールが既存と一致する場合は重複として記録します。';
+}
 async function callDoImport() {
+  const mode    = document.getElementById('ci-mode')?.value || 'insert';
   const company = document.getElementById('ci-company').value;
   const media   = document.getElementById('ci-media').value;
   const file    = document.getElementById('ci-file').files[0];
   if (!file) return toast('CSVファイルを選択してください', 'warn');
   const fd = new FormData();
+  fd.append('mode', mode);
   fd.append('company', company);
   fd.append('media', media);
   fd.append('file', file);
   const resultEl = document.getElementById('ci-result');
-  resultEl.innerHTML = '<p>取込中...</p>';
+  resultEl.innerHTML = mode === 'update' ? '<p>架電結果を反映中...</p>' : '<p>取込中...</p>';
   try {
     const res = await fetch('/api/ops/calls/import', { method: 'POST', body: fd });
     let d;
     try { d = await res.json(); } catch { throw new Error(`サーバーエラー (HTTP ${res.status})`); }
-    if (d.ok) {
+    if (d.ok && d.mode === 'update') {
+      resultEl.innerHTML = `<p style="color:#16a34a">✅ ${d.updated}件の対応状況を更新しました` +
+        (d.notFound ? `・${d.notFound}件は該当者なし` : '') + `（CSVの行数: ${d.rows}行）</p>` +
+        (d.notFoundNames?.length ? `<p style="color:#b45309;font-size:12px">該当なし例: ${d.notFoundNames.join('、')}</p>` : '');
+      toast(`${d.updated}件を更新しました`, d.updated > 0 ? 'success' : 'warn');
+      setTimeout(() => location.reload(), 1500);
+    } else if (d.ok) {
       resultEl.innerHTML = `<p style="color:#16a34a">✅ ${d.imported}件取込・${d.duplicates}件重複` +
         (d.skipped ? `・${d.skipped}件スキップ` : '') + `（CSVの行数: ${d.rows}行）</p>` +
         (d.skipReasons?.length ? `<p style="color:#b45309;font-size:12px">スキップ理由: ${d.skipReasons.join('、')}</p>` : '');
       toast(`${d.imported}件取り込みました`, d.imported > 0 ? 'success' : 'warn');
       setTimeout(() => location.reload(), 1500);
     } else {
-      resultEl.innerHTML = `<p style="color:#dc2626">❌ 取込に失敗しました: ${d.error || '不明なエラー'}</p>`;
-      toast('取込に失敗しました', 'error');
+      resultEl.innerHTML = `<p style="color:#dc2626">❌ 処理に失敗しました: ${d.error || '不明なエラー'}</p>`;
+      toast('処理に失敗しました', 'error');
     }
   } catch (e) {
     resultEl.innerHTML = `<p style="color:#dc2626">❌ エラー: ${e.message}</p>`;
-    toast('取込に失敗しました', 'error');
+    toast('処理に失敗しました', 'error');
   }
 }
 function callCheckDup() {

@@ -170,7 +170,8 @@ function mapCSVRow(row) {
   const sourceMedia = col(['媒体','source_media','応募媒体','media','応募経路']) || 'CSV取込';
 
   // ステータス: Indeed '書類審査済み'/'選考待ち'・求人ボックス '未対応' → すべて '新規' に正規化
-  const rawStatus = col(['ステータス','選考ステータス','status']);
+  // 自社スプレッドシート出力の '対応状況' 列も読み取る（架電結果の反映用）
+  const rawStatus = col(['対応状況','ステータス','選考ステータス','status']);
   const NEW_ALIASES = ['書類審査済み', '選考待ち', '未対応', '新規', '応募', '未着手'];
   const VALID_CALL = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];
   const status = NEW_ALIASES.includes(rawStatus) ? '新規'
@@ -185,6 +186,7 @@ function mapCSVRow(row) {
     sourceMedia,
     appliedAt,
     status,
+    notes:       col(['メモ','notes','備考','対応メモ']),
     // 追加フィールド（求人ボックス・Indeed 両対応）
     gender:      col(['性別','gender']),
     birthDate:   col(['生年月日','birth_date','birthdate']),
@@ -1110,22 +1112,49 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
     const ct = req.headers['content-type'] || '';
     const buf = await readBody(req);
-    let csvText = '', importCompany = co, importMedia = 'indeed';
+    let csvText = '', importCompany = co, importMedia = 'indeed', importMode = 'insert';
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=(.+)$/);
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
       for (const p of parts) {
         if (/name="company"/.test(p.header)) importCompany = p.content.toString('utf8').trim();
         else if (/name="media"/.test(p.header)) importMedia = p.content.toString('utf8').trim();
+        else if (/name="mode"/.test(p.header)) importMode = p.content.toString('utf8').trim();
         else if (/filename=/.test(p.header)) csvText = decodeCsvBuffer(p.content);
       }
     } else {
       csvText = decodeCsvBuffer(buf);
       importCompany = query.company || co;
       importMedia = query.media || 'indeed';
+      importMode = query.mode || 'insert';
     }
 
     const rows = parseCSV(csvText);
+
+    // ── 架電結果の反映モード: 既存応募者の対応状況・架電回数・メモを更新（新規追加しない）──
+    if (importMode === 'update') {
+      let updated = 0, notFound = 0, skipped = 0;
+      const notFoundNames = [];
+      for (const row of rows) {
+        const mapped = mapOpsCSVRow(row, importCompany, importMedia);
+        if (!mapped.name || (!mapped.phone && !mapped.email)) { skipped++; continue; }
+        const nPhone = normalizePhone(mapped.phone);
+        const nEmail = normalizeEmail(mapped.email);
+        const existing = await Applicants.findByContact(nPhone, nEmail, importCompany);
+        if (!existing) { notFound++; if (notFoundNames.length < 5) notFoundNames.push(mapped.name); continue; }
+        await Ops.updateCall(existing.id, {
+          callCount: mapped.callCount,
+          status:    mapped.status,
+          notes:     mapped.notes || undefined,
+        });
+        updated++;
+      }
+      await Logs.create('ops_csv_update', 'success', `${importCompany}/${importMedia}: ${updated}件更新・${notFound}件該当なし`);
+      sendJSON(res, 200, { ok: true, mode: 'update', updated, notFound, skipped, notFoundNames, rows: rows.length });
+      return;
+    }
+
+    // ── 新規取込モード（デフォルト）──
     let imported = 0, duplicates = 0, skipped = 0;
     const skipReasons = [];
     for (const row of rows) {
@@ -1157,8 +1186,14 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const fMedia   = (query.media && query.media !== 'all') ? query.media : null;
     const fStatus  = (query.status && query.status !== 'all') ? query.status : null;
     const fMonth   = (query.month && query.month !== 'all') ? query.month : null;
+    // active=1: 架電対象（新規/架電済(不通)/対応中）のみ＝朝の架電リスト。対応終了などは除外。
+    const activeOnly = query.active === '1' || query.active === 'true';
 
-    const all = await Ops.listCalls({ company: fCompany, media: fMedia, status: fStatus, month: fMonth });
+    let all = await Ops.listCalls({ company: fCompany, media: fMedia, status: fStatus, month: fMonth });
+    if (activeOnly) {
+      const ACTIVE = ['新規', '架電済(不通)', '対応中'];
+      all = all.filter(a => ACTIVE.includes(a.status) && !a.is_duplicate);
+    }
     const mediaLabel = id => { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '不明'); };
 
     const HEADERS = ['媒体', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
@@ -1204,7 +1239,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
     const buf = buildXlsx(sheets.length ? sheets : [{ name: 'data', rows: [HEADERS.map(h => ({ v: h, style: 'header' }))] }]);
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const parts = [fCompany, fMedia, fStatus, fMonth].filter(Boolean).join('_');
+    const parts = [activeOnly ? '架電対象' : null, fCompany, fMedia, fStatus, fMonth].filter(Boolean).join('_');
     const fname = `applicants_${stamp}${parts ? '_' + parts : ''}.xlsx`;
     res.writeHead(200, {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
