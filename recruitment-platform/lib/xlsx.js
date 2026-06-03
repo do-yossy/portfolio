@@ -202,4 +202,142 @@ function zipStore(files) {
   return Buffer.concat([localBuf, centralBuf, eocd]);
 }
 
-module.exports = { buildXlsx };
+// ─────────────────────────────────────────────────────────────
+// 依存ライブラリなしの最小XLSX読み込み
+//   parseXlsx(buffer) → [{ ヘッダ名: 値, ... }, ...]
+//   - Excel / Googleスプレッドシート / 本ツールの出力xlsx を解析
+//   - 全シートを対象。各シートの先頭行をヘッダとして行オブジェクト化
+//   - parseCSV と同じ形式を返すので取込ロジックをそのまま使える
+// ─────────────────────────────────────────────────────────────
+const zlib = require('zlib');
+
+function xmlUnescape(s) {
+  return String(s)
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&amp;/g, '&');
+}
+
+// 列参照（"A","B"..."AA"）を0始まりの列番号に変換
+function colToIndex(ref) {
+  let n = 0;
+  for (let i = 0; i < ref.length; i++) n = n * 26 + (ref.charCodeAt(i) - 64);
+  return n - 1;
+}
+
+// ZIP（中央ディレクトリ方式）を展開して { ファイル名: Buffer } を返す
+function unzip(buf) {
+  const EOCD_SIG = 0x06054b50;
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= 0; i--) {
+    if (buf.readUInt32LE(i) === EOCD_SIG) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('ZIP形式ではありません');
+  const count = buf.readUInt16LE(eocd + 10);
+  const cdOffset = buf.readUInt32LE(eocd + 16);
+
+  const files = {};
+  let p = cdOffset;
+  for (let n = 0; n < count; n++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) break;
+    const method   = buf.readUInt16LE(p + 10);
+    const compSize = buf.readUInt32LE(p + 20);
+    const nameLen  = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const cmtLen   = buf.readUInt16LE(p + 32);
+    const lhOffset = buf.readUInt32LE(p + 42);
+    const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
+    // ローカルヘッダから実データ開始位置を求める
+    const lhNameLen  = buf.readUInt16LE(lhOffset + 26);
+    const lhExtraLen = buf.readUInt16LE(lhOffset + 28);
+    const dataStart = lhOffset + 30 + lhNameLen + lhExtraLen;
+    const compData = buf.slice(dataStart, dataStart + compSize);
+    let content;
+    if (method === 0)      content = compData;                    // stored
+    else if (method === 8) content = zlib.inflateRawSync(compData); // deflate
+    else throw new Error('未対応のZIP圧縮方式: ' + method);
+    files[name] = content;
+    p += 46 + nameLen + extraLen + cmtLen;
+  }
+  return files;
+}
+
+function parseSharedStrings(files) {
+  const f = files['xl/sharedStrings.xml'];
+  if (!f) return [];
+  const xml = f.toString('utf8');
+  const out = [];
+  const siRe = /<si\b[^>]*>([\s\S]*?)<\/si>/g;
+  let m;
+  while ((m = siRe.exec(xml))) {
+    const tRe = /<t\b[^>]*>([\s\S]*?)<\/t>/g;
+    let t, s = '';
+    while ((t = tRe.exec(m[1]))) s += t[1];
+    out.push(xmlUnescape(s));
+  }
+  return out;
+}
+
+// 1シートのXMLを行配列（各行はセル文字列の配列）に変換
+function parseSheetRows(xml, sst) {
+  const rows = [];
+  const rowRe = /<row\b[^>]*>([\s\S]*?)<\/row>/g;
+  let rm;
+  while ((rm = rowRe.exec(xml))) {
+    const cells = [];
+    const cRe = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+    let cm;
+    while ((cm = cRe.exec(rm[1]))) {
+      const attrs = cm[1] || '';
+      const inner = cm[2] || '';
+      const refM = attrs.match(/r="([A-Z]+)\d+"/);
+      const colIdx = refM ? colToIndex(refM[1]) : cells.length;
+      const type = (attrs.match(/t="([^"]+)"/) || [])[1];
+      let val = '';
+      if (type === 's') {
+        const v = inner.match(/<v>([\s\S]*?)<\/v>/);
+        if (v) val = sst[parseInt(v[1], 10)] || '';
+      } else if (type === 'inlineStr') {
+        const t = inner.match(/<t\b[^>]*>([\s\S]*?)<\/t>/);
+        if (t) val = xmlUnescape(t[1]);
+      } else {
+        const v = inner.match(/<v>([\s\S]*?)<\/v>/);
+        if (v) val = xmlUnescape(v[1]);
+      }
+      cells[colIdx] = val;
+    }
+    for (let i = 0; i < cells.length; i++) if (cells[i] === undefined) cells[i] = '';
+    rows.push(cells);
+  }
+  return rows;
+}
+
+function parseXlsx(buf) {
+  const files = unzip(buf);
+  const sst = parseSharedStrings(files);
+  const sheetFiles = Object.keys(files)
+    .filter(n => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))
+    .sort((a, b) => parseInt(a.match(/sheet(\d+)/)[1], 10) - parseInt(b.match(/sheet(\d+)/)[1], 10));
+
+  const records = [];
+  for (const sn of sheetFiles) {
+    const sheetRows = parseSheetRows(files[sn].toString('utf8'), sst);
+    if (!sheetRows.length) continue;
+    // 最初の「中身のある行」をヘッダとして使う
+    const headerIdx = sheetRows.findIndex(r => r.some(c => c && c.trim()));
+    if (headerIdx < 0) continue;
+    const header = sheetRows[headerIdx].map(h => (h || '').trim());
+    for (let i = headerIdx + 1; i < sheetRows.length; i++) {
+      const r = sheetRows[i];
+      if (!r.some(c => c && String(c).trim())) continue; // 空行スキップ
+      const obj = {};
+      header.forEach((h, j) => { if (h) obj[h] = r[j] !== undefined ? r[j] : ''; });
+      records.push(obj);
+    }
+  }
+  return records;
+}
+
+module.exports = { buildXlsx, parseXlsx };

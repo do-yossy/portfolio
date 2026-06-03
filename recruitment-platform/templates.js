@@ -1581,7 +1581,7 @@ function callImportModalHtml(co, media) {
   return `
   <div id="call-import-modal" class="modal-overlay hidden">
     <div class="modal">
-      <h3>CSVインポート</h3>
+      <h3>データインポート（CSV / Excel）</h3>
       <div class="form-grid">
         <label class="full">取込モード<select id="ci-mode" onchange="callImportModeHint()">
           <option value="insert">新規追加（応募者を取り込む）</option>
@@ -1589,9 +1589,9 @@ function callImportModalHtml(co, media) {
         </select></label>
         <label>会社<select id="ci-company">${coOpts}</select></label>
         <label>媒体<select id="ci-media">${mediaOpts}</select></label>
-        <label class="full">CSVファイル<input type="file" id="ci-file" accept=".csv"></label>
+        <label class="full">CSV / Excelファイル<input type="file" id="ci-file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
       </div>
-      <p id="ci-mode-hint" class="muted" style="font-size:12px;margin:0 0 8px">新規の応募者CSVを取り込みます。電話番号・メールが既存と一致する場合は重複として記録します。</p>
+      <p id="ci-mode-hint" class="muted" style="font-size:12px;margin:0 0 8px">新規の応募者を取り込みます。CSV・Excel(.xlsx)・スプレッドシートに対応。電話番号・メールが既存と一致する場合は重複として記録します。</p>
       <div id="ci-result" class="import-result"></div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="callCloseImport()">閉じる</button>

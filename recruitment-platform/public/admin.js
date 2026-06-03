@@ -856,8 +856,8 @@ function callImportModeHint() {
   const hint = document.getElementById('ci-mode-hint');
   if (!hint) return;
   hint.textContent = mode === 'update'
-    ? '架電後のリストを取り込み、電話番号・メールが一致する既存応募者の「対応状況・架電回数・メモ」を更新します（新規追加はしません）。'
-    : '新規の応募者CSVを取り込みます。電話番号・メールが既存と一致する場合は重複として記録します。';
+    ? '架電後のCSV/Excel(.xlsx)/スプレッドシートを取り込み、電話番号・メールが一致する既存応募者の「対応状況・架電回数・メモ」を更新します（新規追加はしません）。'
+    : '新規の応募者を取り込みます。CSV・Excel(.xlsx)・スプレッドシートに対応。電話番号・メールが既存と一致する場合は重複として記録します。';
 }
 async function callDoImport() {
   const mode    = document.getElementById('ci-mode')?.value || 'insert';

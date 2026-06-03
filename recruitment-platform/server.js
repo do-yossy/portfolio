@@ -32,7 +32,7 @@ const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize')
 const { notify } = require('./lib/notify');
 const { requireAuth, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
 const { sendApplicationThanks, sendNewApplicantAlert } = require('./lib/mailer');
-const { buildXlsx } = require('./lib/xlsx');
+const { buildXlsx, parseXlsx } = require('./lib/xlsx');
 const T = require('./templates');
 const { privacyPolicyPage } = T;
 
@@ -1125,7 +1125,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
     const ct = req.headers['content-type'] || '';
     const buf = await readBody(req);
-    let csvText = '', importCompany = co, importMedia = 'indeed', importMode = 'insert';
+    let fileBuf = null, importCompany = co, importMedia = 'indeed', importMode = 'insert';
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=(.+)$/);
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
@@ -1133,16 +1133,28 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         if (/name="company"/.test(p.header)) importCompany = p.content.toString('utf8').trim();
         else if (/name="media"/.test(p.header)) importMedia = p.content.toString('utf8').trim();
         else if (/name="mode"/.test(p.header)) importMode = p.content.toString('utf8').trim();
-        else if (/filename=/.test(p.header)) csvText = decodeCsvBuffer(p.content);
+        else if (/filename=/.test(p.header)) fileBuf = p.content;
       }
     } else {
-      csvText = decodeCsvBuffer(buf);
+      fileBuf = buf;
       importCompany = query.company || co;
       importMedia = query.media || 'indeed';
       importMode = query.mode || 'insert';
     }
 
-    const rows = parseCSV(csvText);
+    // Excel(.xlsx) は ZIP署名(PK\x03\x04)で判定。それ以外は CSV として解析。
+    let rows;
+    const isXlsx = fileBuf && fileBuf.length > 4 &&
+      fileBuf[0] === 0x50 && fileBuf[1] === 0x4B && fileBuf[2] === 0x03 && fileBuf[3] === 0x04;
+    if (isXlsx) {
+      try { rows = parseXlsx(fileBuf); }
+      catch (e) {
+        sendJSON(res, 400, { ok: false, error: 'Excelファイルの読み込みに失敗しました: ' + e.message });
+        return;
+      }
+    } else {
+      rows = parseCSV(decodeCsvBuffer(fileBuf || Buffer.alloc(0)));
+    }
 
     // ── 架電結果の反映モード: 既存応募者の対応状況・架電回数・メモを更新（新規追加しない）──
     if (importMode === 'update') {
