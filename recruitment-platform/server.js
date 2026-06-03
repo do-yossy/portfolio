@@ -1024,20 +1024,16 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       if (rawBuf[0] === 0xEF && rawBuf[1] === 0xBB && rawBuf[2] === 0xBF) {
         return rawBuf.slice(3).toString('utf8');
       }
-      // ASCII範囲外バイトをチェックして Shift-JIS かどうか判定
-      let hasSjisBytes = false;
-      for (let i = 0; i < rawBuf.length - 1; i++) {
-        const b = rawBuf[i];
-        if ((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xFC)) {
-          hasSjisBytes = true; break;
-        }
-      }
-      if (hasSjisBytes) {
+      // まず UTF-8 として厳密にデコードを試す（Indeed/求人ボックスCSVはUTF-8）
+      // UTF-8として妥当ならそのまま採用。不正なら Shift-JIS にフォールバック。
+      try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(rawBuf);
+      } catch (e) {
         try {
           return new TextDecoder('shift_jis').decode(rawBuf);
-        } catch (e) {}
+        } catch (e2) {}
+        return rawBuf.toString('utf8');
       }
-      return rawBuf.toString('utf8');
     }
 
     let csvText = '';
