@@ -813,7 +813,7 @@ const server = http.createServer(async (req, res) => {
     }
     // Fire-and-forget email notifications (don't block response)
     sendApplicationThanks(applicant, jobTitle).catch(() => {});
-    sendNewApplicantAlert({ ...applicant, sourceMedia: applicant.source_media }, jobTitle).catch(() => {});
+    sendNewApplicantAlert({ ...applicant, sourceMedia: applicant.source_media, media: applicant.media }, jobTitle).catch(() => {});
     sendJSON(res, 201, { ok: true, id: applicant.id, isDuplicate: !!dupId });
     return;
   }
