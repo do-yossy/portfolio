@@ -7,12 +7,13 @@
 // ─────────────────────────────────────────────────────────────
 
 // 架電リスト用の列定義（先頭にIDを置き、行を一意に突合する結合キーにする）
-const SHEET_HEADERS = ['ID', '媒体', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
-const SHEET_COL = { id: 0, callCount: 15, status: 16, notes: 19 };
+const SHEET_HEADERS = ['ID', '媒体', '会社', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
+const SHEET_COL = { id: 0, callCount: 16, status: 17, notes: 20 };
 
-function applicantToSheetRow(a, mediaLabel) {
+function applicantToSheetRow(a, mediaLabel, companyLabel) {
   return [
-    a.id, mediaLabel(a.media), a.name || '', a.phone || '', a.email || '',
+    a.id, mediaLabel(a.media), companyLabel ? companyLabel(a.company) : (a.company || ''),
+    a.name || '', a.phone || '', a.email || '',
     a.gender || '', a.birth_date || '', a.age || '', a.address || '',
     a.current_job || '', a.job_title || '', a.experience || '', a.education || '', a.work_location || '',
     (a.applied_at || '').slice(0, 10),
@@ -24,10 +25,11 @@ function applicantToSheetRow(a, mediaLabel) {
 // DB → スプレッドシート（会社ごとタブ。重複を除き、未登録IDのみ追記）
 async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList }) {
   const mediaLabel = id => { const m = mediaList.find(x => x.id === id); return m ? m.name : (id || '不明'); };
+  const companyLabel = id => { const c = companies.find(x => x.id === id); return c ? (c.short || c.name || id) : (id || ''); };
   let count = 0, tabs = 0;
   const warnings = [];
   for (const co of companies) {
-    const list = (await Ops.listCalls({ company: co.id })).filter(a => !a.is_duplicate);
+    const list = (await Ops.listCalls({ company: co.id, archived: false, excludeDuplicate: true }));
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
 
@@ -61,7 +63,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       sectionRowIdx.push(rows.length);               // 0始まりの行インデックス
       rows.push(sec);
       for (const a of grp) {
-        const row = applicantToSheetRow(a, mediaLabel);
+        const row = applicantToSheetRow(a, mediaLabel, companyLabel);
         const p = prior.get(a.id);                   // 手入力済みの架電結果を優先（取込前の編集を保持）
         if (p) {
           if (p.callCount !== undefined && p.callCount !== '') row[SHEET_COL.callCount] = String(p.callCount);

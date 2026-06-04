@@ -570,6 +570,12 @@ const Ops = {
     if (callCount !== undefined && (parseInt(callCount) || 0) > 0) {
       fields.push('last_called_at = ?'); vals.push(ts);
     }
+    // 対応終了・断られた・辞退は過去リストへ自動アーカイブ
+    const TERMINAL = ['対応終了', '断られた', '辞退'];
+    if (status !== undefined) {
+      fields.push('is_archived = ?');
+      vals.push(TERMINAL.includes(status) ? 1 : 0);
+    }
     if (!fields.length) return Applicants.findById(id);
     fields.push('updated_at = ?');
     vals.push(ts, id);
