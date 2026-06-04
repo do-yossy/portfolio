@@ -139,6 +139,13 @@ db.exec("UPDATE applicants SET status='終了' WHERE status IN ('対応終了','
 // Remove '重複' status (it was redundant with is_duplicate=1)
 db.exec("UPDATE applicants SET status='新規' WHERE status='重複'");
 
+// Migration v6: 架電リストには「新規」のみ残す。
+// 既存の新規以外（不通・対応中・終了 等）は過去応募（is_archived=1）へ移動。
+// 以後は Ops.updateCall が 新規以外を自動アーカイブするため冪等。
+try {
+  db.exec("UPDATE applicants SET is_archived=1 WHERE is_archived=0 AND status IS NOT NULL AND status != '' AND status != '新規'");
+} catch {}
+
 // Migration v2: 媒体掲載日報テーブル
 db.exec(`
   CREATE TABLE IF NOT EXISTS media_posts (
@@ -619,11 +626,12 @@ const Ops = {
     if (callCount !== undefined && (parseInt(callCount) || 0) > 0) {
       fields.push('last_called_at = ?'); vals.push(ts);
     }
-    // 終了は過去リストへ自動アーカイブ（skipAutoArchive時は変更しない）
-    const TERMINAL = ['終了'];
+    // 新規以外（不通・対応中・終了）は過去応募へ自動アーカイブ。
+    // 新規に戻した場合は架電リストへ復帰（skipAutoArchive時は変更しない）。
+    // → 架電リストには「新規」のみが残り、それ以外は過去応募タブで対応状況別に表示される。
     if (status !== undefined && !skipAutoArchive) {
       fields.push('is_archived = ?');
-      vals.push(TERMINAL.includes(status) ? 1 : 0);
+      vals.push(status === '新規' ? 0 : 1);
     }
     if (!fields.length) return Applicants.findById(id);
     fields.push('updated_at = ?');

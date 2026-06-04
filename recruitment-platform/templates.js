@@ -1338,7 +1338,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
       </section>
       <section class="card">
         <h2>本日架電を行う件数（会社別）</h2>
-        <p class="muted">「新規」「架電済(不通)」「対応中」の合計（対応終了・断られた・辞退は除く）</p>
+        <p class="muted">架電リストに残っている「新規」の件数（不通・対応中・終了は過去応募へ移動）</p>
         <table class="cross-table" style="max-width:360px">
           <thead><tr><th>会社</th><th>架電対象件数</th></tr></thead>
           <tbody>${targetRows}</tbody>
