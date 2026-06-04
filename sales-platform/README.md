@@ -53,6 +53,7 @@ fetch('https://<your-fly-app>.fly.dev/api/contact', {method:'POST',
 ## 「案件を見つける」仕組み
 - 推奨：求人アラートメール → Gmail → （Claudeが読取・採点）→ `/api/ingest` or `/api/deals` にPOST。
 - 募集文の貼り付け取込（管制塔の取込欄 / `/api/ingest`）も即利用可。
+- 静的コックピット向け：`node scripts/build-queue.js`（`data/inbox.json`→`data/queue.json`）。`scripts/append-log.js` で学習ログ書き戻し。フロー全体は `../営業システム/10-メールアラート運用フロー.md`。
 - ※ プラットフォームの自動巡回・自動応募は規約違反のため非対応（サーバーでも行わない）。サーバー側Gmail自動取込（Gmail API/IMAP）は拡張ポイント。
 
 ## デプロイ（Fly.io）
