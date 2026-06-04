@@ -258,6 +258,12 @@ function mapOpsCSVRow(row, company, media) {
     if (kSei || kMei) base.furigana = `${kSei} ${kMei}`.trim();
   }
   if (!base.furigana) base.furigana = col(['氏名フリガナ','フリガナ','ふりがな','よみがな','カナ氏名']);
+  // ── 求人ボックス形式: 氏名の括弧内ふりがな "松平 吉弘（まつだいら よしひろ）" ──
+  if (!base.furigana) {
+    const rawNm = col(['氏名','名前','お名前']);
+    const fm = rawNm.match(/[（(]([^）)]*)[）)]/);
+    if (fm && /[ぁ-んァ-ヶ]/.test(fm[1])) base.furigana = fm[1].trim();
+  }
 
   // ── 居住地: engage形式は都道府県＋市区町村 ──
   if (!base.address) {
@@ -279,6 +285,15 @@ function mapOpsCSVRow(row, company, media) {
   // ── 求人タイトル: engageは「応募求人-職種名」──
   if (!base.jobTitle) base.jobTitle = col(['応募求人-職種名','応募求人名','求人タイトル','応募職種']);
 
+  // ── 求人ボックス形式: 生年月日 "1994年03月05日 (32歳)" から年齢を抽出 ──
+  if (!base.age) {
+    const bd = col(['生年月日','birth_date','birthdate']);
+    const am = bd.match(/[（(]\s*(\d{1,3})\s*歳/);
+    if (am) base.age = am[1];
+  }
+  // 生年月日から括弧内の年齢表記を除去して保存（"1994年03月05日 (32歳)" → "1994年03月05日"）
+  if (base.birthDate) base.birthDate = base.birthDate.replace(/[（(][^）)]*[）)]/g, '').trim();
+
   // ── 経験: 直近年収・転職回数・経験年数を組み合わせてノート風に ──
   if (!base.experience) {
     const income   = col(['直近の年収','年収']);
@@ -291,8 +306,9 @@ function mapOpsCSVRow(row, company, media) {
     if (parts.length) base.experience = parts.join(' / ');
   }
 
-  // ── 職歴詳細（1〜3件）をnotesへ追記 ──
+  // ── 職歴詳細をnotesへ追記（engage: 職歴N / 求人ボックス: 勤務先_N）──
   const workHistoryParts = [];
+  // engage形式: 職歴1〜3
   for (let i = 1; i <= 3; i++) {
     const co2 = col([`職歴${i} - 企業名`]);
     const from = col([`職歴${i} - 入社年月`]);
@@ -303,9 +319,23 @@ function mapOpsCSVRow(row, company, media) {
       workHistoryParts.push(`【職歴${i}】${co2}${period ? ` (${period})` : ''}${desc ? '\n' + desc.replace(/<br>/g, '\n').slice(0, 200) : ''}`);
     }
   }
-  if (workHistoryParts.length && !base.notes) {
-    base.notes = workHistoryParts.join('\n\n');
+  // 求人ボックス形式: 勤務先_1〜30 / 役職・業務内容など_N
+  if (workHistoryParts.length === 0) {
+    for (let i = 1; i <= 30; i++) {
+      const place = col([`勤務先_${i}`]);
+      const role  = col([`役職・業務内容など_${i}`]);
+      if (place) {
+        workHistoryParts.push(`【勤務先${i}】${place}${role ? '\n' + role.replace(/<br>/g, '\n').slice(0, 200) : ''}`);
+      }
+    }
   }
+  // 既存メモ（備考・PR / 選考コメント等）を保持しつつ職歴を追記
+  const extraNote = col(['選考コメント']);
+  const noteSegments = [];
+  if (base.notes) noteSegments.push(base.notes);
+  if (extraNote && extraNote !== base.notes) noteSegments.push(`【選考コメント】${extraNote}`);
+  if (workHistoryParts.length) noteSegments.push(workHistoryParts.join('\n\n'));
+  if (noteSegments.length) base.notes = noteSegments.join('\n\n');
 
   // ── 架電回数（engageシートに既存値がある場合）──
   let cc = col(['架電回数','call_count']);
