@@ -1527,7 +1527,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
   ].join('');
 
   const mediaTabs = OPS_MEDIA.map(m =>
-    `<a href="${isAll ? '/admin/calls?co=all' : baseHref(co, m.id)}&media=${m.id}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`
+    `<a href="${isAll ? `/admin/calls?co=all&media=${m.id}` : baseHref(co, m.id)}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`
   ).join('');
 
   const countOpts = n => Array.from({ length: 11 }, (_, i) =>

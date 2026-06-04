@@ -1052,9 +1052,9 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── Admin: 架電リストページ ──
   if (pathname === '/admin/calls' && method === 'GET') {
-    const callCo = query.co || co;
-    const callMedia = query.media || 'indeed';
-    const callStatus = query.status || 'all';
+    const callCo = Array.isArray(query.co) ? query.co[0] : (query.co || co);
+    const callMedia = Array.isArray(query.media) ? query.media[0] : (query.media || 'indeed');
+    const callStatus = Array.isArray(query.status) ? query.status[0] : (query.status || 'all');
     const callSearch = query.search || '';
     const applicants = await Ops.listCalls({
       company: callCo !== 'all' ? callCo : undefined,
