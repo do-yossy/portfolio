@@ -156,14 +156,19 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       const ccRaw = row[SHEET_COL.callCount];
       const newStatus = row[SHEET_COL.status];
       const normalizedStatus = STATUS_MIGRATE[newStatus] || newStatus;
-      // 取込では対応状況・架電回数・メモのみ更新し、過去応募への自動移動は行わない
-      // （全員を架電リストに残す。過去応募への移動は管理画面の手動操作で行う）
+      // 対応状況・架電回数・メモを更新し、不通/対応中/終了は過去応募へ移動
       await Ops.updateCall(id, {
         callCount: (ccRaw !== undefined && ccRaw !== '') ? (parseInt(ccRaw) || 0) : undefined,
         status: normalizedStatus || undefined,
         notes: row[SHEET_COL.notes] !== undefined ? row[SHEET_COL.notes] : undefined,
-        skipAutoArchive: true,
+        skipAutoArchive: false,  // 終了 → updateCall内のTERMINAL判定で自動アーカイブ
       });
+      // 不通・対応中 → 手動でアーカイブ（不通は次回応募時に再応募扱い）
+      if (['不通', '対応中'].includes(normalizedStatus) && existing.is_archived === 0) {
+        const { db } = require('../db');
+        db.prepare('UPDATE applicants SET is_archived=1, updated_at=? WHERE id=?')
+          .run(new Date().toISOString(), id);
+      }
       updated++;
     }
   }
