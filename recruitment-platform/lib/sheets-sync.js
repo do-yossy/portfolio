@@ -27,10 +27,14 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   const mediaLabel = id => { const m = mediaList.find(x => x.id === id); return m ? m.name : (id || '不明'); };
   // 管理画面と同じラベルを使用（c.label → c.short → id の順で fallback）
   const companyLabel = id => { const c = companies.find(x => x.id === id); return c ? (c.label || c.short || id) : (id || ''); };
+  // 旧ステータス → 新ステータスのマッピング（スプレッドシートから古い値が返ってきた場合の対応）
+  const STATUS_MIGRATE = {
+    '架電済(不通)': '不通', '対応終了': '終了', '断られた': '終了', '辞退': '終了', '重複': '新規',
+  };
   let count = 0, tabs = 0;
   const warnings = [];
-  // 対応終了・断られた・辞退は除外（バックログ含む全員は表示）
-  const SKIP_STATUSES = new Set(['対応終了', '断られた', '辞退']);
+  // 終了は除外（バックログ含む全員は表示）
+  const SKIP_STATUSES = new Set(['終了']);
   for (const co of companies) {
     const list = (await Ops.listCalls({ company: co.id, archived: false, excludeDuplicate: true }))
       .filter(a => !SKIP_STATUSES.has(a.status));
@@ -102,13 +106,19 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
       await gsheets.setDropdowns(props.sheetId, [
         { colIndex: SHEET_COL.callCount, list: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] },
-        { colIndex: SHEET_COL.status, list: statuses },
+        { colIndex: SHEET_COL.status, list: ['新規', '不通', '対応中', '終了'] },
       ]);
       if (sectionRowIdx.length && gsheets.styleSectionRows) {
         await gsheets.styleSectionRows(props.sheetId, sectionRowIdx, SHEET_HEADERS.length);
       }
     } catch (e) {
       warnings.push(`${title}: 書式/プルダウン設定に失敗 (${e.message || e})`);
+    }
+    // ステータス列（col 17）に条件付き書式を設定
+    if (gsheets.setStatusConditionalFormats) {
+      try {
+        await gsheets.setStatusConditionalFormats(props.sheetId, SHEET_COL.status);
+      } catch (e) { warnings.push(`${title}: 条件付き書式設定失敗 (${e.message || e})`); }
     }
     tabs++;
   }
@@ -119,6 +129,10 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
 
 // スプレッドシート → DB（IDで突合し対応状況・架電回数・メモを更新）
 async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
+  // 旧ステータス → 新ステータスのマッピング（スプレッドシートから古い値が返ってきた場合の対応）
+  const STATUS_MIGRATE = {
+    '架電済(不通)': '不通', '対応終了': '終了', '断られた': '終了', '辞退': '終了', '重複': '新規',
+  };
   let updated = 0, notFound = 0, scanned = 0;
   const meta = await gsheets.getMeta();
   for (const sh of (meta.sheets || [])) {
@@ -132,11 +146,19 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       const existing = await Applicants.findById(id);
       if (!existing) { notFound++; continue; }
       const ccRaw = row[SHEET_COL.callCount];
+      const newStatus = row[SHEET_COL.status];
+      const normalizedStatus = STATUS_MIGRATE[newStatus] || newStatus;
       await Ops.updateCall(id, {
         callCount: (ccRaw !== undefined && ccRaw !== '') ? (parseInt(ccRaw) || 0) : undefined,
-        status: row[SHEET_COL.status] || undefined,
+        status: normalizedStatus || undefined,
         notes: row[SHEET_COL.notes] !== undefined ? row[SHEET_COL.notes] : undefined,
       });
+      // 不通で返ってきたレコードは過去応募に移動（次回は重複扱いしない）
+      if (normalizedStatus === '不通' && existing.is_archived === 0) {
+        const { db } = require('../db');
+        db.prepare('UPDATE applicants SET is_archived=1, updated_at=? WHERE id=?')
+          .run(new Date().toISOString(), id);
+      }
       updated++;
     }
   }

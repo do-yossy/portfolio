@@ -129,6 +129,14 @@ try {
   db.exec(`UPDATE applicants SET media = 'google'    WHERE (media IS NULL OR media = '') AND (source_media = 'direct' OR source_media LIKE '%oogle%' OR source_media LIKE '%しごと%')`);
 } catch {}
 
+// Migration v4: returning_from_id column for re-applicants (previously archived as 不通)
+try { db.exec("ALTER TABLE applicants ADD COLUMN returning_from_id TEXT DEFAULT NULL"); } catch {}
+// Migrate old status values to simplified statuses
+db.exec("UPDATE applicants SET status='不通' WHERE status='架電済(不通)'");
+db.exec("UPDATE applicants SET status='終了' WHERE status IN ('対応終了','断られた','辞退')");
+// Remove '重複' status (it was redundant with is_duplicate=1)
+db.exec("UPDATE applicants SET status='新規' WHERE status='重複'");
+
 // Migration v2: 媒体掲載日報テーブル
 db.exec(`
   CREATE TABLE IF NOT EXISTS media_posts (
@@ -326,8 +334,8 @@ const Applicants = {
       else /* direct / google / しごと / 未設定 → Googleしごと検索経由 */ media = 'google';
     }
     db.prepare(`
-      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, is_archived, is_imported, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, returning_from_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, is_archived, is_imported, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, data.name, data.phone, data.email,
       data.age ? parseInt(data.age) : null,
@@ -337,6 +345,7 @@ const Applicants = {
       data.status || '新規',
       data.isDuplicate || data.is_duplicate ? 1 : 0,
       data.duplicateOfId || data.duplicate_of_id || null,
+      data.returningFromId || data.returning_from_id || null,
       data.notes || '',
       nPhone, nEmail,
       data.company || 'sq',
@@ -384,6 +393,24 @@ const Applicants = {
     if (nEmail) {
       const r = db.prepare(`SELECT id FROM applicants WHERE normalized_email = ? AND normalized_email != '' LIMIT 1`).get(nEmail);
       if (r) return r.id;
+    }
+    return null;
+  },
+  // Returns {id, isReturning} or null.
+  // isReturning=true means the match is an archived '不通' record → treat as returning applicant, NOT duplicate.
+  findDuplicateInfo(nPhone, nEmail) {
+    const check = (row) => {
+      if (!row) return null;
+      const isReturning = row.is_archived === 1 && row.status === '不通';
+      return { id: row.id, isReturning };
+    };
+    if (nPhone) {
+      const r = db.prepare(`SELECT id, is_archived, status FROM applicants WHERE normalized_phone = ? AND normalized_phone != '' ORDER BY is_archived ASC, created_at DESC LIMIT 1`).get(nPhone);
+      if (r) return check(r);
+    }
+    if (nEmail) {
+      const r = db.prepare(`SELECT id, is_archived, status FROM applicants WHERE normalized_email = ? AND normalized_email != '' ORDER BY is_archived ASC, created_at DESC LIMIT 1`).get(nEmail);
+      if (r) return check(r);
     }
     return null;
   },
@@ -562,9 +589,9 @@ const MEDIA = [
   { id: 'engage',   name: 'engage' },
 ];
 // 架電対応状況
-const CALL_STATUSES = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];
+const CALL_STATUSES = ['新規', '不通', '対応中', '終了'];
 // 「今日架電を行う」対象ステータス（終了系を除く）
-const ACTIVE_CALL_STATUSES = ['新規', '架電済(不通)', '対応中'];
+const ACTIVE_CALL_STATUSES = ['新規', '不通', '対応中'];
 
 // ── 架電運用：Applicants 拡張メソッド ──────────────────────────
 const Ops = {
@@ -579,8 +606,8 @@ const Ops = {
     if (callCount !== undefined && (parseInt(callCount) || 0) > 0) {
       fields.push('last_called_at = ?'); vals.push(ts);
     }
-    // 対応終了・断られた・辞退は過去リストへ自動アーカイブ
-    const TERMINAL = ['対応終了', '断られた', '辞退'];
+    // 終了は過去リストへ自動アーカイブ
+    const TERMINAL = ['終了'];
     if (status !== undefined) {
       fields.push('is_archived = ?');
       vals.push(TERMINAL.includes(status) ? 1 : 0);
@@ -734,4 +761,5 @@ const MediaPosts = {
 module.exports = {
   db, Jobs, Applicants, Applications, Logs, Analytics, generateId,
   Ops, MediaPosts, COMPANIES, MEDIA, CALL_STATUSES, ACTIVE_CALL_STATUSES,
+  findDuplicateInfo: (nPhone, nEmail) => Applicants.findDuplicateInfo(nPhone, nEmail),
 };

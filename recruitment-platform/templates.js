@@ -18,13 +18,10 @@ const OPS_MEDIA = [
   { id: 'engage',    name: 'engage' },
 ];
 const CALL_STATUS_COLORS = {
-  '新規':        '#3b82f6',
-  '架電済(不通)': '#eab308',
-  '対応中':       '#06b6d4',
-  '対応終了':     '#16a34a',
-  '断られた':     '#94a3b8',
-  '辞退':         '#94a3b8',
-  '重複':         '#cbd5e1',
+  '新規':  '#3b82f6',
+  '不通':  '#f97316',
+  '対応中': '#06b6d4',
+  '終了':  '#94a3b8',
 };
 
 function adminLayout(title, content, active = 'posts', co = 'sq') {
@@ -1557,7 +1554,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
     <tr data-id="${esc(a.id)}" data-status="${esc(a.status || '')}" style="background:${(CALL_STATUS_COLORS[a.status] || '#fff')}15">
       <td class="num">${i + 1}</td>
       ${coCell(a)}
-      <td class="name-col">${esc(a.name || '')}${a.is_duplicate ? ' <span class="dup-badge">重複</span>' : ''}</td>
+      <td class="name-col">${esc(a.name || '')}${a.is_duplicate ? ` <span class="dup-badge" onclick="showDupInfo('${esc(a.id)}')" style="cursor:pointer" title="重複元を見る">重複</span>` : ''}${a.returning_from_id ? ` <span style="background:#e0f2fe;color:#0369a1;font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer" onclick="showReturningInfo('${esc(a.id)}')" title="前回応募を見る">再応募</span>` : ''}</td>
       <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
       <td>${esc(a.email || '')}</td>
       <td>${esc(a.gender || '')}</td>
@@ -1681,7 +1678,7 @@ function callImportModalHtml(co, media) {
 
 // 運用テンプレ用のヘルパ定数
 const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx'];
-const CALL_STATUSES_LIST = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];
+const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
 function mediaName(id) { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
 module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, privacyPolicyPage, esc, opsPage, callsPage };
