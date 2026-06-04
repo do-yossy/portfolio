@@ -914,10 +914,12 @@ function callCloseSmartImport() {
 }
 async function callDoSmartImport() {
   const company = document.getElementById('si-company').value;
+  const split   = document.getElementById('si-split')?.checked ? '1' : '0';
   const file    = document.getElementById('si-file').files[0];
   if (!file) return toast('Excelファイルを選択してください', 'warn');
   const fd = new FormData();
   fd.append('company', company);
+  fd.append('split', split);
   fd.append('file', file);
   const resultEl = document.getElementById('si-result');
   resultEl.innerHTML = '<p>自動振り分けで取込中...</p>';
@@ -931,6 +933,7 @@ async function callDoSmartImport() {
       ).join('');
       resultEl.innerHTML =
         `<p style="color:#16a34a">✅ 合計 ${d.imported}件取込・${d.duplicates}件重複</p>` +
+        ((d.toCallList || d.toPast) ? `<p style="font-size:13px">📞 架電リスト: <strong>${d.toCallList}件</strong> ／ 📚 過去リスト: <strong>${d.toPast}件</strong></p>` : '') +
         (rows ? `<table style="font-size:12px;border-collapse:collapse;margin-top:6px"><thead><tr><th style="padding:2px 10px;text-align:left">会社/媒体</th><th style="padding:2px 10px">取込</th><th style="padding:2px 10px">重複</th></tr></thead><tbody>${rows}</tbody></table>` : '') +
         (d.skippedSheets?.length ? `<p style="color:#b45309;font-size:12px;margin-top:6px">媒体不明でスキップしたシート: ${d.skippedSheets.join('、')}</p>` : '');
       toast(`${d.imported}件取り込みました`, d.imported > 0 ? 'success' : 'warn');

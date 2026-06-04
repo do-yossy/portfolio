@@ -1644,7 +1644,12 @@ function callImportModalHtml(co, media) {
           <select id="si-company">${COMPANIES_ORDER.map(c => `<option value="${c}">${COMPANIES[c].label}</option>`).join('')}</select>
         </label>
         <label class="full">Excelファイル(.xlsx)<input type="file" id="si-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        <label class="full" style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="si-split" style="width:auto">
+          架電回数で振り分ける（未架電→架電リスト / 架電済み→過去リスト）
+        </label>
       </div>
+      <p class="muted" style="font-size:11px;margin:0 0 8px">※チェックを外すと全件を過去リスト（アーカイブ）として取り込みます。</p>
       <div id="si-result" class="import-result"></div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="callCloseSmartImport()">閉じる</button>

@@ -25,8 +25,8 @@ function companyFromHeaderText(text) {
   const t = String(text || '');
   if (/ピープル|people/i.test(t)) return 'pe';
   if (/ライフテイラー|ライフテーラー|lifetaylor|life ?taylor/i.test(t)) return 'lt';
-  if (/socialquality|social ?quality|ソーシャルクオリティ|ソーシャル ?クオリティ|ソーシャル/i.test(t)) return 'sq';
-  if (/bigeyes|big ?eyes|ビッグアイズ|ビッグアイ/i.test(t)) return 'bg';
+  if (/socialquality|social ?quality|ソーシャルクオリティ|ソーシャル ?クオリティ|ソーシャル|(^|[^A-Za-z])SQ([^A-Za-z]|$)/i.test(t)) return 'sq';
+  if (/bigeyes|big ?eyes|ビッグアイズ|ビックアイズ|ビッグアイ|ビックアイ/i.test(t)) return 'bg';
   if (/[二ニ] ?クール|nicol/i.test(t)) return 'nc';
   if (/ネクサス|nexus/i.test(t)) return 'nx';
   return null;
@@ -49,11 +49,12 @@ function hasContact(row) {
 
 // メイン: parseXlsxSheets の結果を受け取り、会社・媒体を割り当てて取り込む。
 //   deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs }
-async function smartImport({ sheets, deps, defaultCompany = 'sq' }) {
+async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCount = false }) {
   const { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs } = deps;
   const summary = {};   // "会社/媒体" → { imported, duplicates }
   const skippedSheets = [];
   let imported = 0, duplicates = 0, skipped = 0, headerRows = 0;
+  let toCallList = 0, toPast = 0;   // 振り分け結果（架電リスト / 過去リスト）
 
   const bump = (co, media, key) => {
     const k = `${co}/${media}`;
@@ -81,14 +82,20 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq' }) {
 
       const nPhone = normalizePhone(mapped.phone);
       const nEmail = normalizeEmail(mapped.email);
+      // 振り分け: 架電回数で分ける場合は「未架電(0)→架電リスト / 架電済み(≥1)→過去リスト」。
+      // それ以外は全件を過去リスト（アーカイブ）として取り込む。
+      const callCount = parseInt(mapped.callCount || 0) || 0;
+      const archived = splitByCallCount ? (callCount >= 1 ? 1 : 0) : 1;
+
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
       if (dupId) {
-        // 過去応募者は架電リスト（本日分）に出さない＝アーカイブ扱いで取り込む
+        // 重複は架電リストに出さず必ずアーカイブ＋重複フラグで記録
         await Applicants.create({ ...mapped, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
         duplicates++; bump(currentCompany, media, 'duplicates');
       } else {
-        await Applicants.create({ ...mapped, isArchived: 1 });
+        await Applicants.create({ ...mapped, isArchived: archived });
         imported++; bump(currentCompany, media, 'imported');
+        if (archived) toPast++; else toCallList++;
       }
     }
   }
@@ -100,7 +107,7 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq' }) {
       (skippedSheets.length ? ` ※媒体不明でスキップ:${skippedSheets.join(',')}` : ''));
   }
 
-  return { imported, duplicates, skipped, headerRows, summary, skippedSheets };
+  return { imported, duplicates, skipped, headerRows, summary, skippedSheets, toCallList, toPast };
 }
 
 module.exports = { smartImport, mediaFromSheetName, companyFromHeaderText };

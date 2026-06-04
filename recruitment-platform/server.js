@@ -150,6 +150,13 @@ function mapCSVRow(row) {
       const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
       if (v && v.trim()) return v.trim();
     }
+    // 完全一致しない場合、列名にキーを含む列を探す（例: 「架電回数カデンカイスウ」「年齢ネンレイ」等のふりがな付きヘッダ）
+    for (const k of keys) {
+      if (!/[ぁ-んァ-ヶ一-龯]/.test(k)) continue; // 日本語キーのみ部分一致対象
+      for (const rk of Object.keys(row)) {
+        if (rk.includes(k) && row[rk] && String(row[rk]).trim()) return String(row[rk]).trim();
+      }
+    }
     return '';
   };
 
@@ -220,6 +227,12 @@ function mapOpsCSVRow(row, company, media) {
     for (const k of keys) {
       const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
       if (v && v.trim()) return v.trim();
+    }
+    for (const k of keys) {
+      if (!/[ぁ-んァ-ヶ一-龯]/.test(k)) continue;
+      for (const rk of Object.keys(row)) {
+        if (rk.includes(k) && row[rk] && String(row[rk]).trim()) return String(row[rk]).trim();
+      }
     }
     return '';
   };
@@ -1127,17 +1140,19 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   if (pathname === '/api/ops/calls/smart-import' && method === 'POST') {
     const ct = req.headers['content-type'] || '';
     const buf = await readBody(req);
-    let fileBuf = null, defaultCompany = co;
+    let fileBuf = null, defaultCompany = co, splitByCallCount = false;
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=(.+)$/);
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
       for (const p of parts) {
         if (/name="company"/.test(p.header)) defaultCompany = p.content.toString('utf8').trim();
+        else if (/name="split"/.test(p.header)) splitByCallCount = p.content.toString('utf8').trim() === '1';
         else if (/filename=/.test(p.header)) fileBuf = p.content;
       }
     } else {
       fileBuf = buf;
       defaultCompany = query.company || co;
+      splitByCallCount = query.split === '1';
     }
     const isXlsx = fileBuf && fileBuf.length > 4 &&
       fileBuf[0] === 0x50 && fileBuf[1] === 0x4B && fileBuf[2] === 0x03 && fileBuf[3] === 0x04;
@@ -1151,6 +1166,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         sheets,
         deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs },
         defaultCompany,
+        splitByCallCount,
       });
       sendJSON(res, 200, { ok: true, ...r });
     } catch (e) {
