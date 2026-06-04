@@ -1487,6 +1487,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const phoneMap = new Map(); // normalized_phone -> 元データ id
     const emailMap = new Map(); // normalized_email -> 元データ id
     let flagged = 0;
+    const results = []; // 新規に重複フラグを立てた一覧（UI表示用）
 
     for (const a of all) {
       const p = a.normalized_phone || '';
@@ -1497,7 +1498,13 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       if (!originalId && e && emailMap.has(e)) originalId = emailMap.get(e);
 
       if (originalId) {
-        if (!a.is_duplicate) { await Ops.markDuplicate(a.id, originalId); flagged++; }
+        if (!a.is_duplicate) {
+          await Ops.markDuplicate(a.id, originalId);
+          flagged++;
+          // 結果一覧用に重複者と参照元の情報を収集
+          const orig = Applicants.findById(originalId);
+          if (orig) results.push({ dup: a, orig });
+        }
         // この応募者の連絡先も元データに紐付けて登録（連鎖一致に対応）
         if (p && !phoneMap.has(p)) phoneMap.set(p, originalId);
         if (e && !emailMap.has(e)) emailMap.set(e, originalId);
@@ -1506,7 +1513,37 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         if (e) emailMap.set(e, a.id);
       }
     }
-    sendJSON(res, 200, { ok: true, flagged });
+    const companyLabel = id => { const c = OPS_COMPANIES.find(x => x.id === id); return c ? (c.label || c.short || id) : (id || ''); };
+    const mediaLabel   = id => { const m = OPS_MEDIA.find(x => x.id === id);    return m ? m.name : (id || '不明'); };
+    const fmt = a => ({
+      id: a.id, name: a.name, phone: a.phone, email: a.email,
+      company: companyLabel(a.company), media: mediaLabel(a.media),
+      appliedAt: (a.applied_at || '').slice(0, 10),
+      status: a.status, callCount: a.call_count || 0, notes: a.notes || '',
+    });
+    sendJSON(res, 200, {
+      ok: true, flagged,
+      results: results.map(({ dup, orig }) => ({ dup: fmt(dup), orig: fmt(orig) })),
+    });
+    return;
+  }
+
+  // ── 重複応募者を過去応募へ移動（架電リストから削除）──
+  if (pathname === '/api/ops/archive-dups' && method === 'POST') {
+    const body = await parseJSON(req);
+    const ids = Array.isArray(body.ids) ? body.ids : [];
+    if (!ids.length) { sendJSON(res, 400, { ok: false, error: 'ids required' }); return; }
+    const ts = new Date().toISOString();
+    let archived = 0;
+    for (const id of ids) {
+      const a = Applicants.findById(id);
+      if (!a) continue;
+      // 同一人物の全レコードをまとめてアーカイブ
+      db.prepare(`UPDATE applicants SET is_archived=1, updated_at=? WHERE is_archived=0 AND (id=? OR (normalized_phone!='' AND normalized_phone=?) OR (normalized_email!='' AND normalized_email=?))`)
+        .run(ts, id, a.normalized_phone || '', a.normalized_email || '');
+      archived++;
+    }
+    sendJSON(res, 200, { ok: true, archived });
     return;
   }
 

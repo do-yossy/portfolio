@@ -1014,10 +1014,111 @@ function callCheckDup() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
       });
       const d = await res.json();
-      if (d.ok) { toast(`${d.flagged}件を重複にしました`, 'success'); setTimeout(() => location.reload(), 1000); }
-      else toast('重複チェックに失敗しました', 'error');
+      if (!d.ok) { toast('重複チェックに失敗しました', 'error'); return; }
+
+      if (d.flagged === 0) { toast('重複は見つかりませんでした', 'info'); return; }
+
+      // 結果モーダルを表示
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:#fff;border-radius:10px;padding:24px;width:100%;max-width:720px;box-shadow:0 4px 24px rgba(0,0,0,.2)';
+
+      const rows = d.results.map(({ dup, orig }, i) => `
+        <tr style="border-top:1px solid #e2e8f0" data-dup-id="${esc(dup.id)}">
+          <td style="padding:10px 8px;text-align:center;width:36px">
+            <input type="checkbox" class="dup-check" data-id="${esc(dup.id)}" style="width:16px;height:16px;cursor:pointer">
+          </td>
+          <td style="padding:10px 8px">
+            <div style="font-weight:600">${esc(dup.name)}</div>
+            <div style="font-size:12px;color:#64748b">${esc(dup.phone)}</div>
+            <div style="font-size:12px;color:#64748b">${esc(dup.company)} / ${esc(dup.media)}</div>
+            <div style="font-size:12px;color:#64748b">応募日: ${esc(dup.appliedAt)}</div>
+          </td>
+          <td style="padding:10px 8px;text-align:center;color:#94a3b8;font-size:18px">→</td>
+          <td style="padding:10px 8px;background:#fafafa;border-radius:6px">
+            <div style="font-weight:600">${esc(orig.name)}</div>
+            <div style="font-size:12px;color:#64748b">${esc(orig.phone)}</div>
+            <div style="font-size:12px;color:#64748b">${esc(orig.company)} / ${esc(orig.media)}</div>
+            <div style="font-size:12px;color:#64748b">応募日: ${esc(orig.appliedAt)}</div>
+            <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
+              <span style="font-size:11px;padding:1px 7px;border-radius:10px;background:#e0f2fe;color:#0369a1">${esc(orig.status)}</span>
+              <span style="font-size:11px;padding:1px 7px;border-radius:10px;background:#f1f5f9;color:#475569">架電${orig.callCount}回</span>
+              ${orig.notes ? `<span style="font-size:11px;color:#64748b">📝 ${esc(orig.notes)}</span>` : ''}
+            </div>
+          </td>
+        </tr>`).join('');
+
+      box.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <p style="font-weight:700;font-size:15px;margin:0">♻️ 重複チェック結果 — ${d.flagged}件の重複を検出</p>
+          <button id="dup-close-btn" style="padding:4px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer">閉じる</button>
+        </div>
+        <p style="font-size:12px;color:#64748b;margin:0 0 8px">左: 重複と判定された応募者　→　右: 過去の応募情報（元データ）</p>
+        <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px">
+            <input type="checkbox" id="dup-check-all" style="width:15px;height:15px"> 全て選択
+          </label>
+          <span style="font-size:12px;color:#94a3b8">チェックした応募者を架電リストから削除（過去応募へ移動）できます</span>
+        </div>
+        <div style="max-height:55vh;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#f8fafc;font-size:12px;color:#64748b">
+                <th style="padding:6px 8px;width:36px"></th>
+                <th style="padding:6px 8px;text-align:left;font-weight:600">重複応募者</th>
+                <th></th>
+                <th style="padding:6px 8px;text-align:left;font-weight:600">過去の応募情報（元データ）</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+          <button id="dup-archive-btn" style="padding:6px 18px;border:none;border-radius:6px;background:#f97316;color:#fff;cursor:pointer;font-weight:600">選択した応募者を過去応募へ移動</button>
+          <button id="dup-close-btn2" style="padding:6px 18px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer">閉じる</button>
+        </div>`;
+
+      const close = () => { overlay.remove(); location.reload(); };
+
+      // 全選択チェックボックス
+      box.querySelector('#dup-check-all').addEventListener('change', e => {
+        box.querySelectorAll('.dup-check').forEach(cb => cb.checked = e.target.checked);
+      });
+
+      // 過去応募へ移動ボタン
+      box.querySelector('#dup-archive-btn').addEventListener('click', async () => {
+        const ids = [...box.querySelectorAll('.dup-check:checked')].map(cb => cb.dataset.id);
+        if (!ids.length) { alert('移動する応募者を選択してください'); return; }
+        try {
+          const r = await fetch('/api/ops/archive-dups', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+          });
+          const rd = await r.json();
+          if (rd.ok) {
+            toast(`${rd.archived}件を過去応募へ移動しました`, 'success');
+            // 移動済みの行を非表示
+            ids.forEach(id => {
+              const row = box.querySelector(`tr[data-dup-id="${id}"]`);
+              if (row) row.style.display = 'none';
+            });
+          } else toast('移動に失敗しました', 'error');
+        } catch { toast('通信エラー', 'error'); }
+      });
+
+      box.querySelector('#dup-close-btn').addEventListener('click', close);
+      box.querySelector('#dup-close-btn2').addEventListener('click', close);
+      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
     } catch (e) { toast('通信エラー', 'error'); }
   });
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 const COMPANY_LIST = [
