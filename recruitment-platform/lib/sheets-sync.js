@@ -103,6 +103,10 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     // 書式・プルダウンは毎回（冪等）適用。失敗してもデータ反映は止めず警告に。
     try {
       await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
+      // 過去レイアウトの余分なプルダウン（応募日列など）を一度全クリアしてから必要な列だけ再設定
+      if (gsheets.clearDataValidations) {
+        await gsheets.clearDataValidations(props.sheetId);
+      }
       await gsheets.setDropdowns(props.sheetId, [
         { colIndex: SHEET_COL.callCount, list: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] },
         { colIndex: SHEET_COL.status, list: ['新規', '不通', '対応中', '終了'] },
@@ -113,10 +117,10 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     } catch (e) {
       warnings.push(`${title}: 書式/プルダウン設定に失敗 (${e.message || e})`);
     }
-    // ステータス列（col 17）に条件付き書式を設定
+    // 対応状況の値に応じて「行全体」を着色（マスだけでなく行全体）
     if (gsheets.setStatusConditionalFormats) {
       try {
-        await gsheets.setStatusConditionalFormats(props.sheetId, SHEET_COL.status);
+        await gsheets.setStatusConditionalFormats(props.sheetId, SHEET_COL.status, SHEET_HEADERS.length);
       } catch (e) { warnings.push(`${title}: 条件付き書式設定失敗 (${e.message || e})`); }
     }
     tabs++;

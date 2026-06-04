@@ -254,8 +254,9 @@ async function styleSectionRows(tabSheetId, rowIndices, numCols) {
   await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests } });
 }
 
-// ステータス列に条件付き書式（色）を設定。既存ルールをクリアして再設定。
-async function setStatusConditionalFormats(tabSheetId, statusColIndex) {
+// ステータス列の値に応じて「行全体」に色を付ける条件付き書式を設定。既存ルールをクリアして再設定。
+//   statusColIndex: 対応状況列の0始まりインデックス, numCols: 着色する列数（行全体に適用）
+async function setStatusConditionalFormats(tabSheetId, statusColIndex, numCols = 26) {
   // 既存の条件付き書式ルールを全削除してから再設定
   try {
     const meta = await api(`/${sheetId()}?fields=sheets(properties(sheetId),conditionalFormats)`);
@@ -273,12 +274,14 @@ async function setStatusConditionalFormats(tabSheetId, statusColIndex) {
     { value: '対応中', red: 1,    green: 0.95, blue: 0.6  },
     { value: '終了',   red: 0.78, green: 0.96, blue: 1    },
   ];
+  // 対応状況列を絶対参照する CUSTOM_FORMULA で行全体を着色（例: =$R2="不通"）
+  const colL = colLetter(statusColIndex);
   const requests = rules.map((r, i) => ({
     addConditionalFormatRule: {
       rule: {
-        ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: statusColIndex, endColumnIndex: statusColIndex + 1 }],
+        ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: numCols }],
         booleanRule: {
-          condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: r.value }] },
+          condition: { type: 'CUSTOM_FORMULA', values: [{ userEnteredValue: `=$${colL}2="${r.value}"` }] },
           format: { backgroundColor: { red: r.red, green: r.green, blue: r.blue } },
         },
       },
@@ -288,8 +291,24 @@ async function setStatusConditionalFormats(tabSheetId, statusColIndex) {
   await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests } });
 }
 
+// 指定タブのデータ検証（プルダウン）を全クリア（ヘッダー行を除く全列）
+async function clearDataValidations(tabSheetId) {
+  await api(`/${sheetId()}:batchUpdate`, {
+    method: 'POST',
+    body: {
+      requests: [{
+        setDataValidation: {
+          // rule を省略すると検証がクリアされる。startRowIndex:1 でヘッダーは除外、全列対象。
+          range: { sheetId: tabSheetId, startRowIndex: 1 },
+        },
+      }],
+    },
+  });
+}
+
 module.exports = {
   isConfigured, sheetUrl, getAccessToken,
   getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
   setDropdowns, styleHeader, styleSectionRows, colLetter, setStatusConditionalFormats,
+  clearDataValidations,
 };
