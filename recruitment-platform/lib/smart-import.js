@@ -83,10 +83,11 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq' }) {
       const nEmail = normalizeEmail(mapped.email);
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
       if (dupId) {
-        await Applicants.create({ ...mapped, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        // 過去応募者は架電リスト（本日分）に出さない＝アーカイブ扱いで取り込む
+        await Applicants.create({ ...mapped, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
         duplicates++; bump(currentCompany, media, 'duplicates');
       } else {
-        await Applicants.create(mapped);
+        await Applicants.create({ ...mapped, isArchived: 1 });
         imported++; bump(currentCompany, media, 'imported');
       }
     }

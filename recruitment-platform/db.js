@@ -312,8 +312,8 @@ const Applicants = {
     const appliedMonth = (appliedAt || '').slice(0, 7); // 'YYYY-MM'
     const media = data.media || '';
     db.prepare(`
-      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, is_archived, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, data.name, data.phone, data.email,
       data.age ? parseInt(data.age) : null,
@@ -337,6 +337,7 @@ const Applicants = {
       data.experience || '',
       data.education || '',
       data.workLocation || data.work_location || '',
+      data.isArchived || data.is_archived ? 1 : 0,
       ts, ts
     );
     return Applicants.findById(id);
