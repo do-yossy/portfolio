@@ -252,8 +252,9 @@ async function opsNewStats() {
   const { db } = require('./db');
   const today = new Date().toISOString().slice(0, 10);
   const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
-  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE created_at >= ?`).get(today + 'T00:00:00Z').c;
-  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE created_at >= ?`).get(monday + 'T00:00:00Z').c;
+  // 過去応募者の取込（is_archived=1）は「本日の新規応募」に含めない
+  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(today + 'T00:00:00Z').c;
+  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(monday + 'T00:00:00Z').c;
   const activeTotal = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND status IN ('新規','架電済(不通)','対応中')`).get().c;
   return { todayNew, weekNew, activeTotal };
 }
