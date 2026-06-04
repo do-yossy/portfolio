@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# 社内・営業用の資産はインデックスしない
+Disallow: /営業システム/
+Disallow: /営業案件管理ツール.html
+Disallow: /応募コックピット.html
+Disallow: /recruitment-platform/
+
+Sitemap: https://do-yossy.github.io/portfolio/sitemap.xml

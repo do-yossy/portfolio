@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>無料相談・お問い合わせ | Social.Quality — Web制作・ツール・AI開発</title>
+<meta name="description" content="LP・ホームページ・業務効率化ツール・AI活用ツールの無料相談。ヒアリング・お見積もりは無料、24時間以内に返信。修正回数無制限・全国オンライン対応。">
+<link rel="canonical" href="https://do-yossy.github.io/portfolio/お問い合わせ.html">
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080c18;--surface:#0f1220;--surface2:#161b2e;--surface3:#1c2238;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --accent:#5b6ef5;--accent2:#8b7cf8;--gold:#f0b429;--red:#e84545;--green:#22c55e;
+  --text:#dde3f5;--text2:#8892b0;--text3:#4a5070;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-weight:300;line-height:1.8;font-size:14px}
+a{color:inherit;text-decoration:none}
+.nav{position:sticky;top:0;z-index:50;background:rgba(8,12,24,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.nav-inner{max-width:900px;margin:0 auto;padding:1rem 1.2rem;display:flex;justify-content:space-between;align-items:center}
+.nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:-.02em}
+.nav-logo span{color:var(--accent)}
+.nav-back{font-size:.8rem;color:var(--text2)}
+.wrap{max-width:760px;margin:0 auto;padding:2.5rem 1.2rem 5rem}
+.eyebrow{font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:var(--accent2);margin-bottom:.8rem}
+h1{font-size:clamp(1.7rem,5vw,2.4rem);font-weight:700;letter-spacing:-.02em;line-height:1.3;margin-bottom:.8rem}
+h1 .gr{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.lead{color:var(--text2);margin-bottom:1.5rem;font-size:.95rem}
+.trust{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:2rem}
+.trust span{font-size:.74rem;padding:.35rem .8rem;background:var(--surface2);border:1px solid var(--border);border-radius:99px;color:var(--text2)}
+.trust span b{color:var(--gold);font-weight:700}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.6rem;margin-bottom:1.2rem}
+.field{margin-bottom:1.1rem}
+.field label{display:block;font-size:.82rem;color:var(--text);margin-bottom:.4rem;font-weight:500}
+.field .req{color:var(--red);font-size:.72rem;margin-left:.3rem}
+.field .opt{color:var(--text3);font-size:.72rem;margin-left:.3rem}
+input[type=text],input[type=email],input[type=number],select,textarea{
+  width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:10px;color:var(--text);
+  font-family:inherit;font-size:.9rem;padding:.7rem .8rem}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,110,245,.15)}
+textarea{resize:vertical;min-height:110px;line-height:1.7}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.check,.radio{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;cursor:pointer}
+.hp{position:absolute;left:-9999px}
+.submit{width:100%;padding:1rem;background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:inherit;font-size:1rem;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.submit:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(91,110,245,.35)}
+.note{font-size:.76rem;color:var(--text3);text-align:center;margin-top:.8rem}
+.alt{margin-top:1.5rem;padding-top:1.3rem;border-top:1px solid var(--border);text-align:center}
+.alt-btn{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--text2);border:1px solid var(--border);border-radius:8px;padding:.5rem .9rem;margin:.3rem}
+.thanks{display:none;text-align:center;padding:2rem 1rem}
+.thanks.show{display:block;animation:fade .4s ease}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.thanks .ic{font-size:3rem;margin-bottom:.6rem}
+.thanks h2{font-size:1.4rem;margin-bottom:.6rem}
+.copybox{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:.8rem;text-align:left;font-size:.78rem;white-space:pre-wrap;line-height:1.7;margin:1rem 0;max-height:240px;overflow:auto}
+.faq{margin-top:1rem}
+.faq details{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.8rem 1rem;margin-bottom:.6rem}
+.faq summary{cursor:pointer;font-size:.86rem;font-weight:500}
+.faq p{font-size:.82rem;color:var(--text2);margin-top:.6rem}
+@media(max-width:560px){.grid2,.checks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="nav"><div class="nav-inner">
+  <a href="index.html" class="nav-logo">Social<span>.</span>Quality</a>
+  <a href="index.html" class="nav-back">← トップに戻る</a>
+</div></header>
+
+<div class="wrap">
+  <div id="formArea">
+    <div class="eyebrow">Contact / 無料相談</div>
+    <h1>まずは<span class="gr">無料相談</span>から。<br>30秒で送れます。</h1>
+    <p class="lead">「こんなの作れる？」「いくらかかる？」だけでも歓迎です。下記をご記入いただくと、最適なプランと概算見積もりを<b>24時間以内</b>にお返しします。</p>
+    <div class="trust">
+      <span>✏️ 修正回数<b>無制限</b></span>
+      <span>⚡ <b>24h以内</b>返信</span>
+      <span>💰 LP <b>¥50,000〜</b></span>
+      <span>🌐 全国オンライン完結</span>
+      <span>🤝 見積もり<b>無料</b></span>
+    </div>
+
+    <form class="card" id="contactForm" novalidate>
+      <input type="text" class="hp" id="hp_company" name="_hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <div class="grid2">
+        <div class="field"><label>お名前<span class="opt">任意</span></label><input type="text" id="f_name" autocomplete="name"></div>
+        <div class="field"><label>会社名・屋号<span class="opt">任意</span></label><input type="text" id="f_company" autocomplete="organization"></div>
+      </div>
+      <div class="field"><label>メールアドレス<span class="req">必須</span></label><input type="email" id="f_email" autocomplete="email" placeholder="example@mail.com"></div>
+      <div class="field"><label>事業内容・業種<span class="opt">任意</span></label><input type="text" id="f_industry" placeholder="例：美容サロン / 工務店 / ECショップ"></div>
+      <div class="grid2">
+        <div class="field"><label>ご依頼内容<span class="req">必須</span></label>
+          <select id="f_type">
+            <option value="">選択してください</option>
+            <option>LP（ランディングページ）</option>
+            <option>コーポレートサイト</option>
+            <option>ECサイト</option>
+            <option>業務効率化ツール</option>
+            <option>スマホアプリ</option>
+            <option>AI活用ツール</option>
+            <option>LINE公式アカウント構築</option>
+            <option>その他・未定</option>
+          </select></div>
+        <div class="field"><label>目的<span class="opt">任意</span></label>
+          <select id="f_goal">
+            <option value="">選択してください</option>
+            <option>問い合わせ・集客を増やす</option>
+            <option>採用を強化する</option>
+            <option>ブランディング</option>
+            <option>EC・ネット販売の売上</option>
+            <option>業務を効率化する</option>
+            <option>その他</option>
+          </select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>ご予算<span class="opt">任意</span></label>
+          <select id="f_budget">
+            <option value="">選択してください</option>
+            <option>〜5万円</option><option>5〜12万円</option><option>12〜25万円</option>
+            <option>25〜50万円</option><option>50万円〜</option><option>未定・相談したい</option>
+          </select></div>
+        <div class="field"><label>希望納期<span class="opt">任意</span></label>
+          <select id="f_due">
+            <option value="">選択してください</option>
+            <option>1週間以内</option><option>2週間</option><option>1ヶ月</option>
+            <option>2ヶ月以上</option><option>未定</option>
+          </select></div>
+      </div>
+      <div class="field"><label>必要な機能<span class="opt">任意・複数可</span></label>
+        <div class="checks">
+          <label class="check"><input type="checkbox" value="お問い合わせフォーム">お問い合わせフォーム</label>
+          <label class="check"><input type="checkbox" value="予約機能">予約機能</label>
+          <label class="check"><input type="checkbox" value="決済・カート">決済・カート</label>
+          <label class="check"><input type="checkbox" value="会員登録・ログイン">会員登録・ログイン</label>
+          <label class="check"><input type="checkbox" value="CMS（自分で更新）">CMS（自分で更新）</label>
+          <label class="check"><input type="checkbox" value="多言語対応">多言語対応</label>
+        </div>
+      </div>
+      <div class="field"><label>素材（ロゴ・写真・文章）の有無<span class="opt">任意</span></label>
+        <div class="checks">
+          <label class="radio"><input type="radio" name="material" value="すべてある">すべてある</label>
+          <label class="radio"><input type="radio" name="material" value="一部ある">一部ある</label>
+          <label class="radio"><input type="radio" name="material" value="ない（制作希望）">ない（制作希望）</label>
+        </div>
+      </div>
+      <div class="field"><label>参考サイト・イメージ<span class="opt">任意</span></label><textarea id="f_ref" placeholder="「このサイトみたいに」というURLや、好きなデザインの雰囲気があれば（理由も添えていただけると精度が上がります）"></textarea></div>
+      <div class="field"><label>ご相談内容<span class="req">必須</span></label><textarea id="f_message" placeholder="作りたいもの・困っていること・ご質問など、自由にご記入ください。"></textarea></div>
+      <button type="submit" class="submit">無料相談を送信する →</button>
+      <p class="note">送信内容は相談・見積もりのみに利用します。営業電話はありません。</p>
+    </form>
+
+    <div class="alt">
+      <p style="font-size:.82rem;color:var(--text2);margin-bottom:.5rem">プラットフォーム経由での取引をご希望の方はこちら（仮払いで安心）</p>
+      <a href="https://www.lancers.jp/profile/anchan1111" target="_blank" rel="noopener" class="alt-btn">🖥 ランサーズのプロフィール →</a>
+    </div>
+
+    <div class="faq">
+      <h2 style="font-size:1rem;margin:1.8rem 0 .8rem">よくある質問</h2>
+      <details><summary>料金はどのくらいですか？</summary><p>LP ¥50,000〜／5〜10ページのサイト ¥120,000〜／コーポレート・CMS ¥250,000〜。お見積もりは無料です。ご予算に合わせてプランを調整できます。</p></details>
+      <details><summary>修正は何回までできますか？</summary><p>修正回数は無制限です（仕様変更は別途お見積もり）。納得いただけるまで対応します。</p></details>
+      <details><summary>遠方ですが大丈夫ですか？</summary><p>ヒアリングから納品まで完全オンラインで、全国どこからでもご依頼いただけます。</p></details>
+      <details><summary>素材がなくても依頼できますか？</summary><p>はい。ロゴ・写真・文章の制作も承ります（ライティング¥8,000/ページ・バナー¥4,000〜・ロゴ¥25,000〜）。</p></details>
+    </div>
+  </div>
+
+  <div class="thanks card" id="thanks">
+    <div class="ic">✅</div>
+    <h2>ありがとうございます！</h2>
+    <p style="color:var(--text2)">メールアプリが開きます。開かない場合は、下記の内容を <b id="mailto_addr"></b> 宛にお送りください（コピーできます）。<br>24時間以内に返信します。</p>
+    <div class="copybox" id="copybox"></div>
+    <button class="alt-btn" onclick="copyContent()" style="cursor:pointer">📋 内容をコピー</button>
+    <a href="index.html" class="alt-btn">トップに戻る</a>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ─────────────────────────────────────────────
+//  設定（ここを変更してください）
+//  FORMSPREE_ENDPOINT を設定すると、ページ内Ajax送信になります（推奨・無料枠あり: https://formspree.io）
+//  未設定の場合は、入力内容を CONTACT_EMAIL 宛のメール作成画面に流し込みます。
+const FORMSPREE_ENDPOINT = ""; // 例: "https://formspree.io/f/xxxxxxxx"
+const CONTACT_EMAIL = "social.recruiting.information@gmail.com";
+// ─────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function collect(){
+  const features = [...document.querySelectorAll('.checks input[type=checkbox]:checked')].map(c=>c.value);
+  const material = (document.querySelector('input[name=material]:checked')||{}).value || '';
+  return {
+    お名前:$('f_name').value.trim(), 会社名:$('f_company').value.trim(),
+    メール:$('f_email').value.trim(), 業種:$('f_industry').value.trim(),
+    依頼内容:$('f_type').value, 目的:$('f_goal').value,
+    予算:$('f_budget').value, 納期:$('f_due').value,
+    必要機能:features.join('・'), 素材:material,
+    参考サイト:$('f_ref').value.trim(), ご相談内容:$('f_message').value.trim()
+  };
+}
+function formatText(d){
+  return Object.entries(d).filter(([k,v])=>v).map(([k,v])=>`【${k}】${v}`).join('\n');
+}
+function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+$('contactForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if($('hp_company').value){ return; } // スパム（ハニーポット）
+  const d = collect();
+  if(!validEmail(d.メール)){ alert('メールアドレスをご確認ください'); $('f_email').focus(); return; }
+  if(!d.依頼内容){ alert('ご依頼内容を選択してください'); $('f_type').focus(); return; }
+  if(!d.ご相談内容){ alert('ご相談内容をご記入ください'); $('f_message').focus(); return; }
+
+  const text = formatText(d);
+  if(FORMSPREE_ENDPOINT){
+    try{
+      const r = await fetch(FORMSPREE_ENDPOINT, {method:'POST', headers:{'Content-Type':'application/json', Accept:'application/json'}, body:JSON.stringify(d)});
+      if(r.ok){ showThanks(text, false); return; }
+    }catch(err){ /* フォールバックへ */ }
+  }
+  // メールフォールバック
+  const subject = `【お問い合わせ】${d.依頼内容||''} ${d.会社名||d.お名前||''}`.trim();
+  const mailto = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+  showThanks(text, true);
+  setTimeout(()=>{ window.location.href = mailto; }, 400);
+});
+
+function showThanks(text, viaMail){
+  $('copybox').textContent = text;
+  $('mailto_addr').textContent = CONTACT_EMAIL;
+  $('formArea').style.display = 'none';
+  $('thanks').classList.add('show');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function copyContent(){
+  const t = $('copybox').textContent;
+  navigator.clipboard?.writeText(t).catch(()=>{
+    const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  });
+  event.target.textContent='コピーしました ✓';
+}
+</script>
+</body>
+</html>
