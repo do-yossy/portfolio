@@ -49,12 +49,13 @@ function hasContact(row) {
 
 // メイン: parseXlsxSheets の結果を受け取り、会社・媒体を割り当てて取り込む。
 //   deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs }
-async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCount = false }) {
+async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCount = false, countAsNew = false }) {
   const { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs } = deps;
   const summary = {};   // "会社/媒体" → { imported, duplicates }
   const skippedSheets = [];
   let imported = 0, duplicates = 0, skipped = 0, headerRows = 0;
   let toCallList = 0, toPast = 0;   // 振り分け結果（架電リスト / 過去リスト）
+  const today = new Date().toISOString().slice(0, 10);   // 新着計上時の応募日
 
   const bump = (co, media, key) => {
     const k = `${co}/${media}`;
@@ -82,18 +83,27 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
 
       const nPhone = normalizePhone(mapped.phone);
       const nEmail = normalizeEmail(mapped.email);
-      // 振り分け: 架電回数で分ける場合は「未架電(0)→架電リスト / 架電済み(≥1)→過去リスト」。
-      // それ以外は全件を過去リスト（アーカイブ）として取り込む。
+      // 振り分け先(アーカイブ)の決定:
+      //  - 架電回数で分ける場合: 未架電(0)→架電リスト / 架電済み(≥1)→過去リスト
+      //  - 本日の新着として計上(countAsNew): 全件 架電リスト
+      //  - それ以外(過去バックログ): 全件 過去リスト（アーカイブ）
       const callCount = parseInt(mapped.callCount || 0) || 0;
-      const archived = splitByCallCount ? (callCount >= 1 ? 1 : 0) : 1;
+      const archived = splitByCallCount ? (callCount >= 1 ? 1 : 0) : (countAsNew ? 0 : 1);
+      // 新着計上時は新規応募にカウント(is_imported=0)し、応募日を本日に設定して
+      // 「本日の新規応募」に確実に反映させる。過去バックログ時はカウントせず(is_imported=1)、
+      // 応募日が空ならそのまま空に保持する。
+      const importedFlag = countAsNew ? 0 : 1;
+      const newFields = countAsNew
+        ? { isImported: 0, appliedAt: today }
+        : { isImported: 1, allowEmptyDate: true };
 
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
       if (dupId) {
-        // 重複は架電リストに出さず必ずアーカイブ＋重複フラグで記録
+        // 重複は架電リストに出さず必ずアーカイブ＋重複フラグで記録（新着でも計上しない）
         await Applicants.create({ ...mapped, isImported: 1, allowEmptyDate: true, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
         duplicates++; bump(currentCompany, media, 'duplicates');
       } else {
-        await Applicants.create({ ...mapped, isImported: 1, allowEmptyDate: true, isArchived: archived });
+        await Applicants.create({ ...mapped, ...newFields, isArchived: archived });
         imported++; bump(currentCompany, media, 'imported');
         if (archived) toPast++; else toCallList++;
       }

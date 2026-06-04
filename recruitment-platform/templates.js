@@ -1648,8 +1648,12 @@ function callImportModalHtml(co, media) {
           <input type="checkbox" id="si-split" style="width:auto">
           架電回数で振り分ける（未架電→架電リスト / 架電済み→過去リスト）
         </label>
+        <label class="full" style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="si-countnew" style="width:auto">
+          <strong>本日の新着として計上する</strong>（本日の新規応募・会社別×媒体別に反映）
+        </label>
       </div>
-      <p class="muted" style="font-size:11px;margin:0 0 8px">※チェックを外すと全件を過去リスト（アーカイブ）として取り込みます。</p>
+      <p class="muted" style="font-size:11px;margin:0 0 8px">※「本日の新着」にチェック＝今日入ってきた新規応募として計上し架電リストへ。<br>チェックを外す＝過去バックログ（新規応募に計上しない）として取り込みます。</p>
       <div id="si-result" class="import-result"></div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="callCloseSmartImport()">閉じる</button>

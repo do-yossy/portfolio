@@ -913,13 +913,15 @@ function callCloseSmartImport() {
   if (r) r.innerHTML = '';
 }
 async function callDoSmartImport() {
-  const company = document.getElementById('si-company').value;
-  const split   = document.getElementById('si-split')?.checked ? '1' : '0';
-  const file    = document.getElementById('si-file').files[0];
+  const company  = document.getElementById('si-company').value;
+  const split    = document.getElementById('si-split')?.checked ? '1' : '0';
+  const countnew = document.getElementById('si-countnew')?.checked ? '1' : '0';
+  const file     = document.getElementById('si-file').files[0];
   if (!file) return toast('Excelファイルを選択してください', 'warn');
   const fd = new FormData();
   fd.append('company', company);
   fd.append('split', split);
+  fd.append('countnew', countnew);
   fd.append('file', file);
   const resultEl = document.getElementById('si-result');
   resultEl.innerHTML = '<p>自動振り分けで取込中...</p>';

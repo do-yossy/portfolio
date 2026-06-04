@@ -1149,19 +1149,21 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   if (pathname === '/api/ops/calls/smart-import' && method === 'POST') {
     const ct = req.headers['content-type'] || '';
     const buf = await readBody(req);
-    let fileBuf = null, defaultCompany = co, splitByCallCount = false;
+    let fileBuf = null, defaultCompany = co, splitByCallCount = false, countAsNew = false;
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=(.+)$/);
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
       for (const p of parts) {
         if (/name="company"/.test(p.header)) defaultCompany = p.content.toString('utf8').trim();
         else if (/name="split"/.test(p.header)) splitByCallCount = p.content.toString('utf8').trim() === '1';
+        else if (/name="countnew"/.test(p.header)) countAsNew = p.content.toString('utf8').trim() === '1';
         else if (/filename=/.test(p.header)) fileBuf = p.content;
       }
     } else {
       fileBuf = buf;
       defaultCompany = query.company || co;
       splitByCallCount = query.split === '1';
+      countAsNew = query.countnew === '1';
     }
     const isXlsx = fileBuf && fileBuf.length > 4 &&
       fileBuf[0] === 0x50 && fileBuf[1] === 0x4B && fileBuf[2] === 0x03 && fileBuf[3] === 0x04;
@@ -1176,6 +1178,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs },
         defaultCompany,
         splitByCallCount,
+        countAsNew,
       });
       sendJSON(res, 200, { ok: true, ...r });
     } catch (e) {
