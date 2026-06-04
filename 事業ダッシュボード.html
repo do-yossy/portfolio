@@ -90,6 +90,16 @@ textarea{resize:vertical;min-height:60px}
 .hint{font-size:.66rem;color:var(--text3)}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.kpi.goal{grid-column:span 3}}
 @media(max-width:560px){.kpis{grid-template-columns:1fr 1fr}.kpi.goal{grid-column:span 2}.f2{grid-template-columns:1fr}}
+.inbox{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:1rem;overflow:hidden}
+.inbox-h{padding:.7rem 1rem;font-size:.82rem;font-weight:700;color:var(--gold);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.inbox-h span{font-size:.7rem;color:var(--text2);font-weight:400}
+.inbox-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.6rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.inbox-row:last-child{border-bottom:none}
+.ir-main{font-size:.82rem}.ir-main b{font-weight:600}
+.ir-stage{font-size:.62rem;background:var(--surface3);color:var(--text2);padding:.1rem .5rem;border-radius:99px;margin-right:.4rem}
+.ir-amt{color:var(--gold);font-weight:700;margin-left:.5rem}
+.ir-na{font-size:.66rem;color:var(--text2);margin-top:.2rem}
+.ir-act{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -113,6 +123,7 @@ textarea{resize:vertical;min-height:60px}
     <span><span class="dot src-in"></span><b>インバウンド</b>（LP問い合わせ）</span>
     <span class="hint">各カードの「次へ →」でステージを前進。AI担当ステージは中身を私が用意、人担当は確認・送信のみ。</span>
   </div>
+  <div class="inbox" id="inbox"></div>
   <div class="board" id="board"></div>
 
   <details class="lost-wrap"><summary>失注・見送り（<span id="lostCount">0</span>）</summary><div class="lost-grid" id="lostGrid"></div></details>
@@ -260,6 +271,7 @@ function card(d){
 function render(){
   renderKPIs();
   const v = view();
+  renderInbox(v);
   $('board').innerHTML = STAGES.map(st=>{
     const items = v.filter(d=>d.stage===st.key);
     const sum = items.reduce((s,d)=>s+(d.amount||0),0);
@@ -276,6 +288,34 @@ function render(){
   $('lostCount').textContent = lost.length;
   $('lostGrid').innerHTML = lost.length?lost.map(card).join(''):'<div class="empty">なし</div>';
   save();
+}
+
+// 「ボタン一つで確認・承認」アクション・インボックス
+const NEXT = {
+  lead:    {to:'applied', label:'✅ 応募する'},
+  applied: {to:'meeting', label:'💬 返信あり→打合せ'},
+  meeting: {to:'build',   label:'🛠 着手OK'},
+  build:   {to:'qa',      label:'🔍 チェックへ'},
+  qa:      {to:'deliver', label:'📦 納品へ'},
+  deliver: {to:'won',     label:'🎉 受注/完了'}
+};
+function renderInbox(v){
+  const items = v.filter(d=>NEXT[d.stage]).sort((a,b)=>(b.score||0)-(a.score||0));
+  const stageName = k => (STAGES.find(s=>s.key===k)||{}).name||k;
+  $('inbox').innerHTML =
+    `<div class="inbox-h">📥 今日のアクション（ボタン一つで確認・承認）<span>${items.length}件</span></div>` +
+    (items.length ? items.map(d=>{
+      const n = NEXT[d.stage];
+      return `<div class="inbox-row">
+        <div class="ir-main"><span class="ir-stage">${stageName(d.stage)}</span><b>${esc(d.title)}</b>
+          <span class="ir-amt">${yen(d.amount)}</span>${d.priority?`<span class="tag pri-${d.priority}">${d.priority}</span>`:''}
+          ${d.next_action?`<div class="ir-na">次: ${esc(d.next_action)}</div>`:''}</div>
+        <div class="ir-act">
+          <button class="btn" onclick="setStage('${d.id}','${n.to}')">${n.label}</button>
+          <button class="mini" onclick="openEdit('${d.id}')">✎ 確認</button>
+          <button class="mini lose" onclick="setStage('${d.id}','lost')">✗</button>
+        </div></div>`;
+    }).join('') : '<div class="empty" style="padding:1rem">アクション待ちはありません。案件を追加するとここに表示されます。</div>');
 }
 
 function adv(id,dir){
