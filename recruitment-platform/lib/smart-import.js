@@ -50,7 +50,7 @@ function hasContact(row) {
 // メイン: parseXlsxSheets の結果を受け取り、会社・媒体を割り当てて取り込む。
 //   deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs }
 async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCount = false, countAsNew = false }) {
-  const { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs } = deps;
+  const { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Ops, Logs } = deps;
   const summary = {};   // "会社/媒体" → { imported, duplicates }
   const skippedSheets = [];
   let imported = 0, duplicates = 0, skipped = 0, headerRows = 0;
@@ -98,7 +98,12 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
         : { isImported: 1, allowEmptyDate: true };
 
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
-      if (dupId) {
+      if (dupId && countAsNew && Ops && Ops.promoteToNew) {
+        // 新着モードで既存（先に取込済みのバックログ等）が見つかった場合は、
+        // 重複にせず「本日の新着」へ昇格して新規応募に計上する。
+        await Ops.promoteToNew(dupId, today);
+        imported++; toCallList++; bump(currentCompany, media, 'imported');
+      } else if (dupId) {
         // 重複は架電リストに出さず必ずアーカイブ＋重複フラグで記録（新着でも計上しない）
         await Applicants.create({ ...mapped, isImported: 1, allowEmptyDate: true, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
         duplicates++; bump(currentCompany, media, 'duplicates');

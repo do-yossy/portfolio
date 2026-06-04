@@ -584,6 +584,14 @@ const Ops = {
     return Applicants.findById(id);
   },
 
+  // 既存レコードを「本日の新着（新規応募に計上）」へ昇格。
+  //   取込済み(is_imported=1)やアーカイブを解除し、応募日を本日に設定する。
+  promoteToNew(id, appliedAt) {
+    db.prepare(`UPDATE applicants SET is_imported = 0, is_archived = 0, is_duplicate = 0, duplicate_of_id = NULL, applied_at = ?, applied_month = ?, updated_at = ? WHERE id = ?`)
+      .run(appliedAt, (appliedAt || '').slice(0, 7), now(), id);
+    return Applicants.findById(id);
+  },
+
   // 会社×媒体でフィルタした応募者一覧
   listCalls({ company, media, status, month, archived, search, excludeDuplicate } = {}) {
     const conds = [];

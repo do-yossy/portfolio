@@ -1175,7 +1175,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       const sheets = parseXlsxSheets(fileBuf);
       const r = await smartImport({
         sheets,
-        deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs },
+        deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Ops, Logs },
         defaultCompany,
         splitByCallCount,
         countAsNew,
