@@ -7,20 +7,35 @@
 // ─────────────────────────────────────────────────────────────
 
 // 架電リスト用の列定義
-// B列（index 1）を重複情報欄とし、スプレッドシートの先頭で視覚的に確認できるようにする。
-// 重複の種類:
-//   過去応募  … 過去に応募してアーカイブ済みのレコードが存在する（最終対応日・状況を表示）
-//   直近重複  … 今回のプッシュ対象（アクティブ）に同一電話/メールが複数存在する
-const SHEET_HEADERS = ['ID', '重複', '媒体', '会社', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', 'メモ'];
-const SHEET_COL = { id: 0, dupInfo: 1, callCount: 17, status: 18, notes: 20 };
-// 旧レイアウト（重複がT列=index19）の退避用インデックス
-const OLD_SHEET_COL = { id: 0, callCount: 16, status: 17, notes: 20 };
+// B列（index 1）= 重複情報、F列（index 5）= ふりがな（名前の隣）
+// S〜V列（index 18〜21）= 入力欄（架電回数・対応状況・最終架電日・メモ）
+const SHEET_HEADERS = [
+  'ID', '重複', '媒体', '会社', '名前', 'ふりがな',
+  '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地',
+  '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日',
+  '架電回数', '対応状況', '最終架電日', 'メモ',
+];
+const SHEET_COL = { id: 0, dupInfo: 1, furigana: 5, callCount: 18, status: 19, notes: 21 };
+
+// レイアウト検出用（旧レイアウトのインデックスで退避する）
+const LAYOUTS = [
+  // 最新: ID/重複/媒体/会社/名前/ふりがな/...
+  { detect: h => h[0]==='ID' && h[1]==='重複' && h[5]==='ふりがな',
+    col: { id:0, furigana:5, callCount:18, status:19, notes:21 } },
+  // 中間: ID/重複/媒体/会社/名前/電話番号/... (ふりがななし)
+  { detect: h => h[0]==='ID' && h[1]==='重複' && h[2]==='媒体',
+    col: { id:0, furigana:-1, callCount:17, status:18, notes:20 } },
+  // 旧: ID/媒体/会社/名前/...
+  { detect: h => h[0]==='ID' && h[2]==='会社',
+    col: { id:0, furigana:-1, callCount:16, status:17, notes:20 } },
+];
 
 function applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo = '') {
   return [
     a.id, dupInfo,
     mediaLabel(a.media), companyLabel ? companyLabel(a.company) : (a.company || ''),
-    a.name || '', a.phone || '', a.email || '',
+    a.name || '', a.furigana || '',
+    a.phone || '', a.email || '',
     a.gender || '', a.birth_date || '', String(a.age || ''), a.address || '',
     a.current_job || '', a.job_title || '', a.experience || '', a.education || '', a.work_location || '',
     (a.applied_at || '').slice(0, 10),
@@ -47,18 +62,23 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
 
-    // 既存シートから手入力済みの架電結果（ID→{callCount,status,notes}）を退避。
-    // 新レイアウト（B列=重複）と旧レイアウト（B列=媒体）の両方を識別して対応する。
+    // 既存シートから手入力済みの架電結果（ID→{callCount,status,notes,furigana}）を退避。
+    // レイアウトを自動判定し、新旧どのレイアウトでも正しく退避する。
     const existing = await gsheets.readValues(title);
     const prior = new Map();
     const existingHeader = existing[0] || [];
-    const isNewLayout = existingHeader[0] === 'ID' && existingHeader[1] === '重複';
-    const isOldLayout = existingHeader[0] === 'ID' && existingHeader[2] === '会社';
-    const pc = isNewLayout ? SHEET_COL : OLD_SHEET_COL; // prior読み取りに使うインデックス
-    if (isNewLayout || isOldLayout) {
+    const layout = LAYOUTS.find(l => l.detect(existingHeader));
+    if (layout) {
+      const pc = layout.col;
       for (const row of existing.slice(1)) {
         const id = row[pc.id];
-        if (id) prior.set(id, { callCount: row[pc.callCount], status: row[pc.status], notes: row[pc.notes] });
+        if (!id) continue;
+        prior.set(id, {
+          callCount: row[pc.callCount],
+          status:    row[pc.status],
+          notes:     row[pc.notes],
+          furigana:  pc.furigana >= 0 ? row[pc.furigana] : '',
+        });
       }
     }
 
@@ -139,11 +159,12 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       for (const a of grp) {
         const dupInfo = buildDupInfo(a);
         const row = applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo);
-        const p = prior.get(a.id);  // 手入力済みの架電結果を優先
+        const p = prior.get(a.id);  // 手入力済みのデータを優先（架電結果・ふりがな）
         if (p) {
           if (p.callCount !== undefined && p.callCount !== '') row[SHEET_COL.callCount] = String(p.callCount);
           if (p.status) row[SHEET_COL.status] = p.status;
           if (p.notes !== undefined && p.notes !== '') row[SHEET_COL.notes] = p.notes;
+          if (p.furigana) row[SHEET_COL.furigana] = p.furigana;
         }
         rows.push(row);
         count++;
@@ -153,24 +174,29 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     // RAW モードで書き込む（日付・数値の自動変換を防ぐ）
     await gsheets.writeValues(title, rows);
 
-    // 年齢列（I列, index=8）に生年月日（H列）から計算する数式を設定
+    // 年齢列（K列=index10）に生年月日（J列=index9）から計算する数式を設定
     if (rows.length > 1 && gsheets.writeColumnFormulas) {
       const formulas = Array.from({ length: rows.length - 1 }, (_, i) => {
         const r = i + 2; // シート行番号（1始まり、row1はヘッダ）
-        return `=IF(H${r}<>"",IFERROR(DATEDIF(H${r},TODAY(),"Y"),IFERROR(DATEDIF(DATEVALUE(H${r}),TODAY(),"Y"),"")),"")`;
+        return `=IF(J${r}<>"",IFERROR(DATEDIF(J${r},TODAY(),"Y"),IFERROR(DATEDIF(DATEVALUE(J${r}),TODAY(),"Y"),"")),"")`;
       });
-      try { await gsheets.writeColumnFormulas(title, 8, 2, formulas); }
+      try { await gsheets.writeColumnFormulas(title, 10, 2, formulas); }
       catch (e) { warnings.push(`${title}: 年齢数式設定失敗 (${e.message || e})`); }
     }
 
     // 書式・プルダウンは毎回（冪等）適用。失敗してもデータ反映は止めず警告に。
     try {
       await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
-      // R〜U列（架電回数・対応状況・最終架電日・メモ）のヘッダー1行目のみオレンジ
+      // S〜V列（架電回数・対応状況・最終架電日・メモ）のヘッダー1行目のみオレンジ
       if (gsheets.setColumnBackground) {
         await gsheets.setColumnBackground(props.sheetId, SHEET_COL.callCount, SHEET_COL.notes,
           { red: 0.918, green: 0.722, blue: 0 },        // #eab800 濃い黄色（白文字で視認可）
           { red: 1, green: 1, blue: 1 });                // 文字色: 白
+      }
+      // Q〜V列（index16〜21）のデータ行（row2以降）の背景色を白にリセット
+      // 過去のpushで誤ってデータ行にオレンジが付いている場合のクリア
+      if (gsheets.clearColumnDataBackground) {
+        await gsheets.clearColumnDataBackground(props.sheetId, 16, SHEET_HEADERS.length - 1);
       }
       // 過去レイアウトの余分なプルダウン（応募日列など）を一度全クリアしてから必要な列だけ再設定
       if (gsheets.clearDataValidations) {
@@ -199,7 +225,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   return { count, appended: count, tabs, warnings };
 }
 
-// スプレッドシート → DB（IDで突合し対応状況・架電回数・メモを更新）
+// スプレッドシート → DB（IDで突合し対応状況・架電回数・メモ・ふりがなを更新）
 async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
   // 旧ステータス → 新ステータスのマッピング（スプレッドシートから古い値が返ってきた場合の対応）
   const STATUS_MIGRATE = {
@@ -207,7 +233,7 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
   };
   // 取込対象は会社タブ（SQ/BG/PE/LT/NC/NX）のみ。
   // 案件精査・推薦管理・面談依頼など独自に運用しているシートには一切触れない。
-  const { COMPANIES } = require('../db');
+  const { COMPANIES, db } = require('../db');
   const companyTabs = new Set(COMPANIES.map(c => (c.short || c.name || c.id)));
   let updated = 0, notFound = 0, scanned = 0, skippedTabs = [];
   const meta = await gsheets.getMeta();
@@ -216,27 +242,38 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
     if (!companyTabs.has(title)) { skippedTabs.push(title); continue; }
     const values = await gsheets.readValues(title);
     if (values.length < 2) continue;
+    // レイアウト自動検出（旧レイアウトのシートでも正しく列インデックスを使う）
+    const headerRow = values[0] || [];
+    const layout = LAYOUTS.find(l => l.detect(headerRow));
+    const pc = layout ? layout.col : SHEET_COL; // fallback to current layout
     for (const row of values.slice(1)) {
-      const id = row[SHEET_COL.id];
+      const id = row[pc.id];
       if (!id) continue;
       scanned++;
       const existing = await Applicants.findById(id);
       if (!existing) { notFound++; continue; }
-      const ccRaw = row[SHEET_COL.callCount];
-      const newStatus = row[SHEET_COL.status];
+      const ccRaw = row[pc.callCount];
+      const newStatus = row[pc.status];
       const normalizedStatus = STATUS_MIGRATE[newStatus] || newStatus;
       // 対応状況・架電回数・メモを更新し、不通/対応中/終了は過去応募へ移動
       await Ops.updateCall(id, {
         callCount: (ccRaw !== undefined && ccRaw !== '') ? (parseInt(ccRaw) || 0) : undefined,
         status: normalizedStatus || undefined,
-        notes: row[SHEET_COL.notes] !== undefined ? row[SHEET_COL.notes] : undefined,
+        notes: row[pc.notes] !== undefined ? row[pc.notes] : undefined,
         skipAutoArchive: false,  // 終了 → updateCall内のTERMINAL判定で自動アーカイブ
       });
+      // ふりがなをDBに同期（スプレッドシートで手入力されたふりがなを管理ページに反映）
+      if (pc.furigana >= 0) {
+        const sheetFurigana = row[pc.furigana];
+        if (sheetFurigana !== undefined && sheetFurigana !== '') {
+          db.prepare('UPDATE applicants SET furigana=?, updated_at=? WHERE id=?')
+            .run(sheetFurigana, new Date().toISOString(), id);
+        }
+      }
       // 不通/対応中/終了 → 過去応募へ移動。
       // 同一人物の重複レコード（同じ電話番号・メール）もまとめてアーカイブし、
       // 架電リストに残らないようにする。
       if (['不通', '対応中', '終了'].includes(normalizedStatus)) {
-        const { db } = require('../db');
         const ts = new Date().toISOString();
         const nPhone = existing.normalized_phone || '';
         const nEmail = existing.normalized_email || '';

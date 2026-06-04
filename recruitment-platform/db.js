@@ -131,6 +131,8 @@ try {
 
 // Migration v4: returning_from_id column for re-applicants (previously archived as 不通)
 try { db.exec("ALTER TABLE applicants ADD COLUMN returning_from_id TEXT DEFAULT NULL"); } catch {}
+// Migration v5: furigana column (読み仮名) for call list / spreadsheet sync
+try { db.exec("ALTER TABLE applicants ADD COLUMN furigana TEXT DEFAULT ''"); } catch {}
 // Migrate old status values to simplified statuses
 db.exec("UPDATE applicants SET status='不通' WHERE status='架電済(不通)'");
 db.exec("UPDATE applicants SET status='終了' WHERE status IN ('対応終了','断られた','辞退')");
@@ -334,10 +336,10 @@ const Applicants = {
       else /* direct / google / しごと / 未設定 → Googleしごと検索経由 */ media = 'google';
     }
     db.prepare(`
-      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, returning_from_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, is_archived, is_imported, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO applicants (id, name, furigana, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, returning_from_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, is_archived, is_imported, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, data.name, data.phone, data.email,
+      id, data.name, data.furigana || '',  data.phone, data.email,
       data.age ? parseInt(data.age) : null,
       data.address || '',
       data.sourceMedia || data.source_media || 'direct',
@@ -668,8 +670,8 @@ const Ops = {
 
   // 会社×媒体クロス集計（新規応募者タブ・掲載管理タブ用）
   crossTab({ activeOnly = false, todayOnly = false } = {}) {
-    // 新規応募者タブ用。取込データ（is_imported=1）・過去応募者（is_archived=1）は集計対象外。
-    const conds = ['is_archived = 0', 'is_imported = 0'];
+    // 過去応募者（is_archived=1）のみ除外。CSV取込データも含めて集計する。
+    const conds = ['is_archived = 0'];
     const vals = [];
     if (activeOnly) conds.push(`status IN (${ACTIVE_CALL_STATUSES.map(() => '?').join(',')})`), vals.push(...ACTIVE_CALL_STATUSES);
     if (todayOnly) { conds.push('created_at >= ?'); vals.push(new Date().toISOString().slice(0, 10) + 'T00:00:00Z'); }

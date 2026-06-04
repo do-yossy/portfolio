@@ -331,6 +331,27 @@ async function clearDataValidations(tabSheetId) {
   });
 }
 
+// 指定列範囲（startColIndex〜endColIndex）のデータ行（row 2以降 = index 1以降）の背景色を白にリセット
+async function clearColumnDataBackground(tabSheetId, startColIndex, endColIndex) {
+  await api(`/${sheetId()}:batchUpdate`, {
+    method: 'POST',
+    body: {
+      requests: [{
+        repeatCell: {
+          range: {
+            sheetId: tabSheetId,
+            startRowIndex: 1,
+            startColumnIndex: startColIndex,
+            endColumnIndex: endColIndex + 1,
+          },
+          cell: { userEnteredFormat: { backgroundColor: { red: 1, green: 1, blue: 1 } } },
+          fields: 'userEnteredFormat.backgroundColor',
+        },
+      }],
+    },
+  });
+}
+
 // 指定列範囲（startColIndex〜endColIndex）のヘッダー行のみ（行0）に背景色・文字色を設定
 async function setColumnBackground(tabSheetId, startColIndex, endColIndex, bgColor, textColor = null) {
   const fmt = { backgroundColor: bgColor };
@@ -362,5 +383,5 @@ module.exports = {
   isConfigured, sheetUrl, getAccessToken,
   getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
   setDropdowns, styleHeader, styleSectionRows, colLetter, setStatusConditionalFormats,
-  clearDataValidations, setColumnBackground,
+  clearDataValidations, setColumnBackground, clearColumnDataBackground,
 };
