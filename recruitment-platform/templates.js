@@ -1550,7 +1550,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
 
   // 全社まとめ時は会社列、全媒体表示時は媒体列を追加
   const showMedia = media === 'all';
-  const NCOLS = 17 + (isAll ? 1 : 0) + (showMedia ? 1 : 0);
+  const NCOLS = 18 + (isAll ? 1 : 0) + (showMedia ? 1 : 0);
   const coCell = a => isAll ? `<td style="white-space:nowrap;font-size:12px"><span style="display:inline-block;background:${COMPANIES[a.company]?.color || '#94a3b8'};color:#fff;padding:1px 6px;border-radius:4px">${companyName(a.company)}</span></td>` : '';
   const mediaCell = a => showMedia ? `<td style="white-space:nowrap;font-size:12px">${esc(mediaName(a.media))}</td>` : '';
   const rows = applicants.length ? applicants.map((a, i) => `
@@ -1559,6 +1559,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       ${coCell(a)}
       ${mediaCell(a)}
       <td class="name-col">${esc(a.name || '')}${a.is_duplicate ? ` <span class="dup-badge" onclick="showDupInfo('${esc(a.id)}')" style="cursor:pointer" title="重複元を見る">重複</span>` : ''}${a.returning_from_id ? ` <span style="background:#e0f2fe;color:#0369a1;font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer" onclick="showReturningInfo('${esc(a.id)}')" title="前回応募を見る">再応募</span>` : ''}</td>
+      <td style="white-space:nowrap;color:#555">${esc(a.furigana || '')}</td>
       <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
       <td>${esc(a.email || '')}</td>
       <td>${esc(a.gender || '')}</td>
@@ -1609,7 +1610,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       <div class="table-scroll">
         <table class="data-table calls-table" id="calls-table">
           <thead><tr>
-            <th class="num">#</th>${isAll ? '<th>会社</th>' : ''}${showMedia ? '<th>媒体</th>' : ''}<th class="name-col">名前</th><th>電話番号</th><th>メール</th>
+            <th class="num">#</th>${isAll ? '<th>会社</th>' : ''}${showMedia ? '<th>媒体</th>' : ''}<th class="name-col">名前</th><th>ふりがな</th><th>電話番号</th><th>メール</th>
             <th>性別</th><th>生年月日</th><th>年齢</th><th>居住地</th>
             <th>現在の職業</th><th>求人タイトル</th><th>経験</th><th>学歴</th>
             <th>応募日</th><th>架電回数</th><th>対応状況</th><th>最終架電</th><th>メモ</th>
