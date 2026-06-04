@@ -37,6 +37,13 @@ body{font-family:'Noto Sans JP',system-ui,sans-serif;background:var(--bg);color:
 input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:inherit;font-size:.8rem;padding:.5rem}
 .f2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}.foot{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.8rem}
 pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.7rem;font-size:.74rem;line-height:1.7;max-height:50vh;overflow:auto}
+.inbox{background:var(--surface);border:1px solid var(--border);border-radius:11px;margin-bottom:.8rem;overflow:hidden}
+.inbox-h{padding:.6rem .8rem;font-size:.78rem;font-weight:700;color:var(--gold);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+.inbox-h span{font-size:.66rem;color:var(--text2);font-weight:400}
+.irow{display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:.5rem .8rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.irow:last-child{border-bottom:none}
+.irow .m2{font-size:.78rem}.irow .st{font-size:.58rem;background:var(--surface3);color:var(--text2);padding:.08rem .45rem;border-radius:99px;margin-right:.35rem}
+.irow .am{color:var(--gold);font-weight:700;margin-left:.4rem}.irow .act{display:flex;gap:.3rem;flex-wrap:wrap}
 @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.kpi.goal{grid-column:span 3}}
 </style>
 </head>
@@ -55,6 +62,7 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
     <textarea id="ingest" placeholder="案件の募集本文を貼り付け（空行区切りで複数可）→ 一次スコアリングして候補に追加"></textarea>
     <button class="btn" onclick="ingest()">候補に取込</button>
   </div>
+  <div class="inbox" id="inbox"></div>
   <div class="board" id="board"></div>
 </div>
 
@@ -91,7 +99,7 @@ const api=(u,o={})=>fetch(u,{credentials:'same-origin',headers:{'Content-Type':'
 
 async function load(){
   const [m,deals]=await Promise.all([api('/api/metrics'),api('/api/deals')]);
-  STAGES=m.stages; DEALS=deals; renderKPI(m); renderBoard();
+  STAGES=m.stages; DEALS=deals; renderKPI(m); renderBoard(); renderInbox();
 }
 function renderKPI(m){
   $('kpis').innerHTML=`
@@ -125,6 +133,16 @@ function renderBoard(){
     return `<div class="col"><div class="col-h"><div class="n">${st.label}</div><div class="w">${st.who} ${st.key!=='won'&&st.key!=='lead'?'・着地'+Math.round(st.prob*100)+'%':''}</div><div class="m">${items.length}件 ・ ${yen(sum)}</div></div>
      <div class="col-b">${items.length?items.map(card).join(''):'<div class="empty">—</div>'}</div></div>`;
   }).join('');
+}
+const NEXT={lead:{to:'applied',label:'✅ 応募する'},applied:{to:'meeting',label:'💬 打合せへ'},meeting:{to:'build',label:'🛠 着手OK'},build:{to:'qa',label:'🔍 チェックへ'},qa:{to:'deliver',label:'📦 納品へ'},deliver:{to:'won',label:'🎉 受注/完了'}};
+function renderInbox(){
+  const items=DEALS.filter(d=>NEXT[d.stage]).sort((a,b)=>(b.score||0)-(a.score||0));
+  const sn=k=>(STAGES.find(s=>s.key===k)||{}).label||k;
+  $('inbox').innerHTML=`<div class="inbox-h">📥 今日のアクション（ボタン一つで確認・承認）<span>${items.length}件</span></div>`+
+    (items.length?items.map(d=>{const n=NEXT[d.stage];
+      return `<div class="irow"><div class="m2"><span class="st">${sn(d.stage)}</span><b>${esc(d.title)}</b><span class="am">${yen(d.amount)}</span>${d.priority?`<span class="tag ${d.priority}">${d.priority}</span>`:''}${d.next_action?`<div style="font-size:.62rem;color:var(--text2);margin-top:.2rem">次: ${esc(d.next_action)}</div>`:''}</div>
+      <div class="act"><button class="mini adv" onclick="setStage('${d.id}','${n.to}')">${n.label}</button><button class="mini" onclick="edit('${d.id}')">✎確認</button><button class="mini lose" onclick="setStage('${d.id}','lost')">✗</button></div></div>`;
+    }).join(''):'<div class="empty" style="padding:.8rem">アクション待ちはありません。</div>');
 }
 async function adv(id){ await api('/api/deals/'+id+'/advance',{method:'POST'}); load(); }
 async function setStage(id,stage){ await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify({stage})}); load(); }
