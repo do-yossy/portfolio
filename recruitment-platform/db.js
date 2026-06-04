@@ -308,7 +308,9 @@ const Applicants = {
     const ts = now();
     const nPhone = normalizePhone(data.phone);
     const nEmail = normalizeEmail(data.email);
-    const appliedAt = data.appliedAt || data.applied_at || ts;
+    // 通常は応募日未指定なら現在時刻。ただし取込(allowEmptyDate)では空のまま保持し、
+    // 「本日の新規応募」に誤カウントされないようにする。
+    const appliedAt = data.appliedAt || data.applied_at || (data.allowEmptyDate ? '' : ts);
     const appliedMonth = (appliedAt || '').slice(0, 7); // 'YYYY-MM'
     const media = data.media || '';
     db.prepare(`

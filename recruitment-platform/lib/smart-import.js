@@ -90,10 +90,10 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
       if (dupId) {
         // 重複は架電リストに出さず必ずアーカイブ＋重複フラグで記録
-        await Applicants.create({ ...mapped, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        await Applicants.create({ ...mapped, allowEmptyDate: true, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
         duplicates++; bump(currentCompany, media, 'duplicates');
       } else {
-        await Applicants.create({ ...mapped, isArchived: archived });
+        await Applicants.create({ ...mapped, allowEmptyDate: true, isArchived: archived });
         imported++; bump(currentCompany, media, 'imported');
         if (archived) toPast++; else toCallList++;
       }

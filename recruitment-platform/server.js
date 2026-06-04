@@ -173,10 +173,15 @@ function mapCSVRow(row) {
   if (rawPhone && /^[789]/.test(rawPhone)) rawPhone = '0' + rawPhone;
   const phone = rawPhone.replace(/^(\d{2,3})(\d{4})(\d{4})$/, '$1-$2-$3');
 
-  // 応募日: "3月1日" or "2026-06-02" or "2026/06/02" など
+  // 応募日: "3月1日" / "2026-06-02" / "2026/06/02" / Excelシリアル値(45991.6 等)
   let appliedAt = col(['応募日','applied_at','応募日時','日付']);
   const m = appliedAt.match(/^(\d{1,2})月(\d{1,2})日$/);
-  if (m) {
+  if (/^\d{5}(\.\d+)?$/.test(appliedAt)) {
+    // Excelシリアル日付（1899-12-30 起点）→ YYYY-MM-DD
+    const serial = parseFloat(appliedAt);
+    const dt = new Date(Date.UTC(1899, 11, 30) + Math.round(serial * 86400) * 1000);
+    appliedAt = dt.toISOString().slice(0, 10);
+  } else if (m) {
     const year = new Date().getFullYear();
     appliedAt = `${year}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
   } else {
@@ -265,9 +270,11 @@ async function opsNewStats() {
   const { db } = require('./db');
   const today = new Date().toISOString().slice(0, 10);
   const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
-  // 過去応募者の取込（is_archived=1）は「本日の新規応募」に含めない
-  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(today + 'T00:00:00Z').c;
-  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(monday + 'T00:00:00Z').c;
+  // 「本日/今週の新規応募」は応募日(applied_at)基準でカウント。
+  // 取込日(created_at)ではないため、昨日までのリストを今日取り込んでも本日分には入らない。
+  // 過去応募者の取込（is_archived=1）も除外。
+  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND substr(applied_at, 1, 10) = ?`).get(today).c;
+  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND substr(applied_at, 1, 10) >= ?`).get(monday).c;
   const activeTotal = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND status IN ('新規','架電済(不通)','対応中')`).get().c;
   return { todayNew, weekNew, activeTotal };
 }
