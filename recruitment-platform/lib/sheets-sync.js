@@ -77,6 +77,20 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
 
     await gsheets.writeValues(title, rows);
 
+    // 年齢列（index=8, 列I）: 生年月日列（index=7, 列H）から自動計算する数式をセット
+    // ヘッダ行(row1)を除く全行に =IF(H{n}<>"",DATEDIF(DATEVALUE(H{n}),TODAY(),"Y"),"") を設定
+    if (rows.length > 1 && gsheets.writeColumnFormulas) {
+      const BIRTH_COL  = 7; // 生年月日 (H)
+      const AGE_COL    = 8; // 年齢 (I)
+      const bLetter    = 'H'; // 生年月日列は固定でH列（SHEET_HEADERSのindex=7）
+      const formulas   = Array.from({ length: rows.length - 1 }, (_, i) => {
+        const r = i + 2; // シート上の行番号（1始まり。row1はヘッダなので2から）
+        return `=IF(${bLetter}${r}<>"",DATEDIF(DATEVALUE(${bLetter}${r}),TODAY(),"Y"),"")`;
+      });
+      try { await gsheets.writeColumnFormulas(title, AGE_COL, 2, formulas); }
+      catch (e) { warnings.push(`${title}: 年齢数式の設定に失敗 (${e.message || e})`); }
+    }
+
     // 書式・プルダウンは毎回（冪等）適用。失敗してもデータ反映は止めず警告に。
     try {
       await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);

@@ -161,6 +161,18 @@ async function writeValues(title, values) {
   });
 }
 
+// 特定の列に数式を書き込む（USER_ENTERED で数式として解釈させる）
+//   colIndex: 0始まり列インデックス, startRow: 1始まりのシート行番号
+async function writeColumnFormulas(title, colIndex, startRow, formulas) {
+  if (!formulas.length) return;
+  const col = colLetter(colIndex);
+  const range = `${title}!${col}${startRow}:${col}${startRow + formulas.length - 1}`;
+  await api(`/${sheetId()}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`, {
+    method: 'PUT',
+    body: { range, majorDimension: 'COLUMNS', values: [formulas] },
+  });
+}
+
 // 末尾に行を追記（appendはタブ内の表を自動検出して下に足す）
 async function appendValues(title, values) {
   if (!values.length) return { updates: { updatedRows: 0 } };
@@ -244,6 +256,6 @@ async function styleSectionRows(tabSheetId, rowIndices, numCols) {
 
 module.exports = {
   isConfigured, sheetUrl, getAccessToken,
-  getMeta, ensureTab, readValues, writeValues, appendValues,
+  getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
   setDropdowns, styleHeader, styleSectionRows, colLetter,
 };
