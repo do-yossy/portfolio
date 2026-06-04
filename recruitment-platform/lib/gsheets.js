@@ -280,10 +280,10 @@ async function setStatusConditionalFormats(tabSheetId, statusColIndex, numCols =
     requests.push({
       addConditionalFormatRule: {
         rule: {
-          ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: numCols }],
+          ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: dupColIndex, endColumnIndex: dupColIndex + 1 }],
           booleanRule: {
-            condition: { type: 'CUSTOM_FORMULA', values: [{ userEnteredValue: `=$${dupL}2<>""` }] },
-            format: { backgroundColor: { red: 1, green: 0.8, blue: 0.8 } }, // 薄い赤
+            condition: { type: 'NOT_BLANK' },
+            format: { backgroundColor: { red: 1, green: 0.8, blue: 0.8 } }, // 薄い赤（B列のみ）
           },
         },
         index: idx++,
