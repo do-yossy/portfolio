@@ -31,7 +31,7 @@ const { Jobs } = require('../db-factory');
 
 const COMPANY      = 'sq';
 const NOW          = new Date().toISOString();
-const TARGET_MEDIA = ['kyujinbox', 'google', 'stanby'];
+const TARGET_MEDIA = ['kyujinbox', 'google'];
 const JOB_TYPE     = 'ドライバー・配送';
 const EMP_TYPE     = '正社員';
 
