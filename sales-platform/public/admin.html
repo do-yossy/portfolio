@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管制塔 | 営業バックエンド</title>
+<style>
+:root{--bg:#080c18;--surface:#0f1220;--surface2:#161b2e;--surface3:#1c2238;--border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);--accent:#5b6ef5;--accent2:#8b7cf8;--gold:#f0b429;--red:#e84545;--green:#22c55e;--cyan:#22b8cf;--text:#dde3f5;--text2:#8892b0;--text3:#4a5070}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.6}
+.top{position:sticky;top:0;z-index:30;background:rgba(8,12,24,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:.7rem 1.1rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+.brand{font-weight:800;font-size:1rem}.brand span{color:var(--accent)}.brand small{display:block;font-weight:300;font-size:.64rem;color:var(--text2)}
+.btn{display:inline-flex;align-items:center;gap:.3rem;padding:.45rem .8rem;background:var(--accent);color:#fff;border:none;border-radius:7px;font-family:inherit;font-size:.75rem;font-weight:700;cursor:pointer}
+.btn:hover{background:#4a5be0}.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.wrap{padding:1rem 1.1rem 4rem;max-width:1500px;margin:0 auto}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:.6rem;margin-bottom:.9rem}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:.7rem .8rem}
+.kpi .l{font-size:.62rem;color:var(--text2)}.kpi .v{font-size:1.2rem;font-weight:700;margin-top:.15rem}.kpi .s{font-size:.6rem;color:var(--text3)}
+.kpi.goal{grid-column:span 2;background:linear-gradient(135deg,rgba(91,110,245,.14),rgba(139,124,248,.05));border-color:rgba(91,110,245,.3)}
+.bar{height:8px;background:var(--surface3);border-radius:99px;overflow:hidden;margin-top:.4rem}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--gold))}
+.ingest{display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap}
+.ingest textarea{flex:1;min-width:240px;min-height:42px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.78rem;padding:.5rem}
+.board{display:grid;grid-template-columns:repeat(7,minmax(170px,1fr));gap:.55rem;overflow-x:auto;padding-bottom:1rem}
+.col{background:var(--surface);border:1px solid var(--border);border-radius:11px;min-height:120px}
+.col-h{padding:.5rem .6rem;border-bottom:1px solid var(--border)}.col-h .n{font-size:.76rem;font-weight:700}.col-h .w{font-size:.58rem;color:var(--text3)}.col-h .m{font-size:.64rem;color:var(--text2);margin-top:.2rem}
+.col-b{padding:.45rem;display:flex;flex-direction:column;gap:.45rem}
+.card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:8px;padding:.55rem}
+.card.in{border-left-color:var(--gold)}.card .t{font-size:.76rem;font-weight:500;margin-bottom:.3rem}
+.tags{display:flex;gap:.2rem;flex-wrap:wrap;margin-bottom:.3rem}.tag{font-size:.56rem;padding:.08rem .35rem;border-radius:4px;background:var(--surface3);color:var(--text2)}
+.tag.S{background:rgba(34,197,94,.16);color:var(--green)}.tag.A{background:rgba(91,110,245,.16);color:var(--accent)}.tag.B{background:rgba(240,180,41,.16);color:var(--gold)}
+.amt{font-size:.8rem;font-weight:700;color:var(--gold)}.na{font-size:.62rem;color:var(--text2);margin-top:.25rem}
+.cbtns{display:flex;gap:.2rem;margin-top:.4rem;flex-wrap:wrap}.mini{font-size:.6rem;padding:.18rem .4rem;border-radius:5px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer}
+.mini.adv{background:var(--accent);color:#fff;border-color:var(--accent)}.mini.lose{border-color:var(--red);color:var(--red)}
+.empty{font-size:.62rem;color:var(--text3);text-align:center;padding:.8rem}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:1rem}.ov.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:1.3rem;width:min(540px,100%);max-height:90vh;overflow:auto}
+.modal h3{font-size:.95rem;margin-bottom:.9rem}.f{margin-bottom:.7rem}.f label{display:block;font-size:.7rem;color:var(--text2);margin-bottom:.25rem}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:inherit;font-size:.8rem;padding:.5rem}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}.foot{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.8rem}
+pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.7rem;font-size:.74rem;line-height:1.7;max-height:50vh;overflow:auto}
+@media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.kpi.goal{grid-column:span 3}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand">Social<span>.</span>Quality 管制塔<small>営業バックエンド（DB連携・本格システム）</small></div>
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn" onclick="openAdd()">＋案件</button>
+    <button class="btn btn-ghost" onclick="load()">↻ 更新</button>
+    <a class="btn btn-ghost" href="/logout">ログアウト</a>
+  </div>
+</div>
+<div class="wrap">
+  <div class="kpis" id="kpis"></div>
+  <div class="ingest">
+    <textarea id="ingest" placeholder="案件の募集本文を貼り付け（空行区切りで複数可）→ 一次スコアリングして候補に追加"></textarea>
+    <button class="btn" onclick="ingest()">候補に取込</button>
+  </div>
+  <div class="board" id="board"></div>
+</div>
+
+<div class="ov" id="ov"><div class="modal">
+  <h3 id="mt">案件</h3>
+  <input type="hidden" id="m_id">
+  <div class="f"><label>案件名</label><input id="m_title"></div>
+  <div class="f2">
+    <div class="f"><label>流入元</label><select id="m_source"><option value="lancers">ランサーズ</option><option value="crowdworks">CW</option><option value="cwtech">CWテック(直)</option><option value="lp">LP(インバウンド)</option></select></div>
+    <div class="f"><label>種別</label><select id="m_type"><option>LP</option><option value="corp">コーポレート</option><option value="ec">EC</option><option value="system">システム</option><option value="ai">AI</option><option value="line">LINE</option></select></div>
+  </div>
+  <div class="f2">
+    <div class="f"><label>金額</label><input type="number" id="m_amount" value="0"></div>
+    <div class="f"><label>ステージ</label><select id="m_stage"></select></div>
+  </div>
+  <div class="f2">
+    <div class="f"><label>優先度</label><select id="m_priority"><option>S</option><option>A</option><option>B</option></select></div>
+    <div class="f"><label>スコア</label><input type="number" id="m_score" value="0"></div>
+  </div>
+  <div class="f"><label>次アクション</label><input id="m_na"></div>
+  <div class="f"><label>メモ / 募集本文</label><textarea id="m_notes"></textarea></div>
+  <div class="foot"><button class="btn btn-ghost" onclick="ov(false)">閉じる</button><button class="btn" onclick="saveDeal()">保存</button></div>
+</div></div>
+
+<div class="ov" id="ovp"><div class="modal"><h3>提案文</h3><pre id="ptext"></pre><div class="foot"><button class="btn btn-ghost" onclick="document.getElementById('ovp').classList.remove('show')">閉じる</button><button class="btn" onclick="copyP()">コピー</button></div></div></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const yen=n=>'¥'+Math.round(n||0).toLocaleString('ja-JP');
+const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let STAGES=[], DEALS=[];
+const api=(u,o={})=>fetch(u,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...o}).then(r=>{if(r.status===401){location.href='/login';throw 0}return r.json()});
+
+async function load(){
+  const [m,deals]=await Promise.all([api('/api/metrics'),api('/api/deals')]);
+  STAGES=m.stages; DEALS=deals; renderKPI(m); renderBoard();
+}
+function renderKPI(m){
+  $('kpis').innerHTML=`
+   <div class="kpi goal"><div class="l">今月の受注 / 目標 ${yen(m.goal)}</div><div class="v">${yen(m.revenue_month)} <span style="font-size:.75rem;color:var(--text2)">(${m.goal_pct}%)</span></div><div class="bar"><i style="width:${m.goal_pct}%"></i></div><div class="s">加重予測(着地見込み): <b style="color:var(--cyan)">${yen(m.forecast)}</b></div></div>
+   <div class="kpi"><div class="l">進行中</div><div class="v">${m.active}</div><div class="s">IN ${m.inbound}/OUT ${m.outbound}</div></div>
+   <div class="kpi"><div class="l">受注/受注率</div><div class="v">${m.won} <span style="font-size:.7rem">/ ${m.win_rate}%</span></div><div class="s">失注 ${m.lost}</div></div>
+   <div class="kpi"><div class="l">平均単価</div><div class="v">${yen(m.avg_price)}</div><div class="s">利益率 ${m.avg_profit}%</div></div>
+   <div class="kpi"><div class="l">MRR</div><div class="v" style="color:var(--green)">${yen(m.mrr)}</div><div class="s">年 ${yen(m.mrr*12)}</div></div>`;
+}
+function card(d){
+  const isIn=d.source==='lp';
+  const src={lancers:'ランサーズ',crowdworks:'CW',cwtech:'CWテック',lp:'LP'}[d.source]||d.source;
+  const i=STAGES.findIndex(s=>s.key===d.stage);
+  return `<div class="card ${isIn?'in':''}">
+    <div class="t">${esc(d.title)}</div>
+    <div class="tags"><span class="tag">${src}</span><span class="tag">${esc(d.type)}</span>${d.priority?`<span class="tag ${d.priority}">${d.priority}</span>`:''}${d.score?`<span class="tag">${d.score}点</span>`:''}</div>
+    <div class="amt">${yen(d.amount)}${d.maintenance?` <span style="font-size:.58rem;color:var(--green)">+保守${yen(d.maintenance)}</span>`:''}</div>
+    ${d.next_action?`<div class="na"><b style="color:var(--cyan)">次:</b> ${esc(d.next_action)}</div>`:''}
+    <div class="cbtns">
+      ${i>=0&&i<STAGES.length-1?`<button class="mini adv" onclick="adv('${d.id}')">次へ →</button>`:''}
+      <button class="mini" onclick="edit('${d.id}')">✎</button>
+      <button class="mini" onclick="prop('${d.id}')">📝</button>
+      ${d.link?`<a class="mini" href="${esc(d.link)}" target="_blank">🔗</a>`:''}
+      ${d.stage!=='lost'?`<button class="mini lose" onclick="setStage('${d.id}','lost')">✗</button>`:`<button class="mini" onclick="setStage('${d.id}','lead')">↩</button>`}
+    </div></div>`;
+}
+function renderBoard(){
+  $('board').innerHTML=STAGES.map(st=>{
+    const items=DEALS.filter(d=>d.stage===st.key);
+    const sum=items.reduce((s,d)=>s+(d.amount||0),0);
+    return `<div class="col"><div class="col-h"><div class="n">${st.label}</div><div class="w">${st.who} ${st.key!=='won'&&st.key!=='lead'?'・着地'+Math.round(st.prob*100)+'%':''}</div><div class="m">${items.length}件 ・ ${yen(sum)}</div></div>
+     <div class="col-b">${items.length?items.map(card).join(''):'<div class="empty">—</div>'}</div></div>`;
+  }).join('');
+}
+async function adv(id){ await api('/api/deals/'+id+'/advance',{method:'POST'}); load(); }
+async function setStage(id,stage){ await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify({stage})}); load(); }
+async function ingest(){ const t=$('ingest').value.trim(); if(!t)return; const items=t.split(/\n\s*\n/).map(x=>({text:x.trim()})).filter(x=>x.text); const r=await api('/api/ingest',{method:'POST',body:JSON.stringify({items})}); $('ingest').value=''; alert(r.created+'件を候補に追加しました'); load(); }
+
+function ov(s){ $('ov').classList.toggle('show',s); }
+function fillStages(){ $('m_stage').innerHTML=STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('')+'<option value="lost">失注</option>'; }
+function openAdd(){ fillStages(); $('mt').textContent='案件を追加'; ['m_id','m_title','m_na','m_notes'].forEach(i=>$(i).value=''); $('m_amount').value=0;$('m_score').value=0;$('m_source').value='lancers';$('m_type').value='LP';$('m_priority').value='A';$('m_stage').value='lead'; ov(true); }
+function edit(id){ const d=DEALS.find(x=>x.id===id); if(!d)return; fillStages(); $('mt').textContent='案件を編集'; $('m_id').value=d.id;$('m_title').value=d.title||'';$('m_source').value=d.source;$('m_type').value=d.type;$('m_amount').value=d.amount||0;$('m_stage').value=d.stage;$('m_priority').value=d.priority||'A';$('m_score').value=d.score||0;$('m_na').value=d.next_action||'';$('m_notes').value=d.notes||''; ov(true); }
+async function saveDeal(){
+  const id=$('m_id').value;
+  const body={title:$('m_title').value,source:$('m_source').value,type:$('m_type').value,amount:+$('m_amount').value,stage:$('m_stage').value,priority:$('m_priority').value,score:+$('m_score').value,next_action:$('m_na').value,notes:$('m_notes').value};
+  if(id) await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify(body)});
+  else await api('/api/deals',{method:'POST',body:JSON.stringify(body)});
+  ov(false); load();
+}
+let _ptext='';
+async function prop(id){ const r=await api('/api/deals/'+id+'/proposal'); _ptext=r.proposal||''; $('ptext').textContent=_ptext; $('ovp').classList.add('show'); }
+function copyP(){ navigator.clipboard?.writeText(_ptext); }
+load();
+</script>
+</body>
+</html>

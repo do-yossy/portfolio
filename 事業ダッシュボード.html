@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>事業ダッシュボード（管制塔）| 案件パイプライン × 売上100万 × 学習</title>
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080c18;--surface:#0f1220;--surface2:#161b2e;--surface3:#1c2238;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --accent:#5b6ef5;--accent2:#8b7cf8;--gold:#f0b429;--red:#e84545;--green:#22c55e;--cyan:#22b8cf;
+  --text:#dde3f5;--text2:#8892b0;--text3:#4a5070;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-weight:300;font-size:13px;line-height:1.6}
+a{color:inherit;text-decoration:none}
+.top{position:sticky;top:0;z-index:30;background:rgba(8,12,24,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:.8rem 1.2rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+.brand{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem}
+.brand span{color:var(--accent)}
+.brand small{display:block;font-family:'Noto Sans JP';font-weight:300;font-size:.66rem;color:var(--text2);letter-spacing:.05em}
+.top-actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .8rem;background:var(--accent);color:#fff;border:none;border-radius:7px;font-family:inherit;font-size:.76rem;font-weight:700;cursor:pointer;transition:.15s}
+.btn:hover{background:#4a5be0;transform:translateY(-1px)}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-ghost:hover{border-color:var(--accent2);color:var(--accent2)}
+.wrap{padding:1.1rem 1.2rem 4rem;max-width:1500px;margin:0 auto}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:.7rem;margin-bottom:1rem}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:.8rem .9rem}
+.kpi .l{font-size:.64rem;color:var(--text2);letter-spacing:.04em}
+.kpi .v{font-size:1.25rem;font-weight:700;margin-top:.2rem}
+.kpi .s{font-size:.62rem;color:var(--text3);margin-top:.1rem}
+.kpi.goal{grid-column:span 2;background:linear-gradient(135deg,rgba(91,110,245,.14),rgba(139,124,248,.06));border-color:rgba(91,110,245,.3)}
+.bar{height:8px;background:var(--surface3);border-radius:99px;overflow:hidden;margin-top:.45rem}
+.bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:99px}
+.gv{color:var(--green)} .gd{color:var(--gold)} .rd{color:var(--red)}
+
+/* legend */
+.legend{display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin-bottom:.8rem;font-size:.7rem;color:var(--text2)}
+.legend b{color:var(--text)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:.3rem;vertical-align:middle}
+.src-out{background:var(--cyan)} .src-in{background:var(--gold)}
+
+/* board */
+.board{display:grid;grid-template-columns:repeat(7,minmax(180px,1fr));gap:.6rem;overflow-x:auto;padding-bottom:1rem}
+.col{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:140px}
+.col-h{padding:.6rem .7rem;border-bottom:1px solid var(--border);position:sticky;top:0}
+.col-h .name{font-size:.78rem;font-weight:700}
+.col-h .who{font-size:.6rem;color:var(--text3);margin-top:.1rem}
+.col-h .meta{font-size:.66rem;color:var(--text2);margin-top:.25rem}
+.col-body{padding:.5rem;display:flex;flex-direction:column;gap:.5rem;flex:1}
+.card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:9px;padding:.6rem .65rem}
+.card.in{border-left-color:var(--gold)}
+.card .t{font-size:.78rem;font-weight:500;line-height:1.4;margin-bottom:.35rem}
+.tags{display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.4rem}
+.tag{font-size:.58rem;padding:.1rem .4rem;border-radius:4px;background:var(--surface3);color:var(--text2)}
+.tag.pri-S{background:rgba(34,197,94,.16);color:var(--green)}
+.tag.pri-A{background:rgba(91,110,245,.16);color:var(--accent)}
+.tag.pri-B{background:rgba(240,180,41,.16);color:var(--gold)}
+.tag.own{background:rgba(139,124,248,.14);color:var(--accent2)}
+.card .amt{font-size:.82rem;font-weight:700;color:var(--gold)}
+.card .na{font-size:.64rem;color:var(--text2);margin-top:.3rem;line-height:1.5}
+.card .na b{color:var(--cyan)}
+.card-btns{display:flex;gap:.25rem;margin-top:.5rem;flex-wrap:wrap}
+.mini{font-size:.62rem;padding:.2rem .45rem;border-radius:5px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer}
+.mini:hover{border-color:var(--accent);color:var(--accent)}
+.mini.adv{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mini.win{border-color:var(--green);color:var(--green)}
+.mini.lose{border-color:var(--red);color:var(--red)}
+.empty{font-size:.66rem;color:var(--text3);text-align:center;padding:1rem .5rem}
+
+.lost-wrap{margin-top:1rem}
+.lost-wrap summary{cursor:pointer;color:var(--text2);font-size:.74rem}
+.lost-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem;margin-top:.6rem}
+
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50;padding:1rem}
+.ov.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:1.4rem;width:min(560px,100%);max-height:90vh;overflow:auto}
+.modal h3{font-size:1rem;margin-bottom:1rem}
+.f{margin-bottom:.8rem}
+.f label{display:block;font-size:.72rem;color:var(--text2);margin-bottom:.3rem}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:inherit;font-size:.82rem;padding:.55rem .65rem}
+textarea{resize:vertical;min-height:60px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+.modal-foot{display:flex;justify-content:space-between;gap:.5rem;margin-top:1rem}
+.hint{font-size:.66rem;color:var(--text3)}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.kpi.goal{grid-column:span 3}}
+@media(max-width:560px){.kpis{grid-template-columns:1fr 1fr}.kpi.goal{grid-column:span 2}.f2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand">Social<span>.</span>Quality 管制塔<small>案件パイプライン × 売上100万 × 学習</small></div>
+  <div class="top-actions">
+    <button class="btn" onclick="openAdd()">＋ 案件を追加</button>
+    <button class="btn btn-ghost" onclick="importJSON()">⬇ 取込</button>
+    <button class="btn btn-ghost" onclick="exportJSON()">⬆ 書出</button>
+    <button class="btn btn-ghost" onclick="exportLog()">📊 学習ログ出力</button>
+    <label class="btn btn-ghost" style="cursor:pointer"><input type="checkbox" id="showEx" onchange="render()" style="width:auto;margin-right:.3rem">見本</label>
+    <a class="btn btn-ghost" href="営業案件管理ツール.html" target="_blank">🧮 スコア/見積</a>
+    <a class="btn btn-ghost" href="応募コックピット.html" target="_blank">🚀 応募</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="kpis" id="kpis"></div>
+  <div class="legend">
+    <span><span class="dot src-out"></span><b>アウトバウンド</b>（ランサーズ/CW）</span>
+    <span><span class="dot src-in"></span><b>インバウンド</b>（LP問い合わせ）</span>
+    <span class="hint">各カードの「次へ →」でステージを前進。AI担当ステージは中身を私が用意、人担当は確認・送信のみ。</span>
+  </div>
+  <div class="board" id="board"></div>
+
+  <details class="lost-wrap"><summary>失注・見送り（<span id="lostCount">0</span>）</summary><div class="lost-grid" id="lostGrid"></div></details>
+</div>
+
+<!-- 追加/編集モーダル -->
+<div class="ov" id="ov">
+  <div class="modal">
+    <h3 id="mTitle">案件を追加</h3>
+    <input type="hidden" id="m_id">
+    <div class="f"><label>案件名</label><input type="text" id="m_title" placeholder="例：美容サロン向けLP制作"></div>
+    <div class="f2">
+      <div class="f"><label>流入元</label><select id="m_source">
+        <option value="lancers">ランサーズ</option><option value="crowdworks">クラウドワークス</option>
+        <option value="cwtech">CWテック(直)</option><option value="lp">LP問い合わせ(インバウンド)</option></select></div>
+      <div class="f"><label>種別</label><select id="m_type">
+        <option value="LP">LP</option><option value="corp">コーポレート</option><option value="ec">EC</option>
+        <option value="system">システム</option><option value="ai">AIツール</option><option value="line">LINE構築</option></select></div>
+    </div>
+    <div class="f2">
+      <div class="f"><label>金額(円・税別)</label><input type="number" id="m_amount" value="0" step="10000"></div>
+      <div class="f"><label>優先度/スコア</label><div style="display:flex;gap:.4rem"><select id="m_priority"><option>S</option><option selected>A</option><option>B</option></select><input type="number" id="m_score" placeholder="スコア" style="width:80px"></div></div>
+    </div>
+    <div class="f2">
+      <div class="f"><label>予測受注率(%)</label><input type="number" id="m_pred" value="50"></div>
+      <div class="f"><label>ステージ</label><select id="m_stage"></select></div>
+    </div>
+    <div class="f2">
+      <div class="f"><label>利益率(%)・受注時</label><input type="number" id="m_profit" placeholder="任意"></div>
+      <div class="f"><label>月額保守(円)</label><input type="number" id="m_maint" placeholder="任意"></div>
+    </div>
+    <div class="f"><label>次アクション</label><input type="text" id="m_na" placeholder="例：提案文を送信 / 見積もり提示"></div>
+    <div class="f"><label>リンク（案件URL / 提案文 / デモ など・任意）</label><input type="text" id="m_link" placeholder="https://..."></div>
+    <div class="f"><label>メモ</label><textarea id="m_notes"></textarea></div>
+    <div class="modal-foot">
+      <button class="mini lose" onclick="delDeal()" id="mDel" style="visibility:hidden">削除</button>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-ghost" onclick="closeOv()">キャンセル</button>
+        <button class="btn" onclick="saveDeal()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<textarea id="io" style="display:none"></textarea>
+
+<script>
+'use strict';
+const GOAL = 1000000;          // 月商目標
+const MONTH = '2026-06';       // 当月（YYYY-MM）。今月の受注を集計
+const KEY = 'sq_pipeline_v1';
+const $ = id => document.getElementById(id);
+const yen = n => '¥' + Math.round(n||0).toLocaleString('ja-JP');
+const pct = (a,b) => b>0 ? Math.round(a/b*100) : 0;
+
+// パイプライン定義（あなたの構想どおり）
+const STAGES = [
+  {key:'lead',    name:'候補',     who:'AI 選定',      prob:.10, ai:'役割1でスコアリング→応募可否'},
+  {key:'applied', name:'応募',     who:'人 が送信',    prob:.25, ai:'AIが提案文生成→コックピットで提出(送信は人)'},
+  {key:'meeting', name:'打合せ',   who:'AI チャット',  prob:.50, ai:'AIがヒアリング/質疑を下書き(送信は人)'},
+  {key:'build',   name:'着手',     who:'AI 制作',      prob:.90, ai:'要件定義→テンプレ流用で制作'},
+  {key:'qa',      name:'チェック', who:'人 が確認',    prob:.95, ai:'人が最終チェック(誤字/スマホ/フォーム/CTA/SEO/リンク)'},
+  {key:'deliver', name:'納品',     who:'人 が送信',    prob:.99, ai:'AIが納品物パッケージ+請求文を用意(送信は人)'},
+  {key:'won',     name:'受注/完了',who:'売上計上',     prob:1,   ai:'売上に計上→学習ログへ'},
+];
+const STKEY = STAGES.map(s=>s.key);
+const stIndex = k => STKEY.indexOf(k);
+const stMeta = k => STAGES[stIndex(k)] || STAGES[0];
+
+let deals = [];
+try{ deals = JSON.parse(localStorage.getItem(KEY)||'[]'); }catch{ deals=[]; }
+if(!deals.length) deals = seed();
+function save(){ localStorage.setItem(KEY, JSON.stringify(deals)); }
+
+function seed(){
+  return [
+    {id:'EX1',example:true,created:'2026-06-01',source:'lancers',title:'クリニック予約管理システム',type:'system',stage:'meeting',amount:220000,score:82,priority:'S',pred:66,na:'要件の優先順位をヒアリング',link:'',notes:''},
+    {id:'EX2',example:true,created:'2026-06-02',source:'lp',title:'カフェLP（問い合わせ）',type:'LP',stage:'build',amount:50000,score:75,priority:'S',pred:80,na:'FV初稿を作成',link:'お問い合わせ.html',notes:'LPフォームから着信'},
+    {id:'EX3',example:true,created:'2026-06-02',source:'crowdworks',title:'工務店コーポレートサイト',type:'corp',stage:'applied',amount:120000,score:60,priority:'A',pred:48,na:'返信待ち',link:'',notes:''},
+    {id:'EX4',example:true,created:'2026-06-03',source:'lp',title:'AI文章添削ツール PoC',type:'ai',stage:'lead',amount:300000,score:71,priority:'A',pred:57,na:'スコープを一次見積もり',link:'AI添削ツール.html',notes:''},
+    {id:'EX5',example:true,created:'2026-05-28',source:'lancers',title:'アパレルECサイト',type:'ec',stage:'won',amount:300000,score:80,priority:'S',pred:64,profit:60,maint:20000,wonDate:'2026-06',na:'保守運用中',link:'ECサイト.html',notes:'保守¥20,000/月'},
+    {id:'EX6',example:true,created:'2026-05-30',source:'crowdworks',title:'美容LP（相見積）',type:'LP',stage:'lost',amount:50000,score:55,priority:'B',pred:40,na:'価格負け',link:'',notes:''},
+  ];
+}
+
+function view(){ return deals.filter(d=> $('showEx').checked || !d.example); }
+
+// ── KPI ──
+function renderKPIs(){
+  const v = view();
+  const active = v.filter(d=>d.stage!=='won' && d.stage!=='lost');
+  const won = v.filter(d=>d.stage==='won');
+  const lost = v.filter(d=>d.stage==='lost');
+  const wonMonth = won.filter(d=>(d.wonDate||d.created||'').slice(0,7)===MONTH);
+  const revMonth = wonMonth.reduce((s,d)=>s+(d.amount||0),0);
+  const forecast = active.reduce((s,d)=>s+(d.amount||0)*stMeta(d.stage).prob,0) + revMonth;
+  const mrr = won.reduce((s,d)=>s+(d.maint||0),0);
+  const decided = won.length+lost.length;
+  const winRate = pct(won.length, decided);
+  const avgPrice = won.length ? won.reduce((s,d)=>s+(d.amount||0),0)/won.length : 0;
+  const avgProfit = won.filter(d=>d.profit).length ? won.filter(d=>d.profit).reduce((s,d)=>s+d.profit,0)/won.filter(d=>d.profit).length : 0;
+  const inb = active.filter(d=>d.source==='lp').length, outb = active.length-inb;
+  const goalPct = Math.min(100, pct(revMonth, GOAL));
+
+  $('kpis').innerHTML = `
+    <div class="kpi goal">
+      <div class="l">今月の受注売上 / 目標 ${yen(GOAL)}</div>
+      <div class="v ${revMonth>=GOAL?'gv':''}">${yen(revMonth)} <span style="font-size:.8rem;color:var(--text2)">(${goalPct}%)</span></div>
+      <div class="bar"><i style="width:${goalPct}%"></i></div>
+      <div class="s">パイプライン加重予測（着地見込み）: <b style="color:var(--cyan)">${yen(forecast)}</b></div>
+    </div>
+    <div class="kpi"><div class="l">進行中の案件</div><div class="v">${active.length}</div><div class="s">IN ${inb} / OUT ${outb}</div></div>
+    <div class="kpi"><div class="l">受注 / 受注率</div><div class="v">${won.length} <span style="font-size:.7rem">/ ${winRate}%</span></div><div class="s">失注 ${lost.length}</div></div>
+    <div class="kpi"><div class="l">平均単価</div><div class="v">${yen(avgPrice)}</div><div class="s">利益率 ${Math.round(avgProfit)}%</div></div>
+    <div class="kpi"><div class="l">継続収益(MRR)</div><div class="v gv">${yen(mrr)}</div><div class="s">年換算 ${yen(mrr*12)}</div></div>`;
+}
+
+// ── Board ──
+function card(d){
+  const isIn = d.source==='lp';
+  const srcLabel = {lancers:'ランサーズ',crowdworks:'CW',cwtech:'CWテック',lp:'LP'}[d.source]||d.source;
+  const i = stIndex(d.stage);
+  const linkBtn = d.link ? `<a class="mini" href="${escAttr(d.link)}" target="_blank">🔗</a>` : '';
+  return `<div class="card ${isIn?'in':''}">
+    <div class="t">${esc(d.title)}</div>
+    <div class="tags">
+      <span class="tag">${srcLabel}</span>
+      <span class="tag">${esc(d.type)}</span>
+      ${d.priority?`<span class="tag pri-${d.priority}">${d.priority}</span>`:''}
+      ${d.score?`<span class="tag">${d.score}点</span>`:''}
+    </div>
+    <div class="amt">${yen(d.amount)}${d.maint?` <span style="font-size:.6rem;color:var(--green)">+保守${yen(d.maint)}</span>`:''}</div>
+    ${d.na?`<div class="na"><b>次:</b> ${esc(d.na)}</div>`:''}
+    <div class="na" style="color:var(--text3)">AI: ${esc(stMeta(d.stage).ai)}</div>
+    <div class="card-btns">
+      ${i>0?`<button class="mini" onclick="adv('${d.id}',-1)">◀</button>`:''}
+      ${i<STKEY.length-1?`<button class="mini adv" onclick="adv('${d.id}',1)">次へ →</button>`:''}
+      <button class="mini" onclick="openEdit('${d.id}')">✎</button>
+      ${linkBtn}
+      ${d.stage!=='lost'?`<button class="mini lose" onclick="setStage('${d.id}','lost')">✗</button>`:`<button class="mini" onclick="setStage('${d.id}','lead')">↩</button>`}
+    </div>
+  </div>`;
+}
+
+function render(){
+  renderKPIs();
+  const v = view();
+  $('board').innerHTML = STAGES.map(st=>{
+    const items = v.filter(d=>d.stage===st.key);
+    const sum = items.reduce((s,d)=>s+(d.amount||0),0);
+    return `<div class="col">
+      <div class="col-h">
+        <div class="name">${st.name}</div>
+        <div class="who">${st.who}${st.key!=='won'&&st.key!=='lead'?` ・ 着地${Math.round(st.prob*100)}%`:''}</div>
+        <div class="meta">${items.length}件 ・ ${yen(sum)}</div>
+      </div>
+      <div class="col-body">${items.length?items.map(card).join(''):'<div class="empty">—</div>'}</div>
+    </div>`;
+  }).join('');
+  const lost = v.filter(d=>d.stage==='lost');
+  $('lostCount').textContent = lost.length;
+  $('lostGrid').innerHTML = lost.length?lost.map(card).join(''):'<div class="empty">なし</div>';
+  save();
+}
+
+function adv(id,dir){
+  const d = deals.find(x=>x.id===id); if(!d) return;
+  let i = stIndex(d.stage)+dir;
+  i = Math.max(0, Math.min(STKEY.length-1, i));
+  d.stage = STKEY[i];
+  if(d.stage==='won' && !d.wonDate) d.wonDate = MONTH;
+  render();
+}
+function setStage(id,stage){ const d=deals.find(x=>x.id===id); if(d){ d.stage=stage; if(stage==='won'&&!d.wonDate)d.wonDate=MONTH; render(); } }
+
+// ── 追加/編集 ──
+function fillStageSelect(){ $('m_stage').innerHTML = STAGES.map(s=>`<option value="${s.key}">${s.name}</option>`).join('')+'<option value="lost">失注</option>'; }
+function openAdd(){ fillStageSelect(); $('mTitle').textContent='案件を追加'; $('m_id').value=''; $('mDel').style.visibility='hidden';
+  ['m_title','m_score','m_na','m_link','m_notes','m_profit','m_maint'].forEach(i=>$(i).value='');
+  $('m_amount').value=0; $('m_pred').value=50; $('m_source').value='lancers'; $('m_type').value='LP'; $('m_priority').value='A'; $('m_stage').value='lead';
+  $('ov').classList.add('show'); }
+function openEdit(id){ const d=deals.find(x=>x.id===id); if(!d)return; fillStageSelect();
+  $('mTitle').textContent='案件を編集'; $('m_id').value=d.id; $('mDel').style.visibility='visible';
+  $('m_title').value=d.title||''; $('m_source').value=d.source||'lancers'; $('m_type').value=d.type||'LP';
+  $('m_amount').value=d.amount||0; $('m_priority').value=d.priority||'A'; $('m_score').value=d.score||'';
+  $('m_pred').value=d.pred||50; $('m_stage').value=d.stage||'lead'; $('m_profit').value=d.profit||''; $('m_maint').value=d.maint||'';
+  $('m_na').value=d.na||''; $('m_link').value=d.link||''; $('m_notes').value=d.notes||'';
+  $('ov').classList.add('show'); }
+function closeOv(){ $('ov').classList.remove('show'); }
+function saveDeal(){
+  const id=$('m_id').value || ('D'+Date.now());
+  const obj={ id, created:(deals.find(x=>x.id===id)||{}).created || new Date().toISOString().slice(0,10),
+    source:$('m_source').value, title:$('m_title').value.trim()||'(無題)', type:$('m_type').value,
+    amount:+$('m_amount').value||0, priority:$('m_priority').value, score:+$('m_score').value||0,
+    pred:+$('m_pred').value||0, stage:$('m_stage').value, profit:+$('m_profit').value||0, maint:+$('m_maint').value||0,
+    na:$('m_na').value.trim(), link:$('m_link').value.trim(), notes:$('m_notes').value.trim() };
+  const prev=deals.find(x=>x.id===id);
+  if(prev){ obj.wonDate=prev.wonDate; obj.example=prev.example; Object.assign(prev,obj); }
+  else deals.push(obj);
+  if(obj.stage==='won'){ const dd=deals.find(x=>x.id===id); if(!dd.wonDate)dd.wonDate=MONTH; }
+  closeOv(); render();
+}
+function delDeal(){ const id=$('m_id').value; if(id&&confirm('この案件を削除しますか？')){ deals=deals.filter(x=>x.id!==id); closeOv(); render(); } }
+
+// ── 入出力 ──
+function exportJSON(){ show(JSON.stringify(deals.filter(d=>!d.example),null,2),'この内容を案件パイプライン.jsonとして保存できます'); }
+function importJSON(){ const t=prompt('案件JSON(配列)を貼り付け'); if(!t)return; try{ const a=JSON.parse(t); if(Array.isArray(a)){ const m=new Map(deals.map(d=>[d.id,d])); a.forEach(d=>{if(d&&d.id)m.set(d.id,d)}); deals=[...m.values()]; render(); } }catch(e){ alert('JSON不正: '+e.message);} }
+function exportLog(){
+  const done=view().filter(d=>d.stage==='won'||d.stage==='lost');
+  if(!done.length){ alert('受注/失注の案件がありません'); return; }
+  const lines=done.map(d=>JSON.stringify({
+    id:d.id,date:d.wonDate?d.wonDate+'-01':d.created,channel:d.source==='lp'?'self-media':d.source,
+    title:d.title,type:d.type,budget:d.amount,proposed_price:d.amount,est_hours:0,score:d.score,
+    priority:d.priority,pred_win_rate:d.pred,template:'',outcome:d.stage==='won'?'won':'lost',
+    actual_price:d.stage==='won'?d.amount:0,actual_hours:0,profit_rate:d.profit||0,maintenance:d.maint||0,
+    win_factors:'',loss_factors:d.stage==='lost'?(d.na||''):'',notes:d.notes||''
+  }));
+  show(lines.join('\n'),'これを 営業システム/学習/応募ログ.jsonl に追記 → node 集計.js で学習が回ります');
+}
+function show(txt,note){ const io=$('io'); io.style.display='block'; io.value=txt; io.style.position='fixed'; io.style.bottom='0'; io.style.left='0'; io.style.right='0'; io.style.height='180px'; io.style.zIndex='99'; io.style.background='var(--surface)'; io.style.color='var(--text)'; io.style.border='1px solid var(--border2)'; io.style.padding='.6rem'; io.select(); alert(note+'\n\n（画面下のテキストを選択→コピーしてください。閉じるには再読込）'); }
+
+const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const escAttr=s=>esc(s).replace(/"/g,'&quot;');
+render();
+</script>
+</body>
+</html>

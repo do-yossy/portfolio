@@ -1,0 +1,24 @@
+app = "sales-platform"
+primary_region = "nrt"
+
+[build]
+
+[env]
+  PORT = "3100"
+  SALES_GOAL = "1000000"
+  PORTFOLIO_BASE = "https://do-yossy.github.io/portfolio/"
+
+[http_service]
+  internal_port = 3100
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+# データ永続化（SQLite）。本番は fly volume を作成してマウント:
+#   fly volumes create sales_data --size 1
+[mounts]
+  source = "sales_data"
+  destination = "/app/data"
+
+# シークレットは fly secrets set ADMIN_PASSWORD=... SLACK_WEBHOOK_URL=... で設定
