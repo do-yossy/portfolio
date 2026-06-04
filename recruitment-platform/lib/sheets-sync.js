@@ -68,6 +68,9 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const prior = new Map();
     const existingHeader = existing[0] || [];
     const layout = LAYOUTS.find(l => l.detect(existingHeader));
+    // 生年月日・性別はヘッダー名で列位置を検出（手入力値の退避用）
+    const priorBirthCol  = existingHeader.findIndex(h => h === '生年月日');
+    const priorGenderCol = existingHeader.findIndex(h => h === '性別');
     if (layout) {
       const pc = layout.col;
       for (const row of existing.slice(1)) {
@@ -78,6 +81,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
           status:    row[pc.status],
           notes:     row[pc.notes],
           furigana:  pc.furigana >= 0 ? row[pc.furigana] : '',
+          birthDate: priorBirthCol  >= 0 ? row[priorBirthCol]  : '',
+          gender:    priorGenderCol >= 0 ? row[priorGenderCol] : '',
         });
       }
     }
@@ -159,12 +164,15 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       for (const a of grp) {
         const dupInfo = buildDupInfo(a);
         const row = applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo);
-        const p = prior.get(a.id);  // 手入力済みのデータを優先（架電結果・ふりがな）
+        const p = prior.get(a.id);  // 手入力済みのデータを優先（架電結果・ふりがな・生年月日・性別）
         if (p) {
           if (p.callCount !== undefined && p.callCount !== '') row[SHEET_COL.callCount] = String(p.callCount);
           if (p.status) row[SHEET_COL.status] = p.status;
           if (p.notes !== undefined && p.notes !== '') row[SHEET_COL.notes] = p.notes;
           if (p.furigana) row[SHEET_COL.furigana] = p.furigana;
+          // 生年月日(index9)・性別(index8) の手入力値はDBが空でも保持
+          if (p.birthDate && String(p.birthDate).trim() && !row[9]) row[9] = String(p.birthDate).trim();
+          if (p.gender && String(p.gender).trim() && !row[8]) row[8] = String(p.gender).trim();
         }
         rows.push(row);
         count++;
@@ -346,6 +354,22 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
         if (sheetFurigana !== undefined && sheetFurigana !== '') {
           db.prepare('UPDATE applicants SET furigana=?, updated_at=? WHERE id=?')
             .run(sheetFurigana, new Date().toISOString(), id);
+        }
+      }
+      // 生年月日をDBに同期（Indeed等で空欄→シートで手入力した値を取り込む）
+      if (colIdx.birthDate >= 0) {
+        const sheetBirth = row[colIdx.birthDate];
+        if (sheetBirth !== undefined && String(sheetBirth).trim() !== '') {
+          db.prepare('UPDATE applicants SET birth_date=?, updated_at=? WHERE id=?')
+            .run(String(sheetBirth).trim(), new Date().toISOString(), id);
+        }
+      }
+      // 性別をDBに同期（Indeedは性別なし→シートで手入力した値を取り込む）
+      if (colIdx.gender >= 0) {
+        const sheetGender = row[colIdx.gender];
+        if (sheetGender !== undefined && String(sheetGender).trim() !== '') {
+          db.prepare('UPDATE applicants SET gender=?, updated_at=? WHERE id=?')
+            .run(String(sheetGender).trim(), new Date().toISOString(), id);
         }
       }
       // 不通/対応中/終了 → 同一電話・メールのレコードをまとめてアーカイブ
