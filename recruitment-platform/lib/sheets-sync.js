@@ -33,11 +33,9 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   };
   let count = 0, tabs = 0;
   const warnings = [];
-  // 終了は除外（バックログ含む全員は表示）
-  const SKIP_STATUSES = new Set(['終了']);
+  // 全員をシートに反映（対応状況に関わらず除外しない）。過去応募移動は管理画面の手動操作で行う。
   for (const co of companies) {
-    const list = (await Ops.listCalls({ company: co.id, archived: false, excludeDuplicate: true }))
-      .filter(a => !SKIP_STATUSES.has(a.status));
+    const list = (await Ops.listCalls({ company: co.id, archived: false, excludeDuplicate: true }));
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
 
@@ -149,19 +147,14 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       const ccRaw = row[SHEET_COL.callCount];
       const newStatus = row[SHEET_COL.status];
       const normalizedStatus = STATUS_MIGRATE[newStatus] || newStatus;
+      // 取込では対応状況・架電回数・メモのみ更新し、過去応募への自動移動は行わない
+      // （全員を架電リストに残す。過去応募への移動は管理画面の手動操作で行う）
       await Ops.updateCall(id, {
         callCount: (ccRaw !== undefined && ccRaw !== '') ? (parseInt(ccRaw) || 0) : undefined,
         status: normalizedStatus || undefined,
         notes: row[SHEET_COL.notes] !== undefined ? row[SHEET_COL.notes] : undefined,
+        skipAutoArchive: true,
       });
-      // 不通・対応中・終了で返ってきたレコードは過去応募に移動
-      // 不通のみ: 次回同じ人が応募しても重複扱いせず「再応募」として扱う（findDuplicateInfoで判定）
-      // updateCall の TERMINAL チェックで終了は自動アーカイブされるが、不通・対応中は手動でアーカイブ
-      if (['不通', '対応中'].includes(normalizedStatus) && existing.is_archived === 0) {
-        const { db } = require('../db');
-        db.prepare('UPDATE applicants SET is_archived=1, updated_at=? WHERE id=?')
-          .run(new Date().toISOString(), id);
-      }
       updated++;
     }
   }

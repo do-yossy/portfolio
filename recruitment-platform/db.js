@@ -596,7 +596,9 @@ const ACTIVE_CALL_STATUSES = ['新規', '不通', '対応中'];
 // ── 架電運用：Applicants 拡張メソッド ──────────────────────────
 const Ops = {
   // 架電状況の更新（架電回数・ステータス・メモ）
-  updateCall(id, { callCount, status, notes } = {}) {
+  // skipAutoArchive=true の場合、ステータスに応じた is_archived 自動切替を行わない
+  // （スプレッドシート取込時に応募者を架電リストに残したい場合に使用）
+  updateCall(id, { callCount, status, notes, skipAutoArchive = false } = {}) {
     const ts = now();
     const fields = [];
     const vals = [];
@@ -606,9 +608,9 @@ const Ops = {
     if (callCount !== undefined && (parseInt(callCount) || 0) > 0) {
       fields.push('last_called_at = ?'); vals.push(ts);
     }
-    // 終了は過去リストへ自動アーカイブ
+    // 終了は過去リストへ自動アーカイブ（skipAutoArchive時は変更しない）
     const TERMINAL = ['終了'];
-    if (status !== undefined) {
+    if (status !== undefined && !skipAutoArchive) {
       fields.push('is_archived = ?');
       vals.push(TERMINAL.includes(status) ? 1 : 0);
     }
