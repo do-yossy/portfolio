@@ -225,7 +225,7 @@ function mapCSVRow(row) {
   };
 }
 
-// 運用管理用CSVマッパー（会社・媒体を指定、Indeed分割氏名にも対応）
+// 運用管理用CSVマッパー（会社・媒体を指定、Indeed/engage分割氏名にも対応）
 function mapOpsCSVRow(row, company, media) {
   const base = mapCSVRow(row);
   const col = (keys) => {
@@ -241,22 +241,80 @@ function mapOpsCSVRow(row, company, media) {
     }
     return '';
   };
-  // Indeedダウンロード形式: 氏名（姓）＋氏名（名）
+
+  // ── engage / Indeed形式: 氏名（姓）＋氏名（名）結合 ──
   if (!base.name) {
     const sei = col(['氏名（姓）','姓','sei']);
     const mei = col(['氏名（名）','名','mei']);
     const joined = `${sei} ${mei}`.trim();
     if (joined) base.name = joined.replace(/[（(][^）)]*[）)]/g, '').trim();
   }
-  // engage形式の「氏名」単体や「名前」
   if (!base.name) base.name = col(['氏名','名前']).replace(/[（(][^）)]*[）)]/g, '').trim();
-  // 居住地（engage形式）
-  if (!base.address) base.address = col(['応募者の居住地','居住地','都道府県']);
-  // 架電回数（engageシートに既存値がある場合）
+
+  // ── engage形式: ふりがな（姓カナ＋名カナ結合）──
+  if (!base.furigana) {
+    const kSei = col(['氏名フリガナ（姓）','氏名カナ（姓）','姓カナ','フリガナ（姓）']);
+    const kMei = col(['氏名フリガナ（名）','氏名カナ（名）','名カナ','フリガナ（名）']);
+    if (kSei || kMei) base.furigana = `${kSei} ${kMei}`.trim();
+  }
+  if (!base.furigana) base.furigana = col(['氏名フリガナ','フリガナ','ふりがな','よみがな','カナ氏名']);
+
+  // ── 居住地: engage形式は都道府県＋市区町村 ──
+  if (!base.address) {
+    const pref = col(['都道府県']);
+    const city = col(['市区町村']);
+    if (pref) base.address = city ? `${pref}${city}` : pref;
+  }
+  if (!base.address) base.address = col(['応募者の居住地','居住地','以降の住所']);
+
+  // ── 学歴: 最終学歴 - 学校区分 ＋ 学校名 ──
+  if (!base.education) {
+    const gakkou = col(['最終学歴 - 学校区分','学校区分']);
+    const name   = col(['最終学歴 - 学校名','学校名']);
+    const gakka  = col(['最終学歴 - 学部/学科']);
+    const parts  = [gakkou, name, gakka].filter(Boolean);
+    if (parts.length) base.education = parts.join(' ');
+  }
+
+  // ── 求人タイトル: engageは「応募求人-職種名」──
+  if (!base.jobTitle) base.jobTitle = col(['応募求人-職種名','応募求人名','求人タイトル','応募職種']);
+
+  // ── 経験: 直近年収・転職回数・経験年数を組み合わせてノート風に ──
+  if (!base.experience) {
+    const income   = col(['直近の年収','年収']);
+    const tenJob   = col(['転職経験']);
+    const expYears = col(['経験年数']);
+    const parts    = [];
+    if (income)   parts.push(`年収: ${income}`);
+    if (tenJob)   parts.push(`転職: ${tenJob}`);
+    if (expYears) parts.push(`経験年数: ${expYears}`);
+    if (parts.length) base.experience = parts.join(' / ');
+  }
+
+  // ── 職歴詳細（1〜3件）をnotesへ追記 ──
+  const workHistoryParts = [];
+  for (let i = 1; i <= 3; i++) {
+    const co2 = col([`職歴${i} - 企業名`]);
+    const from = col([`職歴${i} - 入社年月`]);
+    const to   = col([`職歴${i} - 退社年月`]);
+    const desc = col([`職歴${i} - 経験されたお仕事やスキル`]);
+    if (co2) {
+      const period = [from, to].filter(Boolean).join('〜');
+      workHistoryParts.push(`【職歴${i}】${co2}${period ? ` (${period})` : ''}${desc ? '\n' + desc.replace(/<br>/g, '\n').slice(0, 200) : ''}`);
+    }
+  }
+  if (workHistoryParts.length && !base.notes) {
+    base.notes = workHistoryParts.join('\n\n');
+  }
+
+  // ── 架電回数（engageシートに既存値がある場合）──
   let cc = col(['架電回数','call_count']);
   cc = /^\d+$/.test(cc) ? parseInt(cc) : 0;
 
-  return { ...base, company, media, callCount: cc, status: base.status || '新規' };
+  // sourceMediaが未取得('CSV取込'デフォルト)の場合はmedia名を使用
+  const sourceMedia = (base.sourceMedia && base.sourceMedia !== 'CSV取込') ? base.sourceMedia : media;
+
+  return { ...base, company, media, sourceMedia, callCount: cc, status: base.status || '新規' };
 }
 
 // 会社ID → 正式社名（スクリプトの COMPANY_NAME 用）
