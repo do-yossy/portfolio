@@ -306,9 +306,30 @@ async function clearDataValidations(tabSheetId) {
   });
 }
 
+// 指定列範囲（startColIndex〜endColIndex）のデータ行（ヘッダー除く）に背景色を設定
+async function setColumnBackground(tabSheetId, startColIndex, endColIndex, color) {
+  await api(`/${sheetId()}:batchUpdate`, {
+    method: 'POST',
+    body: {
+      requests: [{
+        repeatCell: {
+          range: {
+            sheetId: tabSheetId,
+            startRowIndex: 1,       // ヘッダー行（行0）は除外
+            startColumnIndex: startColIndex,
+            endColumnIndex: endColIndex + 1,
+          },
+          cell: { userEnteredFormat: { backgroundColor: color } },
+          fields: 'userEnteredFormat.backgroundColor',
+        },
+      }],
+    },
+  });
+}
+
 module.exports = {
   isConfigured, sheetUrl, getAccessToken,
   getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
   setDropdowns, styleHeader, styleSectionRows, colLetter, setStatusConditionalFormats,
-  clearDataValidations,
+  clearDataValidations, setColumnBackground,
 };

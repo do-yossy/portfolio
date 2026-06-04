@@ -103,6 +103,11 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     // 書式・プルダウンは毎回（冪等）適用。失敗してもデータ反映は止めず警告に。
     try {
       await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
+      // Q〜U列（index16〜20: 架電回数・対応状況・最終架電日・重複・メモ）を薄い黄色に
+      if (gsheets.setColumnBackground) {
+        await gsheets.setColumnBackground(props.sheetId, 16, 20,
+          { red: 1, green: 0.992, blue: 0.906 }); // #fffde7
+      }
       // 過去レイアウトの余分なプルダウン（応募日列など）を一度全クリアしてから必要な列だけ再設定
       if (gsheets.clearDataValidations) {
         await gsheets.clearDataValidations(props.sheetId);
