@@ -379,9 +379,19 @@ async function setColumnBackground(tabSheetId, startColIndex, endColIndex, bgCol
   });
 }
 
+// 単一セルに値を書き込む（スプレッドシート手入力行のID列バックフィル用）
+async function writeSingleCell(title, row1based, col0based, value) {
+  const cellAddr = `${colLetter(col0based)}${row1based}`;
+  const range = `${title}!${cellAddr}`;
+  await api(`/${sheetId()}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
+    method: 'PUT',
+    body: { range, majorDimension: 'ROWS', values: [[String(value)]] },
+  });
+}
+
 module.exports = {
   isConfigured, sheetUrl, getAccessToken,
   getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
   setDropdowns, styleHeader, styleSectionRows, colLetter, setStatusConditionalFormats,
-  clearDataValidations, setColumnBackground, clearColumnDataBackground,
+  clearDataValidations, setColumnBackground, clearColumnDataBackground, writeSingleCell,
 };

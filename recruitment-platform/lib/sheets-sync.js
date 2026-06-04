@@ -225,44 +225,122 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   return { count, appended: count, tabs, warnings };
 }
 
-// スプレッドシート → DB（IDで突合し対応状況・架電回数・メモ・ふりがなを更新）
+// スプレッドシート → DB（IDで突合し対応状況・架電回数・メモ・ふりがなを更新。IDなし行は新規作成）
 async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
-  // 旧ステータス → 新ステータスのマッピング（スプレッドシートから古い値が返ってきた場合の対応）
   const STATUS_MIGRATE = {
     '架電済(不通)': '不通', '対応終了': '終了', '断られた': '終了', '辞退': '終了', '重複': '新規',
   };
-  // 取込対象は会社タブ（SQ/BG/PE/LT/NC/NX）のみ。
-  // 案件精査・推薦管理・面談依頼など独自に運用しているシートには一切触れない。
-  const { COMPANIES, db } = require('../db');
-  const companyTabs = new Set(COMPANIES.map(c => (c.short || c.name || c.id)));
-  let updated = 0, notFound = 0, scanned = 0, skippedTabs = [];
+  const { COMPANIES, MEDIA, db } = require('../db');
+  // media名→IDマッピング（"Indeed"→"indeed", "求人ボックス"→"kyujinbox" 等）
+  const mediaNameToId = {};
+  for (const m of MEDIA) { mediaNameToId[m.name] = m.id; mediaNameToId[m.id] = m.id; }
+  // タブ名→会社オブジェクトのマップ
+  const tabToCompany = {};
+  for (const c of COMPANIES) { tabToCompany[c.short || c.name || c.id] = c; }
+
+  const companyTabs = new Set(Object.keys(tabToCompany));
+  let updated = 0, created = 0, notFound = 0, scanned = 0, skippedTabs = [];
   const meta = await gsheets.getMeta();
+
   for (const sh of (meta.sheets || [])) {
     const title = sh.properties.title;
     if (!companyTabs.has(title)) { skippedTabs.push(title); continue; }
+    const coObj = tabToCompany[title];
+    const companyId = coObj ? coObj.id : 'sq';
+
     const values = await gsheets.readValues(title);
     if (values.length < 2) continue;
-    // レイアウト自動検出（旧レイアウトのシートでも正しく列インデックスを使う）
+
+    // ヘッダー行からカラム位置を名前で検出（全レイアウト共通）
     const headerRow = values[0] || [];
+    const fc = (name) => headerRow.findIndex(h => h === name);
+    const colIdx = {
+      id:          fc('ID') >= 0 ? fc('ID') : 0,
+      media:       fc('媒体'),
+      name:        fc('名前'),
+      furigana:    fc('ふりがな'),
+      phone:       fc('電話番号'),
+      email:       fc('メールアドレス'),
+      gender:      fc('性別'),
+      birthDate:   fc('生年月日'),
+      address:     fc('居住地'),
+      currentJob:  fc('現在の職業'),
+      jobTitle:    fc('求人タイトル'),
+      experience:  fc('経験'),
+      education:   fc('学歴'),
+      workLocation:fc('勤務地'),
+      appliedAt:   fc('応募日'),
+    };
+
+    // 架電結果列は LAYOUTS で検出（旧レイアウトのインデックスずれを吸収）
     const layout = LAYOUTS.find(l => l.detect(headerRow));
-    const pc = layout ? layout.col : SHEET_COL; // fallback to current layout
-    for (const row of values.slice(1)) {
-      const id = row[pc.id];
-      if (!id) continue;
+    const pc = layout ? layout.col : SHEET_COL;
+
+    for (let rowIdx = 0; rowIdx < values.length - 1; rowIdx++) {
+      const row = values[rowIdx + 1];
+      const sheetRowNum = rowIdx + 2; // 1始まりシート行番号
+
+      const id = row[colIdx.id];
+
+      // ── IDなし行：スプレッドシート手入力の新規応募者 ──────────
+      if (!id) {
+        const nameVal  = colIdx.name  >= 0 ? (row[colIdx.name]  || '') : '';
+        const phoneVal = colIdx.phone >= 0 ? (row[colIdx.phone] || '') : '';
+        // 名前・電話なし、またはセクション見出し行（▼）はスキップ
+        if (!nameVal || !phoneVal || (row[2] || '').startsWith('▼')) continue;
+
+        const emailVal = colIdx.email >= 0 ? (row[colIdx.email] || '') : '';
+        const mediaNameVal = colIdx.media >= 0 ? (row[colIdx.media] || '') : '';
+        const mediaId = mediaNameToId[mediaNameVal] || 'google';
+
+        const newA = Applicants.create({
+          name:          nameVal,
+          furigana:      colIdx.furigana    >= 0 ? (row[colIdx.furigana]    || '') : '',
+          phone:         phoneVal,
+          email:         emailVal,
+          gender:        colIdx.gender      >= 0 ? (row[colIdx.gender]      || '') : '',
+          birth_date:    colIdx.birthDate   >= 0 ? (row[colIdx.birthDate]   || '') : '',
+          address:       colIdx.address     >= 0 ? (row[colIdx.address]     || '') : '',
+          current_job:   colIdx.currentJob  >= 0 ? (row[colIdx.currentJob]  || '') : '',
+          job_title:     colIdx.jobTitle    >= 0 ? (row[colIdx.jobTitle]    || '') : '',
+          experience:    colIdx.experience  >= 0 ? (row[colIdx.experience]  || '') : '',
+          education:     colIdx.education   >= 0 ? (row[colIdx.education]   || '') : '',
+          work_location: colIdx.workLocation >= 0 ? (row[colIdx.workLocation] || '') : '',
+          applied_at:    colIdx.appliedAt >= 0 && row[colIdx.appliedAt]
+                           ? row[colIdx.appliedAt] : new Date().toISOString(),
+          call_count:    pc.callCount >= 0 && row[pc.callCount] ? (parseInt(row[pc.callCount]) || 0) : 0,
+          status:        pc.status >= 0 && row[pc.status]
+                           ? (STATUS_MIGRATE[row[pc.status]] || row[pc.status]) : '新規',
+          notes:         pc.notes >= 0 ? (row[pc.notes] || '') : '',
+          media:         mediaId,
+          source_media:  mediaNameVal,
+          company:       companyId,
+          allowEmptyDate: true,
+        });
+        if (newA) {
+          created++;
+          // A列（ID列）に生成したIDを書き戻す
+          if (gsheets.writeSingleCell) {
+            try { await gsheets.writeSingleCell(title, sheetRowNum, colIdx.id, newA.id); } catch {}
+          }
+        }
+        continue;
+      }
+
+      // ── IDあり行：既存レコードを更新 ──────────────────────────
       scanned++;
       const existing = await Applicants.findById(id);
       if (!existing) { notFound++; continue; }
       const ccRaw = row[pc.callCount];
       const newStatus = row[pc.status];
       const normalizedStatus = STATUS_MIGRATE[newStatus] || newStatus;
-      // 対応状況・架電回数・メモを更新し、不通/対応中/終了は過去応募へ移動
       await Ops.updateCall(id, {
         callCount: (ccRaw !== undefined && ccRaw !== '') ? (parseInt(ccRaw) || 0) : undefined,
         status: normalizedStatus || undefined,
         notes: row[pc.notes] !== undefined ? row[pc.notes] : undefined,
-        skipAutoArchive: false,  // 終了 → updateCall内のTERMINAL判定で自動アーカイブ
+        skipAutoArchive: false,
       });
-      // ふりがなをDBに同期（スプレッドシートで手入力されたふりがなを管理ページに反映）
+      // ふりがなをDBに同期
       if (pc.furigana >= 0) {
         const sheetFurigana = row[pc.furigana];
         if (sheetFurigana !== undefined && sheetFurigana !== '') {
@@ -270,9 +348,7 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
             .run(sheetFurigana, new Date().toISOString(), id);
         }
       }
-      // 不通/対応中/終了 → 過去応募へ移動。
-      // 同一人物の重複レコード（同じ電話番号・メール）もまとめてアーカイブし、
-      // 架電リストに残らないようにする。
+      // 不通/対応中/終了 → 同一電話・メールのレコードをまとめてアーカイブ
       if (['不通', '対応中', '終了'].includes(normalizedStatus)) {
         const ts = new Date().toISOString();
         const nPhone = existing.normalized_phone || '';
@@ -289,9 +365,9 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
     }
   }
   if (Logs) await Logs.create('sheets_pull', 'success',
-    `${updated}件をスプレッドシートから更新（${notFound}件該当なし）` +
+    `${updated}件更新・${created}件新規作成（${notFound}件該当なし）` +
     (skippedTabs.length ? `／対象外タブ: ${skippedTabs.join('・')}` : ''));
-  return { updated, notFound, scanned, skippedTabs };
+  return { updated, created, notFound, scanned, skippedTabs };
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -766,11 +766,15 @@ const MediaPosts = {
   crossTab() {
     const table = {};
     for (const c of COMPANIES) { table[c.id] = {}; for (const m of MEDIA) table[c.id][m.id] = 0; }
+    // target_media には名前（"求人ボックス"）またはID（"kyujinbox"）が入る場合があるため両方対応
+    const nameToId = {};
+    for (const m of MEDIA) { nameToId[m.name] = m.id; nameToId[m.id] = m.id; }
     const jobs = db.prepare(`SELECT company, target_media FROM jobs WHERE is_published = 1`).all();
     for (const job of jobs) {
       let mediaList = [];
       try { mediaList = JSON.parse(job.target_media || '[]'); } catch {}
-      for (const mediaId of mediaList) {
+      for (const mediaVal of mediaList) {
+        const mediaId = nameToId[mediaVal] || mediaVal;
         if (table[job.company] && table[job.company][mediaId] !== undefined) {
           table[job.company][mediaId]++;
         }
