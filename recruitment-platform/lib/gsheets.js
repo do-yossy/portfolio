@@ -331,8 +331,13 @@ async function clearDataValidations(tabSheetId) {
   });
 }
 
-// 指定列範囲（startColIndex〜endColIndex）のヘッダー行のみ（行0）に背景色を設定
-async function setColumnBackground(tabSheetId, startColIndex, endColIndex, color) {
+// 指定列範囲（startColIndex〜endColIndex）のヘッダー行のみ（行0）に背景色・文字色を設定
+async function setColumnBackground(tabSheetId, startColIndex, endColIndex, bgColor, textColor = null) {
+  const fmt = { backgroundColor: bgColor };
+  if (textColor) fmt.textFormat = { foregroundColor: textColor, bold: true };
+  const fields = textColor
+    ? 'userEnteredFormat(backgroundColor,textFormat)'
+    : 'userEnteredFormat.backgroundColor';
   await api(`/${sheetId()}:batchUpdate`, {
     method: 'POST',
     body: {
@@ -340,13 +345,13 @@ async function setColumnBackground(tabSheetId, startColIndex, endColIndex, color
         repeatCell: {
           range: {
             sheetId: tabSheetId,
-            startRowIndex: 0,  // ヘッダー行のみ
+            startRowIndex: 0,
             endRowIndex: 1,
             startColumnIndex: startColIndex,
             endColumnIndex: endColIndex + 1,
           },
-          cell: { userEnteredFormat: { backgroundColor: color } },
-          fields: 'userEnteredFormat.backgroundColor',
+          cell: { userEnteredFormat: fmt },
+          fields,
         },
       }],
     },

@@ -169,7 +169,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       // R〜U列（架電回数・対応状況・最終架電日・メモ）のヘッダー1行目のみオレンジ
       if (gsheets.setColumnBackground) {
         await gsheets.setColumnBackground(props.sheetId, SHEET_COL.callCount, SHEET_COL.notes,
-          { red: 0.918, green: 0.353, blue: 0.047 }); // #ea580c オレンジ
+          { red: 0.918, green: 0.722, blue: 0 },        // #eab800 濃い黄色（白文字で視認可）
+          { red: 1, green: 1, blue: 1 });                // 文字色: 白
       }
       // 過去レイアウトの余分なプルダウン（応募日列など）を一度全クリアしてから必要な列だけ再設定
       if (gsheets.clearDataValidations) {
