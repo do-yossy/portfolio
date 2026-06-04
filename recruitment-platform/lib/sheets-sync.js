@@ -10,11 +10,15 @@
 const SHEET_HEADERS = ['ID', '媒体', '会社', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
 const SHEET_COL = { id: 0, callCount: 16, status: 17, notes: 20 };
 
-function applicantToSheetRow(a, mediaLabel, companyLabel) {
+// sheetRowNum: 1始まりのシート行番号（渡すと年齢列に数式を埋め込む）
+function applicantToSheetRow(a, mediaLabel, companyLabel, sheetRowNum) {
+  const ageCell = sheetRowNum
+    ? `=IF(H${sheetRowNum}<>"",IFERROR(DATEDIF(H${sheetRowNum},TODAY(),"Y"),IFERROR(DATEDIF(DATEVALUE(H${sheetRowNum}),TODAY(),"Y"),"")),"")`
+    : String(a.age || '');
   return [
     a.id, mediaLabel(a.media), companyLabel ? companyLabel(a.company) : (a.company || ''),
     a.name || '', a.phone || '', a.email || '',
-    a.gender || '', a.birth_date || '', a.age || '', a.address || '',
+    a.gender || '', a.birth_date || '', ageCell, a.address || '',
     a.current_job || '', a.job_title || '', a.experience || '', a.education || '', a.work_location || '',
     (a.applied_at || '').slice(0, 10),
     String(a.call_count || 0), a.status || '', (a.last_called_at || '').slice(0, 10),
@@ -28,8 +32,11 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   const companyLabel = id => { const c = companies.find(x => x.id === id); return c ? (c.short || c.name || id) : (id || ''); };
   let count = 0, tabs = 0;
   const warnings = [];
+  // 対応終了・断られた・辞退は除外（バックログ含む全員は表示）
+  const SKIP_STATUSES = new Set(['対応終了', '断られた', '辞退']);
   for (const co of companies) {
-    const list = (await Ops.listCalls({ company: co.id, archived: false, excludeDuplicate: true }));
+    const list = (await Ops.listCalls({ company: co.id, excludeDuplicate: true }))
+      .filter(a => !SKIP_STATUSES.has(a.status));
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
 
@@ -63,7 +70,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       sectionRowIdx.push(rows.length);               // 0始まりの行インデックス
       rows.push(sec);
       for (const a of grp) {
-        const row = applicantToSheetRow(a, mediaLabel, companyLabel);
+        const sheetRowNum = rows.length + 1; // 0始まりのrows配列長 + 1 = 1始まりのシート行番号
+        const row = applicantToSheetRow(a, mediaLabel, companyLabel, sheetRowNum);
         const p = prior.get(a.id);                   // 手入力済みの架電結果を優先（取込前の編集を保持）
         if (p) {
           if (p.callCount !== undefined && p.callCount !== '') row[SHEET_COL.callCount] = String(p.callCount);
@@ -75,21 +83,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       }
     }
 
-    await gsheets.writeValues(title, rows);
-
-    // 年齢列（index=8, 列I）: 生年月日列（index=7, 列H）から自動計算する数式をセット
-    // ヘッダ行(row1)を除く全行に =IF(H{n}<>"",DATEDIF(DATEVALUE(H{n}),TODAY(),"Y"),"") を設定
-    if (rows.length > 1 && gsheets.writeColumnFormulas) {
-      const BIRTH_COL  = 7; // 生年月日 (H)
-      const AGE_COL    = 8; // 年齢 (I)
-      const bLetter    = 'H'; // 生年月日列は固定でH列（SHEET_HEADERSのindex=7）
-      const formulas   = Array.from({ length: rows.length - 1 }, (_, i) => {
-        const r = i + 2; // シート上の行番号（1始まり。row1はヘッダなので2から）
-        return `=IF(${bLetter}${r}<>"",DATEDIF(DATEVALUE(${bLetter}${r}),TODAY(),"Y"),"")`;
-      });
-      try { await gsheets.writeColumnFormulas(title, AGE_COL, 2, formulas); }
-      catch (e) { warnings.push(`${title}: 年齢数式の設定に失敗 (${e.message || e})`); }
-    }
+    // USER_ENTERED で書き込むことで年齢列の =IF(...) 数式が有効になる
+    await gsheets.writeValues(title, rows, { valueInputOption: 'USER_ENTERED' });
 
     // 書式・プルダウンは毎回（冪等）適用。失敗してもデータ反映は止めず警告に。
     try {

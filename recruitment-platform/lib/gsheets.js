@@ -150,12 +150,12 @@ async function readValues(title) {
 }
 
 // タブ全体をクリアして values（2次元配列）を書き込む
-async function writeValues(title, values) {
+async function writeValues(title, values, { valueInputOption = 'RAW' } = {}) {
   const lastCol = colLetter(Math.max(0, (values[0]?.length || 1) - 1));
   const range = `${title}!A1:${lastCol}${Math.max(values.length, 1)}`;
   // 既存をクリアしてから上書き
   await api(`/${sheetId()}/values/${encodeURIComponent(`${title}!A1:Z100000`)}:clear`, { method: 'POST' });
-  await api(`/${sheetId()}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
+  await api(`/${sheetId()}/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`, {
     method: 'PUT',
     body: { range, majorDimension: 'ROWS', values },
   });
