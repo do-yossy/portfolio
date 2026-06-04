@@ -163,11 +163,21 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
         notes: row[SHEET_COL.notes] !== undefined ? row[SHEET_COL.notes] : undefined,
         skipAutoArchive: false,  // 終了 → updateCall内のTERMINAL判定で自動アーカイブ
       });
-      // 不通・対応中 → 手動でアーカイブ（不通は次回応募時に再応募扱い）
-      if (['不通', '対応中'].includes(normalizedStatus) && existing.is_archived === 0) {
+      // 不通/対応中/終了 → 過去応募へ移動。
+      // 同一人物の重複レコード（同じ電話番号・メール）もまとめてアーカイブし、
+      // 架電リストに残らないようにする。
+      if (['不通', '対応中', '終了'].includes(normalizedStatus)) {
         const { db } = require('../db');
-        db.prepare('UPDATE applicants SET is_archived=1, updated_at=? WHERE id=?')
-          .run(new Date().toISOString(), id);
+        const ts = new Date().toISOString();
+        const nPhone = existing.normalized_phone || '';
+        const nEmail = existing.normalized_email || '';
+        db.prepare(`
+          UPDATE applicants SET is_archived=1, updated_at=?
+          WHERE is_archived=0
+            AND ( id=?
+              OR (normalized_phone != '' AND normalized_phone = ?)
+              OR (normalized_email != '' AND normalized_email = ?) )
+        `).run(ts, id, nPhone, nEmail);
       }
       updated++;
     }
