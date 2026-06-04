@@ -306,7 +306,7 @@ async function clearDataValidations(tabSheetId) {
   });
 }
 
-// 指定列範囲（startColIndex〜endColIndex）のデータ行（ヘッダー除く）に背景色を設定
+// 指定列範囲（startColIndex〜endColIndex）のヘッダー行のみ（行0）に背景色を設定
 async function setColumnBackground(tabSheetId, startColIndex, endColIndex, color) {
   await api(`/${sheetId()}:batchUpdate`, {
     method: 'POST',
@@ -315,7 +315,8 @@ async function setColumnBackground(tabSheetId, startColIndex, endColIndex, color
         repeatCell: {
           range: {
             sheetId: tabSheetId,
-            startRowIndex: 1,       // ヘッダー行（行0）は除外
+            startRowIndex: 0,  // ヘッダー行のみ
+            endRowIndex: 1,
             startColumnIndex: startColIndex,
             endColumnIndex: endColIndex + 1,
           },

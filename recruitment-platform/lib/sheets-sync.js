@@ -6,19 +6,26 @@
 //   pullFromSheets: スプレッドシート → DB（IDで突合し対応状況等を更新）
 // ─────────────────────────────────────────────────────────────
 
-// 架電リスト用の列定義（先頭にIDを置き、行を一意に突合する結合キーにする）
-const SHEET_HEADERS = ['ID', '媒体', '会社', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', '重複', 'メモ'];
-const SHEET_COL = { id: 0, callCount: 16, status: 17, notes: 20 };
+// 架電リスト用の列定義
+// B列（index 1）を重複情報欄とし、スプレッドシートの先頭で視覚的に確認できるようにする。
+// 重複の種類:
+//   過去応募  … 過去に応募してアーカイブ済みのレコードが存在する（最終対応日・状況を表示）
+//   直近重複  … 今回のプッシュ対象（アクティブ）に同一電話/メールが複数存在する
+const SHEET_HEADERS = ['ID', '重複', '媒体', '会社', '名前', '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地', '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日', '架電回数', '対応状況', '最終架電日', 'メモ'];
+const SHEET_COL = { id: 0, dupInfo: 1, callCount: 17, status: 18, notes: 20 };
+// 旧レイアウト（重複がT列=index19）の退避用インデックス
+const OLD_SHEET_COL = { id: 0, callCount: 16, status: 17, notes: 20 };
 
-function applicantToSheetRow(a, mediaLabel, companyLabel) {
+function applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo = '') {
   return [
-    a.id, mediaLabel(a.media), companyLabel ? companyLabel(a.company) : (a.company || ''),
+    a.id, dupInfo,
+    mediaLabel(a.media), companyLabel ? companyLabel(a.company) : (a.company || ''),
     a.name || '', a.phone || '', a.email || '',
     a.gender || '', a.birth_date || '', String(a.age || ''), a.address || '',
     a.current_job || '', a.job_title || '', a.experience || '', a.education || '', a.work_location || '',
     (a.applied_at || '').slice(0, 10),
     String(a.call_count || 0), a.status || '', (a.last_called_at || '').slice(0, 10),
-    a.is_duplicate ? '重複' : '', (a.notes || '').replace(/[\r\n]+/g, ' '),
+    (a.notes || '').replace(/[\r\n]+/g, ' '),
   ].map(v => v == null ? '' : String(v));
 }
 
@@ -33,26 +40,66 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   };
   let count = 0, tabs = 0;
   const warnings = [];
-  // 全員をシートに反映（対応状況に関わらず除外しない）。過去応募移動は管理画面の手動操作で行う。
+  // 全員をシートに反映（重複・過去応募に関わらず除外しない）
   for (const co of companies) {
-    const list = (await Ops.listCalls({ company: co.id, archived: false, excludeDuplicate: true }));
+    const { db } = require('../db');
+    const list = (await Ops.listCalls({ company: co.id, archived: false }));
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
 
-    // 既存シートから手入力済みの架電結果（ID→{callCount,status,notes}）を退避し、
-    // 組み直しても記入内容を失わないようにする。
-    // ヘッダ行の列数が現行レイアウトと一致する場合のみ退避する（列追加後のずれ防止）
+    // 既存シートから手入力済みの架電結果（ID→{callCount,status,notes}）を退避。
+    // 新レイアウト（B列=重複）と旧レイアウト（B列=媒体）の両方を識別して対応する。
     const existing = await gsheets.readValues(title);
     const prior = new Map();
     const existingHeader = existing[0] || [];
-    // 列数が増減しても、ID列(0)があり会社列(2)='会社'なら現行レイアウトとみなして退避する
-    const layoutMatches = existingHeader[0] === 'ID' && existingHeader[2] === '会社' && existingHeader[SHEET_COL.status] === '対応状況';
-    if (layoutMatches) {
+    const isNewLayout = existingHeader[0] === 'ID' && existingHeader[1] === '重複';
+    const isOldLayout = existingHeader[0] === 'ID' && existingHeader[2] === '会社';
+    const pc = isNewLayout ? SHEET_COL : OLD_SHEET_COL; // prior読み取りに使うインデックス
+    if (isNewLayout || isOldLayout) {
       for (const row of existing.slice(1)) {
-        const id = row[SHEET_COL.id];
-        if (id) prior.set(id, { callCount: row[SHEET_COL.callCount], status: row[SHEET_COL.status], notes: row[SHEET_COL.notes] });
+        const id = row[pc.id];
+        if (id) prior.set(id, { callCount: row[pc.callCount], status: row[pc.status], notes: row[pc.notes] });
       }
     }
+
+    // ── 重複検出 ──────────────────────────────────────────────
+    // ① 直近重複: 今回プッシュ対象の中に同一電話/メールが複数いる
+    const phoneCount = new Map(); // normalized_phone → [id, ...]
+    const emailCount = new Map(); // normalized_email → [id, ...]
+    for (const a of list) {
+      if (a.normalized_phone) {
+        if (!phoneCount.has(a.normalized_phone)) phoneCount.set(a.normalized_phone, []);
+        phoneCount.get(a.normalized_phone).push(a.id);
+      }
+      if (a.normalized_email) {
+        if (!emailCount.has(a.normalized_email)) emailCount.set(a.normalized_email, []);
+        emailCount.get(a.normalized_email).push(a.id);
+      }
+    }
+    // ② 過去応募: 同一電話/メールのアーカイブ済みレコードが存在する
+    const buildDupInfo = (a) => {
+      const parts = [];
+      // 直近重複チェック
+      const pIds = (a.normalized_phone && phoneCount.get(a.normalized_phone)) || [];
+      const eIds = (a.normalized_email && emailCount.get(a.normalized_email)) || [];
+      const allIds = [...new Set([...pIds, ...eIds])];
+      const recentCount = allIds.filter(id => id !== a.id).length;
+      if (recentCount > 0) parts.push(`直近重複 ${recentCount + 1}件`);
+      // 過去応募チェック（アーカイブ済みレコードを検索）
+      let pastRow = null;
+      if (a.normalized_phone) {
+        pastRow = db.prepare(`SELECT status, last_called_at, updated_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_phone);
+      }
+      if (!pastRow && a.normalized_email) {
+        pastRow = db.prepare(`SELECT status, last_called_at, updated_at FROM applicants WHERE normalized_email=? AND normalized_email!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_email);
+      }
+      if (pastRow) {
+        const date = (pastRow.last_called_at || pastRow.updated_at || '').slice(0, 10);
+        parts.push(`過去応募 最終対応:${date} (${pastRow.status})`);
+      }
+      return parts.join(' / ');
+    };
+    // ──────────────────────────────────────────────────────────
 
     // 媒体ごとにグルーピング（未知の媒体は「その他」へ）
     const groups = new Map();
@@ -71,12 +118,13 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       if (!grp || !grp.length) continue;
       const label = key === '__other__' ? 'その他・媒体未設定' : mediaLabel(key);
       const sec = new Array(SHEET_HEADERS.length).fill('');
-      sec[1] = `▼ ${label}（${grp.length}件）`;   // 見出しはID列(A)を空にして取込でスキップさせる
-      sectionRowIdx.push(rows.length);               // 0始まりの行インデックス
+      sec[2] = `▼ ${label}（${grp.length}件）`;  // 媒体見出し（B列=重複を避けてC列に）
+      sectionRowIdx.push(rows.length);
       rows.push(sec);
       for (const a of grp) {
-        const row = applicantToSheetRow(a, mediaLabel, companyLabel);
-        const p = prior.get(a.id);                   // 手入力済みの架電結果を優先（取込前の編集を保持）
+        const dupInfo = buildDupInfo(a);
+        const row = applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo);
+        const p = prior.get(a.id);  // 手入力済みの架電結果を優先
         if (p) {
           if (p.callCount !== undefined && p.callCount !== '') row[SHEET_COL.callCount] = String(p.callCount);
           if (p.status) row[SHEET_COL.status] = p.status;
@@ -103,9 +151,9 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     // 書式・プルダウンは毎回（冪等）適用。失敗してもデータ反映は止めず警告に。
     try {
       await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
-      // Q〜U列（index16〜20: 架電回数・対応状況・最終架電日・重複・メモ）を薄い黄色に
+      // R〜U列（index17〜20: 架電回数・対応状況・最終架電日・メモ）のヘッダー行のみ薄い黄色に
       if (gsheets.setColumnBackground) {
-        await gsheets.setColumnBackground(props.sheetId, 16, 20,
+        await gsheets.setColumnBackground(props.sheetId, SHEET_COL.callCount, SHEET_COL.notes,
           { red: 1, green: 0.992, blue: 0.906 }); // #fffde7
       }
       // 過去レイアウトの余分なプルダウン（応募日列など）を一度全クリアしてから必要な列だけ再設定
@@ -113,8 +161,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         await gsheets.clearDataValidations(props.sheetId);
       }
       await gsheets.setDropdowns(props.sheetId, [
-        { colIndex: SHEET_COL.callCount, list: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] },
-        { colIndex: SHEET_COL.status, list: ['新規', '不通', '対応中', '終了'] },
+        { colIndex: SHEET_COL.callCount, list: ['1','2','3','4','5','6','7','8','9','10'] },
+        { colIndex: SHEET_COL.status,    list: ['新規','不通','対応中','終了'] },
       ]);
       if (sectionRowIdx.length && gsheets.styleSectionRows) {
         await gsheets.styleSectionRows(props.sheetId, sectionRowIdx, SHEET_HEADERS.length);

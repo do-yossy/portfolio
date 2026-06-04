@@ -792,17 +792,8 @@ const server = http.createServer(async (req, res) => {
     if (!body.name || !body.phone || !body.email) {
       sendError(res, 400, '氏名・電話・メールは必須です'); return;
     }
-    const dupInfo = Applicants.findDuplicateInfo
-      ? Applicants.findDuplicateInfo(
-          normalizePhone(body.phone || ''),
-          normalizeEmail(body.email || '')
-        )
-      : { id: await checkDuplicate(body), isReturning: false };
     const applicant = await Applicants.create({
       ...body,
-      isDuplicate: dupInfo && !dupInfo.isReturning ? true : false,
-      duplicateOfId: dupInfo && !dupInfo.isReturning ? dupInfo.id : null,
-      returningFromId: dupInfo && dupInfo.isReturning ? dupInfo.id : null,
       status: '新規',
       sourceMedia: body.sourceMedia || 'direct',
       media: body.media || 'google',
@@ -821,7 +812,7 @@ const server = http.createServer(async (req, res) => {
     // Fire-and-forget email notifications (don't block response)
     sendApplicationThanks(applicant, jobTitle).catch(() => {});
     sendNewApplicantAlert({ ...applicant, sourceMedia: applicant.source_media, media: applicant.media }, jobTitle).catch(() => {});
-    sendJSON(res, 201, { ok: true, id: applicant.id, isDuplicate: !!(dupInfo && !dupInfo.isReturning) });
+    sendJSON(res, 201, { ok: true, id: applicant.id });
     return;
   }
 
@@ -1324,12 +1315,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       const nPhone = normalizePhone(mapped.phone);
       const nEmail = normalizeEmail(mapped.email);
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
-      if (dupId) {
-        duplicates++;
-        // 重複は記録しつつ重複フラグを立てて取り込む（架電対象外にする）
-        await Applicants.create({ ...mapped, isImported: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
-        continue;
-      }
+      if (dupId) duplicates++;
       await Applicants.create({ ...mapped, isImported: 1 });
       imported++;
     }
@@ -1664,12 +1650,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         continue;
       }
       const dupId = await checkDuplicate(mapped);
-      await Applicants.create({
-        ...mapped,
-        isDuplicate: !!dupId,
-        duplicateOfId: dupId,
-        status: dupId ? '重複' : (mapped.status || '新規')
-      });
+      await Applicants.create({ ...mapped, status: mapped.status || '新規' });
       if (dupId) duplicates++; else imported++;
     }
     await Logs.create('csv_import', 'success', `CSV取込: ${imported}件新規, ${duplicates}件重複, ${skipped}件スキップ`);
@@ -1784,7 +1765,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       let count = 0;
       for (const s of samples) {
         const dup = await checkDuplicate(s);
-        await Applicants.create({ ...s, isDuplicate: !!dup, duplicateOfId: dup, status: dup ? '重複' : '新規' });
+        await Applicants.create({ ...s, status: '新規' });
         count++;
         sseSend(res, { message: `✅ 取得: ${s.name}（${s.phone}）`, type: 'success' });
         await new Promise(r => setTimeout(r, 300));
@@ -1814,7 +1795,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
             sseSend(res, { message: obj.message, type: obj.level || 'info' });
           } else if (obj.type === 'applicant') {
             const dup = await checkDuplicate(obj.data);
-            await Applicants.create({ ...obj.data, sourceMedia: 'Indeed', isDuplicate: !!dup, duplicateOfId: dup, status: dup ? '重複' : '新規' });
+            await Applicants.create({ ...obj.data, sourceMedia: 'Indeed', status: '新規' });
             count++;
             sseSend(res, { message: `✅ 取得: ${obj.data.name}（${obj.data.phone}）`, type: 'success' });
           }
