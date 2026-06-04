@@ -1536,9 +1536,11 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       `<a href="${baseHref(c, media)}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`)
   ].join('');
 
-  const mediaTabs = OPS_MEDIA.map(m =>
-    `<a href="${isAll ? `/admin/calls?co=all&media=${m.id}` : baseHref(co, m.id)}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`
-  ).join('');
+  const mediaTabs = [
+    `<a href="${baseHref(isAll ? 'all' : co, 'all')}" class="call-media-tab ${media === 'all' ? 'active' : ''}">すべての媒体</a>`,
+    ...OPS_MEDIA.map(m =>
+      `<a href="${baseHref(isAll ? 'all' : co, m.id)}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`),
+  ].join('');
 
   const countOpts = n => Array.from({ length: 11 }, (_, i) =>
     `<option value="${i}"${i === (n || 0) ? ' selected' : ''}>${i}</option>`).join('');
@@ -1547,13 +1549,16 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
   const statusFilterOpts = [{ v: 'all', l: '全ての対応状況' }, ...CALL_STATUSES_LIST.map(s => ({ v: s, l: s }))].map(o =>
     `<option value="${o.v}"${o.v === statusFilter ? ' selected' : ''}>${o.l}</option>`).join('');
 
-  // 全社まとめ時は会社列を追加
-  const NCOLS = isAll ? 18 : 17;
+  // 全社まとめ時は会社列、全媒体表示時は媒体列を追加
+  const showMedia = media === 'all';
+  const NCOLS = 17 + (isAll ? 1 : 0) + (showMedia ? 1 : 0);
   const coCell = a => isAll ? `<td style="white-space:nowrap;font-size:12px"><span style="display:inline-block;background:${COMPANIES[a.company]?.color || '#94a3b8'};color:#fff;padding:1px 6px;border-radius:4px">${companyName(a.company)}</span></td>` : '';
+  const mediaCell = a => showMedia ? `<td style="white-space:nowrap;font-size:12px">${esc(mediaName(a.media))}</td>` : '';
   const rows = applicants.length ? applicants.map((a, i) => `
     <tr data-id="${esc(a.id)}" data-status="${esc(a.status || '')}" style="background:${(CALL_STATUS_COLORS[a.status] || '#fff')}15">
       <td class="num">${i + 1}</td>
       ${coCell(a)}
+      ${mediaCell(a)}
       <td class="name-col">${esc(a.name || '')}${a.is_duplicate ? ` <span class="dup-badge" onclick="showDupInfo('${esc(a.id)}')" style="cursor:pointer" title="重複元を見る">重複</span>` : ''}${a.returning_from_id ? ` <span style="background:#e0f2fe;color:#0369a1;font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer" onclick="showReturningInfo('${esc(a.id)}')" title="前回応募を見る">再応募</span>` : ''}</td>
       <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
       <td>${esc(a.email || '')}</td>
@@ -1605,7 +1610,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       <div class="table-scroll">
         <table class="data-table calls-table" id="calls-table">
           <thead><tr>
-            <th class="num">#</th>${isAll ? '<th>会社</th>' : ''}<th class="name-col">名前</th><th>電話番号</th><th>メール</th>
+            <th class="num">#</th>${isAll ? '<th>会社</th>' : ''}${showMedia ? '<th>媒体</th>' : ''}<th class="name-col">名前</th><th>電話番号</th><th>メール</th>
             <th>性別</th><th>生年月日</th><th>年齢</th><th>居住地</th>
             <th>現在の職業</th><th>求人タイトル</th><th>経験</th><th>学歴</th>
             <th>応募日</th><th>架電回数</th><th>対応状況</th><th>最終架電</th><th>メモ</th>
@@ -1679,6 +1684,6 @@ function callImportModalHtml(co, media) {
 // 運用テンプレ用のヘルパ定数
 const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx'];
 const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
-function mediaName(id) { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
+function mediaName(id) { if (id === 'all') return 'すべての媒体'; const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
 module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, privacyPolicyPage, esc, opsPage, callsPage };
