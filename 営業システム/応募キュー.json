@@ -1,0 +1,22 @@
+[
+  {
+    "id": "EX-Q1",
+    "example": true,
+    "date": "2026-06-04",
+    "channel": "lancers",
+    "title": "【見本】カフェの新規LP制作（1ページ・スマホ対応）",
+    "industry": "飲食",
+    "type": "LP",
+    "budget": 50000,
+    "proposed_price": 50000,
+    "est_hours": 6,
+    "score": 78,
+    "priority": "S",
+    "pred_win_rate": 62,
+    "template": "A",
+    "url": "https://www.lancers.jp/work/detail/0000000",
+    "demo_url": "https://do-yossy.github.io/portfolio/カフェLP.html",
+    "proposal": "（ここにAIが生成した送信用提案文が入ります。これは書式確認用の見本です。「見本も表示」をONにすると表示されます。）",
+    "notes": "見本データ。実データ投入時は example を外す。"
+  }
+]
