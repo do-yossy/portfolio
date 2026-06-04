@@ -32,7 +32,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   // 対応終了・断られた・辞退は除外（バックログ含む全員は表示）
   const SKIP_STATUSES = new Set(['対応終了', '断られた', '辞退']);
   for (const co of companies) {
-    const list = (await Ops.listCalls({ company: co.id, excludeDuplicate: true }))
+    const list = (await Ops.listCalls({ company: co.id, archived: false, excludeDuplicate: true }))
       .filter(a => !SKIP_STATUSES.has(a.status));
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
