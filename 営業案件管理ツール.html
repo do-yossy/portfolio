@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>営業案件管理ツール — スコアリング・見積もり・提案文生成</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a;
+  --accent:#4f8ef7; --accent2:#7c5cbf; --gold:#f0b429; --green:#2dd4a0; --red:#f87171;
+  --text:#e8eaf0; --text2:#9ca3b8; --border:rgba(255,255,255,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-weight:300;line-height:1.7;font-size:14px;padding:1.5rem 1rem 4rem}
+.wrap{max-width:920px;margin:0 auto}
+.page-header{text-align:center;padding:2rem 0 1.5rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.page-header h1{font-size:1.5rem;font-weight:700;letter-spacing:.08em}
+.page-header p{color:var(--text2);font-size:.8rem;letter-spacing:.12em;margin-top:.4rem}
+.tabs{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.tab-btn{flex:1;min-width:140px;padding:.7rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-family:inherit;font-size:.85rem;font-weight:500;cursor:pointer;transition:all .2s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{background:rgba(79,142,247,.12);border-color:var(--accent);color:var(--accent)}
+.panel{display:none}
+.panel.active{display:block;animation:fade .3s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.4rem;margin-bottom:1rem}
+.card-title{font-size:.72rem;font-weight:700;color:var(--gold);letter-spacing:.12em;margin-bottom:1rem;text-transform:uppercase}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.8rem;color:var(--text2);margin-bottom:.4rem}
+input[type=text],input[type=number],select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.85rem;padding:.6rem .7rem}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:240px;line-height:1.8}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.check-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.check{display:flex;align-items:flex-start;gap:.5rem;font-size:.8rem;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.55rem .6rem;cursor:pointer}
+.check input{margin-top:3px;flex-shrink:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.75rem 1.4rem;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s}
+.btn:hover{background:#3d7be0;transform:translateY(-1px)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{border-color:var(--accent2);color:var(--accent2);background:transparent}
+.result{margin-top:1rem;display:none}
+.result.show{display:block}
+.score-head{display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem}
+.score-num{font-size:2.6rem;font-weight:700;line-height:1}
+.badge{display:inline-block;padding:.3rem .9rem;border-radius:99px;font-size:.78rem;font-weight:700;letter-spacing:.08em}
+.b-s{background:rgba(45,212,160,.15);color:var(--green)}
+.b-a{background:rgba(79,142,247,.15);color:var(--accent)}
+.b-b{background:rgba(240,180,41,.15);color:var(--gold)}
+.b-x{background:rgba(248,113,113,.15);color:var(--red)}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin:1rem 0}
+.metric{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.7rem;text-align:center}
+.metric .v{font-size:1.1rem;font-weight:700;color:var(--text)}
+.metric .l{font-size:.66rem;color:var(--text2);margin-top:.2rem}
+.outbox{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:.82rem;white-space:pre-wrap;line-height:1.9;color:var(--text)}
+.note{font-size:.74rem;color:var(--text2);margin-top:.5rem}
+.warn{color:var(--red)}
+.ok{color:var(--green)}
+.row-out{display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.85rem}
+.row-out:last-child{border-bottom:none}
+.row-out strong{color:var(--text);font-weight:700}
+.row-out.total strong{color:var(--gold);font-size:1.05rem}
+@media(max-width:640px){.grid-2,.check-grid,.metrics{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-header">
+    <h1>営業案件管理ツール</h1>
+    <p>案件スコアリング ・ 見積もり ・ 提案文生成　|　半自動化Web制作事業</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="score">① 案件スコアリング</button>
+    <button class="tab-btn" data-tab="quote">② 見積もり計算</button>
+    <button class="tab-btn" data-tab="proposal">③ 提案文生成</button>
+  </div>
+
+  <!-- ① スコアリング -->
+  <div class="panel active" id="score">
+    <div class="card">
+      <div class="card-title">案件情報の入力</div>
+      <div class="field"><label>案件名</label><input type="text" id="s_name" placeholder="例：美容サロン向けLP制作"></div>
+      <div class="grid-2">
+        <div class="field"><label>提示予算（円・税別）</label><input type="number" id="s_budget" value="120000" step="10000"></div>
+        <div class="field"><label>想定工数（時間）</label><input type="number" id="s_hours" value="20" step="1"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>媒体（手数料計算用）</label>
+          <select id="s_media"><option value="cw">クラウドワークス</option><option value="lancers">ランサーズ</option><option value="cwtech">CWテック（直請け・0%）</option></select></div>
+        <div class="field"><label>② テンプレ流用可能性</label>
+          <select id="s_tmpl"><option value="20">直マッチ（ほぼ流用で納品可）</option><option value="12">一部流用（5〜7割）</option><option value="4">ほぼ新規</option></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>③ 仕様の明確さ</label>
+          <select id="s_spec"><option value="20">明確（参考サイト＋ページ数＋機能）</option><option value="10">一部のみ</option><option value="2">曖昧</option></select></div>
+        <div class="field"><label>④ 継続・保守の見込み</label>
+          <select id="s_cont"><option value="15">高（更新前提/法人/複数フェーズ）</option><option value="8">中</option><option value="3">単発</option></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>⑤ 競合の少なさ × 募集人数</label>
+          <select id="s_comp"><option value="10">競合少＋複数採用</option><option value="5">普通</option><option value="2">競合多 or 1名のみ</option></select></div>
+        <div class="field"><label>⑥ 締切の近さ</label>
+          <select id="s_dead"><option value="10">適度に近い</option><option value="6">普通</option><option value="3">遠い/未定</option></select></div>
+      </div>
+      <div class="field"><label>除外フラグ（該当するものをチェック）</label>
+        <div class="check-grid">
+          <label class="check"><input type="checkbox" data-pen="15" id="f_rev">修正回数の上限・追加費用条項が無い「納得いくまで」系（−15）</label>
+          <label class="check"><input type="checkbox" data-pen="15" id="f_undef">仕様未確定でヒアリングにも応じない（−15）</label>
+          <label class="check"><input type="checkbox" data-pen="15" id="f_over">予算に対し機能過多（要求過多）（−15）</label>
+          <label class="check"><input type="checkbox" data-pen="20" id="f_short">短納期 × 高工数（テンプレ流用不可×3日以内 等）（−20）</label>
+          <label class="check"><input type="checkbox" data-rej="1" id="f_low">極端な低単価（−即見送り）</label>
+          <label class="check"><input type="checkbox" data-rej="1" id="f_risk">契約リスク（著作権/偽装請負/前金不可）（−即見送り）</label>
+        </div>
+      </div>
+      <button class="btn" onclick="runScore()">スコアを計算</button>
+    </div>
+
+    <div class="card result" id="s_result">
+      <div class="score-head">
+        <div class="score-num" id="s_scoreNum">0</div>
+        <div><div id="s_badge" class="badge b-b">—</div><div class="note" id="s_decision"></div></div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="v" id="m_rate">—</div><div class="l">推定受注率</div></div>
+        <div class="metric"><div class="v" id="m_profit">—</div><div class="l">想定利益率</div></div>
+        <div class="metric"><div class="v" id="m_wage">—</div><div class="l">実効時給</div></div>
+        <div class="metric"><div class="v" id="m_net">—</div><div class="l">受取額</div></div>
+      </div>
+      <div class="outbox" id="s_out"></div>
+    </div>
+  </div>
+
+  <!-- ② 見積もり -->
+  <div class="panel" id="quote">
+    <div class="card">
+      <div class="card-title">見積もり条件</div>
+      <div class="grid-2">
+        <div class="field"><label>ベースプラン</label>
+          <select id="q_plan">
+            <option value="50000">ライト（LP・1ページ）¥50,000</option>
+            <option value="120000" selected>スタンダード（5〜10p＋フォーム）¥120,000</option>
+            <option value="250000">プレミアム（コーポ＋CMS）¥250,000</option>
+            <option value="200000">システム（予約/在庫/勤怠）¥200,000〜</option>
+            <option value="400000">アプリ（iOS/Android）¥400,000〜</option>
+          </select></div>
+        <div class="field"><label>媒体（手数料）</label>
+          <select id="q_media"><option value="cw">クラウドワークス</option><option value="lancers">ランサーズ</option><option value="cwtech">CWテック（0%）</option></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>追加ページ数（×¥15,000）</label><input type="number" id="q_addpage" value="0" min="0"></div>
+        <div class="field"><label>ライティング ページ数（×¥8,000）</label><input type="number" id="q_write" value="0" min="0"></div>
+      </div>
+      <div class="field"><label>バナー点数（×¥4,000）</label><input type="number" id="q_banner" value="0" min="0"></div>
+      <div class="field"><label>オプション</label>
+        <div class="check-grid">
+          <label class="check"><input type="checkbox" data-amt="40000" id="o_cms">CMS導入（¥40,000）</label>
+          <label class="check"><input type="checkbox" data-amt="25000" id="o_form">予約フォーム（¥25,000）</label>
+          <label class="check"><input type="checkbox" data-amt="15000" id="o_seo">SEO基本対策（¥15,000）</label>
+          <label class="check"><input type="checkbox" data-amt="25000" id="o_logo">ロゴ制作（¥25,000）</label>
+          <label class="check"><input type="checkbox" data-amt="8000" id="o_srv">サーバー・ドメイン代行（¥8,000）</label>
+          <label class="check"><input type="checkbox" id="o_rush">特急対応（小計の +20%）</label>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>想定工数（時間）</label><input type="number" id="q_hours" value="20"></div>
+        <div class="field"><label>直接コスト（外注/素材・円）</label><input type="number" id="q_cost" value="0"></div>
+      </div>
+      <div class="field"><label>提案する保守プラン</label>
+        <select id="q_maint"><option value="0">提案しない</option><option value="10000">ライト ¥10,000/月</option><option value="20000">スタンダード ¥20,000/月</option><option value="40000">プレミアム ¥40,000/月</option></select></div>
+      <button class="btn" onclick="runQuote()">見積もりを計算</button>
+    </div>
+
+    <div class="card result" id="q_result">
+      <div class="card-title">見積もり結果（税別・概算）</div>
+      <div id="q_rows"></div>
+      <div class="note" id="q_check" style="margin-top:.8rem"></div>
+    </div>
+  </div>
+
+  <!-- ③ 提案文 -->
+  <div class="panel" id="proposal">
+    <div class="card">
+      <div class="card-title">提案文の変数入力</div>
+      <div class="grid-2">
+        <div class="field"><label>テンプレタイプ</label>
+          <select id="p_type"><option value="A">A：LP制作</option><option value="B">B：コーポレート/士業</option><option value="C">C：EC/システム</option><option value="D">D：AI活用ツール</option></select></div>
+        <div class="field"><label>案件名（相手の募集タイトルを引用）</label><input type="text" id="p_name" placeholder="例：飲食店向けLP制作"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>業種</label><input type="text" id="p_industry" placeholder="例：カフェ"></div>
+        <div class="field"><label>目的</label><input type="text" id="p_goal" placeholder="例：来店予約の増加"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>金額（税別）</label><input type="text" id="p_price" placeholder="例：50,000"></div>
+        <div class="field"><label>納期</label><input type="text" id="p_due" placeholder="例：1週間"></div>
+      </div>
+      <div class="field"><label>ポートフォリオURL</label><input type="text" id="p_url" placeholder="例：https://.../カフェLP.html"></div>
+      <div class="field"><label>具体提案1</label><input type="text" id="p_p1" placeholder="例：限定メニューを主役にした写真訴求"></div>
+      <div class="field"><label>具体提案2</label><input type="text" id="p_p2" placeholder="例：スマホで1タップ予約導線"></div>
+      <div class="field"><label>具体提案3</label><input type="text" id="p_p3" placeholder="例：Googleマップ・SNS連携"></div>
+      <button class="btn" onclick="runProposal()">提案文を生成</button>
+      <button class="btn btn-ghost" onclick="copyProposal()" style="margin-left:.5rem">コピー</button>
+    </div>
+    <div class="card result" id="p_result">
+      <div class="card-title">生成された提案文</div>
+      <textarea id="p_out" readonly></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+const $ = id => document.getElementById(id);
+
+// 媒体手数料
+function mediaFee(amount, media){
+  if(media==='cwtech') return 0;
+  if(media==='lancers') return Math.round(amount*0.165);
+  let fee = Math.min(amount,100000)*0.20;            // 〜10万 20%
+  if(amount>100000) fee += Math.min(amount-100000,100000)*0.10; // 10〜20万 10%
+  if(amount>200000) fee += (amount-200000)*0.05;      // 20万超 5%
+  return Math.round(fee);
+}
+
+// タブ切替
+document.querySelectorAll('.tab-btn').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    $(b.dataset.tab).classList.add('active');
+  };
+});
+
+// ① スコアリング
+function budgetPts(b){ if(b>=250000)return 25; if(b>=120000)return 18; if(b>=50000)return 10; return 3; }
+
+function runScore(){
+  const budget = +$('s_budget').value||0;
+  const hours  = Math.max(+$('s_hours').value||1,1);
+  const media  = $('s_media').value;
+  let total = budgetPts(budget)
+            + (+$('s_tmpl').value) + (+$('s_spec').value) + (+$('s_cont').value)
+            + (+$('s_comp').value) + (+$('s_dead').value);
+
+  let penalty=0, rejected=false;
+  document.querySelectorAll('#score [data-pen]').forEach(c=>{ if(c.checked) penalty+=(+c.dataset.pen); });
+  document.querySelectorAll('#score [data-rej]').forEach(c=>{ if(c.checked) rejected=true; });
+  total = Math.max(0, Math.min(100, total - penalty));
+
+  const net  = budget - mediaFee(budget, media);
+  const wage = net / hours;
+  const lowWage = wage < 4000;
+
+  // 優先度判定
+  let prio,badgeCls,decision,apply;
+  if(rejected){ prio='見送り'; badgeCls='b-x'; apply=false; decision='除外フラグ該当 → 応募しない'; }
+  else if(total>=75){ prio='S'; badgeCls='b-s'; apply=true; decision='即応募（提案文A系・実績＋具体提案フル版）'; }
+  else if(total>=55){ prio='A'; badgeCls='b-a'; apply=true; decision='応募（テンプレ流用前提・工数管理を明記）'; }
+  else if(total>=40){ prio='B'; badgeCls='b-b'; apply=false; decision='不足情報をヒアリング（03）してから再判定'; }
+  else { prio='見送り'; badgeCls='b-x'; apply=false; decision='スコア不足 → 応募しない'; }
+  if(lowWage && apply){ decision += '　※実効時給が¥4,000未満：スコープ調整 or 見送り検討'; }
+
+  // 推定受注率（スコアと競合状況の簡易関数）
+  const rate = Math.max(5, Math.min(85, Math.round(total*0.8)));
+  // 想定利益率（受取に対する粗利＝1−時間原価率, 原価=工数×¥3,000の機会費用）
+  const profit = net>0 ? Math.max(0, Math.round((1 - (hours*3000)/net)*100)) : 0;
+
+  $('s_scoreNum').textContent = total;
+  const badge=$('s_badge'); badge.className='badge '+badgeCls; badge.textContent='優先度 '+prio;
+  $('s_decision').textContent = decision;
+  $('m_rate').textContent = rate+'%';
+  $('m_profit').textContent = profit+'%';
+  $('m_wage').textContent = yen(wage);
+  $('m_wage').className = 'v ' + (lowWage?'warn':'ok');
+  $('m_net').textContent = yen(net);
+
+  $('s_out').textContent =
+`【案件分析】
+案件名：${$('s_name').value||'（未入力）'}
+推定受注率：${rate}%
+利益率（想定）：${profit}%
+工数（想定）：${hours}h
+継続可能性：${(+$('s_cont').value)>=15?'高':(+$('s_cont').value)>=8?'中':'低'}
+スコア：${total}/100（優先度 ${prio}）
+
+【応募判断】${apply?'応募する':'応募しない'}
+【理由】加点 ${total+penalty}点 − 減点 ${penalty}点 = ${total}点${rejected?'／除外フラグ該当':''}。実効時給 ${yen(wage)}（媒体手数料 ${yen(mediaFee(budget,media))}）。
+【次アクション】${apply?'02テンプレートから提案文を生成 → 24時間以内に応募':'見送り理由を記録して学習に回す'}`;
+
+  $('s_result').classList.add('show');
+}
+
+// ② 見積もり
+function runQuote(){
+  const base = +$('q_plan').value;
+  const media = $('q_media').value;
+  let optsum = (+$('q_addpage').value||0)*15000
+             + (+$('q_write').value||0)*8000
+             + (+$('q_banner').value||0)*4000;
+  document.querySelectorAll('#quote [data-amt]').forEach(c=>{ if(c.checked) optsum+=(+c.dataset.amt); });
+
+  let subtotal = base + optsum;
+  const rush = $('o_rush').checked;
+  const total = rush ? Math.round(subtotal*1.2) : subtotal;
+  const fee = mediaFee(total, media);
+  const net = total - fee;
+  const hours = Math.max(+$('q_hours').value||1,1);
+  const cost = +$('q_cost').value||0;
+  const wage = net/hours;
+  const profit = Math.round(((net - cost)/total)*100);
+  const maint = +$('q_maint').value;
+
+  const r=[];
+  r.push(['ベースプラン', yen(base)]);
+  if(optsum>0) r.push(['オプション小計', yen(optsum)]);
+  if(rush) r.push(['特急対応 +20%', yen(total-subtotal)]);
+  r.push(['受注額（税別）', yen(total), 'total']);
+  r.push([media==='cwtech'?'手数料（0%）':'媒体手数料', '−'+yen(fee)]);
+  r.push(['受取額', yen(net)]);
+  r.push(['実効時給（受取÷工数）', yen(wage)]);
+  r.push(['想定利益率', profit+'%']);
+  if(maint>0) r.push(['＋ 保守（継続収益）', yen(maint)+' /月']);
+
+  $('q_rows').innerHTML = r.map(x=>
+    `<div class="row-out ${x[2]||''}"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join('');
+
+  const wageOk = wage>=4000, profitOk = profit>=50;
+  $('q_check').innerHTML =
+    `判定：実効時給 <span class="${wageOk?'ok':'warn'}">${yen(wage)}${wageOk?' ✓':' （¥4,000未満）'}</span> ／ `+
+    `利益率 <span class="${profitOk?'ok':'warn'}">${profit}%${profitOk?' ✓':' （50%未満：スコープ調整推奨）'}</span>`+
+    (maint>0?`<br>年間保守換算：<span class="ok">${yen(maint*12)}</span> の継続収益が積み上がります。`:'');
+  $('q_result').classList.add('show');
+}
+
+// ③ 提案文
+const TPL = {
+A:`{案件名} を拝見しました。{業種}様向けのLP、ご提示の納期内で対応可能です。
+
+▼実績（同系統のLP）
+{ポートフォリオURL}
+
+▼ご提案
+・{目的}達成のため、ファーストビューで「{具体提案1}」を訴求
+・{具体提案2}（問い合わせ導線をスマホ最適化）
+・{具体提案3}
+
+▼料金・納期：¥{金額}（税別）／約{納期}
+▼強み：修正回数無制限・オンライン完結・ご連絡は24時間以内
+
+まず参考サイトをご共有頂ければ、構成案をお出しします。ご検討よろしくお願いいたします。`,
+B:`{案件名} を拝見しました。信頼感が成果に直結する{業種}様のサイト、得意領域です。
+
+▼実績（法律事務所サイト等）
+{ポートフォリオURL}
+
+▼ご提案
+・{具体提案1}（会社概要・実績・問い合わせの3導線を明確化）
+・スマホ最適化＋表示速度対策でSEOの土台を確保
+・{具体提案3}
+
+▼料金・納期：¥{金額}（税別）／約{納期}　※追加ページ¥15,000〜で拡張可
+▼強み：修正無制限・オンライン完結・24h返信
+
+ページ構成のたたき台をすぐお出しできます。よろしくお願いいたします。`,
+C:`{案件名} を拝見しました。{目的}を満たす{業種}向けシステム、実装経験があります。
+
+▼実績
+{ポートフォリオURL}
+
+▼ご提案
+・{具体提案1}（核となる機能）
+・{具体提案2}（運用負荷を下げる自動化／CSV出力）
+・段階リリースで{納期}内に主要機能を先行納品
+
+▼料金・納期：¥{金額}（税別）／{納期}（要件確定後に確定見積もり）
+▼強み：修正無制限・保守プラン（¥10,000〜/月）で納品後も安心
+
+要件の優先順位だけ伺えれば、MoSCoWで整理してお見積もりします。`,
+D:`{案件名} を拝見しました。Claude API等を用いた{目的}の自動化ツール、開発可能です。
+
+▼実績（AI文章添削ツール／AI面接ツール）
+{ポートフォリオURL}
+
+▼ご提案
+・{具体提案1}（スコアリング＋改善提案の自動生成）
+・{具体提案2}（既存業務フローへの組み込み）
+・PoC → 本実装の2段階でリスクを抑えて進行
+
+▼料金・納期：¥{金額}（税別）／{納期}
+▼強み：修正無制限・運用設計まで伴走
+
+実現したい出力イメージを1例頂ければ、精度の見立てをお返しします。`
+};
+
+function runProposal(){
+  let t = TPL[$('p_type').value];
+  const map = {
+    '案件名':$('p_name').value||'（案件名）',
+    '業種':$('p_industry').value||'御社',
+    '目的':$('p_goal').value||'目的',
+    '金額':$('p_price').value||'—',
+    '納期':$('p_due').value||'—',
+    'ポートフォリオURL':$('p_url').value||'（ポートフォリオURL）',
+    '具体提案1':$('p_p1').value||'（具体提案1）',
+    '具体提案2':$('p_p2').value||'（具体提案2）',
+    '具体提案3':$('p_p3').value||'（具体提案3）'
+  };
+  for(const k in map){ t = t.split('{'+k+'}').join(map[k]); }
+  $('p_out').value = t;
+  $('p_result').classList.add('show');
+}
+function copyProposal(){
+  const ta=$('p_out'); if(!ta.value){ runProposal(); }
+  ta.select(); document.execCommand('copy');
+  const b=event.target; const o=b.textContent; b.textContent='コピーしました ✓';
+  setTimeout(()=>b.textContent=o,1500);
+}
+</script>
+</body>
+</html>
