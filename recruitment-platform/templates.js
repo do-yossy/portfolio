@@ -1593,6 +1593,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
         <span style="width:1px;height:24px;background:#e2e8f0;margin:0 2px"></span>
         <button class="btn btn-ghost btn-sm" onclick="callImport()" title="各媒体のCSV/Excelを取り込む">⬆ CSV/Excel取込</button>
         <a href="${morningExportHref}" class="btn btn-ghost btn-sm" download>📞 朝の架電リスト(xlsx)</a>
+        <button class="btn btn-ghost btn-sm" onclick="callCheckDup()">♻️ 重複チェック</button>
       </div>
     </div>
     <div class="call-co-tabs">${companyTabs}</div>
