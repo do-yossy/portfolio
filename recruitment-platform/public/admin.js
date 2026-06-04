@@ -1059,7 +1059,7 @@ function callCheckDup() {
           <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px">
             <input type="checkbox" id="dup-check-all" style="width:15px;height:15px"> 全て選択
           </label>
-          <span style="font-size:12px;color:#94a3b8">チェックした応募者を架電リストから削除（過去応募へ移動）できます</span>
+          <span style="font-size:12px;color:#94a3b8">チェックした応募者をDBから削除できます（元に戻せません）</span>
         </div>
         <div style="max-height:55vh;overflow-y:auto">
           <table style="width:100%;border-collapse:collapse">
@@ -1075,7 +1075,7 @@ function callCheckDup() {
           </table>
         </div>
         <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
-          <button id="dup-archive-btn" style="padding:6px 18px;border:none;border-radius:6px;background:#f97316;color:#fff;cursor:pointer;font-weight:600">選択した応募者を過去応募へ移動</button>
+          <button id="dup-archive-btn" style="padding:6px 18px;border:none;border-radius:6px;background:#ef4444;color:#fff;cursor:pointer;font-weight:600">選択した応募者を削除</button>
           <button id="dup-close-btn2" style="padding:6px 18px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer">閉じる</button>
         </div>`;
 
@@ -1097,7 +1097,7 @@ function callCheckDup() {
           });
           const rd = await r.json();
           if (rd.ok) {
-            toast(`${rd.archived}件を過去応募へ移動しました`, 'success');
+            toast(`${rd.archived}件を削除しました`, 'success');
             // 移動済みの行を非表示
             ids.forEach(id => {
               const row = box.querySelector(`tr[data-dup-id="${id}"]`);

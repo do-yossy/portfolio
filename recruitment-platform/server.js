@@ -1528,20 +1528,15 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
-  // ── 重複応募者を過去応募へ移動（架電リストから削除）──
+  // ── 重複応募者を削除 ──
   if (pathname === '/api/ops/archive-dups' && method === 'POST') {
     const body = await parseJSON(req);
     const ids = Array.isArray(body.ids) ? body.ids : [];
     if (!ids.length) { sendJSON(res, 400, { ok: false, error: 'ids required' }); return; }
-    const ts = new Date().toISOString();
     let archived = 0;
     for (const id of ids) {
-      const a = Applicants.findById(id);
-      if (!a) continue;
-      // 同一人物の全レコードをまとめてアーカイブ
-      db.prepare(`UPDATE applicants SET is_archived=1, updated_at=? WHERE is_archived=0 AND (id=? OR (normalized_phone!='' AND normalized_phone=?) OR (normalized_email!='' AND normalized_email=?))`)
-        .run(ts, id, a.normalized_phone || '', a.normalized_email || '');
-      archived++;
+      const r = db.prepare(`DELETE FROM applicants WHERE id=?`).run(id);
+      if (r.changes) archived++;
     }
     sendJSON(res, 200, { ok: true, archived });
     return;
