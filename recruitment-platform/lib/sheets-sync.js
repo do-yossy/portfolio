@@ -76,16 +76,30 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         emailCount.get(a.normalized_email).push(a.id);
       }
     }
-    // ② 過去応募: 同一電話/メールのアーカイブ済みレコードが存在する
+    // listをid→レコードのMapに変換（直近重複の最終対応日参照用）
+    const listById = new Map(list.map(a => [a.id, a]));
+
     const buildDupInfo = (a) => {
       const parts = [];
-      // 直近重複チェック
+
+      // ① 直近重複: 今回プッシュ対象に同一電話/メールが複数存在する
       const pIds = (a.normalized_phone && phoneCount.get(a.normalized_phone)) || [];
       const eIds = (a.normalized_email && emailCount.get(a.normalized_email)) || [];
-      const allIds = [...new Set([...pIds, ...eIds])];
-      const recentCount = allIds.filter(id => id !== a.id).length;
-      if (recentCount > 0) parts.push(`直近重複 ${recentCount + 1}件`);
-      // 過去応募チェック（アーカイブ済みレコードを検索）
+      const otherIds = [...new Set([...pIds, ...eIds])].filter(id => id !== a.id);
+      if (otherIds.length > 0) {
+        // 直近の他レコードのうち最終架電日が最新のものを取得
+        let latestDate = '', latestStatus = '';
+        for (const oid of otherIds) {
+          const other = listById.get(oid);
+          if (!other) continue;
+          const d = other.last_called_at || other.updated_at || '';
+          if (d > latestDate) { latestDate = d; latestStatus = other.status; }
+        }
+        const datePart = latestDate ? ` 最終対応:${latestDate.slice(0, 10)} (${latestStatus})` : '';
+        parts.push(`直近重複 ${otherIds.length + 1}件${datePart}`);
+      }
+
+      // ② 過去応募: アーカイブ済みレコードが存在する
       let pastRow = null;
       if (a.normalized_phone) {
         pastRow = db.prepare(`SELECT status, last_called_at, updated_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_phone);
@@ -97,6 +111,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         const date = (pastRow.last_called_at || pastRow.updated_at || '').slice(0, 10);
         parts.push(`過去応募 最終対応:${date} (${pastRow.status})`);
       }
+
       return parts.join(' / ');
     };
     // ──────────────────────────────────────────────────────────
@@ -173,7 +188,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     // 対応状況の値に応じて「行全体」を着色（マスだけでなく行全体）
     if (gsheets.setStatusConditionalFormats) {
       try {
-        await gsheets.setStatusConditionalFormats(props.sheetId, SHEET_COL.status, SHEET_HEADERS.length);
+        await gsheets.setStatusConditionalFormats(props.sheetId, SHEET_COL.status, SHEET_HEADERS.length, SHEET_COL.dupInfo);
       } catch (e) { warnings.push(`${title}: 条件付き書式設定失敗 (${e.message || e})`); }
     }
     tabs++;

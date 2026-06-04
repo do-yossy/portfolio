@@ -254,9 +254,11 @@ async function styleSectionRows(tabSheetId, rowIndices, numCols) {
   await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests } });
 }
 
-// ステータス列の値に応じて「行全体」に色を付ける条件付き書式を設定。既存ルールをクリアして再設定。
-//   statusColIndex: 対応状況列の0始まりインデックス, numCols: 着色する列数（行全体に適用）
-async function setStatusConditionalFormats(tabSheetId, statusColIndex, numCols = 26) {
+// ステータス列・重複列の値に応じて「行全体」に色を付ける条件付き書式を設定。
+//   statusColIndex: 対応状況列の0始まりインデックス
+//   dupColIndex: 重複情報列の0始まりインデックス（指定時: 空でない行を赤で最優先着色）
+//   numCols: 着色する列数
+async function setStatusConditionalFormats(tabSheetId, statusColIndex, numCols = 26, dupColIndex = null) {
   // 既存の条件付き書式ルールを全削除してから再設定
   try {
     const meta = await api(`/${sheetId()}?fields=sheets(properties(sheetId),conditionalFormats)`);
@@ -268,26 +270,49 @@ async function setStatusConditionalFormats(tabSheetId, statusColIndex, numCols =
       await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests: delRequests } });
     }
   } catch {}
-  // 色ルール：不通=オレンジ, 対応中=黄色, 終了=水色（新規はデフォルト白）
-  const rules = [
-    { value: '不通',  red: 1,    green: 0.85, blue: 0.65 },
+
+  const requests = [];
+  let idx = 0;
+
+  // 重複列が空でない行 → 薄い赤（最優先 index:0）
+  if (dupColIndex !== null) {
+    const dupL = colLetter(dupColIndex);
+    requests.push({
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: numCols }],
+          booleanRule: {
+            condition: { type: 'CUSTOM_FORMULA', values: [{ userEnteredValue: `=$${dupL}2<>""` }] },
+            format: { backgroundColor: { red: 1, green: 0.8, blue: 0.8 } }, // 薄い赤
+          },
+        },
+        index: idx++,
+      },
+    });
+  }
+
+  // ステータス色ルール：不通=オレンジ, 対応中=黄色, 終了=水色（重複色より低優先）
+  const statusRules = [
+    { value: '不通',   red: 1,    green: 0.85, blue: 0.65 },
     { value: '対応中', red: 1,    green: 0.95, blue: 0.6  },
     { value: '終了',   red: 0.78, green: 0.96, blue: 1    },
   ];
-  // 対応状況列を絶対参照する CUSTOM_FORMULA で行全体を着色（例: =$R2="不通"）
   const colL = colLetter(statusColIndex);
-  const requests = rules.map((r, i) => ({
-    addConditionalFormatRule: {
-      rule: {
-        ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: numCols }],
-        booleanRule: {
-          condition: { type: 'CUSTOM_FORMULA', values: [{ userEnteredValue: `=$${colL}2="${r.value}"` }] },
-          format: { backgroundColor: { red: r.red, green: r.green, blue: r.blue } },
+  for (const r of statusRules) {
+    requests.push({
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: numCols }],
+          booleanRule: {
+            condition: { type: 'CUSTOM_FORMULA', values: [{ userEnteredValue: `=$${colL}2="${r.value}"` }] },
+            format: { backgroundColor: { red: r.red, green: r.green, blue: r.blue } },
+          },
         },
+        index: idx++,
       },
-      index: i,
-    },
-  }));
+    });
+  }
+
   await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests } });
 }
 
