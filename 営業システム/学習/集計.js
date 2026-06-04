@@ -23,12 +23,14 @@ const isWon = r => r.outcome === 'won';
 
 // 媒体手数料（営業案件管理ツール.html と同一ロジック）
 function mediaFee(amount, channel) {
-  if (channel === 'cwtech') return 0;
   if (channel === 'lancers') return Math.round(amount * 0.165);
-  let f = Math.min(amount, 100000) * 0.20;
-  if (amount > 100000) f += Math.min(amount - 100000, 100000) * 0.10;
-  if (amount > 200000) f += (amount - 200000) * 0.05;
-  return Math.round(f);
+  if (channel === 'crowdworks' || channel === 'cw') { // 段階制
+    let f = Math.min(amount, 100000) * 0.20;
+    if (amount > 100000) f += Math.min(amount - 100000, 100000) * 0.10;
+    if (amount > 200000) f += (amount - 200000) * 0.05;
+    return Math.round(f);
+  }
+  return 0; // cwtech / self-media（自社メディア直契約）/ inbound / direct は手数料なし
 }
 
 // ── ロード ─────────────────────────────────────
