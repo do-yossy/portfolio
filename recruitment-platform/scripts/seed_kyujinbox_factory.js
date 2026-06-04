@@ -3,10 +3,8 @@
 // 求人ボックス向け：倉庫作業・検品・機械オペレーターの正社員求人を各エリア1件ずつ作成
 // 条件: 月給27〜38万円（ランダム）/ 日勤 / 完全週休二日制 / 未経験可
 // 応募が集まりやすいシンプルな軽作業系の職種にしている（自動車系は避ける）
-const { db, Jobs } = require('../db');
-
-// 旧バッチ（製造・工場スタッフ）が残っていれば削除して作り直す
-const OLD_PATTERN = '%製造・工場スタッフ｜正社員｜未経験歓迎｜日勤・土日休み%';
+// ※ 旧求人は削除せず、追加のみ行う
+const { Jobs } = require('../db');
 
 // 職種テンプレート（倉庫・検品・機械オペレーター）
 const ROLES = {
@@ -83,11 +81,7 @@ ${r.work}
 }
 
 (function main() {
-  // 旧バッチを削除
-  const old = db.prepare(`SELECT id FROM jobs WHERE title LIKE ?`).all(OLD_PATTERN);
-  for (const o of old) Jobs.delete(o.id);
-  if (old.length) console.log(`旧「製造・工場スタッフ」求人 ${old.length} 件を削除しました。\n`);
-
+  // 旧求人は削除せず、新規求人を追加するのみ
   let created = 0;
   for (const a of AREAS) {
     const r = ROLES[a.role];
