@@ -760,11 +760,20 @@ const MediaPosts = {
     db.prepare('DELETE FROM media_posts WHERE id = ?').run(id);
   },
   // 会社×媒体の掲載中件数クロス集計
+  // jobs テーブルの is_published=1 かつ target_media に含まれる媒体を集計する
   crossTab() {
-    const rows = db.prepare(`SELECT company_id, media, COUNT(*) as c FROM media_posts WHERE status = '掲載中' GROUP BY company_id, media`).all();
     const table = {};
     for (const c of COMPANIES) { table[c.id] = {}; for (const m of MEDIA) table[c.id][m.id] = 0; }
-    for (const r of rows) { if (table[r.company_id] && r.media) table[r.company_id][r.media] = r.c; }
+    const jobs = db.prepare(`SELECT company, target_media FROM jobs WHERE is_published = 1`).all();
+    for (const job of jobs) {
+      let mediaList = [];
+      try { mediaList = JSON.parse(job.target_media || '[]'); } catch {}
+      for (const mediaId of mediaList) {
+        if (table[job.company] && table[job.company][mediaId] !== undefined) {
+          table[job.company][mediaId]++;
+        }
+      }
+    }
     return table;
   },
 };
