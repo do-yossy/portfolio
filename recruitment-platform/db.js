@@ -585,7 +585,7 @@ const Ops = {
   },
 
   // 会社×媒体でフィルタした応募者一覧
-  listCalls({ company, media, status, month, archived, search } = {}) {
+  listCalls({ company, media, status, month, archived, search, excludeDuplicate } = {}) {
     const conds = [];
     const vals = [];
     if (company && company !== 'all') { conds.push('company = ?'); vals.push(company); }
@@ -594,6 +594,7 @@ const Ops = {
     if (month && month !== 'all')     { conds.push('applied_month = ?'); vals.push(month); }
     if (archived === true)  conds.push('is_archived = 1');
     if (archived === false) conds.push('is_archived = 0');
+    if (excludeDuplicate)   conds.push('is_duplicate = 0');
     if (search) {
       conds.push('(name LIKE ? OR phone LIKE ? OR email LIKE ? OR address LIKE ? OR job_title LIKE ?)');
       vals.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);

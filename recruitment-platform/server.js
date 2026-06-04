@@ -1062,6 +1062,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       status: callStatus !== 'all' ? callStatus : undefined,
       search: callSearch || undefined,
       archived: false, // 架電リスト（本日分）はアーカイブ済み（過去応募者）を除外
+      // 重複は架電リストから除外。ただし「重複」ステータスで絞り込んだ時だけ表示する。
+      excludeDuplicate: callStatus !== '重複',
     });
     send(res, 200, T.callsPage({ co: callCo, media: callMedia, applicants, statusFilter: callStatus, search: callSearch }));
     return;
