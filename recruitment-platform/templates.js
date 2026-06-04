@@ -20,8 +20,8 @@ const OPS_MEDIA = [
 const CALL_STATUS_COLORS = {
   '新規':  '#3b82f6',
   '不通':  '#f97316',
-  '対応中': '#06b6d4',
-  '終了':  '#94a3b8',
+  '対応中': '#eab308',
+  '終了':  '#06b6d4',
 };
 
 function adminLayout(title, content, active = 'posts', co = 'sq') {

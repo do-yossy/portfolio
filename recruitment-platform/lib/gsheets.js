@@ -267,11 +267,11 @@ async function setStatusConditionalFormats(tabSheetId, statusColIndex) {
       await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests: delRequests } });
     }
   } catch {}
-  // 色ルール：不通=オレンジ, 対応中=水色, 終了=グレー（新規はデフォルト白）
+  // 色ルール：不通=オレンジ, 対応中=黄色, 終了=水色（新規はデフォルト白）
   const rules = [
-    { value: '不通',  red: 1,    green: 0.91, blue: 0.73 },
-    { value: '対応中', red: 0.78, green: 0.96, blue: 1    },
-    { value: '終了',   red: 0.90, green: 0.90, blue: 0.90 },
+    { value: '不通',  red: 1,    green: 0.85, blue: 0.65 },
+    { value: '対応中', red: 1,    green: 0.95, blue: 0.6  },
+    { value: '終了',   red: 0.78, green: 0.96, blue: 1    },
   ];
   const requests = rules.map((r, i) => ({
     addConditionalFormatRule: {
