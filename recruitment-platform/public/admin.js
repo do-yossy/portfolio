@@ -900,6 +900,50 @@ async function callDoImport() {
     toast('処理に失敗しました', 'error');
   }
 }
+// ── スマート一括取込（全会社・全媒体混在Excel）──
+function callSmartImport() {
+  const m = document.getElementById('call-smart-import-modal');
+  if (!m) { toast('ページを再読み込みしてください', 'warn'); return; }
+  m.classList.remove('hidden');
+}
+function callCloseSmartImport() {
+  const m = document.getElementById('call-smart-import-modal');
+  if (m) m.classList.add('hidden');
+  const r = document.getElementById('si-result');
+  if (r) r.innerHTML = '';
+}
+async function callDoSmartImport() {
+  const company = document.getElementById('si-company').value;
+  const file    = document.getElementById('si-file').files[0];
+  if (!file) return toast('Excelファイルを選択してください', 'warn');
+  const fd = new FormData();
+  fd.append('company', company);
+  fd.append('file', file);
+  const resultEl = document.getElementById('si-result');
+  resultEl.innerHTML = '<p>自動振り分けで取込中...</p>';
+  try {
+    const res = await fetch('/api/ops/calls/smart-import', { method: 'POST', body: fd });
+    let d;
+    try { d = await res.json(); } catch { throw new Error(`サーバーエラー (HTTP ${res.status})`); }
+    if (d.ok) {
+      const rows = Object.entries(d.summary || {}).map(([k, v]) =>
+        `<tr><td style="padding:2px 10px">${k}</td><td style="padding:2px 10px;text-align:right">${v.imported}件</td><td style="padding:2px 10px;text-align:right;color:#b45309">${v.duplicates || 0}件重複</td></tr>`
+      ).join('');
+      resultEl.innerHTML =
+        `<p style="color:#16a34a">✅ 合計 ${d.imported}件取込・${d.duplicates}件重複</p>` +
+        (rows ? `<table style="font-size:12px;border-collapse:collapse;margin-top:6px"><thead><tr><th style="padding:2px 10px;text-align:left">会社/媒体</th><th style="padding:2px 10px">取込</th><th style="padding:2px 10px">重複</th></tr></thead><tbody>${rows}</tbody></table>` : '') +
+        (d.skippedSheets?.length ? `<p style="color:#b45309;font-size:12px;margin-top:6px">媒体不明でスキップしたシート: ${d.skippedSheets.join('、')}</p>` : '');
+      toast(`${d.imported}件取り込みました`, d.imported > 0 ? 'success' : 'warn');
+      setTimeout(() => location.reload(), 2500);
+    } else {
+      resultEl.innerHTML = `<p style="color:#dc2626">❌ 取込に失敗しました: ${d.error || '不明なエラー'}</p>`;
+      toast('取込に失敗しました', 'error');
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<p style="color:#dc2626">❌ エラー: ${e.message}</p>`;
+    toast('取込に失敗しました', 'error');
+  }
+}
 // ── 共有スプレッドシート（Google Sheets）連携 ──
 async function sheetsStatus() {
   try {

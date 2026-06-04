@@ -32,7 +32,8 @@ const { normalizePhone, normalizeEmail, isNameSimilar } = require('./normalize')
 const { notify } = require('./lib/notify');
 const { requireAuth, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
 const { sendApplicationThanks, sendNewApplicantAlert } = require('./lib/mailer');
-const { buildXlsx, parseXlsx } = require('./lib/xlsx');
+const { buildXlsx, parseXlsx, parseXlsxSheets } = require('./lib/xlsx');
+const { smartImport } = require('./lib/smart-import');
 const gsheets = require('./lib/gsheets');
 const { pushToSheets, pullFromSheets, initRecruitmentSheets } = require('./lib/sheets-sync');
 const T = require('./templates');
@@ -1116,6 +1117,44 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   // ── 新規応募者タブ統計 ──
   if (pathname === '/api/ops/stats' && method === 'GET') {
     sendJSON(res, 200, await opsNewStats());
+    return;
+  }
+
+  // ── スマート一括取込（全会社・全媒体混在Excel）──
+  //   シート名→媒体、シート内の会社見出し行→会社 を自動判定して取り込む。
+  if (pathname === '/api/ops/calls/smart-import' && method === 'POST') {
+    const ct = req.headers['content-type'] || '';
+    const buf = await readBody(req);
+    let fileBuf = null, defaultCompany = co;
+    if (ct.includes('multipart/form-data')) {
+      const boundaryMatch = ct.match(/boundary=(.+)$/);
+      const parts = parseMultipart(buf, boundaryMatch[1].trim());
+      for (const p of parts) {
+        if (/name="company"/.test(p.header)) defaultCompany = p.content.toString('utf8').trim();
+        else if (/filename=/.test(p.header)) fileBuf = p.content;
+      }
+    } else {
+      fileBuf = buf;
+      defaultCompany = query.company || co;
+    }
+    const isXlsx = fileBuf && fileBuf.length > 4 &&
+      fileBuf[0] === 0x50 && fileBuf[1] === 0x4B && fileBuf[2] === 0x03 && fileBuf[3] === 0x04;
+    if (!isXlsx) {
+      sendJSON(res, 400, { ok: false, error: 'スマート取込はExcel(.xlsx)ファイルのみ対応しています' });
+      return;
+    }
+    try {
+      const sheets = parseXlsxSheets(fileBuf);
+      const r = await smartImport({
+        sheets,
+        deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs },
+        defaultCompany,
+      });
+      sendJSON(res, 200, { ok: true, ...r });
+    } catch (e) {
+      await Logs.create('ops_smart_import', 'error', String(e.message || e));
+      sendJSON(res, 500, { ok: false, error: String(e.message || e) });
+    }
     return;
   }
 

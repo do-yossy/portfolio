@@ -5,6 +5,7 @@ const COMPANIES = {
   bg: { label: 'Bigeyes',        full: '株式会社Bigeyes',        color: '#ea580c' },
   pe: { label: 'ピープル',        full: '合同会社ピープル',        color: '#16a34a' },
   lt: { label: 'Life Tailor',    full: '株式会社Life Tailor',    color: '#0891b2' },
+  nc: { label: 'ニクール',        full: '合同会社ニクール',        color: '#db2777' },
 };
 
 // 運用管理の媒体マスタ
@@ -13,6 +14,7 @@ const OPS_MEDIA = [
   { id: 'kyujinbox', name: '求人ボックス' },
   { id: 'stanby',    name: 'スタンバイ' },
   { id: 'google',    name: 'Googleしごと検索' },
+  { id: 'engage',    name: 'engage' },
 ];
 const CALL_STATUS_COLORS = {
   '新規':        '#3b82f6',
@@ -1409,6 +1411,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <h2>絞り込み <span class="count" id="past-total">${pastApplicants.length}件</span></h2>
           <div style="display:flex;gap:8px">
             <button class="btn btn-secondary btn-sm" onclick="callImport()" title="過去応募者データ（CSV / Excel）を取り込む">📥 過去応募者を取り込む</button>
+            <button class="btn btn-secondary btn-sm" onclick="callSmartImport()" title="全会社・全媒体が1つに混在したExcelを自動振り分けで取り込む">🪄 まとめてExcel取込</button>
             <a id="past-export" href="${exportHref}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全件）</a>
           </div>
         </div>
@@ -1625,11 +1628,33 @@ function callImportModalHtml(co, media) {
         <button class="btn btn-primary" onclick="callDoImport()">取込実行</button>
       </div>
     </div>
+  </div>
+  <div id="call-smart-import-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>🪄 まとめてExcel取込</h3>
+      <p class="muted" style="font-size:12px;margin:0 0 10px">
+        全会社・全媒体が1つに混在したExcel（シート＝媒体、シート内の会社見出し行＝会社）を自動で振り分けて取り込みます。<br>
+        ・シート名から媒体を判定（indeed / engage / 求人ボックス 等）<br>
+        ・「合同会社ピープル」「株式会社ライフテイラー」「ニクール」等の見出し行で会社を判定<br>
+        ・電話番号／メールが既存と一致する応募者は重複として記録します
+      </p>
+      <div class="form-grid">
+        <label class="full">既定の会社（見出しが無い場合の振り分け先）
+          <select id="si-company">${COMPANIES_ORDER.map(c => `<option value="${c}">${COMPANIES[c].label}</option>`).join('')}</select>
+        </label>
+        <label class="full">Excelファイル(.xlsx)<input type="file" id="si-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      </div>
+      <div id="si-result" class="import-result"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="callCloseSmartImport()">閉じる</button>
+        <button class="btn btn-primary" onclick="callDoSmartImport()">自動振り分けで取込</button>
+      </div>
+    </div>
   </div>`;
 }
 
 // 運用テンプレ用のヘルパ定数
-const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt'];
+const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc'];
 const CALL_STATUSES_LIST = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];
 function mediaName(id) { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 

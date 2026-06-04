@@ -535,12 +535,14 @@ const COMPANIES = [
   { id: 'bg', name: '株式会社Bigeyes',       short: 'BG' },
   { id: 'pe', name: '合同会社ピープル',        short: 'PE' },
   { id: 'lt', name: '株式会社lifeTaylor',     short: 'LT' },
+  { id: 'nc', name: '合同会社ニクール',        short: 'NC' },
 ];
 const MEDIA = [
   { id: 'indeed',   name: 'Indeed' },
   { id: 'kyujinbox', name: '求人ボックス' },
   { id: 'stanby',   name: 'スタンバイ' },
   { id: 'google',   name: 'Googleしごと検索' },
+  { id: 'engage',   name: 'engage' },
 ];
 // 架電対応状況
 const CALL_STATUSES = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];

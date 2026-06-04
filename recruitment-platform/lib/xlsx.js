@@ -351,4 +351,63 @@ function parseXlsx(buf) {
   return records;
 }
 
-module.exports = { buildXlsx, parseXlsx };
+// workbook.xml と rels から「シートファイル名 → シート表示名」の対応を作る
+function sheetNameMap(files) {
+  const wb = files['xl/workbook.xml'];
+  const rels = files['xl/_rels/workbook.xml.rels'];
+  if (!wb || !rels) return {};
+  const wbXml = wb.toString('utf8');
+  const relsXml = rels.toString('utf8');
+  // rId → ターゲット（worksheets/sheetN.xml）
+  const ridToTarget = {};
+  const relRe = /<Relationship\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*\/>/g;
+  let rm;
+  while ((rm = relRe.exec(relsXml))) {
+    if (/worksheets\/sheet\d+\.xml/.test(rm[2])) {
+      ridToTarget[rm[1]] = 'xl/' + rm[2].replace(/^\/?/, '');
+    }
+  }
+  // <sheet name="..." r:id="rIdN"/> → 表示名
+  const map = {};
+  const shRe = /<sheet\b([^>]*)\/>/g;
+  let sm;
+  while ((sm = shRe.exec(wbXml))) {
+    const attrs = sm[1];
+    const name = (attrs.match(/name="([^"]*)"/) || [])[1];
+    const rid = (attrs.match(/r:id="([^"]+)"/) || [])[1];
+    if (name && rid && ridToTarget[rid]) map[ridToTarget[rid]] = xmlUnescape(name);
+  }
+  return map;
+}
+
+// シート単位で解析: [{ name, records: [{ヘッダ名:値,...}] }]
+//   各シートのヘッダ・行は parseXlsx と同じロジック。シート名を保持して返す。
+function parseXlsxSheets(buf) {
+  const files = unzip(buf);
+  const sst = parseSharedStrings(files);
+  const nameMap = sheetNameMap(files);
+  const sheetFiles = Object.keys(files)
+    .filter(n => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))
+    .sort((a, b) => parseInt(a.match(/sheet(\d+)/)[1], 10) - parseInt(b.match(/sheet(\d+)/)[1], 10));
+
+  const out = [];
+  for (const sn of sheetFiles) {
+    const sheetRows = parseSheetRows(files[sn].toString('utf8'), sst);
+    if (!sheetRows.length) continue;
+    const headerIdx = sheetRows.findIndex(r => r.some(c => c && c.trim()));
+    if (headerIdx < 0) continue;
+    const header = sheetRows[headerIdx].map(h => (h || '').trim());
+    const records = [];
+    for (let i = headerIdx + 1; i < sheetRows.length; i++) {
+      const r = sheetRows[i];
+      if (!r.some(c => c && String(c).trim())) continue;
+      const obj = {};
+      header.forEach((h, j) => { if (h) obj[h] = r[j] !== undefined ? r[j] : ''; });
+      records.push(obj);
+    }
+    out.push({ name: nameMap[sn] || sn.replace(/^xl\/worksheets\/|\.xml$/g, ''), records });
+  }
+  return out;
+}
+
+module.exports = { buildXlsx, parseXlsx, parseXlsxSheets };
