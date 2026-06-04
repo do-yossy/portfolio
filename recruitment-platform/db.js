@@ -538,12 +538,12 @@ const Analytics = {
 
 // ── 運用管理マスタ定数 ────────────────────────────────────────
 const COMPANIES = [
-  { id: 'sq', name: '株式会社SocialQuality', short: 'SQ' },
-  { id: 'bg', name: '株式会社Bigeyes',       short: 'BG' },
-  { id: 'pe', name: '合同会社ピープル',        short: 'PE' },
-  { id: 'lt', name: '株式会社lifeTaylor',     short: 'LT' },
-  { id: 'nc', name: '合同会社ニクール',        short: 'NC' },
-  { id: 'nx', name: 'ネクサス株式会社',        short: 'NX' },
+  { id: 'sq', name: '株式会社SocialQuality', short: 'SQ', label: 'Social Quality' },
+  { id: 'bg', name: '株式会社Bigeyes',       short: 'BG', label: 'Bigeyes' },
+  { id: 'pe', name: '合同会社ピープル',        short: 'PE', label: 'ピープル' },
+  { id: 'lt', name: '株式会社lifeTaylor',     short: 'LT', label: 'Life Tailor' },
+  { id: 'nc', name: '合同会社ニクール',        short: 'NC', label: 'ニクール' },
+  { id: 'nx', name: 'ネクサス株式会社',        short: 'NX', label: 'ネクサス' },
 ];
 const MEDIA = [
   { id: 'indeed',   name: 'Indeed' },
