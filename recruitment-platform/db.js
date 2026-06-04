@@ -606,8 +606,8 @@ const Ops = {
 
   // 会社×媒体クロス集計（新規応募者タブ・掲載管理タブ用）
   crossTab({ activeOnly = false, todayOnly = false } = {}) {
-    // 新規応募者タブ用。過去応募者の取込（is_archived=1）は集計対象外。
-    const conds = ['is_archived = 0'];
+    // 新規応募者タブ用。取込データ（is_imported=1）・過去応募者（is_archived=1）は集計対象外。
+    const conds = ['is_archived = 0', 'is_imported = 0'];
     const vals = [];
     if (activeOnly) conds.push(`status IN (${ACTIVE_CALL_STATUSES.map(() => '?').join(',')})`), vals.push(...ACTIVE_CALL_STATUSES);
     if (todayOnly) { conds.push('created_at >= ?'); vals.push(new Date().toISOString().slice(0, 10) + 'T00:00:00Z'); }
