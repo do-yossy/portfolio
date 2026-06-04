@@ -315,7 +315,16 @@ const Applicants = {
     // 「本日の新規応募」に誤カウントされないようにする。
     const appliedAt = data.appliedAt || data.applied_at || (data.allowEmptyDate ? '' : ts);
     const appliedMonth = (appliedAt || '').slice(0, 7); // 'YYYY-MM'
-    const media = data.media || '';
+    // media が未指定の場合は sourceMedia から自動判定（マイグレーションと同じロジック）
+    let media = data.media || '';
+    if (!media) {
+      const sm = (data.sourceMedia || data.source_media || '').toLowerCase();
+      if      (sm.includes('indeed'))                                   media = 'indeed';
+      else if (sm.includes('求人ボックス') || sm.includes('kyujinbox')) media = 'kyujinbox';
+      else if (sm.includes('スタンバイ')  || sm.includes('stanby'))    media = 'stanby';
+      else if (sm.includes('engage'))                                   media = 'engage';
+      else /* direct / google / しごと / 未設定 → Googleしごと検索経由 */ media = 'google';
+    }
     db.prepare(`
       INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, is_archived, is_imported, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

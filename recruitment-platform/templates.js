@@ -876,7 +876,7 @@ function jobDetailPage(job) {
         <form id="apply-form">
           <input type="hidden" name="jobId" value="${job.id}">
           <input type="hidden" name="jobTitle" value="${esc(job.title)}">
-          <input type="hidden" name="sourceMedia" value="direct">
+          <input type="hidden" name="sourceMedia" id="apply-source-media" value="direct">
           <div class="form-row">
             <div class="form-group">
               <label>お名前<span class="req">*</span></label>
@@ -910,7 +910,20 @@ function jobDetailPage(job) {
       </div>
     </div>
   </div>
-</div>`;
+</div>
+<script>
+(function(){
+  // Googleしごと検索・Google広告からの流入を検知してsourceMediaをセット
+  const field = document.getElementById('apply-source-media');
+  if (!field) return;
+  const params = new URLSearchParams(window.location.search);
+  const utmSource = (params.get('utm_source') || '').toLowerCase();
+  const ref = (document.referrer || '').toLowerCase();
+  if (utmSource.includes('google') || ref.includes('google.com')) {
+    field.value = 'google';
+  }
+})();
+</script>`;
 
   return publicLayout(`${esc(job.title)} | 求人詳細`, content, {
     description: `${job.location}・${job.salary}・${job.employment_type}。${job.description.slice(0, 100)}`,
