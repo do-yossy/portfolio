@@ -1019,3 +1019,66 @@ function callCheckDup() {
     } catch (e) { toast('通信エラー', 'error'); }
   });
 }
+
+const COMPANY_LIST = [
+  { id: 'sq', label: 'Social Quality' },
+  { id: 'bg', label: 'Bigeyes' },
+  { id: 'pe', label: 'ピープル' },
+  { id: 'lt', label: 'Life Tailor' },
+  { id: 'nc', label: 'ニクール' },
+  { id: 'nx', label: 'ネクサス' },
+];
+
+async function moveCompany(id, currentCompany) {
+  const opts = COMPANY_LIST.map(c =>
+    `<option value="${c.id}"${c.id === currentCompany ? ' selected' : ''}>${c.label}</option>`
+  ).join('');
+  const sel = document.createElement('select');
+  sel.innerHTML = opts;
+  sel.style.cssText = 'width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;margin-top:8px';
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:10px;padding:24px;min-width:280px;box-shadow:0 4px 24px rgba(0,0,0,.2)';
+  box.innerHTML = '<p style="font-weight:600;margin:0 0 4px">会社を変更する</p><p style="font-size:12px;color:#64748b;margin:0 0 8px">移動先の会社を選んでください</p>';
+  box.appendChild(sel);
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;margin-top:16px;justify-content:flex-end';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'キャンセル';
+  cancelBtn.style.cssText = 'padding:6px 16px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer';
+  const okBtn = document.createElement('button');
+  okBtn.textContent = '移動する';
+  okBtn.style.cssText = 'padding:6px 16px;border:none;border-radius:6px;background:#7c3aed;color:#fff;cursor:pointer;font-weight:600';
+  btns.appendChild(cancelBtn);
+  btns.appendChild(okBtn);
+  box.appendChild(btns);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  cancelBtn.addEventListener('click', () => overlay.remove());
+  okBtn.addEventListener('click', async () => {
+    const newCompany = sel.value;
+    if (newCompany === currentCompany) { overlay.remove(); return; }
+    okBtn.disabled = true;
+    okBtn.textContent = '処理中...';
+    try {
+      const res = await fetch(`/api/ops/calls/${id}/move-company`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: newCompany }),
+      });
+      const d = await res.json();
+      overlay.remove();
+      if (d.ok) {
+        toast('会社を変更しました（スプレッドシートにも反映）', 'success');
+        setTimeout(() => location.reload(), 1200);
+      } else {
+        toast('変更に失敗: ' + (d.error || '不明なエラー'), 'error');
+      }
+    } catch (e) {
+      overlay.remove();
+      toast('通信エラー: ' + e.message, 'error');
+    }
+  });
+}

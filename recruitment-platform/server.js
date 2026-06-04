@@ -1138,7 +1138,32 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
-  // ── 新規応募者タブ統計 ──
+  // ── 会社変更（DB更新 + スプレッドシート該当タブ再同期）──
+  const moveMatch = pathname.match(/^\/api\/ops\/calls\/([^/]+)\/move-company$/);
+  if (moveMatch && method === 'POST') {
+    const id = moveMatch[1];
+    const body = await parseJSON(req);
+    const newCompany = body.company;
+    if (!OPS_COMPANIES.find(c => c.id === newCompany)) {
+      sendJSON(res, 400, { error: '不明な会社ID' }); return;
+    }
+    const cur = Applicants.findById(id);
+    if (!cur) { sendJSON(res, 404, { error: '該当者なし' }); return; }
+    const oldCompany = cur.company;
+    const { db } = require('./db');
+    db.prepare('UPDATE applicants SET company=?, updated_at=? WHERE id=?').run(newCompany, new Date().toISOString(), id);
+    // 変更前後の会社タブだけ再同期
+    const affected = OPS_COMPANIES.filter(c => c.id === oldCompany || c.id === newCompany);
+    if (gsheets.isConfigured() && affected.length) {
+      try {
+        const { pushToSheets } = require('./lib/sheets-sync');
+        await pushToSheets({ gsheets, Ops, Logs, companies: affected, statuses: CALL_STATUSES, mediaList: OPS_MEDIA });
+      } catch (e) { /* sync失敗は無視してDB更新は確定 */ }
+    }
+    sendJSON(res, 200, { ok: true, from: oldCompany, to: newCompany });
+    return;
+  }
+
   if (pathname === '/api/ops/stats' && method === 'GET') {
     sendJSON(res, 200, await opsNewStats());
     return;

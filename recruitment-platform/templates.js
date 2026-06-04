@@ -1374,7 +1374,10 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <td>${esc(a.job_title || '')}</td>
           <td>${esc(a.current_job || '')}</td>
           <td>${esc(a.education || '')}</td>
-          <td>${companyName(a.company)}</td>
+          <td style="white-space:nowrap">
+            <span style="font-size:12px">${companyName(a.company)}</span>
+            <button onclick="moveCompany('${esc(a.id)}','${esc(a.company || '')}')" style="margin-left:4px;padding:1px 5px;font-size:10px;border:1px solid #cbd5e1;border-radius:3px;background:#f8fafc;cursor:pointer" title="会社変更">↔</button>
+          </td>
           <td>${esc(mediaName(a.media))}</td>
           <td style="white-space:nowrap">${esc((a.applied_at || '').slice(0, 10))}</td>
           <td class="num">${a.call_count || 0}</td>
