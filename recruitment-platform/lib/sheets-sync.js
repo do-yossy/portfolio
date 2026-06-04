@@ -132,10 +132,15 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
   const STATUS_MIGRATE = {
     '架電済(不通)': '不通', '対応終了': '終了', '断られた': '終了', '辞退': '終了', '重複': '新規',
   };
-  let updated = 0, notFound = 0, scanned = 0;
+  // 取込対象は会社タブ（SQ/BG/PE/LT/NC/NX）のみ。
+  // 案件精査・推薦管理・面談依頼など独自に運用しているシートには一切触れない。
+  const { COMPANIES } = require('../db');
+  const companyTabs = new Set(COMPANIES.map(c => (c.short || c.name || c.id)));
+  let updated = 0, notFound = 0, scanned = 0, skippedTabs = [];
   const meta = await gsheets.getMeta();
   for (const sh of (meta.sheets || [])) {
     const title = sh.properties.title;
+    if (!companyTabs.has(title)) { skippedTabs.push(title); continue; }
     const values = await gsheets.readValues(title);
     if (values.length < 2) continue;
     for (const row of values.slice(1)) {
@@ -158,8 +163,10 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       updated++;
     }
   }
-  if (Logs) await Logs.create('sheets_pull', 'success', `${updated}件をスプレッドシートから更新（${notFound}件該当なし）`);
-  return { updated, notFound, scanned };
+  if (Logs) await Logs.create('sheets_pull', 'success',
+    `${updated}件をスプレッドシートから更新（${notFound}件該当なし）` +
+    (skippedTabs.length ? `／対象外タブ: ${skippedTabs.join('・')}` : ''));
+  return { updated, notFound, scanned, skippedTabs };
 }
 
 // ─────────────────────────────────────────────────────────────
