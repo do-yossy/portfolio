@@ -2,15 +2,18 @@
 # Deploy: fly launch (first time) or fly deploy (updates)
 # Docs: https://fly.io/docs/reference/configuration/
 
-app = "recruitment-platform"
+app = "sq-saiyou"
 primary_region = "nrt"   # Tokyo
 
 [build]
   dockerfile = "Dockerfile"
 
 [env]
-  PORT = "3000"
+  PORT       = "3000"
   NODE_OPTIONS = "--experimental-sqlite"
+  SITE_URL   = "https://sq-saiyou.fly.dev"
+  COMPANY_NAME = "株式会社Social Quality"
+  SITE_NAME  = "採用サイト"
 
 [http_service]
   internal_port = 3000

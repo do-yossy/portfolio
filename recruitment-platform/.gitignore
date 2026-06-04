@@ -4,3 +4,11 @@ node_modules/
 *.db
 *.db-shm
 *.db-wal
+__pycache__/
+*.pyc
+logs/*.png
+
+# Google サービスアカウント鍵（絶対にコミットしない）
+google-key.json
+*service-account*.json
+*.iam.gserviceaccount.com.json

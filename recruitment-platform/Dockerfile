@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y python3 python3-pip python3-venv && \
 WORKDIR /app
 
 COPY package.json ./
-COPY server.js normalize.js db.js seed.js ./
+COPY server.js normalize.js db.js db-factory.js db-postgres.js seed.js migrate-to-postgres.js ./
 COPY lib/ ./lib/
 COPY public/ ./public/
 COPY templates.js ./
