@@ -98,10 +98,10 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
         : { isImported: 1, allowEmptyDate: true };
 
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
-      if (dupId && countAsNew && Ops && Ops.promoteToNew) {
+      if (dupId && countAsNew && Applicants.promoteToNew) {
         // 新着モードで既存（先に取込済みのバックログ等）が見つかった場合は、
         // 重複にせず「本日の新着」へ昇格して新規応募に計上する。
-        await Ops.promoteToNew(dupId, today);
+        await Applicants.promoteToNew(dupId, today);
         imported++; toCallList++; bump(currentCompany, media, 'imported');
       } else if (dupId) {
         // 重複は架電リストに出さず必ずアーカイブ＋重複フラグで記録（新着でも計上しない）
