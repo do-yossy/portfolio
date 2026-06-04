@@ -24,10 +24,11 @@ function mediaFromSheetName(name) {
 function companyFromHeaderText(text) {
   const t = String(text || '');
   if (/ピープル|people/i.test(t)) return 'pe';
-  if (/ライフテイラー|lifetaylor|life ?taylor/i.test(t)) return 'lt';
-  if (/socialquality|social ?quality|ソーシャルクオリティ|ソーシャル ?クオリティ/i.test(t)) return 'sq';
+  if (/ライフテイラー|ライフテーラー|lifetaylor|life ?taylor/i.test(t)) return 'lt';
+  if (/socialquality|social ?quality|ソーシャルクオリティ|ソーシャル ?クオリティ|ソーシャル/i.test(t)) return 'sq';
   if (/bigeyes|big ?eyes|ビッグアイズ|ビッグアイ/i.test(t)) return 'bg';
   if (/[二ニ] ?クール|nicol/i.test(t)) return 'nc';
+  if (/ネクサス|nexus/i.test(t)) return 'nx';
   return null;
 }
 

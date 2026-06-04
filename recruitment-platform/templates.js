@@ -6,6 +6,7 @@ const COMPANIES = {
   pe: { label: 'ピープル',        full: '合同会社ピープル',        color: '#16a34a' },
   lt: { label: 'Life Tailor',    full: '株式会社Life Tailor',    color: '#0891b2' },
   nc: { label: 'ニクール',        full: '合同会社ニクール',        color: '#db2777' },
+  nx: { label: 'ネクサス',        full: 'ネクサス株式会社',        color: '#0d9488' },
 };
 
 // 運用管理の媒体マスタ
@@ -1654,7 +1655,7 @@ function callImportModalHtml(co, media) {
 }
 
 // 運用テンプレ用のヘルパ定数
-const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc'];
+const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx'];
 const CALL_STATUSES_LIST = ['新規', '架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複'];
 function mediaName(id) { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
