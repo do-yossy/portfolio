@@ -397,22 +397,31 @@ const Applicants = {
     return null;
   },
   // Returns {id, isReturning} or null.
-  // isReturning=true means the match is an archived '不通' record → treat as returning applicant, NOT duplicate.
+  // 過去応募（is_archived=1）の中で、
+  //   - 不通       → isReturning=true（再応募扱い／前回応募情報を表示）
+  //   - 対応中・終了 → isReturning=false（重複判定）
+  // を返す。電話番号・メールのいずれかが一致するレコードを全件集めて判定する。
   findDuplicateInfo(nPhone, nEmail) {
-    const check = (row) => {
-      if (!row) return null;
-      const isReturning = row.is_archived === 1 && row.status === '不通';
-      return { id: row.id, isReturning };
+    const rows = [];
+    const seen = new Set();
+    const collect = (list) => {
+      for (const r of list) { if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } }
     };
     if (nPhone) {
-      const r = db.prepare(`SELECT id, is_archived, status FROM applicants WHERE normalized_phone = ? AND normalized_phone != '' ORDER BY is_archived ASC, created_at DESC LIMIT 1`).get(nPhone);
-      if (r) return check(r);
+      collect(db.prepare(`SELECT id, is_archived, status, created_at FROM applicants WHERE normalized_phone = ? AND normalized_phone != ''`).all(nPhone));
     }
     if (nEmail) {
-      const r = db.prepare(`SELECT id, is_archived, status FROM applicants WHERE normalized_email = ? AND normalized_email != '' ORDER BY is_archived ASC, created_at DESC LIMIT 1`).get(nEmail);
-      if (r) return check(r);
+      collect(db.prepare(`SELECT id, is_archived, status, created_at FROM applicants WHERE normalized_email = ? AND normalized_email != ''`).all(nEmail));
     }
-    return null;
+    if (!rows.length) return null;
+    // ① アーカイブ済みの「不通」を最優先 → 再応募（前回応募情報を表示）
+    const returning = rows
+      .filter(r => r.is_archived === 1 && r.status === '不通')
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
+    if (returning) return { id: returning.id, isReturning: true };
+    // ② それ以外（対応中・終了・通常応募）は重複判定。最新レコードを参照元にする。
+    rows.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    return { id: rows[0].id, isReturning: false };
   },
   // 架電結果の反映用: 電話番号 or メールで既存応募者を検索（会社を優先一致）。
   // 重複レコードより「元データ（is_duplicate=0）」を優先して返す。
