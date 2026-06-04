@@ -271,10 +271,10 @@ async function opsNewStats() {
   const today = new Date().toISOString().slice(0, 10);
   const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
   // 「本日/今週の新規応募」は応募日(applied_at)基準でカウント。
-  // 取込日(created_at)ではないため、昨日までのリストを今日取り込んでも本日分には入らない。
-  // 過去応募者の取込（is_archived=1）も除外。
-  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND substr(applied_at, 1, 10) = ?`).get(today).c;
-  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND substr(applied_at, 1, 10) >= ?`).get(monday).c;
+  // 取り込んだ過去データ（is_imported=1）とアーカイブ（is_archived=1）は除外し、
+  // ライブで応募フォーム等から来た本日分のみを数える。
+  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND is_imported = 0 AND substr(applied_at, 1, 10) = ?`).get(today).c;
+  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND is_imported = 0 AND substr(applied_at, 1, 10) >= ?`).get(monday).c;
   const activeTotal = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND status IN ('新規','架電済(不通)','対応中')`).get().c;
   return { todayNew, weekNew, activeTotal };
 }
@@ -1258,10 +1258,10 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       if (dupId) {
         duplicates++;
         // 重複は記録しつつ重複フラグを立てて取り込む（架電対象外にする）
-        await Applicants.create({ ...mapped, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        await Applicants.create({ ...mapped, isImported: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
         continue;
       }
-      await Applicants.create(mapped);
+      await Applicants.create({ ...mapped, isImported: 1 });
       imported++;
     }
     await Logs.create('ops_csv_import', 'success', `${importCompany}/${importMedia}: ${imported}件取込・${duplicates}件重複`);

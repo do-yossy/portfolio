@@ -101,6 +101,9 @@ try { db.exec('ALTER TABLE jobs ADD COLUMN how_to_apply TEXT DEFAULT ""'); } cat
 // Migration: is_archived フラグ（重複チェック用に保持するが出力対象外）
 try { db.exec('ALTER TABLE applicants ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0'); } catch {}
 
+// Migration: is_imported フラグ（CSV/Excel等で取り込んだ過去データ。本日の新規応募に含めない）
+try { db.exec('ALTER TABLE applicants ADD COLUMN is_imported INTEGER NOT NULL DEFAULT 0'); } catch {}
+
 // Migration v2: 架電運用管理カラム
 try { db.exec(`ALTER TABLE applicants ADD COLUMN media TEXT DEFAULT ''`); } catch {}            // 'indeed'/'kyujinbox'/'stanby'/'google'
 try { db.exec('ALTER TABLE applicants ADD COLUMN call_count INTEGER DEFAULT 0'); } catch {}     // 架電回数 0〜10
@@ -314,8 +317,8 @@ const Applicants = {
     const appliedMonth = (appliedAt || '').slice(0, 7); // 'YYYY-MM'
     const media = data.media || '';
     db.prepare(`
-      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, is_archived, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO applicants (id, name, phone, email, age, address, source_media, applied_at, status, is_duplicate, duplicate_of_id, notes, normalized_phone, normalized_email, company, media, call_count, applied_month, last_called_at, gender, birth_date, current_job, job_title, experience, education, work_location, is_archived, is_imported, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, data.name, data.phone, data.email,
       data.age ? parseInt(data.age) : null,
@@ -340,6 +343,7 @@ const Applicants = {
       data.education || '',
       data.workLocation || data.work_location || '',
       data.isArchived || data.is_archived ? 1 : 0,
+      data.isImported || data.is_imported ? 1 : 0,
       ts, ts
     );
     return Applicants.findById(id);
