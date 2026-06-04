@@ -1051,7 +1051,9 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       };
       data.filter = filter;
       data.months = await Ops.appliedMonths();
-      data.pastApplicants = await Ops.listCalls({});
+      // 過去応募タブは「過去応募（アーカイブ済み）」のみ表示。
+      // 架電リスト（アクティブ）と重複して表示しないようにする。
+      data.pastApplicants = await Ops.listCalls({ archived: true });
     }
     send(res, 200, T.opsPage(data));
     return;

@@ -1366,11 +1366,10 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
     CALL_STATUSES_LIST.forEach(s => groups[s] = []);
     pastApplicants.forEach(a => { (groups[a.status] || (groups[a.status] = [])).push(a); });
 
-    const sectionsOrder = ['架電済(不通)', '対応中', '対応終了', '断られた', '辞退', '重複', '新規'];
+    const sectionsOrder = ['不通', '対応中', '終了', '新規'];
     const sectionLabels = {
-      '架電済(不通)': '🔁 再架電リスト（不通）', '対応中': '🔵 対応中',
-      '対応終了': '✅ 対応終了', '断られた': '⛔ 断られた', '辞退': '🚫 辞退',
-      '重複': '♻️ 重複', '新規': '🆕 新規（未架電）',
+      '不通': '🔁 再架電リスト（不通）', '対応中': '🔵 対応中',
+      '終了': '✅ 終了', '新規': '🆕 新規',
     };
     const sections = sectionsOrder.filter(s => (groups[s] || []).length).map(s => {
       const rows = groups[s].map(a => `
