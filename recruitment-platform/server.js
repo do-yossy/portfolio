@@ -792,13 +792,20 @@ const server = http.createServer(async (req, res) => {
     if (!body.name || !body.phone || !body.email) {
       sendError(res, 400, '氏名・電話・メールは必須です'); return;
     }
-    const dupId = await checkDuplicate(body);
+    const dupInfo = Applicants.findDuplicateInfo
+      ? Applicants.findDuplicateInfo(
+          normalizePhone(body.phone || ''),
+          normalizeEmail(body.email || '')
+        )
+      : { id: await checkDuplicate(body), isReturning: false };
     const applicant = await Applicants.create({
       ...body,
-      isDuplicate: !!dupId,
-      duplicateOfId: dupId,
-      status: dupId ? '重複' : '新規',
-      sourceMedia: body.sourceMedia || 'direct'
+      isDuplicate: dupInfo && !dupInfo.isReturning ? true : false,
+      duplicateOfId: dupInfo && !dupInfo.isReturning ? dupInfo.id : null,
+      returningFromId: dupInfo && dupInfo.isReturning ? dupInfo.id : null,
+      status: '新規',
+      sourceMedia: body.sourceMedia || 'direct',
+      media: body.media || 'google',
     });
     let jobTitle = body.jobTitle || '';
     if (body.jobId) {
@@ -814,7 +821,7 @@ const server = http.createServer(async (req, res) => {
     // Fire-and-forget email notifications (don't block response)
     sendApplicationThanks(applicant, jobTitle).catch(() => {});
     sendNewApplicantAlert({ ...applicant, sourceMedia: applicant.source_media, media: applicant.media }, jobTitle).catch(() => {});
-    sendJSON(res, 201, { ok: true, id: applicant.id, isDuplicate: !!dupId });
+    sendJSON(res, 201, { ok: true, id: applicant.id, isDuplicate: !!(dupInfo && !dupInfo.isReturning) });
     return;
   }
 
@@ -1161,6 +1168,35 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       } catch (e) { /* sync失敗は無視してDB更新は確定 */ }
     }
     sendJSON(res, 200, { ok: true, from: oldCompany, to: newCompany });
+    return;
+  }
+
+  // ── 重複元・再応募元の情報取得 ──
+  const dupInfoMatch = pathname.match(/^\/api\/ops\/calls\/([^/]+)\/(dup-info|returning-info)$/);
+  if (dupInfoMatch && method === 'GET') {
+    const id = dupInfoMatch[1];
+    const type = dupInfoMatch[2];
+    const cur = Applicants.findById(id);
+    if (!cur) { sendJSON(res, 404, { error: '該当者なし' }); return; }
+    const refId = type === 'dup-info' ? cur.duplicate_of_id : cur.returning_from_id;
+    if (!refId) { sendJSON(res, 200, { ref: null }); return; }
+    const ref = Applicants.findById(refId);
+    if (!ref) { sendJSON(res, 200, { ref: null }); return; }
+    const companyLabel = id => { const c = OPS_COMPANIES.find(x => x.id === id); return c ? (c.label || c.short || id) : (id || ''); };
+    const mediaLabel = id => { const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '不明'); };
+    sendJSON(res, 200, { ref: {
+      id: ref.id,
+      name: ref.name,
+      phone: ref.phone,
+      email: ref.email,
+      appliedAt: (ref.applied_at || '').slice(0, 10),
+      company: companyLabel(ref.company),
+      media: mediaLabel(ref.media),
+      jobTitle: ref.job_title || '',
+      status: ref.status,
+      callCount: ref.call_count || 0,
+      notes: ref.notes || '',
+    }});
     return;
   }
 

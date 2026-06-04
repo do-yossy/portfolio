@@ -254,8 +254,42 @@ async function styleSectionRows(tabSheetId, rowIndices, numCols) {
   await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests } });
 }
 
+// ステータス列に条件付き書式（色）を設定。既存ルールをクリアして再設定。
+async function setStatusConditionalFormats(tabSheetId, statusColIndex) {
+  // 既存の条件付き書式ルールを全削除してから再設定
+  try {
+    const meta = await api(`/${sheetId()}?fields=sheets(properties(sheetId),conditionalFormats)`);
+    const sh = (meta.sheets || []).find(s => s.properties.sheetId === tabSheetId);
+    const count = (sh?.conditionalFormats || []).length;
+    if (count > 0) {
+      const delRequests = Array.from({ length: count }, (_, i) => count - 1 - i)
+        .map(i => ({ deleteConditionalFormatRule: { sheetId: tabSheetId, index: i } }));
+      await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests: delRequests } });
+    }
+  } catch {}
+  // 色ルール：不通=オレンジ, 対応中=水色, 終了=グレー（新規はデフォルト白）
+  const rules = [
+    { value: '不通',  red: 1,    green: 0.91, blue: 0.73 },
+    { value: '対応中', red: 0.78, green: 0.96, blue: 1    },
+    { value: '終了',   red: 0.90, green: 0.90, blue: 0.90 },
+  ];
+  const requests = rules.map((r, i) => ({
+    addConditionalFormatRule: {
+      rule: {
+        ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: statusColIndex, endColumnIndex: statusColIndex + 1 }],
+        booleanRule: {
+          condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: r.value }] },
+          format: { backgroundColor: { red: r.red, green: r.green, blue: r.blue } },
+        },
+      },
+      index: i,
+    },
+  }));
+  await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests } });
+}
+
 module.exports = {
   isConfigured, sheetUrl, getAccessToken,
   getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
-  setDropdowns, styleHeader, styleSectionRows, colLetter,
+  setDropdowns, styleHeader, styleSectionRows, colLetter, setStatusConditionalFormats,
 };

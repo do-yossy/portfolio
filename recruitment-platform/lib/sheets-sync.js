@@ -47,7 +47,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const existing = await gsheets.readValues(title);
     const prior = new Map();
     const existingHeader = existing[0] || [];
-    const layoutMatches = existingHeader.length === SHEET_HEADERS.length && existingHeader[2] === '会社';
+    // 列数が増減しても、ID列(0)があり会社列(2)='会社'なら現行レイアウトとみなして退避する
+    const layoutMatches = existingHeader[0] === 'ID' && existingHeader[2] === '会社' && existingHeader[SHEET_COL.status] === '対応状況';
     if (layoutMatches) {
       for (const row of existing.slice(1)) {
         const id = row[SHEET_COL.id];
@@ -153,8 +154,10 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
         status: normalizedStatus || undefined,
         notes: row[SHEET_COL.notes] !== undefined ? row[SHEET_COL.notes] : undefined,
       });
-      // 不通で返ってきたレコードは過去応募に移動（次回は重複扱いしない）
-      if (normalizedStatus === '不通' && existing.is_archived === 0) {
+      // 不通・対応中・終了で返ってきたレコードは過去応募に移動
+      // 不通のみ: 次回同じ人が応募しても重複扱いせず「再応募」として扱う（findDuplicateInfoで判定）
+      // updateCall の TERMINAL チェックで終了は自動アーカイブされるが、不通・対応中は手動でアーカイブ
+      if (['不通', '対応中'].includes(normalizedStatus) && existing.is_archived === 0) {
         const { db } = require('../db');
         db.prepare('UPDATE applicants SET is_archived=1, updated_at=? WHERE id=?')
           .run(new Date().toISOString(), id);

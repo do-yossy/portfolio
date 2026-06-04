@@ -1082,3 +1082,42 @@ async function moveCompany(id, currentCompany) {
     }
   });
 }
+
+async function showDupInfo(id) {
+  await _showRefPopup(id, 'dup-info', '重複元の応募情報');
+}
+async function showReturningInfo(id) {
+  await _showRefPopup(id, 'returning-info', '前回の応募情報（再応募者）');
+}
+async function _showRefPopup(id, type, title) {
+  try {
+    const res = await fetch(`/api/ops/calls/${id}/${type}`);
+    const d = await res.json();
+    if (!d.ref) { toast('参照元の情報が見つかりません', 'warn'); return; }
+    const r = d.ref;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:10px;padding:24px;min-width:320px;max-width:480px;box-shadow:0 4px 24px rgba(0,0,0,.2)';
+    box.innerHTML = `
+      <p style="font-weight:700;font-size:15px;margin:0 0 16px">${title}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tr><td style="padding:4px 8px;color:#64748b;width:90px">氏名</td><td style="padding:4px 8px;font-weight:600">${r.name}</td></tr>
+        <tr><td style="padding:4px 8px;color:#64748b">電話</td><td style="padding:4px 8px">${r.phone}</td></tr>
+        <tr style="background:#f8fafc"><td style="padding:4px 8px;color:#64748b">会社</td><td style="padding:4px 8px">${r.company}</td></tr>
+        <tr><td style="padding:4px 8px;color:#64748b">媒体</td><td style="padding:4px 8px">${r.media}</td></tr>
+        <tr style="background:#f8fafc"><td style="padding:4px 8px;color:#64748b">応募日</td><td style="padding:4px 8px">${r.appliedAt}</td></tr>
+        <tr><td style="padding:4px 8px;color:#64748b">求人タイトル</td><td style="padding:4px 8px">${r.jobTitle || '—'}</td></tr>
+        <tr style="background:#f8fafc"><td style="padding:4px 8px;color:#64748b">対応状況</td><td style="padding:4px 8px">${r.status}</td></tr>
+        <tr><td style="padding:4px 8px;color:#64748b">架電回数</td><td style="padding:4px 8px">${r.callCount}回</td></tr>
+        ${r.notes ? `<tr style="background:#f8fafc"><td style="padding:4px 8px;color:#64748b">メモ</td><td style="padding:4px 8px">${r.notes}</td></tr>` : ''}
+      </table>
+      <div style="margin-top:16px;text-align:right">
+        <button style="padding:6px 18px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer">閉じる</button>
+      </div>`;
+    box.querySelector('button').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  } catch (e) { toast('情報の取得に失敗しました', 'error'); }
+}
