@@ -15,7 +15,7 @@ const SHEET_HEADERS = [
   '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日',
   '架電回数', '対応状況', '最終架電日', 'メモ',
 ];
-const SHEET_COL = { id: 0, dupInfo: 1, furigana: 5, callCount: 18, status: 19, notes: 21 };
+const SHEET_COL = { id: 0, dupInfo: 1, furigana: 5, callCount: 18, status: 19, lastCalled: 20, notes: 21 };
 
 // レイアウト検出用（旧レイアウトのインデックスで退避する）
 const LAYOUTS = [
@@ -45,7 +45,7 @@ function applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo = '') {
 }
 
 // DB → スプレッドシート（会社ごとタブ。重複を除き、未登録IDのみ追記）
-async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList }) {
+async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList, archived = false }) {
   const mediaLabel = id => { const m = mediaList.find(x => x.id === id); return m ? m.name : (id || '不明'); };
   // 管理画面と同じラベルを使用（c.label → c.short → id の順で fallback）
   const companyLabel = id => { const c = companies.find(x => x.id === id); return c ? (c.label || c.short || id) : (id || ''); };
@@ -58,7 +58,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   // 全員をシートに反映（重複・過去応募に関わらず除外しない）
   for (const co of companies) {
     const { db } = require('../db');
-    const list = (await Ops.listCalls({ company: co.id, archived: false }));
+    const list = (await Ops.listCalls({ company: co.id, archived }));
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
 
@@ -68,18 +68,27 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const prior = new Map();
     const existingHeader = existing[0] || [];
     const layout = LAYOUTS.find(l => l.detect(existingHeader));
-    if (layout) {
-      const pc = layout.col;
-      for (const row of existing.slice(1)) {
-        const id = row[pc.id];
-        if (!id) continue;
-        prior.set(id, {
-          callCount: row[pc.callCount],
-          status:    row[pc.status],
-          notes:     row[pc.notes],
-          furigana:  pc.furigana >= 0 ? row[pc.furigana] : '',
-        });
-      }
+    // 手入力値を退避する列はヘッダー名でも検出（レイアウト判定に失敗してもメモ等を消さない）
+    const priorBirthCol  = existingHeader.findIndex(h => h === '生年月日');
+    const priorGenderCol = existingHeader.findIndex(h => h === '性別');
+    const priorNotesCol  = existingHeader.findIndex(h => h === 'メモ');
+    const priorFuriCol   = existingHeader.findIndex(h => h === 'ふりがな');
+    const priorLastCol   = existingHeader.findIndex(h => h === '最終架電日');
+    const priorIdCol     = existingHeader.findIndex(h => h === 'ID');
+    const pcL  = layout ? layout.col : null;
+    const idCl = pcL ? pcL.id : (priorIdCol >= 0 ? priorIdCol : 0);
+    for (const row of existing.slice(1)) {
+      const id = row[idCl];
+      if (!id) continue;
+      prior.set(id, {
+        callCount:  pcL && pcL.callCount >= 0 ? row[pcL.callCount] : undefined,
+        status:     pcL && pcL.status   >= 0 ? row[pcL.status]    : undefined,
+        notes:      priorNotesCol >= 0 ? row[priorNotesCol] : (pcL && pcL.notes    >= 0 ? row[pcL.notes]    : ''),
+        furigana:   priorFuriCol  >= 0 ? row[priorFuriCol]  : (pcL && pcL.furigana >= 0 ? row[pcL.furigana] : ''),
+        birthDate:  priorBirthCol  >= 0 ? row[priorBirthCol]  : '',
+        gender:     priorGenderCol >= 0 ? row[priorGenderCol] : '',
+        lastCalled: priorLastCol   >= 0 ? row[priorLastCol]   : '',
+      });
     }
 
     // ── 重複検出 ──────────────────────────────────────────────
@@ -112,7 +121,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         for (const oid of otherIds) {
           const other = listById.get(oid);
           if (!other) continue;
-          const d = other.last_called_at || other.updated_at || '';
+          const d = other.last_called_at || other.applied_at || '';
           if (d > latestDate) { latestDate = d; latestStatus = other.status; }
         }
         const datePart = latestDate ? ` 最終対応:${latestDate.slice(0, 10)} (${latestStatus})` : '';
@@ -122,13 +131,15 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       // ② 過去応募: アーカイブ済みレコードが存在する
       let pastRow = null;
       if (a.normalized_phone) {
-        pastRow = db.prepare(`SELECT status, last_called_at, updated_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_phone);
+        pastRow = db.prepare(`SELECT status, last_called_at, applied_at, updated_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_phone);
       }
       if (!pastRow && a.normalized_email) {
-        pastRow = db.prepare(`SELECT status, last_called_at, updated_at FROM applicants WHERE normalized_email=? AND normalized_email!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_email);
+        pastRow = db.prepare(`SELECT status, last_called_at, applied_at, updated_at FROM applicants WHERE normalized_email=? AND normalized_email!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_email);
       }
       if (pastRow) {
-        const date = (pastRow.last_called_at || pastRow.updated_at || '').slice(0, 10);
+        // 実際に対応した日(last_called_at)を優先。無ければ過去の応募日(applied_at)。
+        // updated_at はアーカイブ等のDB更新で本日に書き換わるため使わない。
+        const date = (pastRow.last_called_at || pastRow.applied_at || '').slice(0, 10);
         parts.push(`過去応募 最終対応:${date} (${pastRow.status})`);
       }
 
@@ -159,12 +170,30 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       for (const a of grp) {
         const dupInfo = buildDupInfo(a);
         const row = applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo);
-        const p = prior.get(a.id);  // 手入力済みのデータを優先（架電結果・ふりがな）
+        const p = prior.get(a.id);  // 手入力済みのデータを優先（架電結果・ふりがな・生年月日・性別）
         if (p) {
           if (p.callCount !== undefined && p.callCount !== '') row[SHEET_COL.callCount] = String(p.callCount);
           if (p.status) row[SHEET_COL.status] = p.status;
-          if (p.notes !== undefined && p.notes !== '') row[SHEET_COL.notes] = p.notes;
+          // メモ: 架電リスト(DB)のメモとシート手入力のメモを両方保持してマージ（どちらも消さない）
+          {
+            const dbNotes    = String(row[SHEET_COL.notes] || '').trim(); // DB(架電リスト)のメモ
+            const sheetNotes = String(p.notes || '').trim();              // シート手入力のメモ
+            let merged;
+            if (dbNotes && sheetNotes) {
+              if (sheetNotes.includes(dbNotes))      merged = sheetNotes;
+              else if (dbNotes.includes(sheetNotes)) merged = dbNotes;
+              else                                    merged = `${dbNotes} / ${sheetNotes}`;
+            } else {
+              merged = dbNotes || sheetNotes;
+            }
+            row[SHEET_COL.notes] = merged;
+          }
           if (p.furigana) row[SHEET_COL.furigana] = p.furigana;
+          // 生年月日(index9)・性別(index8)・最終架電日 の手入力値はDBが空でも保持
+          if (p.birthDate && String(p.birthDate).trim() && !row[9]) row[9] = String(p.birthDate).trim();
+          if (p.gender && String(p.gender).trim() && !row[8]) row[8] = String(p.gender).trim();
+          if (p.lastCalled && String(p.lastCalled).trim() && !String(row[SHEET_COL.lastCalled] || '').trim())
+            row[SHEET_COL.lastCalled] = String(p.lastCalled).trim();
         }
         rows.push(row);
         count++;
@@ -220,8 +249,9 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     }
     tabs++;
   }
+  const listLabel = archived ? '過去応募者スプレッドシート' : '共有スプレッドシート';
   if (Logs) await Logs.create('sheets_push', 'success',
-    `${count}件を共有スプレッドシートに反映（${tabs}タブ・媒体別）` + (warnings.length ? ` ※${warnings.join(' / ')}` : ''));
+    `${count}件を${listLabel}に反映（${tabs}タブ・媒体別）` + (warnings.length ? ` ※${warnings.join(' / ')}` : ''));
   return { count, appended: count, tabs, warnings };
 }
 
@@ -270,6 +300,7 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       education:   fc('学歴'),
       workLocation:fc('勤務地'),
       appliedAt:   fc('応募日'),
+      lastCalled:  fc('最終架電日'),
     };
 
     // 架電結果列は LAYOUTS で検出（旧レイアウトのインデックスずれを吸収）
@@ -337,7 +368,8 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       await Ops.updateCall(id, {
         callCount: (ccRaw !== undefined && ccRaw !== '') ? (parseInt(ccRaw) || 0) : undefined,
         status: normalizedStatus || undefined,
-        notes: row[pc.notes] !== undefined ? row[pc.notes] : undefined,
+        // 空セルではDBのメモを消さない（手入力メモを保持）。値がある時だけ更新。
+        notes: (row[pc.notes] !== undefined && String(row[pc.notes]).trim() !== '') ? row[pc.notes] : undefined,
         skipAutoArchive: false,
       });
       // ふりがなをDBに同期
@@ -346,6 +378,31 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
         if (sheetFurigana !== undefined && sheetFurigana !== '') {
           db.prepare('UPDATE applicants SET furigana=?, updated_at=? WHERE id=?')
             .run(sheetFurigana, new Date().toISOString(), id);
+        }
+      }
+      // 生年月日をDBに同期（Indeed等で空欄→シートで手入力した値を取り込む）
+      if (colIdx.birthDate >= 0) {
+        const sheetBirth = row[colIdx.birthDate];
+        if (sheetBirth !== undefined && String(sheetBirth).trim() !== '') {
+          db.prepare('UPDATE applicants SET birth_date=?, updated_at=? WHERE id=?')
+            .run(String(sheetBirth).trim(), new Date().toISOString(), id);
+        }
+      }
+      // 性別をDBに同期（Indeedは性別なし→シートで手入力した値を取り込む）
+      if (colIdx.gender >= 0) {
+        const sheetGender = row[colIdx.gender];
+        if (sheetGender !== undefined && String(sheetGender).trim() !== '') {
+          db.prepare('UPDATE applicants SET gender=?, updated_at=? WHERE id=?')
+            .run(String(sheetGender).trim(), new Date().toISOString(), id);
+        }
+      }
+      // 最終架電日をDBに同期（シートで手入力した値を取り込む）。
+      // updateCallが架電回数>0で last_called_at を本日に上書きするため、その後に手入力値で再設定する。
+      if (colIdx.lastCalled >= 0) {
+        const sheetLast = row[colIdx.lastCalled];
+        if (sheetLast !== undefined && String(sheetLast).trim() !== '') {
+          db.prepare('UPDATE applicants SET last_called_at=?, updated_at=? WHERE id=?')
+            .run(String(sheetLast).trim(), new Date().toISOString(), id);
         }
       }
       // 不通/対応中/終了 → 同一電話・メールのレコードをまとめてアーカイブ

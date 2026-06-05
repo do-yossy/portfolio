@@ -1338,7 +1338,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
       </section>
       <section class="card">
         <h2>本日架電を行う件数（会社別）</h2>
-        <p class="muted">「新規」「架電済(不通)」「対応中」の合計（対応終了・断られた・辞退は除く）</p>
+        <p class="muted">架電リストに残っている「新規」の件数（不通・対応中・終了は過去応募へ移動）</p>
         <table class="cross-table" style="max-width:360px">
           <thead><tr><th>会社</th><th>架電対象件数</th></tr></thead>
           <tbody>${targetRows}</tbody>
@@ -1425,7 +1425,8 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <div style="display:flex;gap:8px">
             <button class="btn btn-secondary btn-sm" onclick="callImport()" title="過去応募者データ（CSV / Excel）を取り込む">📥 過去応募者を取り込む</button>
             <button class="btn btn-secondary btn-sm" onclick="callSmartImport()" title="全会社・全媒体が1つに混在したExcelを自動振り分けで取り込む">🪄 まとめてExcel取込</button>
-            <a id="past-export" href="${exportHref}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全件）</a>
+            <button class="btn btn-primary btn-sm" onclick="sheetsPushPast()" title="過去応募者を架電用とは別の専用スプレッドシートへ出力（GOOGLE_PAST_SHEET_ID）">📤 過去リストを別シート出力</button>
+            <a id="past-export" href="${exportHref}" class="btn btn-secondary btn-sm" download>📊 CSV出力（全件）</a>
           </div>
         </div>
         <form id="past-filter" class="filter-bar">

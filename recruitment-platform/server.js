@@ -225,7 +225,7 @@ function mapCSVRow(row) {
   };
 }
 
-// 運用管理用CSVマッパー（会社・媒体を指定、Indeed分割氏名にも対応）
+// 運用管理用CSVマッパー（会社・媒体を指定、Indeed/engage分割氏名にも対応）
 function mapOpsCSVRow(row, company, media) {
   const base = mapCSVRow(row);
   const col = (keys) => {
@@ -241,22 +241,110 @@ function mapOpsCSVRow(row, company, media) {
     }
     return '';
   };
-  // Indeedダウンロード形式: 氏名（姓）＋氏名（名）
+
+  // ── engage / Indeed形式: 氏名（姓）＋氏名（名）結合 ──
   if (!base.name) {
     const sei = col(['氏名（姓）','姓','sei']);
     const mei = col(['氏名（名）','名','mei']);
     const joined = `${sei} ${mei}`.trim();
     if (joined) base.name = joined.replace(/[（(][^）)]*[）)]/g, '').trim();
   }
-  // engage形式の「氏名」単体や「名前」
   if (!base.name) base.name = col(['氏名','名前']).replace(/[（(][^）)]*[）)]/g, '').trim();
-  // 居住地（engage形式）
-  if (!base.address) base.address = col(['応募者の居住地','居住地','都道府県']);
-  // 架電回数（engageシートに既存値がある場合）
+
+  // ── engage形式: ふりがな（姓カナ＋名カナ結合）──
+  if (!base.furigana) {
+    const kSei = col(['氏名フリガナ（姓）','氏名カナ（姓）','姓カナ','フリガナ（姓）']);
+    const kMei = col(['氏名フリガナ（名）','氏名カナ（名）','名カナ','フリガナ（名）']);
+    if (kSei || kMei) base.furigana = `${kSei} ${kMei}`.trim();
+  }
+  if (!base.furigana) base.furigana = col(['氏名フリガナ','フリガナ','ふりがな','よみがな','カナ氏名']);
+  // ── 求人ボックス形式: 氏名の括弧内ふりがな "松平 吉弘（まつだいら よしひろ）" ──
+  if (!base.furigana) {
+    const rawNm = col(['氏名','名前','お名前']);
+    const fm = rawNm.match(/[（(]([^）)]*)[）)]/);
+    if (fm && /[ぁ-んァ-ヶ]/.test(fm[1])) base.furigana = fm[1].trim();
+  }
+
+  // ── 居住地: engage形式は都道府県＋市区町村 ──
+  if (!base.address) {
+    const pref = col(['都道府県']);
+    const city = col(['市区町村']);
+    if (pref) base.address = city ? `${pref}${city}` : pref;
+  }
+  if (!base.address) base.address = col(['応募者の居住地','居住地','以降の住所']);
+
+  // ── 学歴: 最終学歴 - 学校区分 ＋ 学校名 ──
+  if (!base.education) {
+    const gakkou = col(['最終学歴 - 学校区分','学校区分']);
+    const name   = col(['最終学歴 - 学校名','学校名']);
+    const gakka  = col(['最終学歴 - 学部/学科']);
+    const parts  = [gakkou, name, gakka].filter(Boolean);
+    if (parts.length) base.education = parts.join(' ');
+  }
+
+  // ── 求人タイトル: engageは「応募求人-職種名」──
+  if (!base.jobTitle) base.jobTitle = col(['応募求人-職種名','応募求人名','求人タイトル','応募職種']);
+
+  // ── 求人ボックス形式: 生年月日 "1994年03月05日 (32歳)" から年齢を抽出 ──
+  if (!base.age) {
+    const bd = col(['生年月日','birth_date','birthdate']);
+    const am = bd.match(/[（(]\s*(\d{1,3})\s*歳/);
+    if (am) base.age = am[1];
+  }
+  // 生年月日から括弧内の年齢表記を除去して保存（"1994年03月05日 (32歳)" → "1994年03月05日"）
+  if (base.birthDate) base.birthDate = base.birthDate.replace(/[（(][^）)]*[）)]/g, '').trim();
+
+  // ── 経験: 直近年収・転職回数・経験年数を組み合わせてノート風に ──
+  if (!base.experience) {
+    const income   = col(['直近の年収','年収']);
+    const tenJob   = col(['転職経験']);
+    const expYears = col(['経験年数']);
+    const parts    = [];
+    if (income)   parts.push(`年収: ${income}`);
+    if (tenJob)   parts.push(`転職: ${tenJob}`);
+    if (expYears) parts.push(`経験年数: ${expYears}`);
+    if (parts.length) base.experience = parts.join(' / ');
+  }
+
+  // ── 職歴詳細をnotesへ追記（engage: 職歴N / 求人ボックス: 勤務先_N）──
+  const workHistoryParts = [];
+  // engage形式: 職歴1〜3
+  for (let i = 1; i <= 3; i++) {
+    const co2 = col([`職歴${i} - 企業名`]);
+    const from = col([`職歴${i} - 入社年月`]);
+    const to   = col([`職歴${i} - 退社年月`]);
+    const desc = col([`職歴${i} - 経験されたお仕事やスキル`]);
+    if (co2) {
+      const period = [from, to].filter(Boolean).join('〜');
+      workHistoryParts.push(`【職歴${i}】${co2}${period ? ` (${period})` : ''}${desc ? '\n' + desc.replace(/<br>/g, '\n').slice(0, 200) : ''}`);
+    }
+  }
+  // 求人ボックス形式: 勤務先_1〜30 / 役職・業務内容など_N
+  if (workHistoryParts.length === 0) {
+    for (let i = 1; i <= 30; i++) {
+      const place = col([`勤務先_${i}`]);
+      const role  = col([`役職・業務内容など_${i}`]);
+      if (place) {
+        workHistoryParts.push(`【勤務先${i}】${place}${role ? '\n' + role.replace(/<br>/g, '\n').slice(0, 200) : ''}`);
+      }
+    }
+  }
+  // 既存メモ（備考・PR / 選考コメント等）を保持しつつ職歴を追記
+  const extraNote = col(['選考コメント']);
+  const noteSegments = [];
+  if (base.notes) noteSegments.push(base.notes);
+  if (extraNote && extraNote !== base.notes) noteSegments.push(`【選考コメント】${extraNote}`);
+  if (workHistoryParts.length) noteSegments.push(workHistoryParts.join('\n\n'));
+  if (noteSegments.length) base.notes = noteSegments.join('\n\n');
+
+  // ── 架電回数（engageシートに既存値がある場合）──
   let cc = col(['架電回数','call_count']);
   cc = /^\d+$/.test(cc) ? parseInt(cc) : 0;
 
-  return { ...base, company, media, callCount: cc, status: base.status || '新規' };
+  // sourceMediaが未取得('CSV取込'デフォルト)の場合はmedia名を使用
+  const sourceMedia = (base.sourceMedia && base.sourceMedia !== 'CSV取込') ? base.sourceMedia : media;
+
+  return { ...base, company, media, sourceMedia, callCount: cc, status: base.status || '新規' };
 }
 
 // 会社ID → 正式社名（スクリプトの COMPANY_NAME 用）
@@ -270,11 +358,11 @@ async function opsNewStats() {
   const { db } = require('./db');
   const today = new Date().toISOString().slice(0, 10);
   const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
-  // 「本日/今週の新規応募」は応募日(applied_at)基準でカウント。
-  // 取り込んだ過去データ（is_imported=1）とアーカイブ（is_archived=1）は除外し、
-  // ライブで応募フォーム等から来た本日分のみを数える。
-  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND is_imported = 0 AND substr(applied_at, 1, 10) = ?`).get(today).c;
-  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND is_imported = 0 AND substr(applied_at, 1, 10) >= ?`).get(monday).c;
+  // 「本日の新規応募」は created_at（登録日時）基準でカウント。
+  // CSV取り込み分（is_imported=1）も含め、今日登録された全応募者を数える。
+  // これにより会社別×媒体別 新規応募数の合計と一致する。
+  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(today + 'T00:00:00Z').c;
+  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(monday + 'T00:00:00Z').c;
   const activeTotal = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND status IN ('新規','架電済(不通)','対応中')`).get().c;
   return { todayNew, weekNew, activeTotal };
 }
@@ -1030,7 +1118,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       data.siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
       try { data.indeedRepostCount = (await computeDashboardStats(co)).indeedRepostCount || 0; } catch { data.indeedRepostCount = 0; }
     } else if (tab === 'new') {
-      data.applicantsCross = await Ops.crossTab({});
+      data.applicantsCross = await Ops.crossTab({ todayOnly: true });
       data.todayTargets = await Ops.todayCallTargets();
       data.stats = await opsNewStats();
     } else if (tab === 'past') {
@@ -1410,7 +1498,13 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // 設定状況（UIの表示制御用）
   if (pathname === '/api/ops/sheets/status' && method === 'GET') {
-    sendJSON(res, 200, { ok: true, configured: gsheets.isConfigured(), url: gsheets.isConfigured() ? gsheets.sheetUrl() : null });
+    sendJSON(res, 200, {
+      ok: true,
+      configured: gsheets.isConfigured(),
+      url: gsheets.isConfigured() ? gsheets.sheetUrl() : null,
+      pastConfigured: gsheets.isPastConfigured(),
+      pastUrl: gsheets.isPastConfigured() ? gsheets.pastSheetUrl() : null,
+    });
     return;
   }
 
@@ -1425,6 +1519,26 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       sendJSON(res, 200, { ok: true, ...r, url: gsheets.sheetUrl() });
     } catch (e) {
       await Logs.create('sheets_push', 'error', String(e.message || e));
+      sendJSON(res, 500, { ok: false, error: String(e.message || e) });
+    }
+    return;
+  }
+
+  // 過去応募者（アーカイブ済み）を「別スプレッドシート」へ出力
+  //   GOOGLE_PAST_SHEET_ID で指定した、架電用とは別のスプレッドシートに書き出す
+  if (pathname === '/api/ops/sheets/push-past' && method === 'POST') {
+    if (!gsheets.isPastConfigured()) {
+      sendJSON(res, 400, { ok: false, error: '過去応募者用スプレッドシートが未設定です（GOOGLE_PAST_SHEET_ID）' });
+      return;
+    }
+    try {
+      const pastId = process.env.GOOGLE_PAST_SHEET_ID;
+      const r = await gsheets.withSheetId(pastId, () =>
+        pushToSheets({ gsheets, Ops, Logs, companies: OPS_COMPANIES, statuses: CALL_STATUSES, mediaList: OPS_MEDIA, archived: true })
+      );
+      sendJSON(res, 200, { ok: true, ...r, url: gsheets.pastSheetUrl() });
+    } catch (e) {
+      await Logs.create('sheets_push', 'error', '過去応募者出力: ' + String(e.message || e));
       sendJSON(res, 500, { ok: false, error: String(e.message || e) });
     }
     return;
