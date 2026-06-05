@@ -59,7 +59,7 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
 <div class="wrap">
   <div class="kpis" id="kpis"></div>
   <div class="ingest">
-    <textarea id="ingest" placeholder="案件の募集本文を貼り付け（空行区切りで複数可）→ 一次スコアリングして候補に追加"></textarea>
+    <textarea id="ingest" placeholder="案件の募集本文を貼り付け（1回＝1案件。複数は --- の行で区切る）→ 候補に取込"></textarea>
     <button class="btn" onclick="ingest()">候補に取込</button>
   </div>
   <div class="inbox" id="inbox"></div>
@@ -122,6 +122,7 @@ function card(d){
       ${i>=0&&i<STAGES.length-1?`<button class="mini adv" onclick="adv('${d.id}')">次へ →</button>`:''}
       <button class="mini" onclick="edit('${d.id}')">✎</button>
       <button class="mini" onclick="prop('${d.id}')">📝</button>
+      <button class="mini lose" onclick="delDeal('${d.id}')">🗑</button>
       ${d.link?`<a class="mini" href="${esc(d.link)}" target="_blank">🔗</a>`:''}
       ${d.stage!=='lost'?`<button class="mini lose" onclick="setStage('${d.id}','lost')">✗</button>`:`<button class="mini" onclick="setStage('${d.id}','lead')">↩</button>`}
     </div></div>`;
@@ -145,8 +146,9 @@ function renderInbox(){
     }).join(''):'<div class="empty" style="padding:.8rem">アクション待ちはありません。</div>');
 }
 async function adv(id){ await api('/api/deals/'+id+'/advance',{method:'POST'}); load(); }
+async function delDeal(id){ if(!confirm('この案件を削除しますか？'))return; await api('/api/deals/'+id,{method:'DELETE'}); load(); }
 async function setStage(id,stage){ await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify({stage})}); load(); }
-async function ingest(){ const t=$('ingest').value.trim(); if(!t)return; const items=t.split(/\n\s*\n/).map(x=>({text:x.trim()})).filter(x=>x.text); const r=await api('/api/ingest',{method:'POST',body:JSON.stringify({items})}); $('ingest').value=''; alert(r.created+'件を候補に追加しました'); load(); }
+async function ingest(){ const t=$('ingest').value.trim(); if(!t)return; const items=t.split(/\n[ \t]*[-=]{3,}[ \t]*\n/).map(x=>({text:x.trim()})).filter(x=>x.text); const r=await api('/api/ingest',{method:'POST',body:JSON.stringify({items})}); $('ingest').value=''; alert(r.created+'件を候補に追加しました'); load(); }
 
 function ov(s){ $('ov').classList.toggle('show',s); }
 function fillStages(){ $('m_stage').innerHTML=STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('')+'<option value="lost">失注</option>'; }
