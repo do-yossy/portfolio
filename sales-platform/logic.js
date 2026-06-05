@@ -14,6 +14,8 @@ const DEMO = {
   system: '予約管理ツール.html', ai: 'AI添削ツール.html', line: 'LINE公式アカウント構築.html'
 };
 const demoUrl = type => PORTFOLIO_BASE + encodeURIComponent(DEMO[type] || DEMO.LP);
+const LANCERS_PROFILE = process.env.LANCERS_PROFILE || 'https://www.lancers.jp/profile/anchan1111';
+const jisseki = type => `・最も近い実績デモ：${demoUrl(type)}\n・制作一覧（ポートフォリオ）：${PORTFOLIO_BASE}\n・ランサーズ実績：${LANCERS_PROFILE}`;
 
 const STAGES = [
   { key: 'lead',    label: '候補',     prob: .10, who: 'AI 選定' },
@@ -88,10 +90,15 @@ function detectBudget(text) {
   if (man) return parseInt(man[1].replace(/[０-９]/g, d => '0123456789'['０１２３４５６７８９'.indexOf(d)])) * 10000;
   const yen = text.match(/([0-9,]{3,})\s*円/);
   if (yen) return parseInt(yen[1].replace(/,/g, ''));
+  // 文字単価 × 文字数（ライティングの記事単価）
+  const rate = text.match(/文字単価\s*([0-9.]+)\s*円?/);
+  const chars = text.match(/([0-9,]{3,6})\s*文字/);
+  if (rate && chars) return Math.round(parseFloat(rate[1]) * parseInt(chars[1].replace(/,/g, '')));
   return 0;
 }
 function detectType(text) {
   const t = text;
+  if (/(ライティング|記事(の)?(作成|執筆|制作)|SEO記事|ブログ記事|コラム執筆|webライ|文字単価|[0-9０-９]{3,}\s*文字)/i.test(t) && !/(ツール|システム|アプリ)/i.test(t)) return 'writing';
   if (/AI|人工知能|ChatGPT|Claude|自動化ツール/i.test(t)) return 'ai';
   if (/LINE|ステップ配信|リッチメニュー/i.test(t)) return 'line';
   if (/ECサイト|ネットショップ|通販サイト|カート機能|決済/i.test(t)) return 'ec';
@@ -115,7 +122,7 @@ function scoreFromText(text = '', extra = {}) {
   const continuity = /(継続|長期|保守|運用|複数)/.test(t) ? 'high' : 'single';
   const competition = (() => { const m = t.match(/提案\s*([0-9]+)\s*件/); return m ? (+m[1] > 15 ? 'high' : +m[1] > 5 ? 'mid' : 'low') : 'mid'; })();
   const deadline = /(急ぎ|至急|今週|今月中)/.test(t) ? 'near' : 'mid';
-  const est_hours = type === 'LP' ? 6 : type === 'corp' ? 24 : 40;
+  const est_hours = type === 'LP' ? 6 : type === 'corp' ? 24 : type === 'writing' ? 3 : 40;
   const r = score({ budget, channel, template_fit, spec, continuity, competition, deadline, flags, est_hours });
   return { ...r, type, budget, est_hours, template_fit, spec, continuity, competition, deadline };
 }
@@ -201,10 +208,48 @@ ${d.demo}
 実現したい出力イメージを1例頂ければ、精度の見立てをお返しします。`
 };
 TPL.ec = TPL.system; TPL.line = TPL.LP;
+TPL.writing = (d) => `${d.title} を拝見しました。${d.industry || '御社'}のテーマで、SEOを意識した読みやすい記事を執筆できます。
+
+▼実績・スタイル
+・ランサーズ実績：${LANCERS_PROFILE}
+・ポートフォリオ：${PORTFOLIO_BASE}
+
+▼ご提案
+・検索意図に沿った見出し構成（PREP法）で離脱を防止
+・指定キーワードを自然に配置し、SEOの土台を確保
+・コピペチェック・推敲込みで納品
+
+▼料金・納期：文字単価¥1.5〜／1記事あたり約2〜3日（文字数により調整）
+▼強み：修正無制限・オンライン完結・24時間以内返信
+
+ご希望の文字数・キーワード・構成をいただければ、即着手します。よろしくお願いいたします。`;
+
+const DELIVERABLE = {
+  web: (d) => `📎 添付する成果物（実績デモ）
+下記をそのまま提示してください。
+${jisseki(d.type)}
+※「ご依頼後、まず構成案（ワイヤー）をお出しします」と添えると親切です。`,
+  writing: (d) => `📎 添付する成果物（サンプル記事の構成案）
+タイトル案：${String(d.title || 'テーマ').slice(0, 40)} を分かりやすく解説
+リード（です・ます調・約150字）：読者の悩み → この記事で分かること → 結論の予告 の順で導入。
+
+■見出し構成（H2/H3）
+H2 基礎：そもそも何か／背景
+H2 選び方・手順（H3 ポイント3つ）
+H2 よくある失敗と対策
+H2 まとめ（次の行動を促す）
+
+※指定の文字数・キーワード・構成があれば準拠します。本文サンプルが要る場合は1本書き起こします。`
+};
 function proposal(deal = {}) {
   const type = deal.type || 'LP';
-  const d = { ...deal, demo: deal.link || demoUrl(type) };
-  return (TPL[type] || TPL.LP)(d);
+  const d = { ...deal, type, demo: jisseki(type) };
+  const body = (TPL[type] || TPL.LP)(d);
+  const deliv = (type === 'writing' ? DELIVERABLE.writing : DELIVERABLE.web)(d);
+  return `${body}
+
+―――――――――――――――――
+${deliv}`;
 }
 
 module.exports = { STAGES, STAGE_KEYS, stageProb, mediaFee, score, scoreFromText, quote, proposal, demoUrl, PLAN, OPT };

@@ -169,10 +169,15 @@ const server = http.createServer(async (req, res) => {
       const pm = p.match(/^\/api\/deals\/([^/]+)\/proposal$/);
       if (pm && m === 'GET') { const d = Deals.findById(pm[1]); if (!d) return json(res, 404, {}); return json(res, 200, { proposal: L.proposal(d) }); }
 
-      // Claudeで提案文＋成果物を生成（手動・再生成用）
+      // 提案文＋成果物を生成（APIキー有=Claude高品質／無=無料テンプレで完結）
       const gm = p.match(/^\/api\/deals\/([^/]+)\/generate$/);
       if (gm && m === 'POST') {
         const d = Deals.findById(gm[1]); if (!d) return json(res, 404, { error: 'not found' });
+        if (!process.env.ANTHROPIC_API_KEY) {
+          const free = L.proposal(d);
+          Deals.update(d.id, { proposal: free });
+          return json(res, 200, { proposal: free, free: true });
+        }
         try {
           const g = await claude.generate(d);
           const combined = (g.proposal || '') + '\n\n――― 添付用の成果物（' + (g.deliverable_type || '') + '） ―――\n' + (g.deliverable || '') + '\n\n参考デモ: ' + (g.demo_url || '');
