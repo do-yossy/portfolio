@@ -1951,7 +1951,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       return sendJSON(res, 400, { error: '❌ VPN未接続です。処理を中止します。' });
     }
 
-    const startBody = await parseJSON(req);
+    const startBody   = await parseJSON(req);
     const batchSize   = Math.min(parseInt(startBody.limit || '25', 10), 25);
     const kbCompany   = startBody.company || null;
     const forceRepost = startBody.forceRepost === true || startBody.forceRepost === 'true';
