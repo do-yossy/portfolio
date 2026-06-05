@@ -45,7 +45,7 @@ function applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo = '') {
 }
 
 // DB → スプレッドシート（会社ごとタブ。重複を除き、未登録IDのみ追記）
-async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList }) {
+async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList, archived = false }) {
   const mediaLabel = id => { const m = mediaList.find(x => x.id === id); return m ? m.name : (id || '不明'); };
   // 管理画面と同じラベルを使用（c.label → c.short → id の順で fallback）
   const companyLabel = id => { const c = companies.find(x => x.id === id); return c ? (c.label || c.short || id) : (id || ''); };
@@ -58,7 +58,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   // 全員をシートに反映（重複・過去応募に関わらず除外しない）
   for (const co of companies) {
     const { db } = require('../db');
-    const list = (await Ops.listCalls({ company: co.id, archived: false }));
+    const list = (await Ops.listCalls({ company: co.id, archived }));
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
 
@@ -249,8 +249,9 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     }
     tabs++;
   }
+  const listLabel = archived ? '過去応募者スプレッドシート' : '共有スプレッドシート';
   if (Logs) await Logs.create('sheets_push', 'success',
-    `${count}件を共有スプレッドシートに反映（${tabs}タブ・媒体別）` + (warnings.length ? ` ※${warnings.join(' / ')}` : ''));
+    `${count}件を${listLabel}に反映（${tabs}タブ・媒体別）` + (warnings.length ? ` ※${warnings.join(' / ')}` : ''));
   return { count, appended: count, tabs, warnings };
 }
 

@@ -1425,7 +1425,8 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <div style="display:flex;gap:8px">
             <button class="btn btn-secondary btn-sm" onclick="callImport()" title="過去応募者データ（CSV / Excel）を取り込む">📥 過去応募者を取り込む</button>
             <button class="btn btn-secondary btn-sm" onclick="callSmartImport()" title="全会社・全媒体が1つに混在したExcelを自動振り分けで取り込む">🪄 まとめてExcel取込</button>
-            <a id="past-export" href="${exportHref}" class="btn btn-primary btn-sm" download>📊 スプレッドシート出力（全件）</a>
+            <button class="btn btn-primary btn-sm" onclick="sheetsPushPast()" title="過去応募者を架電用とは別の専用スプレッドシートへ出力（GOOGLE_PAST_SHEET_ID）">📤 過去リストを別シート出力</button>
+            <a id="past-export" href="${exportHref}" class="btn btn-secondary btn-sm" download>📊 CSV出力（全件）</a>
           </div>
         </div>
         <form id="past-filter" class="filter-bar">

@@ -1498,7 +1498,13 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // 設定状況（UIの表示制御用）
   if (pathname === '/api/ops/sheets/status' && method === 'GET') {
-    sendJSON(res, 200, { ok: true, configured: gsheets.isConfigured(), url: gsheets.isConfigured() ? gsheets.sheetUrl() : null });
+    sendJSON(res, 200, {
+      ok: true,
+      configured: gsheets.isConfigured(),
+      url: gsheets.isConfigured() ? gsheets.sheetUrl() : null,
+      pastConfigured: gsheets.isPastConfigured(),
+      pastUrl: gsheets.isPastConfigured() ? gsheets.pastSheetUrl() : null,
+    });
     return;
   }
 
@@ -1513,6 +1519,26 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       sendJSON(res, 200, { ok: true, ...r, url: gsheets.sheetUrl() });
     } catch (e) {
       await Logs.create('sheets_push', 'error', String(e.message || e));
+      sendJSON(res, 500, { ok: false, error: String(e.message || e) });
+    }
+    return;
+  }
+
+  // 過去応募者（アーカイブ済み）を「別スプレッドシート」へ出力
+  //   GOOGLE_PAST_SHEET_ID で指定した、架電用とは別のスプレッドシートに書き出す
+  if (pathname === '/api/ops/sheets/push-past' && method === 'POST') {
+    if (!gsheets.isPastConfigured()) {
+      sendJSON(res, 400, { ok: false, error: '過去応募者用スプレッドシートが未設定です（GOOGLE_PAST_SHEET_ID）' });
+      return;
+    }
+    try {
+      const pastId = process.env.GOOGLE_PAST_SHEET_ID;
+      const r = await gsheets.withSheetId(pastId, () =>
+        pushToSheets({ gsheets, Ops, Logs, companies: OPS_COMPANIES, statuses: CALL_STATUSES, mediaList: OPS_MEDIA, archived: true })
+      );
+      sendJSON(res, 200, { ok: true, ...r, url: gsheets.pastSheetUrl() });
+    } catch (e) {
+      await Logs.create('sheets_push', 'error', '過去応募者出力: ' + String(e.message || e));
       sendJSON(res, 500, { ok: false, error: String(e.message || e) });
     }
     return;

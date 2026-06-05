@@ -975,6 +975,23 @@ async function sheetsPush() {
     } else { toast('反映に失敗: ' + (d.error || '不明なエラー'), 'error'); }
   } catch (e) { toast('通信エラー: ' + e.message, 'error'); }
 }
+async function sheetsPushPast() {
+  const st = await sheetsStatus();
+  if (!st.pastConfigured) { toast('過去応募者用スプレッドシートが未設定です（.env に GOOGLE_PAST_SHEET_ID を設定してください）', 'warn'); return; }
+  confirmAction('過去応募者（アーカイブ済み）を架電用とは別の専用スプレッドシートへ出力します。よろしいですか？', async () => {
+    toast('過去リストを別スプレッドシートへ出力中...', 'info');
+    try {
+      const r = await fetch('/api/ops/sheets/push-past', { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) {
+        const n = (d.count != null ? d.count : d.appended) || 0;
+        toast(`${n}件を過去応募者スプレッドシートに出力しました（媒体別）`, n > 0 ? 'success' : 'info');
+        if (d.warnings && d.warnings.length) toast('注意: ' + d.warnings.join(' / '), 'warn');
+        if (d.url) window.open(d.url, '_blank');
+      } else { toast('出力に失敗: ' + (d.error || '不明なエラー'), 'error'); }
+    } catch (e) { toast('通信エラー: ' + e.message, 'error'); }
+  });
+}
 async function sheetsPull() {
   const st = await sheetsStatus();
   if (!st.configured) { toast('Googleスプレッドシート連携が未設定です（設定方法はGOOGLE_SHEETS_SETUP.mdを参照）', 'warn'); return; }

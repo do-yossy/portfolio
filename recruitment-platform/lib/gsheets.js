@@ -104,18 +104,38 @@ async function api(path, { method = 'GET', body } = {}) {
   return data;
 }
 
+// 操作対象スプレッドシートIDの一時上書き（過去応募者用など別シートに出力する際に使用）
+let _overrideSheetId = null;
+
 function sheetId() {
-  const id = process.env.GOOGLE_SHEET_ID;
+  const id = _overrideSheetId || process.env.GOOGLE_SHEET_ID;
   if (!id) throw new Error('GOOGLE_SHEET_ID が未設定です');
   return id;
+}
+
+// fn の実行中だけ対象スプレッドシートを sid に切り替える（終了後に必ず復元）
+async function withSheetId(sid, fn) {
+  const prev = _overrideSheetId;
+  _overrideSheetId = sid;
+  try { return await fn(); }
+  finally { _overrideSheetId = prev; }
 }
 
 function isConfigured() {
   return !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_SHEET_ID);
 }
 
+// 過去応募者用スプレッドシート（別シート）が設定済みか
+function isPastConfigured() {
+  return !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_PAST_SHEET_ID);
+}
+
 function sheetUrl() {
   return `https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_SHEET_ID || ''}/edit`;
+}
+
+function pastSheetUrl() {
+  return `https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_PAST_SHEET_ID || ''}/edit`;
 }
 
 // スプレッドシートのメタ（タブ一覧）を取得
@@ -390,7 +410,7 @@ async function writeSingleCell(title, row1based, col0based, value) {
 }
 
 module.exports = {
-  isConfigured, sheetUrl, getAccessToken,
+  isConfigured, isPastConfigured, sheetUrl, pastSheetUrl, withSheetId, getAccessToken,
   getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
   setDropdowns, styleHeader, styleSectionRows, colLetter, setStatusConditionalFormats,
   clearDataValidations, setColumnBackground, clearColumnDataBackground, writeSingleCell,
