@@ -68,23 +68,25 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const prior = new Map();
     const existingHeader = existing[0] || [];
     const layout = LAYOUTS.find(l => l.detect(existingHeader));
-    // 生年月日・性別はヘッダー名で列位置を検出（手入力値の退避用）
+    // 手入力値を退避する列はヘッダー名でも検出（レイアウト判定に失敗してもメモ等を消さない）
     const priorBirthCol  = existingHeader.findIndex(h => h === '生年月日');
     const priorGenderCol = existingHeader.findIndex(h => h === '性別');
-    if (layout) {
-      const pc = layout.col;
-      for (const row of existing.slice(1)) {
-        const id = row[pc.id];
-        if (!id) continue;
-        prior.set(id, {
-          callCount: row[pc.callCount],
-          status:    row[pc.status],
-          notes:     row[pc.notes],
-          furigana:  pc.furigana >= 0 ? row[pc.furigana] : '',
-          birthDate: priorBirthCol  >= 0 ? row[priorBirthCol]  : '',
-          gender:    priorGenderCol >= 0 ? row[priorGenderCol] : '',
-        });
-      }
+    const priorNotesCol  = existingHeader.findIndex(h => h === 'メモ');
+    const priorFuriCol   = existingHeader.findIndex(h => h === 'ふりがな');
+    const priorIdCol     = existingHeader.findIndex(h => h === 'ID');
+    const pcL  = layout ? layout.col : null;
+    const idCl = pcL ? pcL.id : (priorIdCol >= 0 ? priorIdCol : 0);
+    for (const row of existing.slice(1)) {
+      const id = row[idCl];
+      if (!id) continue;
+      prior.set(id, {
+        callCount: pcL && pcL.callCount >= 0 ? row[pcL.callCount] : undefined,
+        status:    pcL && pcL.status   >= 0 ? row[pcL.status]    : undefined,
+        notes:     priorNotesCol >= 0 ? row[priorNotesCol] : (pcL && pcL.notes    >= 0 ? row[pcL.notes]    : ''),
+        furigana:  priorFuriCol  >= 0 ? row[priorFuriCol]  : (pcL && pcL.furigana >= 0 ? row[pcL.furigana] : ''),
+        birthDate: priorBirthCol  >= 0 ? row[priorBirthCol]  : '',
+        gender:    priorGenderCol >= 0 ? row[priorGenderCol] : '',
+      });
     }
 
     // ── 重複検出 ──────────────────────────────────────────────
@@ -170,7 +172,20 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         if (p) {
           if (p.callCount !== undefined && p.callCount !== '') row[SHEET_COL.callCount] = String(p.callCount);
           if (p.status) row[SHEET_COL.status] = p.status;
-          if (p.notes !== undefined && p.notes !== '') row[SHEET_COL.notes] = p.notes;
+          // メモ: 架電リスト(DB)のメモとシート手入力のメモを両方保持してマージ（どちらも消さない）
+          {
+            const dbNotes    = String(row[SHEET_COL.notes] || '').trim(); // DB(架電リスト)のメモ
+            const sheetNotes = String(p.notes || '').trim();              // シート手入力のメモ
+            let merged;
+            if (dbNotes && sheetNotes) {
+              if (sheetNotes.includes(dbNotes))      merged = sheetNotes;
+              else if (dbNotes.includes(sheetNotes)) merged = dbNotes;
+              else                                    merged = `${dbNotes} / ${sheetNotes}`;
+            } else {
+              merged = dbNotes || sheetNotes;
+            }
+            row[SHEET_COL.notes] = merged;
+          }
           if (p.furigana) row[SHEET_COL.furigana] = p.furigana;
           // 生年月日(index9)・性別(index8) の手入力値はDBが空でも保持
           if (p.birthDate && String(p.birthDate).trim() && !row[9]) row[9] = String(p.birthDate).trim();
@@ -347,7 +362,8 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       await Ops.updateCall(id, {
         callCount: (ccRaw !== undefined && ccRaw !== '') ? (parseInt(ccRaw) || 0) : undefined,
         status: normalizedStatus || undefined,
-        notes: row[pc.notes] !== undefined ? row[pc.notes] : undefined,
+        // 空セルではDBのメモを消さない（手入力メモを保持）。値がある時だけ更新。
+        notes: (row[pc.notes] !== undefined && String(row[pc.notes]).trim() !== '') ? row[pc.notes] : undefined,
         skipAutoArchive: false,
       });
       // ふりがなをDBに同期
