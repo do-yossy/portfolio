@@ -117,7 +117,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         for (const oid of otherIds) {
           const other = listById.get(oid);
           if (!other) continue;
-          const d = other.last_called_at || other.updated_at || '';
+          const d = other.last_called_at || other.applied_at || '';
           if (d > latestDate) { latestDate = d; latestStatus = other.status; }
         }
         const datePart = latestDate ? ` 最終対応:${latestDate.slice(0, 10)} (${latestStatus})` : '';
@@ -127,13 +127,15 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       // ② 過去応募: アーカイブ済みレコードが存在する
       let pastRow = null;
       if (a.normalized_phone) {
-        pastRow = db.prepare(`SELECT status, last_called_at, updated_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_phone);
+        pastRow = db.prepare(`SELECT status, last_called_at, applied_at, updated_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_phone);
       }
       if (!pastRow && a.normalized_email) {
-        pastRow = db.prepare(`SELECT status, last_called_at, updated_at FROM applicants WHERE normalized_email=? AND normalized_email!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_email);
+        pastRow = db.prepare(`SELECT status, last_called_at, applied_at, updated_at FROM applicants WHERE normalized_email=? AND normalized_email!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_email);
       }
       if (pastRow) {
-        const date = (pastRow.last_called_at || pastRow.updated_at || '').slice(0, 10);
+        // 実際に対応した日(last_called_at)を優先。無ければ過去の応募日(applied_at)。
+        // updated_at はアーカイブ等のDB更新で本日に書き換わるため使わない。
+        const date = (pastRow.last_called_at || pastRow.applied_at || '').slice(0, 10);
         parts.push(`過去応募 最終対応:${date} (${pastRow.status})`);
       }
 
