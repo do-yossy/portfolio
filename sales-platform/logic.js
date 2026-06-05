@@ -99,12 +99,15 @@ function detectBudget(text) {
 function detectType(text) {
   const t = text;
   if (/(ライティング|記事(の)?(作成|執筆|制作)|SEO記事|ブログ記事|コラム執筆|webライ|文字単価|[0-9０-９]{3,}\s*文字)/i.test(t) && !/(ツール|システム|アプリ)/i.test(t)) return 'writing';
+  if (/(ロゴ|バナー|チラシ|フライヤー|サムネ|サムネイル|アイキャッチ|イラスト|似顔絵|名刺|ポスター|画像(加工|編集|作成|制作)|Instagram|インスタ|SNS(運用|投稿|画像))/i.test(t) && !/(ツール|システム|アプリ|開発|プログラム)/i.test(t)) return 'design';
+  if (/(動画(編集|制作)|YouTube|ショート動画|リール|TikTok|テロップ|字幕|ムービー)/i.test(t) && !/(ツール|システム|アプリ開発)/i.test(t)) return 'video';
   if (/AI|人工知能|ChatGPT|Claude|自動化ツール/i.test(t)) return 'ai';
   if (/LINE|ステップ配信|リッチメニュー/i.test(t)) return 'line';
   if (/ECサイト|ネットショップ|通販サイト|カート機能|決済/i.test(t)) return 'ec';
   if (/予約システム|予約管理|在庫管理|勤怠|管理システム|業務効率化|システム開発|ツール開発/i.test(t)) return 'system';
   if (/ランディングページ|LP制作|\bLP\b/i.test(t)) return 'LP';
   if (/コーポレート|会社\s*サイト|ホームページ|HP制作|採用サイト/i.test(t)) return 'corp';
+  if (/(翻訳|ローカライズ|データ入力|データ収集|リサーチ|文字起こし|テープ起こし|ナレーション|音声|アンケート|モニター)/i.test(t)) return 'other';
   return 'LP';
 }
 function scoreFromText(text = '', extra = {}) {
@@ -122,13 +125,13 @@ function scoreFromText(text = '', extra = {}) {
   const continuity = /(継続|長期|保守|運用|複数)/.test(t) ? 'high' : 'single';
   const competition = (() => { const m = t.match(/提案\s*([0-9]+)\s*件/); return m ? (+m[1] > 15 ? 'high' : +m[1] > 5 ? 'mid' : 'low') : 'mid'; })();
   const deadline = /(急ぎ|至急|今週|今月中)/.test(t) ? 'near' : 'mid';
-  const est_hours = type === 'LP' ? 6 : type === 'corp' ? 24 : type === 'writing' ? 3 : 40;
+  const est_hours = { LP: 6, corp: 24, writing: 3, design: 5, video: 5, other: 6 }[type] || 40;
   const r = score({ budget, channel, template_fit, spec, continuity, competition, deadline, flags, est_hours });
   return { ...r, type, budget, est_hours, template_fit, spec, continuity, competition, deadline };
 }
 
 // ── 見積もり ──
-const PLAN = { LP: 50000, corp: 120000, ec: 300000, system: 200000, ai: 500000, line: 50000 };
+const PLAN = { LP: 50000, corp: 120000, ec: 300000, system: 200000, ai: 500000, line: 50000, design: 10000, video: 15000, writing: 8000, other: 30000 };
 const OPT = { addpage: 15000, cms: 40000, reserve: 25000, seo: 15000, logo: 25000, server: 8000, writing: 8000, banner: 4000 };
 function quote(input = {}) {
   const type = input.type || 'LP';
@@ -223,6 +226,51 @@ TPL.writing = (d) => `${d.title} を拝見しました。${d.industry || '御社
 ▼強み：修正無制限・オンライン完結・24時間以内返信
 
 ご希望の文字数・キーワード・構成をいただければ、即着手します。よろしくお願いいたします。`;
+TPL.design = (d) => `${d.title} を拝見しました。${d.industry || '御社'}のデザイン、ご提示の条件で対応可能です。
+
+▼実績・スタイル
+・ポートフォリオ：${PORTFOLIO_BASE}
+・ランサーズ実績：${LANCERS_PROFILE}
+
+▼ご提案
+・目的とターゲットに合わせたトーン&マナーで作成
+・初稿2案 → フィードバック反映で仕上げ
+・データ納品（AI/PSD/PNG/JPG など希望形式に対応）
+
+▼料金・納期：¥${(d.amount || 10000).toLocaleString()}（税別）／約3〜5日
+▼強み：修正回数無制限・オンライン完結・24時間以内返信
+
+参考イメージや配色のご希望があれば、すぐラフをお出しします。よろしくお願いいたします。`;
+TPL.video = (d) => `${d.title} を拝見しました。${d.industry || '御社'}の動画編集、対応可能です。
+
+▼実績・スタイル
+・ポートフォリオ：${PORTFOLIO_BASE}
+・ランサーズ実績：${LANCERS_PROFILE}
+
+▼ご提案
+・テンポ重視のカット＋読みやすいテロップで離脱を防止
+・BGM/SE選定、サムネイルもセットで対応可
+・指定の尺・テイストに合わせて編集
+
+▼料金・納期：¥${(d.amount || 10000).toLocaleString()}（税別）／約3〜5日
+▼強み：修正回数無制限・オンライン完結・24時間以内返信
+
+サンプル尺やテイストのご希望をいただければ、冒頭30秒のテスト編集をお出しします。`;
+TPL.other = (d) => `${d.title} を拝見しました。ご提示の内容で対応可能です。
+
+▼実績
+・ポートフォリオ：${PORTFOLIO_BASE}
+・ランサーズ実績：${LANCERS_PROFILE}
+
+▼ご提案
+・要件を整理し、品質基準を明確にして進行
+・中間共有を入れて認識ズレを防止
+・短納期・修正対応で安心して進められます
+
+▼料金・納期：ご提示条件に合わせて対応（要相談）
+▼強み：修正回数無制限・オンライン完結・24時間以内返信
+
+具体的な分量・締切をいただければ、すぐ着手します。よろしくお願いいたします。`;
 
 const DELIVERABLE = {
   web: (d) => `📎 添付する成果物（実績デモ）
@@ -239,13 +287,35 @@ H2 選び方・手順（H3 ポイント3つ）
 H2 よくある失敗と対策
 H2 まとめ（次の行動を促す）
 
-※指定の文字数・キーワード・構成があれば準拠します。本文サンプルが要る場合は1本書き起こします。`
+※指定の文字数・キーワード・構成があれば準拠します。本文サンプルが要る場合は1本書き起こします。`,
+  design: (d) => `📎 添付する成果物（デザイン提案・ラフ案）
+・コンセプト：${String(d.title || '本件').slice(0, 30)}の目的に合う印象を狙います
+・方向性2案：A案=シンプル/視認性重視、B案=インパクト/装飾性重視
+・配色案：メイン/アクセント/背景の3色構成（例：紺 × オレンジ × 白）
+・レイアウト：主役要素 → キャッチ → 補足 → CTA の優先順位
+・書体：見出し=太ゴシック、本文=可読性重視
+※ご依頼後、上記をラフ画像に起こして初稿を提出します（修正無制限）。
+・参考実績：${PORTFOLIO_BASE} ／ ${LANCERS_PROFILE}`,
+  video: (d) => `📎 添付する成果物（編集構成案）
+・全体構成：オープニング（フック5秒）→ 本編 → まとめ → CTA
+・テロップ方針：要点のみ大きく、色は2色で統一、可読性優先
+・テンポ：無音/間延びをカット、ジャンプカットで離脱防止
+・サムネ案：主題コピー＋表情カットの2案
+・納品形式：MP4（指定の解像度・尺に対応）
+※ご依頼後、冒頭30秒のテスト編集を先に提出します。
+・参考実績：${PORTFOLIO_BASE} ／ ${LANCERS_PROFILE}`,
+  generic: (d) => `📎 添付する成果物（サンプル・進め方）
+・対応イメージ：${String(d.title || '本件').slice(0, 30)}を、目的 → 手順 → 品質チェックの順で進めます
+・サンプル：ご希望があれば一部を試しに仕上げてお見せします
+・品質保証：納品前にセルフチェック、修正は無制限
+・参考実績：${PORTFOLIO_BASE} ／ ${LANCERS_PROFILE}`
 };
+const DELIV_KIND = { writing: 'writing', design: 'design', video: 'video', other: 'generic' };
 function proposal(deal = {}) {
   const type = deal.type || 'LP';
   const d = { ...deal, type, demo: jisseki(type) };
   const body = (TPL[type] || TPL.LP)(d);
-  const deliv = (type === 'writing' ? DELIVERABLE.writing : DELIVERABLE.web)(d);
+  const deliv = (DELIVERABLE[DELIV_KIND[type]] || DELIVERABLE.web)(d);
   return `${body}
 
 ―――――――――――――――――
