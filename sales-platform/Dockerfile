@@ -1,7 +1,7 @@
 FROM node:22-slim
 WORKDIR /app
 COPY package.json ./
-# 依存ゼロ（標準ライブラリのみ）。将来 pg を使う場合はここで npm install。
+RUN npm install --omit=dev
 COPY . .
 RUN mkdir -p data
 ENV PORT=3100
