@@ -15,7 +15,7 @@ const SHEET_HEADERS = [
   '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日',
   '架電回数', '対応状況', '最終架電日', 'メモ',
 ];
-const SHEET_COL = { id: 0, dupInfo: 1, furigana: 5, callCount: 18, status: 19, notes: 21 };
+const SHEET_COL = { id: 0, dupInfo: 1, furigana: 5, callCount: 18, status: 19, lastCalled: 20, notes: 21 };
 
 // レイアウト検出用（旧レイアウトのインデックスで退避する）
 const LAYOUTS = [
@@ -73,6 +73,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const priorGenderCol = existingHeader.findIndex(h => h === '性別');
     const priorNotesCol  = existingHeader.findIndex(h => h === 'メモ');
     const priorFuriCol   = existingHeader.findIndex(h => h === 'ふりがな');
+    const priorLastCol   = existingHeader.findIndex(h => h === '最終架電日');
     const priorIdCol     = existingHeader.findIndex(h => h === 'ID');
     const pcL  = layout ? layout.col : null;
     const idCl = pcL ? pcL.id : (priorIdCol >= 0 ? priorIdCol : 0);
@@ -80,12 +81,13 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       const id = row[idCl];
       if (!id) continue;
       prior.set(id, {
-        callCount: pcL && pcL.callCount >= 0 ? row[pcL.callCount] : undefined,
-        status:    pcL && pcL.status   >= 0 ? row[pcL.status]    : undefined,
-        notes:     priorNotesCol >= 0 ? row[priorNotesCol] : (pcL && pcL.notes    >= 0 ? row[pcL.notes]    : ''),
-        furigana:  priorFuriCol  >= 0 ? row[priorFuriCol]  : (pcL && pcL.furigana >= 0 ? row[pcL.furigana] : ''),
-        birthDate: priorBirthCol  >= 0 ? row[priorBirthCol]  : '',
-        gender:    priorGenderCol >= 0 ? row[priorGenderCol] : '',
+        callCount:  pcL && pcL.callCount >= 0 ? row[pcL.callCount] : undefined,
+        status:     pcL && pcL.status   >= 0 ? row[pcL.status]    : undefined,
+        notes:      priorNotesCol >= 0 ? row[priorNotesCol] : (pcL && pcL.notes    >= 0 ? row[pcL.notes]    : ''),
+        furigana:   priorFuriCol  >= 0 ? row[priorFuriCol]  : (pcL && pcL.furigana >= 0 ? row[pcL.furigana] : ''),
+        birthDate:  priorBirthCol  >= 0 ? row[priorBirthCol]  : '',
+        gender:     priorGenderCol >= 0 ? row[priorGenderCol] : '',
+        lastCalled: priorLastCol   >= 0 ? row[priorLastCol]   : '',
       });
     }
 
@@ -187,9 +189,11 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
             row[SHEET_COL.notes] = merged;
           }
           if (p.furigana) row[SHEET_COL.furigana] = p.furigana;
-          // 生年月日(index9)・性別(index8) の手入力値はDBが空でも保持
+          // 生年月日(index9)・性別(index8)・最終架電日 の手入力値はDBが空でも保持
           if (p.birthDate && String(p.birthDate).trim() && !row[9]) row[9] = String(p.birthDate).trim();
           if (p.gender && String(p.gender).trim() && !row[8]) row[8] = String(p.gender).trim();
+          if (p.lastCalled && String(p.lastCalled).trim() && !String(row[SHEET_COL.lastCalled] || '').trim())
+            row[SHEET_COL.lastCalled] = String(p.lastCalled).trim();
         }
         rows.push(row);
         count++;
@@ -295,6 +299,7 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       education:   fc('学歴'),
       workLocation:fc('勤務地'),
       appliedAt:   fc('応募日'),
+      lastCalled:  fc('最終架電日'),
     };
 
     // 架電結果列は LAYOUTS で検出（旧レイアウトのインデックスずれを吸収）
@@ -388,6 +393,15 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
         if (sheetGender !== undefined && String(sheetGender).trim() !== '') {
           db.prepare('UPDATE applicants SET gender=?, updated_at=? WHERE id=?')
             .run(String(sheetGender).trim(), new Date().toISOString(), id);
+        }
+      }
+      // 最終架電日をDBに同期（シートで手入力した値を取り込む）。
+      // updateCallが架電回数>0で last_called_at を本日に上書きするため、その後に手入力値で再設定する。
+      if (colIdx.lastCalled >= 0) {
+        const sheetLast = row[colIdx.lastCalled];
+        if (sheetLast !== undefined && String(sheetLast).trim() !== '') {
+          db.prepare('UPDATE applicants SET last_called_at=?, updated_at=? WHERE id=?')
+            .run(String(sheetLast).trim(), new Date().toISOString(), id);
         }
       }
       // 不通/対応中/終了 → 同一電話・メールのレコードをまとめてアーカイブ
