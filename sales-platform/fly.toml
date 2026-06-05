@@ -5,6 +5,7 @@ primary_region = "nrt"
 
 [env]
   PORT = "3100"
+  NODE_OPTIONS = "--experimental-sqlite"
   SALES_GOAL = "1000000"
   PORTFOLIO_BASE = "https://do-yossy.github.io/portfolio/"
 
