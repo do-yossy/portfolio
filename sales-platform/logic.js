@@ -98,10 +98,11 @@ function detectBudget(text) {
 }
 function detectType(text) {
   const t = text;
+  if (/(脚本|シナリオ|台本|プロット|原作制作|ドラマ脚本|小説|物語の制作)/i.test(t) && !/(ツール|システム|アプリ)/i.test(t)) return 'script';
   if (/(ライティング|記事(の)?(作成|執筆|制作)|SEO記事|ブログ記事|コラム執筆|webライ|文字単価|[0-9０-９]{3,}\s*文字)/i.test(t) && !/(ツール|システム|アプリ)/i.test(t)) return 'writing';
   if (/(ロゴ|バナー|チラシ|フライヤー|サムネ|サムネイル|アイキャッチ|イラスト|似顔絵|名刺|ポスター|画像(加工|編集|作成|制作)|Instagram|インスタ|SNS(運用|投稿|画像))/i.test(t) && !/(ツール|システム|アプリ|開発|プログラム)/i.test(t)) return 'design';
   if (/(動画(編集|制作)|YouTube|ショート動画|リール|TikTok|テロップ|字幕|ムービー)/i.test(t) && !/(ツール|システム|アプリ開発)/i.test(t)) return 'video';
-  if (/AI|人工知能|ChatGPT|Claude|自動化ツール/i.test(t)) return 'ai';
+  if (/AI|人工知能|ChatGPT|Claude|自動化ツール|機械学習|LLM/i.test(t.replace(/生成AIの?使用(可否|がOK|可)?/g, ''))) return 'ai';
   if (/LINE|ステップ配信|リッチメニュー/i.test(t)) return 'line';
   if (/ECサイト|ネットショップ|通販サイト|カート機能|決済/i.test(t)) return 'ec';
   if (/予約システム|予約管理|在庫管理|勤怠|管理システム|業務効率化|システム開発|ツール開発/i.test(t)) return 'system';
@@ -125,13 +126,13 @@ function scoreFromText(text = '', extra = {}) {
   const continuity = /(継続|長期|保守|運用|複数)/.test(t) ? 'high' : 'single';
   const competition = (() => { const m = t.match(/提案\s*([0-9]+)\s*件/); return m ? (+m[1] > 15 ? 'high' : +m[1] > 5 ? 'mid' : 'low') : 'mid'; })();
   const deadline = /(急ぎ|至急|今週|今月中)/.test(t) ? 'near' : 'mid';
-  const est_hours = { LP: 6, corp: 24, writing: 3, design: 5, video: 5, other: 6 }[type] || 40;
+  const est_hours = { LP: 6, corp: 24, writing: 3, script: 10, design: 5, video: 5, other: 6 }[type] || 40;
   const r = score({ budget, channel, template_fit, spec, continuity, competition, deadline, flags, est_hours });
   return { ...r, type, budget, est_hours, template_fit, spec, continuity, competition, deadline };
 }
 
 // ── 見積もり ──
-const PLAN = { LP: 50000, corp: 120000, ec: 300000, system: 200000, ai: 500000, line: 50000, design: 10000, video: 15000, writing: 8000, other: 30000 };
+const PLAN = { LP: 50000, corp: 120000, ec: 300000, system: 200000, ai: 500000, line: 50000, design: 10000, video: 15000, writing: 8000, script: 50000, other: 30000 };
 const OPT = { addpage: 15000, cms: 40000, reserve: 25000, seo: 15000, logo: 25000, server: 8000, writing: 8000, banner: 4000 };
 function quote(input = {}) {
   const type = input.type || 'LP';
@@ -271,6 +272,21 @@ TPL.other = (d) => `${d.title} を拝見しました。ご提示の内容で対�
 ▼強み：修正回数無制限・オンライン完結・24時間以内返信
 
 具体的な分量・締切をいただければ、すぐ着手します。よろしくお願いいたします。`;
+TPL.script = (d) => `${d.title} を拝見しました。大人向けの人間ドラマ・恋愛など、感情と人間関係をリアルに描くシナリオを得意としています。
+
+▼作風・実績
+・ポートフォリオ：${PORTFOLIO_BASE}
+・ランサーズ実績：${LANCERS_PROFILE}
+
+▼ご提案
+・プロット／箱書きで構成を固めてから執筆し、リライトにも柔軟に対応
+・過度な露出に頼らず、心理描写と緊張感で“刺激”と没入感を表現
+・オンラインMTで方向性をすり合わせ、トライアルから着実に進めます
+
+▼条件：トライアル対応可／本採用後は話数・尺に合わせて執筆
+▼強み：修正対応・オンライン完結・24時間以内返信
+
+トライアルのテーマや主人公像をいただければ、すぐにプロット案をお出しします。よろしくお願いいたします。`;
 
 const DELIVERABLE = {
   web: (d) => `📎 添付する成果物（実績デモ）
@@ -308,9 +324,18 @@ H2 まとめ（次の行動を促す）
 ・対応イメージ：${String(d.title || '本件').slice(0, 30)}を、目的 → 手順 → 品質チェックの順で進めます
 ・サンプル：ご希望があれば一部を試しに仕上げてお見せします
 ・品質保証：納品前にセルフチェック、修正は無制限
-・参考実績：${PORTFOLIO_BASE} ／ ${LANCERS_PROFILE}`
+・参考実績：${PORTFOLIO_BASE} ／ ${LANCERS_PROFILE}`,
+  script: (d) => `📎 添付する成果物（脚本サンプル：ログライン＋1シーン）
+・ログライン：${String(d.title || '本作').slice(0, 30)}を題材に、「ある選択で人間関係が壊れ、そして変わる」物語を一行で
+・構成（3幕）：日常 → 亀裂（事件） → 選択と余韻
+・1シーン抜粋（ト書き＋セリフ）
+　夜のキッチン。沈黙。
+　A「……まだ起きてたんだ」
+　B（背を向けたまま）「眠れなくて」
+　A「俺さ、ずっと言えなかったんだけど——」
+※過度な露出に頼らず心理描写で“刺激”を表現。ご指定のテーマ・トーン・話数に合わせて作成します。`
 };
-const DELIV_KIND = { writing: 'writing', design: 'design', video: 'video', other: 'generic' };
+const DELIV_KIND = { writing: 'writing', script: 'script', design: 'design', video: 'video', other: 'generic' };
 function proposal(deal = {}) {
   const type = deal.type || 'LP';
   const d = { ...deal, type, demo: jisseki(type) };
