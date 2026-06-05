@@ -186,6 +186,19 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { return json(res, 200, { error: e.message }); }
       }
 
+      if (p === '/api/generate-all' && m === 'POST') {
+        let n = 0;
+        for (const d of Deals.findAll()) {
+          if (d.stage === 'lost') continue;                 // 断片・不要カードは除外
+          if (d.proposal && d.proposal.trim()) continue;    // 既存の提案は温存
+          const type = (d.raw && d.raw.trim()) ? L.scoreFromText(d.raw).type : d.type; // 種別を再判定
+          Deals.update(d.id, { type, proposal: L.proposal({ ...d, type }) });
+          n++;
+        }
+        Logs.create('generate_all', 'success', `${n}件に提案文＋成果物を生成`);
+        return json(res, 200, { generated: n });
+      }
+
       return json(res, 404, { error: 'no route' });
     }
 
