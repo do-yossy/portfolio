@@ -12,6 +12,7 @@ const { URL } = require('url');
 
 const { Deals, Logs } = require('./db');
 const L = require('./logic');
+const claude = require('./lib/claude');
 
 const PORT = process.env.PORT || 3100;
 const GOAL = +process.env.SALES_GOAL || 1000000;
@@ -130,14 +131,25 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/ingest' && m === 'POST') {
         const b = await parseJSON(req);
         const items = b.items || (b.text ? [{ text: b.text }] : []);
-        const created = items.map(it => {
+        const created = [];
+        for (const it of items) {
           const s = L.scoreFromText(it.text || it.title || '', it);
-          return Deals.create({
+          const deal = Deals.create({
             title: it.title || (it.text || '').slice(0, 40) || '無題案件', source: it.source || 'lancers',
             stage: 'lead', raw: it.text || '', link: it.url || '', ...pick(s)
           });
-        });
-        Logs.create('ingest', 'success', `${created.length}件をスコアリングして候補化`);
+          // 取込と同時に、提案文＋成果物をClaudeで生成して deal.proposal に保存（APIキーがあれば）
+          if (process.env.ANTHROPIC_API_KEY) {
+            try {
+              const g = await claude.generate(deal);
+              const combined = (g.proposal || '') + '\n\n――― 添付用の成果物（' + (g.deliverable_type || '') + '） ―――\n' + (g.deliverable || '') + '\n\n参考デモ: ' + (g.demo_url || '');
+              Deals.update(deal.id, { proposal: combined });
+              deal.proposal = combined;
+            } catch (e) { Logs.create('claude', 'error', e.message); }
+          }
+          created.push(deal);
+        }
+        Logs.create('ingest', 'success', `${created.length}件を採点${process.env.ANTHROPIC_API_KEY ? '＋提案文/成果物を生成' : ''}`);
         return json(res, 200, { created: created.length, deals: created });
       }
       if (p === '/api/quote' && m === 'POST') { const b = await parseJSON(req); return json(res, 200, L.quote(b)); }
@@ -156,6 +168,18 @@ const server = http.createServer(async (req, res) => {
       }
       const pm = p.match(/^\/api\/deals\/([^/]+)\/proposal$/);
       if (pm && m === 'GET') { const d = Deals.findById(pm[1]); if (!d) return json(res, 404, {}); return json(res, 200, { proposal: L.proposal(d) }); }
+
+      // Claudeで提案文＋成果物を生成（手動・再生成用）
+      const gm = p.match(/^\/api\/deals\/([^/]+)\/generate$/);
+      if (gm && m === 'POST') {
+        const d = Deals.findById(gm[1]); if (!d) return json(res, 404, { error: 'not found' });
+        try {
+          const g = await claude.generate(d);
+          const combined = (g.proposal || '') + '\n\n――― 添付用の成果物（' + (g.deliverable_type || '') + '） ―――\n' + (g.deliverable || '') + '\n\n参考デモ: ' + (g.demo_url || '');
+          Deals.update(d.id, { proposal: combined });
+          return json(res, 200, { proposal: combined });
+        } catch (e) { return json(res, 200, { error: e.message }); }
+      }
 
       return json(res, 404, { error: 'no route' });
     }
