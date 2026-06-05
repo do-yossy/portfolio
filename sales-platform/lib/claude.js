@@ -6,7 +6,7 @@
  * 任意: CLAUDE_MODEL（既定 claude-opus-4-8。コスト重視なら claude-haiku-4-5 等）
  */
 const https = require('https');
-const L = require('./logic');
+const L = require('../logic');
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-4-8';
 
