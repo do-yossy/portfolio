@@ -72,7 +72,7 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
   <div class="f"><label>案件名</label><input id="m_title"></div>
   <div class="f2">
     <div class="f"><label>流入元</label><select id="m_source"><option value="lancers">ランサーズ</option><option value="crowdworks">CW</option><option value="cwtech">CWテック(直)</option><option value="lp">LP(インバウンド)</option></select></div>
-    <div class="f"><label>種別</label><select id="m_type"><option>LP</option><option value="corp">コーポレート</option><option value="ec">EC</option><option value="system">システム</option><option value="ai">AI</option><option value="line">LINE</option></select></div>
+    <div class="f"><label>種別</label><select id="m_type"><option>LP</option><option value="corp">コーポレート</option><option value="ec">EC</option><option value="system">システム</option><option value="ai">AI</option><option value="line">LINE</option><option value="writing">ライティング</option><option value="script">脚本/シナリオ</option><option value="design">デザイン</option><option value="video">動画編集</option><option value="other">その他</option></select></div>
   </div>
   <div class="f2">
     <div class="f"><label>金額</label><input type="number" id="m_amount" value="0"></div>
@@ -83,11 +83,11 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
     <div class="f"><label>スコア</label><input type="number" id="m_score" value="0"></div>
   </div>
   <div class="f"><label>次アクション</label><input id="m_na"></div>
-  <div class="f"><label>メモ / 募集本文</label><textarea id="m_notes"></textarea></div>
+  <div class="f"><label>メモ</label><textarea id="m_notes"></textarea></div>
   <div class="foot"><button class="btn btn-ghost" onclick="ov(false)">閉じる</button><button class="btn" onclick="saveDeal()">保存</button></div>
 </div></div>
 
-<div class="ov" id="ovp"><div class="modal"><h3>提案文</h3><pre id="ptext"></pre><div class="foot"><button class="btn btn-ghost" onclick="document.getElementById('ovp').classList.remove('show')">閉じる</button><button class="btn" onclick="copyP()">コピー</button></div></div></div>
+<div class="ov" id="ovp"><div class="modal"><h3 id="ovpt">提案文</h3><pre id="ptext"></pre><div class="foot"><button class="btn btn-ghost" onclick="document.getElementById('ovp').classList.remove('show')">閉じる</button><button class="btn" onclick="copyP()">コピー</button></div></div></div>
 
 <script>
 'use strict';
@@ -121,6 +121,7 @@ function card(d){
     <div class="cbtns">
       ${i>=0&&i<STAGES.length-1?`<button class="mini adv" onclick="adv('${d.id}')">次へ →</button>`:''}
       <button class="mini" onclick="edit('${d.id}')">✎</button>
+      <button class="mini" onclick="detail('${d.id}')">📄内容</button>
       <button class="mini" onclick="prop('${d.id}')">📝</button>
       <button class="mini adv" onclick="gen('${d.id}')">✨生成</button>
       <button class="mini lose" onclick="delDeal('${d.id}')">🗑</button>
@@ -163,8 +164,9 @@ async function saveDeal(){
   ov(false); load();
 }
 let _ptext='';
-async function prop(id){ const d=DEALS.find(x=>x.id===id); _ptext=(d&&d.proposal)?d.proposal:((await api('/api/deals/'+id+'/proposal')).proposal||''); $('ptext').textContent=_ptext; $('ovp').classList.add('show'); }
-async function gen(id){ $('ptext').textContent='Claudeが提案文＋成果物を生成中…（30秒ほど）'; $('ovp').classList.add('show'); const r=await api('/api/deals/'+id+'/generate',{method:'POST'}); _ptext=r.error?('エラー: '+r.error):(r.proposal||''); $('ptext').textContent=_ptext; load(); }
+function detail(id){ const d=DEALS.find(x=>x.id===id); _ptext=(d&&d.raw&&d.raw.trim())?d.raw:'（この案件には募集本文が保存されていません。手入力(＋案件)の場合は本文がありません）'; $('ovpt').textContent='依頼内容（募集本文）'; $('ptext').textContent=_ptext; $('ovp').classList.add('show'); }
+async function prop(id){ const d=DEALS.find(x=>x.id===id); _ptext=(d&&d.proposal)?d.proposal:((await api('/api/deals/'+id+'/proposal')).proposal||''); $('ovpt').textContent='提案文＋成果物'; $('ptext').textContent=_ptext; $('ovp').classList.add('show'); }
+async function gen(id){ $('ovpt').textContent='提案文＋成果物'; $('ptext').textContent='Claudeが提案文＋成果物を生成中…（30秒ほど）'; $('ovp').classList.add('show'); const r=await api('/api/deals/'+id+'/generate',{method:'POST'}); _ptext=r.error?('エラー: '+r.error):(r.proposal||''); $('ptext').textContent=_ptext; load(); }
 function copyP(){ navigator.clipboard?.writeText(_ptext); }
 load();
 </script>
