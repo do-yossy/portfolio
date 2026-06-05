@@ -1,13 +1,53 @@
 'use strict';
 
-function adminLayout(title, content, active = 'dashboard') {
+const COMPANIES = {
+  sq: { label: 'Social Quality', full: '株式会社Social Quality', color: '#7c3aed' },
+  bg: { label: 'Bigeyes',        full: '株式会社Bigeyes',        color: '#ea580c' },
+  pe: { label: 'ピープル',        full: '合同会社ピープル',        color: '#16a34a' },
+  lt: { label: 'Life Tailor',    full: '株式会社Life Tailor',    color: '#0891b2' },
+  nc: { label: 'ニクール',        full: '合同会社ニクール',        color: '#db2777' },
+  nx: { label: 'ネクサス',        full: 'ネクサス株式会社',        color: '#0d9488' },
+};
+
+// 運用管理の媒体マスタ
+const OPS_MEDIA = [
+  { id: 'indeed',    name: 'Indeed' },
+  { id: 'kyujinbox', name: '求人ボックス' },
+  { id: 'stanby',    name: 'スタンバイ' },
+  { id: 'google',    name: 'Googleしごと検索' },
+  { id: 'engage',    name: 'engage' },
+];
+const CALL_STATUS_COLORS = {
+  '新規':  '#3b82f6',
+  '不通':  '#f97316',
+  '対応中': '#eab308',
+  '終了':  '#06b6d4',
+};
+
+function adminLayout(title, content, active = 'posts', co = 'sq') {
+  // per-section hrefs that carry the current company through navigation
+  const pageHref = {
+    posts:     (c) => `/admin/ops?tab=posts&co=${c}`,
+    new:       (c) => `/admin/ops?tab=new&co=${c}`,
+    past:      (c) => `/admin/ops?tab=past&co=${c}`,
+    calls:     (c) => `/admin/calls?co=${c}`,
+    jobs:      (c) => `/admin/jobs?co=${c}`,
+    analytics: (c) => `/admin/analytics?co=${c}`,
+    logs:      (c) => `/admin/logs?co=${c}`,
+    site:      ()  => '/jobs',
+  };
+  const getHref = (key, c) => pageHref[key] ? pageHref[key](c) : `/admin/ops?tab=posts&co=${c}`;
+
   const nav = [
-    { href: '/admin', icon: '🏠', label: 'ダッシュボード', key: 'dashboard' },
-    { href: '/admin/jobs', icon: '💼', label: '求人管理', key: 'jobs' },
-    { href: '/admin/applicants', icon: '👥', label: '応募者管理', key: 'applicants' },
-    { href: '/admin/logs', icon: '📋', label: '投稿ログ', key: 'logs' },
-    { href: '/jobs', icon: '🌐', label: '求人サイトを見る', key: 'site' },
-  ].map(n => `<a href="${n.href}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
+    { key: 'posts',     icon: '📋', label: '掲載管理' },
+    { key: 'new',       icon: '🆕', label: '新規応募' },
+    { key: 'past',      icon: '📚', label: '過去応募者' },
+    { key: 'calls',     icon: '📞', label: '架電リスト' },
+    { key: 'jobs',      icon: '💼', label: '求人管理' },
+    { key: 'analytics', icon: '📈', label: '分析・レポート' },
+    { key: 'logs',      icon: '📋', label: '投稿ログ' },
+    { key: 'site',      icon: '🌐', label: '求人サイトを見る' },
+  ].map(n => `<a href="${getHref(n.key, co)}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
 
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -15,16 +55,16 @@ function adminLayout(title, content, active = 'dashboard') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} | 採用管理</title>
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css?v=${process.env.ASSET_VERSION || '1'}">
 </head>
 <body class="admin-layout">
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <h1>SEO採用<br>プラットフォーム</h1>
-    <span>管理画面</span>
+    <h1>採用管理システム</h1>
+    <span>運用・架電管理</span>
   </div>
   <nav>${nav}</nav>
-  <div class="sidebar-footer">v1.0 MVP</div>
+  <div class="sidebar-footer"><a href="/admin/logout" style="color:var(--text-muted);font-size:12px;text-decoration:none">🚪 ログアウト</a></div>
 </aside>
 <main class="main-content">
 ${content}
@@ -40,22 +80,30 @@ ${content}
   </div>
 </div>
 <div id="toast-container"></div>
-<script src="/admin.js"></script>
+<script src="/admin.js?v=${process.env.ASSET_VERSION || '1'}"></script>
 </body>
 </html>`;
 }
 
-function publicLayout(title, content, { description = '', jsonld = '' } = {}) {
+function publicLayout(title, content, { description = '', jsonld = '', canonical = '' } = {}) {
+  const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+  const canonicalUrl = canonical || siteUrl + '/jobs';
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
+<meta name="google-site-verification" content="3jz3zHw23HzRLL6kianNdfBLtX-V9JZnXrN-YmkYNeU">
 ${description ? `<meta name="description" content="${esc(description)}">` : ''}
+<link rel="canonical" href="${canonicalUrl}">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="ja_JP">
 <meta property="og:title" content="${esc(title)}">
+<meta property="og:url" content="${canonicalUrl}">
+${description ? `<meta property="og:description" content="${esc(description)}">` : ''}
 ${jsonld}
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css?v=${process.env.ASSET_VERSION || '1'}">
 </head>
 <body class="pub-body">
 <header class="pub-header">
@@ -69,8 +117,14 @@ ${jsonld}
 <main>
 ${content}
 </main>
+<footer class="pub-footer">
+  <div class="pub-footer-inner">
+    <span>${esc(process.env.COMPANY_NAME || '採用企業')}</span>
+    <a href="/privacy">プライバシーポリシー</a>
+  </div>
+</footer>
 <div id="toast-container"></div>
-<script src="/admin.js"></script>
+<script src="/admin.js?v=${process.env.ASSET_VERSION || '1'}"></script>
 </body>
 </html>`;
 }
@@ -90,7 +144,30 @@ function nl2br(str) {
 }
 
 // ── Admin Dashboard ──
-function dashboardPage({ stats, lastPost }) {
+function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], todayKyujinbox = 0, todayStanby = 0, indeedRepostCount = 0, siteUrl = '', co = 'sq',
+  TARGET_ACTIVE = parseInt(process.env.ROTATE_TARGET || '25', 10),
+  ROTATE_AFTER_DAYS = parseInt(process.env.ROTATE_DAYS || '14', 10),
+}) {
+  // BAN risk helper
+  function banLevel(count, warn, danger) {
+    if (count >= danger) return 'ban-danger';
+    if (count >= warn)   return 'ban-warn';
+    return 'ban-safe';
+  }
+  const kb = banRisk.kyujinbox || 0;
+  const st = banRisk.stanby    || 0;
+  const wp = banRisk.weeklyPosts || 0;
+
+  const maxMedia = mediaBreakdown.length > 0 ? Math.max(...mediaBreakdown.map(m => m.count)) : 1;
+  const mediaBars = mediaBreakdown.slice(0, 6).map(({ media, count }) => {
+    const pct = Math.round((count / maxMedia) * 100);
+    return `<div class="media-bar-row">
+      <span class="media-bar-label">${esc(media)}</span>
+      <div class="media-bar-track"><div class="media-bar-fill" style="width:${pct}%"></div></div>
+      <span class="media-bar-count">${count}</span>
+    </div>`;
+  }).join('');
+
   const content = `
 <div class="header-row">
   <div>
@@ -123,6 +200,74 @@ function dashboardPage({ stats, lastPost }) {
   </div>
 </div>
 
+<div class="card mb-24">
+  <div class="action-section-title" style="margin-bottom:16px">📅 今日の作業 <span class="text-muted text-sm" style="font-weight:400">（目標: 1日50件応募）</span></div>
+  <div class="daily-tasks">
+    ${[
+      { label: '求人ボックス（目標25件/日）', done: todayKyujinbox, target: 25, alert: false },
+      { label: 'スタンバイ（目標25件/日）',   done: todayStanby,    target: 25, alert: false },
+      { label: 'Indeed 再掲載（3日ごと）',    done: indeedRepostCount, target: 1, alert: indeedRepostCount > 0 },
+    ].map(({ label, done, target, alert }) => {
+      const pct  = Math.min(100, Math.round(done / target * 100));
+      const isDone = !alert && done >= target;
+      const remain = alert
+        ? (done > 0 ? `🔴 ${done}件が再掲載期限超過` : '✅ 全件OK')
+        : isDone ? '✅ 完了' : `あと${target - done}件`;
+      return `<div class="daily-task${alert && done > 0 ? ' daily-task-alert' : ''}">
+        <div class="daily-task-label">${label}</div>
+        <div class="daily-task-progress">
+          <div class="daily-task-bar-wrap"><div class="daily-task-bar${alert && done > 0 ? ' bar-alert' : ''}" style="width:${pct}%"></div></div>
+          <span class="daily-task-count">${done}${target > 1 ? '/' + target + '件' : '件'}</span>
+        </div>
+        <div class="daily-task-remain ${isDone || (alert && done === 0) ? 'task-done' : alert ? 'task-alert-text' : ''}">${remain}</div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="margin-top:14px;font-size:13px;color:#64748b">
+    ✨ <a href="/admin/jobs" style="color:#7c3aed">求人管理</a> でAI一括生成 → 媒体を選択して公開すると件数が更新されます
+  </div>
+</div>
+
+<div class="grid-2 gap-24 mb-24">
+  <div class="card">
+    <div class="action-section-title" style="margin-bottom:14px">⚠️ 媒体BANリスク</div>
+    <div class="ban-risk-grid">
+      <div class="ban-item ${banLevel(kb, 12, 16)}">
+        <div class="ban-item-label">求人ボックス</div>
+        <div class="ban-item-count">${kb}<span>/20件</span></div>
+        <div class="ban-item-bar"><div style="width:${Math.min(100, Math.round(kb/20*100))}%"></div></div>
+        <div class="ban-item-status">${kb >= 16 ? '🔴 危険域' : kb >= 12 ? '🟡 注意域' : '🟢 安全域'}</div>
+      </div>
+      <div class="ban-item ${banLevel(st, 28, 32)}">
+        <div class="ban-item-label">スタンバイ</div>
+        <div class="ban-item-count">${st}<span>/32件</span></div>
+        <div class="ban-item-bar"><div style="width:${Math.min(100, Math.round(st/32*100))}%"></div></div>
+        <div class="ban-item-status">${st >= 32 ? '🔴 危険域' : st >= 28 ? '🟡 注意域' : '🟢 安全域'}</div>
+      </div>
+      <div class="ban-item ${banLevel(wp, 2, 3)}">
+        <div class="ban-item-label">今週の投稿回数</div>
+        <div class="ban-item-count">${wp}<span>回/週</span></div>
+        <div class="ban-item-bar"><div style="width:${Math.min(100, Math.round(wp/3*100))}%"></div></div>
+        <div class="ban-item-status">${wp >= 3 ? '🔴 過多' : wp >= 2 ? '🟡 注意' : '🟢 問題なし'}</div>
+      </div>
+      <div class="ban-item ban-info">
+        <div class="ban-item-label" style="font-size:11px;line-height:1.5">
+          ・求人ボックス: 1日1〜2件まで<br>
+          ・削除再投稿: 月1回のみ<br>
+          ・スタンバイ: XML更新週1〜2回
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="action-section-title" style="margin-bottom:14px">📊 媒体別応募数</div>
+    ${mediaBreakdown.length === 0
+      ? '<p class="text-muted text-sm">応募者データがありません</p>'
+      : `<div class="media-bars">${mediaBars}</div>`}
+  </div>
+</div>
+
 <div class="grid-2 gap-24">
   <div class="card">
     <div class="action-section">
@@ -134,20 +279,90 @@ function dashboardPage({ stats, lastPost }) {
     </div>
 
     <div class="action-section mt-16">
-      <div class="action-section-title">📡 媒体運用</div>
-      <div class="btn-group">
-        <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox()">
-          🚀 求人ボックスに投稿する
+      <div class="action-section-title">🔄 求人ローテーション <span class="text-muted text-sm">（常時${TARGET_ACTIVE}件維持・${ROTATE_AFTER_DAYS}日で交代）</span></div>
+      <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px">
+        <button class="btn btn-primary" onclick="runRotation()" id="btn-rotate">
+          🔄 今すぐローテーション実行
         </button>
-        <button id="btn-xml-kyujinbox" class="btn btn-ghost" onclick="downloadXML('kyujinbox')">
-          ⬇ XMLフィードを生成する（求人ボックス）
-        </button>
-        <button id="btn-xml-stanby" class="btn btn-ghost" onclick="downloadXML('stanby')">
-          ⬇ XMLフィードを生成する（スタンバイ）
-        </button>
+        <span class="text-sm text-muted">月・水・金 9時に自動実行</span>
       </div>
-      <div id="progress-kyujinbox-wrap" class="progress-wrap hidden">
-        <div id="progress-kyujinbox" class="progress-box"></div>
+      <div id="rotation-result" class="text-sm" style="margin-top:8px;white-space:pre-wrap;background:#f8fafc;border-radius:6px;padding:8px;display:none"></div>
+    </div>
+
+    <div class="action-section mt-16">
+      <div class="action-section-title">🤖 AI求人自動生成 <span class="text-muted text-sm">（軽配送エリア別・30日で自動削除）</span></div>
+      <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px">
+        <label style="font-size:12px;color:#64748b;white-space:nowrap">媒体:</label>
+        <select id="ai-gen-target" class="form-input" style="width:130px;padding:4px 8px;font-size:13px">
+          <option value="all">全媒体</option>
+          <option value="kyujinbox">求人ボックス</option>
+          <option value="stanby">スタンバイ</option>
+        </select>
+        <label style="font-size:12px;color:#64748b;white-space:nowrap">件数:</label>
+        <select id="ai-gen-count" class="form-input" style="width:70px;padding:4px 8px;font-size:13px">
+          <option value="0">自動</option>
+          <option value="5">5件</option>
+          <option value="10">10件</option>
+          <option value="25">25件</option>
+        </select>
+        <button class="btn btn-primary" onclick="runAIGenerate()" id="btn-ai-generate" style="background:#7c3aed;border-color:#7c3aed">
+          🤖 AI求人を生成する
+        </button>
+        <span class="text-sm text-muted">毎日7:30に自動実行</span>
+      </div>
+      <div id="ai-gen-result" class="text-sm" style="margin-top:8px;white-space:pre-wrap;background:#f8fafc;border-radius:6px;padding:8px;display:none"></div>
+    </div>
+
+    <div class="action-section mt-16">
+      <div class="action-section-title">📡 媒体運用</div>
+
+      <div class="media-op-section">
+        <div class="media-op-label">求人ボックス <span class="text-muted text-sm">（スクレイピング投稿・VPN必須）</span></div>
+        <div class="btn-group" style="align-items:center">
+          <label style="font-size:12px;color:#64748b;white-space:nowrap">1回の投稿数:</label>
+          <select id="kb-batch-size" class="form-input" style="width:70px;padding:4px 8px;font-size:13px">
+            <option value="3">3件</option>
+            <option value="5" selected>5件</option>
+            <option value="8">8件</option>
+            <option value="10">10件</option>
+          </select>
+          <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox()">
+            🚀 求人ボックスに投稿する（未投稿のみ）
+          </button>
+          <button id="btn-post-kyujinbox-force" class="btn btn-ghost btn-sm" onclick="startPostKyujinboxForce()" title="投稿済み求人も含めて全件投稿">
+            🔄 強制再投稿
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="resetKyujinboxPosted()" title="投稿済みフラグをリセット">
+            ♻️ フラグリセット
+          </button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">目標25件/日 → 5件 × 5回（数時間おきに実行）／1度投稿した求人は次回スキップ</div>
+        <div id="progress-kyujinbox-wrap" class="progress-wrap hidden">
+          <div id="progress-kyujinbox" class="progress-box"></div>
+        </div>
+      </div>
+
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">スタンバイ <span class="text-muted text-sm">（XMLフィード自動連携）</span></div>
+        <div class="feed-url-row">
+          <code class="feed-url-code" id="feed-url-stanby">${siteUrl}/api/feed/stanby</code>
+          <button class="btn btn-ghost btn-sm" onclick="copyFeedUrl('stanby')">コピー</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadXML('stanby')">DL</button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">このURLをスタンバイ管理画面の「XMLフィード」に登録してください</div>
+      </div>
+
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">Indeed <span class="text-muted text-sm">（手動掲載・3日ごとに再掲載）</span></div>
+        <div class="btn-group">
+          <button id="btn-post-indeed" class="btn btn-warning btn-sm" onclick="startPostIndeed()">
+            🚀 Indeed に掲載する
+          </button>
+          ${indeedRepostCount > 0 ? `<span class="badge" style="background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:20px;font-size:12px">🔴 ${indeedRepostCount}件が再掲載期限超過</span>` : '<span style="font-size:12px;color:#16a34a">✅ 全件OK</span>'}
+        </div>
+        <div id="progress-indeed-post-wrap" class="progress-wrap hidden">
+          <div id="progress-indeed-post" class="progress-box"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -177,11 +392,16 @@ function dashboardPage({ stats, lastPost }) {
 
 ${jobModalHTML()}
 `;
-  return adminLayout('ダッシュボード', content, 'dashboard');
+  return adminLayout('ダッシュボード', content, 'dashboard', co);
 }
 
 // ── Admin Jobs ──
-function adminJobsPage(jobs) {
+function adminJobsPage(jobs, co = 'sq') {
+  const coKeys = Object.keys(COMPANIES);
+  const coTabs = coKeys.map(c =>
+    `<a href="/admin/jobs?co=${c}" class="call-co-tab ${c === co ? 'active' : ''}" style="${c === co ? 'background:' + COMPANIES[c].color + ';border-color:' + COMPANIES[c].color : ''}">${COMPANIES[c].label}</a>`
+  ).join('');
+
   const rows = jobs.length === 0
     ? `<tr><td colspan="7" class="empty-state"><p>求人が登録されていません</p></td></tr>`
     : jobs.map(j => {
@@ -206,9 +426,14 @@ function adminJobsPage(jobs) {
   const content = `
 <div class="header-row">
   <h2>求人管理</h2>
-  <button class="btn btn-primary" onclick="showJobModal(null)">＋ 求人を登録する</button>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-secondary" onclick="openBulkModal()" style="background:#7c3aed;color:#fff;border-color:#7c3aed">✨ AI一括生成</button>
+    <button class="btn btn-primary" onclick="showJobModal(null)">＋ 求人を登録する</button>
+  </div>
 </div>
+<div class="call-co-tabs">${coTabs}</div>
 <div class="card">
+  <div style="padding:10px 16px 2px;font-size:13px;color:#64748b">${COMPANIES[co]?.label || co} の求人 <strong>${jobs.length}件</strong></div>
   <div class="table-wrap">
     <table>
       <thead><tr>
@@ -219,8 +444,10 @@ function adminJobsPage(jobs) {
     </table>
   </div>
 </div>
-${jobModalHTML()}`;
-  return adminLayout('求人管理', content, 'jobs');
+<input type="hidden" id="jobs-current-co" value="${esc(co)}">
+${jobModalHTML()}
+${bulkModalHTML()}`;
+  return adminLayout('求人管理', content, 'jobs', co);
 }
 
 function jobModalHTML() {
@@ -267,10 +494,50 @@ function jobModalHTML() {
       </div>
     </div>
     <div class="form-group">
-      <label>仕事内容<span class="req">*</span></label>
-      <textarea id="jf-description" rows="6" placeholder="仕事内容を入力してください"></textarea>
+      <label>キャッチコピー <span class="text-muted text-sm">（求人ボックス・スタンバイ用・25〜35文字）</span></label>
+      <input type="text" id="jf-catchcopy" placeholder="例: 未経験歓迎！研修充実で安心スタート" maxlength="50">
     </div>
-    <div class="form-group checkbox-row">
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <label style="margin:0">仕事内容<span class="req">*</span></label>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-ai-gen" onclick="generateWithAI()">
+          ✨ AIで原稿を生成
+        </button>
+      </div>
+      <textarea id="jf-description" rows="6" placeholder="仕事内容を入力してください"></textarea>
+      <div id="ai-gen-status" class="text-sm text-muted mt-8" style="display:none"></div>
+    </div>
+    <details class="form-group" style="margin-top:4px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px">
+      <summary style="font-weight:600;cursor:pointer;color:#1e40af">求人ボックス必須項目（展開して入力）</summary>
+      <p class="text-sm text-muted" style="margin:6px 0 12px">求人ボックスへ自動投稿するには以下の項目が必要です。各130文字以内。</p>
+      <div class="form-group">
+        <label>やりがい <span class="req">*</span><span class="text-muted text-sm">（例: 多くのお客様に喜ばれるやりがいのある仕事です / 130字以内）</span></label>
+        <textarea id="jf-rewarding" rows="3" maxlength="140" placeholder="例: 毎日多くのお客様に感謝されるやりがいのある仕事です。未経験でも研修で成長できます。"></textarea>
+      </div>
+      <div class="form-group">
+        <label>勤務時間・休日 <span class="req">*</span><span class="text-muted text-sm">（130字以内）</span></label>
+        <textarea id="jf-worktime" rows="3" maxlength="140" placeholder="例: 9:00〜18:00（実働8時間）　週休2日制（土日祝）　年間休日120日"></textarea>
+      </div>
+      <div class="form-group">
+        <label>アクセス <span class="req">*</span><span class="text-muted text-sm">（130字以内）</span></label>
+        <textarea id="jf-transportation" rows="2" maxlength="140" placeholder="例: JR大阪駅より徒歩5分、または車通勤OK（駐車場完備）"></textarea>
+      </div>
+      <div class="form-group">
+        <label>応募方法</label>
+        <textarea id="jf-how-to-apply" rows="2" placeholder="例: 下記URLよりWebでご応募ください。書類選考後にご連絡いたします。"></textarea>
+      </div>
+    </details>
+    <div class="form-group" style="margin-top:4px">
+      <label style="font-weight:600;display:block;margin-bottom:8px">配信媒体 <span class="text-muted text-sm" style="font-weight:400">（1媒体のみ・重複掲載を防ぎます）</span></label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <label class="media-radio-label"><input type="radio" name="jf-media" value=""> なし</label>
+        <label class="media-radio-label"><input type="radio" name="jf-media" value="求人ボックス"> 求人ボックス</label>
+        <label class="media-radio-label"><input type="radio" name="jf-media" value="スタンバイ"> スタンバイ</label>
+        <label class="media-radio-label"><input type="radio" name="jf-media" value="Indeed"> Indeed</label>
+      </div>
+      <p class="text-sm text-muted" style="margin-top:4px">Googleしごと検索は公開求人に自動掲載されます</p>
+    </div>
+    <div class="form-group checkbox-row" style="margin-top:4px">
       <input type="checkbox" id="jf-published">
       <label for="jf-published">すぐに公開する</label>
     </div>
@@ -282,11 +549,97 @@ function jobModalHTML() {
 </div>`;
 }
 
+function bulkModalHTML() {
+  const jobTypes = [
+    '看護師・准看護師', '介護士・ケアワーカー', '調理師・キッチンスタッフ',
+    '事務・受付スタッフ', '営業（個人向け）', '営業（法人向け）',
+    'Webエンジニア（フロントエンド）', 'Webエンジニア（バックエンド）',
+    '保育士・幼稚園教諭', 'ドライバー・配送',
+  ];
+  const locations = [
+    { label: '東京・新宿',  value: '東京都新宿区' },
+    { label: '東京・品川',  value: '東京都品川区' },
+    { label: '東京・渋谷',  value: '東京都渋谷区' },
+    { label: '東京・豊島',  value: '東京都豊島区' },
+    { label: '大阪・中央',  value: '大阪府大阪市中央区' },
+    { label: '大阪・北区',  value: '大阪府大阪市北区' },
+    { label: '大阪・阿倍野', value: '大阪府大阪市阿倍野区' },
+    { label: '大阪・西区',  value: '大阪府大阪市西区' },
+  ];
+  const typeChecks = jobTypes.map(t =>
+    `<label class="bulk-check"><input type="checkbox" name="bulk-type" value="${esc(t)}"> ${esc(t)}</label>`
+  ).join('');
+  const locChecks = locations.map(l =>
+    `<label class="bulk-check"><input type="checkbox" name="bulk-loc" value="${esc(l.value)}"> ${esc(l.label)}</label>`
+  ).join('');
+
+  return `
+<div id="bulk-modal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <h3>✨ AI一括求人生成</h3>
+    <p class="text-muted text-sm" style="margin:4px 0 16px">選択した職種×勤務地の組み合わせ分の求人原稿をAIが自動生成します。<br>生成後は「求人管理」で内容確認・公開できます。</p>
+
+    <div id="bulk-form">
+      <div class="form-group">
+        <label style="font-weight:600;margin-bottom:8px;display:block">職種（複数選択可）
+          <span style="font-weight:400;margin-left:8px">
+            <a href="#" onclick="toggleAllBulkType(true);return false" style="font-size:12px">全選択</a> /
+            <a href="#" onclick="toggleAllBulkType(false);return false" style="font-size:12px">全解除</a>
+          </span>
+        </label>
+        <div class="bulk-checks">${typeChecks}</div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label style="font-weight:600;margin-bottom:8px;display:block">勤務地（複数選択可）
+          <span style="font-weight:400;margin-left:8px">
+            <a href="#" onclick="toggleAllBulkLoc(true);return false" style="font-size:12px">全選択</a> /
+            <a href="#" onclick="toggleAllBulkLoc(false);return false" style="font-size:12px">全解除</a>
+          </span>
+        </label>
+        <div class="bulk-checks">${locChecks}</div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label style="font-weight:600">雇用形態</label>
+        <select id="bulk-emp-type" class="form-input" style="max-width:200px;margin-top:6px">
+          <option value="正社員">正社員</option>
+          <option value="パート・アルバイト">パート・アルバイト</option>
+          <option value="契約社員">契約社員</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label style="font-weight:600;margin-bottom:8px;display:block">配信媒体 <span class="text-muted text-sm" style="font-weight:400">（均等に割り当てます）</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <label class="bulk-check"><input type="checkbox" name="bulk-media" value="求人ボックス" checked onchange="updateBulkCount()"> 求人ボックス</label>
+          <label class="bulk-check"><input type="checkbox" name="bulk-media" value="スタンバイ" checked onchange="updateBulkCount()"> スタンバイ</label>
+          <label class="bulk-check"><input type="checkbox" name="bulk-media" value="Indeed" onchange="updateBulkCount()"> Indeed</label>
+        </div>
+        <p class="text-sm text-muted" style="margin-top:4px">各媒体への重複掲載を防ぐため、求人を均等に振り分けます</p>
+      </div>
+      <div id="bulk-count-preview" class="text-sm" style="margin-top:8px;color:#7c3aed;font-weight:600"></div>
+      <div class="modal-footer" style="margin-top:16px">
+        <button class="btn btn-ghost" onclick="closeBulkModal()">キャンセル</button>
+        <button class="btn btn-primary" id="btn-bulk-gen" onclick="startBulkGenerate()" style="background:#7c3aed;border-color:#7c3aed">✨ 生成開始</button>
+      </div>
+    </div>
+
+    <div id="bulk-progress" style="display:none">
+      <div id="bulk-progress-bar-wrap" style="background:#f1f3f4;border-radius:4px;height:8px;margin-bottom:12px">
+        <div id="bulk-progress-bar" style="background:#7c3aed;height:8px;border-radius:4px;width:0%;transition:width .3s"></div>
+      </div>
+      <div id="bulk-log" style="max-height:300px;overflow-y:auto;font-size:12px;font-family:monospace;background:#f8f9fa;border-radius:4px;padding:10px;line-height:1.8"></div>
+      <div class="modal-footer" style="margin-top:16px">
+        <button class="btn btn-primary" id="btn-bulk-done" onclick="closeBulkModal();location.reload()" style="display:none">完了 — 求人管理を更新</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
 // ── Admin Applicants ──
-function adminApplicantsPage(applicants, filter = 'all') {
+function adminApplicantsPage(applicants, filter = 'all', co = 'sq') {
   const statusList = ['all','新規','未対応','架電済','面談済','紹介済','NG','重複'];
   const chips = statusList.map(s =>
-    `<span class="filter-chip ${s === filter ? 'active' : ''}" onclick="location.href='/admin/applicants?status=${s}'">${s === 'all' ? 'すべて' : s}</span>`
+    `<span class="filter-chip ${s === filter ? 'active' : ''}" onclick="location.href='/admin/applicants?status=${s}&co=${co}'">${s === 'all' ? 'すべて' : s}</span>`
   ).join('');
 
   const rows = applicants.length === 0
@@ -317,7 +670,19 @@ function adminApplicantsPage(applicants, filter = 'all') {
   <div class="btn-group">
     <button id="btn-import" class="btn btn-ghost" onclick="triggerCSVImport()">📂 CSVをインポート</button>
     <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVFile(this)">
-    <button id="btn-csv-export" class="btn btn-ghost" onclick="exportCSV()">📤 CA対応リスト出力</button>
+    <button id="btn-csv-export" class="btn btn-ghost" onclick="exportCSV('${co}')">📤 この会社のCSV出力</button>
+    <button class="btn btn-primary" onclick="exportCSV('all')" title="Social Quality + Life Tailor を合算してCSV出力">📊 全社合算CSV出力</button>
+  </div>
+</div>
+<div class="card mb-16">
+  <div class="action-section-title">📤 リスト出力</div>
+  <div class="btn-group flex-wrap">
+    <button class="btn btn-primary btn-sm" onclick="exportList('new')">① 新規リスト出力</button>
+    <div class="flex items-center gap-8">
+      <input type="month" id="export-month" class="input-sm" value="${new Date().toISOString().slice(0,7)}">
+      <button class="btn btn-ghost btn-sm" onclick="exportList('monthly')">② 月次全応募者出力</button>
+      <button class="btn btn-warning btn-sm" onclick="exportList('ng')">③ 月次NGリスト出力</button>
+    </div>
   </div>
 </div>
 <div id="drop-zone" class="drop-zone mb-16" onclick="triggerCSVImport()">
@@ -337,13 +702,15 @@ function adminApplicantsPage(applicants, filter = 'all') {
     </table>
   </div>
 </div>`;
-  return adminLayout('応募者管理', content, 'applicants');
+  return adminLayout('応募者管理', content, 'applicants', co);
 }
 
 // ── Admin Logs ──
-function adminLogsPage(logs) {
+function adminLogsPage(logs, co = 'sq') {
   const actionLabel = {
     kyujinbox_post: '求人ボックス投稿',
+    stanby_post: 'スタンバイ投稿',
+    indeed_post: 'Indeed掲載',
     indeed_scrape: 'Indeedスクレイピング',
     xml_generate: 'XML生成',
     csv_import: 'CSVインポート'
@@ -370,7 +737,7 @@ function adminLogsPage(logs) {
     </table>
   </div>
 </div>`;
-  return adminLayout('投稿ログ', content, 'logs');
+  return adminLayout('投稿ログ', content, 'logs', co);
 }
 
 // ── Public Jobs List ──
@@ -424,33 +791,64 @@ function jobDetailPage(job) {
     ? `<div class="job-body"><h2>よくある質問</h2>${faq.map(f => `<p><strong>Q. ${esc(f.q)}</strong></p><p>A. ${esc(f.a)}</p>`).join('<br>')}</div>`
     : '';
 
-  const jsonld = `<script type="application/ld+json">${JSON.stringify({
+  const salaryParsed = parseSalary(job.salary);
+  const salarySchema = salaryParsed ? {
+    "@type": "MonetaryAmount",
+    "currency": "JPY",
+    "value": {
+      "@type": "QuantitativeValue",
+      ...(salaryParsed.min   ? { "minValue": salaryParsed.min }   : {}),
+      ...(salaryParsed.max   ? { "maxValue": salaryParsed.max }   : {}),
+      "unitText": salaryParsed.unitText
+    }
+  } : undefined;
+
+  const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+  const jobUrl  = `${siteUrl}/jobs/${job.id}`;
+
+  // 都道府県を location 文字列から抽出（Google Jobs: addressRegion）
+  const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+  const addressRegion = PREFS.find(p => job.location.includes(p)) || '';
+
+  // validThrough: DB に expires_at があればその値、なければ掲載日から60日後
+  const datePosted = (job.published_at || job.created_at || '').slice(0, 10);
+  const validThrough = job.expires_at
+    ? job.expires_at.slice(0, 10)
+    : (() => {
+        const d = new Date(datePosted || Date.now());
+        d.setDate(d.getDate() + 60);
+        return d.toISOString().slice(0, 10);
+      })();
+
+  const jsonldObj = {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
     "title": job.title,
     "description": job.description,
-    "identifier": { "@type": "PropertyValue", "name": "recruitment-platform", "value": job.id },
-    "datePosted": (job.published_at || job.created_at || '').slice(0,10),
-    "validThrough": job.expires_at ? job.expires_at.slice(0,10) : "",
+    "url": jobUrl,
+    "identifier": { "@type": "PropertyValue", "name": process.env.COMPANY_NAME || "採用企業", "value": job.id },
+    "datePosted": datePosted,
+    "validThrough": validThrough,
+    "directApply": true,
     "employmentType": mapEmploymentType(job.employment_type),
-    "hiringOrganization": { "@type": "Organization", "name": "採用企業" },
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": process.env.COMPANY_NAME || "採用企業",
+      ...(process.env.SITE_URL ? { "sameAs": process.env.SITE_URL } : {})
+    },
     "jobLocation": {
       "@type": "Place",
       "address": {
         "@type": "PostalAddress",
         "addressLocality": job.location,
+        ...(addressRegion ? { "addressRegion": addressRegion } : {}),
         "addressCountry": "JP"
       }
     },
-    "baseSalary": {
-      "@type": "MonetaryAmount",
-      "currency": "JPY",
-      "value": {
-        "@type": "QuantitativeValue",
-        "unitText": "MONTH"
-      }
-    }
-  }, null, 2)}<\/script>`;
+    ...(salarySchema ? { "baseSalary": salarySchema } : {})
+  };
+
+  const jsonld = `<script type="application/ld+json">${JSON.stringify(jsonldObj, null, 2)}<\/script>`;
 
   const content = `
 <div class="pub-main">
@@ -481,7 +879,7 @@ function jobDetailPage(job) {
         <form id="apply-form">
           <input type="hidden" name="jobId" value="${job.id}">
           <input type="hidden" name="jobTitle" value="${esc(job.title)}">
-          <input type="hidden" name="sourceMedia" value="direct">
+          <input type="hidden" name="sourceMedia" id="apply-source-media" value="direct">
           <div class="form-row">
             <div class="form-group">
               <label>お名前<span class="req">*</span></label>
@@ -515,11 +913,25 @@ function jobDetailPage(job) {
       </div>
     </div>
   </div>
-</div>`;
+</div>
+<script>
+(function(){
+  // Googleしごと検索・Google広告からの流入を検知してsourceMediaをセット
+  const field = document.getElementById('apply-source-media');
+  if (!field) return;
+  const params = new URLSearchParams(window.location.search);
+  const utmSource = (params.get('utm_source') || '').toLowerCase();
+  const ref = (document.referrer || '').toLowerCase();
+  if (utmSource.includes('google') || ref.includes('google.com')) {
+    field.value = 'google';
+  }
+})();
+</script>`;
 
   return publicLayout(`${esc(job.title)} | 求人詳細`, content, {
     description: `${job.location}・${job.salary}・${job.employment_type}。${job.description.slice(0, 100)}`,
-    jsonld
+    jsonld,
+    canonical: `${siteUrl}/jobs/${job.id}`
   });
 }
 
@@ -528,4 +940,759 @@ function mapEmploymentType(t) {
   return m[t] || 'OTHER';
 }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, jobsListPage, jobDetailPage, esc };
+// Parse Japanese salary string → { min, max, unitText }
+// Examples: "月給25万円〜30万円" → {min:250000, max:300000, unitText:"MONTH"}
+//           "時給1,200円" → {min:1200, unitText:"HOUR"}
+//           "年収400万円〜600万円" → {min:4000000, max:6000000, unitText:"YEAR"}
+function parseSalary(salary) {
+  if (!salary) return null;
+  const s = salary.replace(/,/g, '').replace(/，/g, '');
+  let unitText = 'MONTH';
+  if (/時給|時間/.test(s))  unitText = 'HOUR';
+  if (/日給|日当/.test(s))  unitText = 'DAY';
+  if (/年収|年俸/.test(s))  unitText = 'YEAR';
+
+  // Multiplier: 万 = 10000
+  const toNum = str => {
+    const m = str.match(/([\d.]+)万/);
+    if (m) return Math.round(parseFloat(m[1]) * 10000);
+    const n = str.match(/[\d]+/);
+    return n ? parseInt(n[0], 10) : null;
+  };
+
+  // Range: "23万円〜30万円" / "25万〜30万" / "1,200円〜1,600円"
+  // Allow any non-digit chars between the number and the range delimiter
+  const range = s.match(/([\d.]+万?[\d]*)\D*[〜～〜~]\D*([\d.]+万?[\d]*)/);
+  if (range) {
+    const min = toNum(range[1]);
+    const max = toNum(range[2]);
+    if (min && max) return { min, max, unitText };
+  }
+
+  // Single value
+  const single = toNum(s);
+  if (single) return { min: single, unitText };
+
+  return null;
+}
+
+// ── SVG Line Chart helper ──────────────────────────────────────
+function svgLineChart(data, { width = 560, height = 160, color = '#2563eb' } = {}) {
+  if (!data.length) return `<div class="chart-empty">データなし</div>`;
+  const pad = { t: 10, r: 10, b: 28, l: 32 };
+  const W = width - pad.l - pad.r;
+  const H = height - pad.t - pad.b;
+  const maxV = Math.max(...data.map(d => d.count), 1);
+
+  const pts = data.map((d, i) => {
+    const x = pad.l + (data.length > 1 ? (i / (data.length - 1)) * W : W / 2);
+    const y = pad.t + H - (d.count / maxV) * H;
+    return { x, y, d };
+  });
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const fillD = `${pathD} L ${pts[pts.length-1].x.toFixed(1)},${(pad.t + H).toFixed(1)} L ${pts[0].x.toFixed(1)},${(pad.t + H).toFixed(1)} Z`;
+
+  // X labels: show every ~7 points
+  const step = Math.max(1, Math.floor(data.length / 6));
+  const xLabels = pts.filter((_, i) => i % step === 0 || i === data.length - 1)
+    .map(p => `<text x="${p.x.toFixed(1)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="#94a3b8">${p.d.date.slice(5)}</text>`)
+    .join('');
+
+  // Y labels
+  const yLabels = [0, Math.ceil(maxV / 2), maxV].map(v => {
+    const y = pad.t + H - (v / maxV) * H;
+    return `<text x="${pad.l - 4}" y="${y.toFixed(1)}" text-anchor="end" font-size="9" fill="#94a3b8" dominant-baseline="middle">${v}</text>
+    <line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + W}" y2="${y.toFixed(1)}" stroke="#f1f5f9" stroke-width="1"/>`;
+  }).join('');
+
+  const dots = pts.filter(p => p.d.count > 0)
+    .map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}" opacity=".8"/>`)
+    .join('');
+
+  return `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
+  ${yLabels}
+  <path d="${fillD}" fill="${color}" fill-opacity=".08"/>
+  <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+  ${dots}
+  ${xLabels}
+</svg>`;
+}
+
+// ── Admin Analytics ────────────────────────────────────────────
+function adminAnalyticsPage({ daily, media, status, topJobs, weekly, co = 'sq' }) {
+  const totalApps = daily.reduce((s, d) => s + d.count, 0);
+  const wow = weekly.weekOnWeek !== null
+    ? `<span style="color:${weekly.weekOnWeek >= 0 ? 'var(--success)' : 'var(--error)'}">${weekly.weekOnWeek >= 0 ? '↑' : '↓'}${Math.abs(weekly.weekOnWeek)}%</span>`
+    : '<span style="color:var(--text-muted)">-</span>';
+
+  // Media chart
+  const maxMedia = media.length ? Math.max(...media.map(m => m.total), 1) : 1;
+  const mediaBars = media.map(m => {
+    const pct = Math.round((m.total / maxMedia) * 100);
+    const dupPct = m.total > 0 ? Math.round((m.duplicates / m.total) * 100) : 0;
+    return `<div class="analytics-bar-row">
+      <div class="analytics-bar-label">${esc(m.media)}</div>
+      <div class="analytics-bar-track">
+        <div class="analytics-bar-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="analytics-bar-meta">
+        <span>${m.total}件</span>
+        <span class="text-muted">（重複${dupPct}%）</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Status donut (simple table)
+  const statusColors = { '新規':'#2563eb','未対応':'#d97706','架電済':'#16a34a','面談済':'#7c3aed','紹介済':'#0891b2','NG':'#dc2626','重複':'#94a3b8' };
+  const totalStatus = status.reduce((s, r) => s + r.count, 0) || 1;
+  const statusBars = status.map(s => {
+    const pct = Math.round((s.count / totalStatus) * 100);
+    const color = statusColors[s.status] || '#64748b';
+    return `<div class="analytics-bar-row">
+      <div class="analytics-bar-label"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;vertical-align:middle"></span>${esc(s.status)}</div>
+      <div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="analytics-bar-meta"><span>${s.count}件</span><span class="text-muted">${pct}%</span></div>
+    </div>`;
+  }).join('');
+
+  // Top jobs table
+  const jobRows = topJobs.length === 0
+    ? `<tr><td colspan="4" class="empty-state text-sm">データなし</td></tr>`
+    : topJobs.map((j, i) => `<tr>
+        <td style="color:var(--text-muted)">${i + 1}</td>
+        <td><a href="/jobs/${j.id}" target="_blank" style="color:var(--primary)">${esc(j.title)}</a></td>
+        <td>${esc(j.location)}</td>
+        <td style="font-weight:700;color:var(--primary)">${j.app_count}</td>
+      </tr>`).join('');
+
+  const content = `
+<div class="page-header">
+  <h2>分析・レポート</h2>
+  <p>応募データの分析と媒体パフォーマンス</p>
+</div>
+
+<div class="grid-4 mb-24">
+  <div class="card card-sm">
+    <div class="card-title">今週の応募</div>
+    <div class="card-value">${weekly.thisWeek}</div>
+    <div class="card-sub">先週比 ${wow}</div>
+  </div>
+  <div class="card card-sm">
+    <div class="card-title">過去30日の応募</div>
+    <div class="card-value">${totalApps}</div>
+  </div>
+  <div class="card card-sm">
+    <div class="card-title">重複率</div>
+    <div class="card-value">${weekly.dupRate}%</div>
+    <div class="card-sub">全体平均</div>
+  </div>
+  <div class="card card-sm">
+    <div class="card-title">先週の応募</div>
+    <div class="card-value">${weekly.lastWeek}</div>
+  </div>
+</div>
+
+<div class="card mb-24">
+  <div class="action-section-title" style="margin-bottom:16px">📅 応募数トレンド（過去30日）</div>
+  <div class="chart-wrap">
+    ${svgLineChart(daily)}
+  </div>
+</div>
+
+<div class="grid-2 gap-24 mb-24">
+  <div class="card">
+    <div class="action-section-title" style="margin-bottom:14px">📡 媒体別パフォーマンス</div>
+    ${media.length === 0
+      ? '<p class="text-muted text-sm">データなし</p>'
+      : `<div class="analytics-bars">${mediaBars}</div>`}
+  </div>
+  <div class="card">
+    <div class="action-section-title" style="margin-bottom:14px">👥 ステータス分布</div>
+    ${status.length === 0
+      ? '<p class="text-muted text-sm">データなし</p>'
+      : `<div class="analytics-bars">${statusBars}</div>`}
+  </div>
+</div>
+
+<div class="card">
+  <div class="action-section-title" style="margin-bottom:14px">🏆 求人別応募数ランキング</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>求人タイトル</th><th>勤務地</th><th>応募数</th></tr></thead>
+      <tbody>${jobRows}</tbody>
+    </table>
+  </div>
+</div>`;
+
+  return adminLayout('分析・レポート', content, 'analytics', co);
+}
+
+// ── Login page ──
+function loginPage(error = '') {
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ログイン | 採用管理</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+.login-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:40px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo h1{font-size:20px;font-weight:700;color:var(--primary);margin:0 0 4px}
+.login-logo p{font-size:12px;color:var(--text-muted)}
+.login-error{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:13px;padding:10px 14px;border-radius:6px;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>SEO採用プラットフォーム</h1>
+      <p>管理画面へのログイン</p>
+    </div>
+    ${error ? `<div class="login-error">⚠️ ${esc(error)}</div>` : ''}
+    <form method="POST" action="/admin/login">
+      <div class="form-group">
+        <label class="form-label">ユーザー名</label>
+        <input class="form-input" type="text" name="username" autocomplete="username" required autofocus>
+      </div>
+      <div class="form-group">
+        <label class="form-label">パスワード</label>
+        <input class="form-input" type="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-primary w-full mt-16" type="submit" style="width:100%;justify-content:center">ログイン</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+// ── Privacy Policy ──
+function privacyPolicyPage() {
+  const company  = process.env.COMPANY_NAME || '採用企業';
+  const adminEmail = process.env.ADMIN_EMAIL || '';
+  const siteUrl  = process.env.SITE_URL || '';
+  const today    = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const content = `
+<div class="pub-main" style="max-width:800px;margin:0 auto;padding:40px 24px">
+  <h1 style="font-size:24px;font-weight:700;margin-bottom:8px">プライバシーポリシー</h1>
+  <p style="font-size:13px;color:#70757a;margin-bottom:40px">制定日：${today}</p>
+
+  <div class="privacy-section">
+    <h2>1. 事業者情報</h2>
+    <p>${esc(company)}（以下「当社」）は、当採用サイト（以下「本サイト」）において取得する個人情報の取り扱いについて、以下のとおりプライバシーポリシーを定めます。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>2. 収集する個人情報の種類</h2>
+    <p>本サイトでは、求人への応募時に以下の個人情報を収集します。</p>
+    <ul>
+      <li>氏名</li>
+      <li>電話番号</li>
+      <li>メールアドレス</li>
+      <li>年齢（任意）</li>
+      <li>住所（任意）</li>
+      <li>志望動機・メッセージ（任意）</li>
+      <li>応募した求人情報・応募日時</li>
+    </ul>
+  </div>
+
+  <div class="privacy-section">
+    <h2>3. 個人情報の利用目的</h2>
+    <p>収集した個人情報は、以下の目的にのみ利用します。</p>
+    <ul>
+      <li>採用選考の実施および選考結果のご連絡</li>
+      <li>採用担当者からのご連絡・面談の調整</li>
+      <li>採用管理業務の遂行</li>
+      <li>重複応募の確認および応募履歴の管理</li>
+    </ul>
+    <p>上記以外の目的で個人情報を利用することはありません。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>4. 個人情報の第三者提供</h2>
+    <p>当社は、以下の場合を除き、ご本人の同意なく第三者に個人情報を提供しません。</p>
+    <ul>
+      <li>法令に基づく場合</li>
+      <li>人の生命・身体または財産の保護のために必要な場合</li>
+      <li>公衆衛生の向上または児童の健全な育成の推進のために特に必要な場合</li>
+    </ul>
+  </div>
+
+  <div class="privacy-section">
+    <h2>5. 個人情報の管理</h2>
+    <p>当社は、個人情報の漏洩・滅失・毀損を防止するため、適切なセキュリティ対策を実施します。個人情報へのアクセスは採用担当者に限定し、不要になった個人情報は速やかに削除します。</p>
+    <p>個人情報の保管期間は、選考終了後<strong>6ヶ月以内</strong>とします。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>6. 個人情報の開示・訂正・削除について</h2>
+    <p>ご本人から個人情報の開示・訂正・削除のご要望があった場合は、本人確認のうえ、合理的な期間内に対応いたします。下記のお問い合わせ先までご連絡ください。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>7. Cookie（クッキー）について</h2>
+    <p>本サイトは管理画面のセッション管理のみにCookieを使用します。求職者向けの求人一覧・求人詳細ページではCookieを使用しておらず、トラッキングも行いません。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>8. プライバシーポリシーの変更</h2>
+    <p>当社は、法令の変更や事業内容の変化に応じて、本ポリシーを改定することがあります。改定後のポリシーは本ページに掲載した時点で効力を生じます。</p>
+  </div>
+
+  <div class="privacy-section">
+    <h2>9. お問い合わせ先</h2>
+    <p>個人情報の取り扱いに関するお問い合わせは、以下までご連絡ください。</p>
+    <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-top:8px">
+      <p><strong>${esc(company)}</strong><br>
+      個人情報保護担当窓口<br>
+      ${adminEmail ? `メール：<a href="mailto:${esc(adminEmail)}" style="color:var(--primary)">${esc(adminEmail)}</a>` : 'メール：採用担当までお問い合わせください'}</p>
+    </div>
+  </div>
+</div>`;
+
+  return publicLayout('プライバシーポリシー | 採用サイト', content, {
+    description: `${company}の採用サイトにおける個人情報の取り扱いについて説明します。`,
+    canonical: `${siteUrl}/privacy`,
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// 運用管理ページ（3タブ）
+// ══════════════════════════════════════════════════════════════
+function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applicantsCross = {}, todayTargets = {}, stats = {}, pastApplicants = [], months = [], filter = {}, siteUrl = '', indeedRepostCount = 0 } = {}) {
+  const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
+
+  const tabBar = `
+    <div class="ops-tabs">
+      <a href="/admin/ops?tab=posts" class="ops-tab ${tab === 'posts' ? 'active' : ''}">📋 掲載管理</a>
+      <a href="/admin/ops?tab=new"   class="ops-tab ${tab === 'new'   ? 'active' : ''}">🆕 新規応募</a>
+      <a href="/admin/ops?tab=past"  class="ops-tab ${tab === 'past'  ? 'active' : ''}">📚 過去応募者</a>
+    </div>`;
+
+  // ── クロス集計表の共通レンダラ ──
+  const crossTable = (data, label, mediaList = OPS_MEDIA) => {
+    const totalsByMedia = {}; mediaList.forEach(m => totalsByMedia[m.id] = 0);
+    let grand = 0;
+    const rows = COMPANIES_ORDER.map(cid => {
+      let rowTotal = 0;
+      const cells = mediaList.map(m => {
+        const v = (data[cid] && data[cid][m.id]) || 0;
+        rowTotal += v; totalsByMedia[m.id] += v; grand += v;
+        return `<td class="num${v === 0 ? ' zero' : ''}">${v}</td>`;
+      }).join('');
+      return `<tr><th>${companyName(cid)}</th>${cells}<td class="num total">${rowTotal}</td></tr>`;
+    }).join('');
+    const footCells = mediaList.map(m => `<td class="num total">${totalsByMedia[m.id]}</td>`).join('');
+    return `
+      <table class="cross-table">
+        <thead><tr><th>${label}</th>${mediaList.map(m => `<th>${m.name}</th>`).join('')}<th>合計</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><th>合計</th>${footCells}<td class="num total">${grand}</td></tr></tfoot>
+      </table>`;
+  };
+  const POSTS_MEDIA = OPS_MEDIA.filter(m => m.id !== 'indeed');
+
+  let body = '';
+
+  // ── Tab A: 掲載管理 ──
+  if (tab === 'posts') {
+    // Per-company totals from postsCross
+    const companyTotals = COMPANIES_ORDER.map(cid => {
+      const mediaData = postsCross[cid] || {};
+      const total = OPS_MEDIA.reduce((sum, m) => sum + (mediaData[m.id] || 0), 0);
+      return { cid, total, label: companyName(cid) };
+    });
+    const grandTotal = companyTotals.reduce((sum, c) => sum + c.total, 0);
+
+    const summaryCards = `
+      <section class="stat-cards">
+        <div class="stat-card"><div class="stat-label">掲載総数</div><div class="stat-value">${grandTotal}</div></div>
+        ${companyTotals.map(c =>
+          `<div class="stat-card"><div class="stat-label">${c.label}</div><div class="stat-value">${c.total}</div></div>`
+        ).join('')}
+      </section>`;
+
+    const postRows = '';
+
+    body = `
+      ${summaryCards}
+      <section class="card">
+        <h2>媒体別 × 会社別 掲載中件数</h2>
+        ${crossTable(postsCross, '会社＼媒体', POSTS_MEDIA)}
+      </section>
+      ${opsAutomationPanel(co, siteUrl, indeedRepostCount)}`;
+  }
+
+  // ── Tab B: 新規応募者 ──
+  if (tab === 'new') {
+    const targetRows = COMPANIES_ORDER.map(cid =>
+      `<tr><th>${companyName(cid)}</th><td class="num">${(todayTargets.byCompany && todayTargets.byCompany[cid]) || 0}</td></tr>`
+    ).join('');
+    body = `
+      <section class="stat-cards">
+        <div class="stat-card"><div class="stat-label">本日の新規応募</div><div class="stat-value">${stats.todayNew || 0}</div></div>
+        <div class="stat-card"><div class="stat-label">本日架電対象（全体）</div><div class="stat-value">${(todayTargets.total) || 0}</div></div>
+      </section>
+      <section class="card">
+        <h2>会社別 × 媒体別 新規応募数</h2>
+        ${crossTable(applicantsCross, '会社＼媒体')}
+      </section>
+      <section class="card">
+        <h2>本日架電を行う件数（会社別）</h2>
+        <p class="muted">架電リストに残っている「新規」の件数（不通・対応中・終了は過去応募へ移動）</p>
+        <table class="cross-table" style="max-width:360px">
+          <thead><tr><th>会社</th><th>架電対象件数</th></tr></thead>
+          <tbody>${targetRows}</tbody>
+          <tfoot><tr><th>合計</th><td class="num total">${todayTargets.total || 0}</td></tr></tfoot>
+        </table>
+        <div style="margin-top:16px">
+          <a href="/admin/calls" class="btn btn-primary">📞 架電リストを開く</a>
+        </div>
+      </section>`;
+  }
+
+  // ── Tab C: 過去応募者 ──
+  if (tab === 'past') {
+    const sel = (name, options, current) => `
+      <select name="${name}" class="filter-select" onchange="opsPastFilter()">
+        ${options.map(o => `<option value="${o.v}"${o.v === current ? ' selected' : ''}>${o.l}</option>`).join('')}
+      </select>`;
+    const companyOpts = [{ v: 'all', l: '全ての会社' }, ...COMPANIES_ORDER.map(c => ({ v: c, l: companyName(c) }))];
+    const mediaOpts = [{ v: 'all', l: '全ての媒体' }, ...OPS_MEDIA.map(m => ({ v: m.id, l: m.name }))];
+    const statusOpts = [{ v: 'all', l: '全ての対応状況' }, ...CALL_STATUSES_LIST.map(s => ({ v: s, l: s }))];
+    const monthOpts = [{ v: 'all', l: '全ての応募月' }, ...months.map(m => ({ v: m, l: m }))];
+
+    // 対応状況別にグルーピング
+    const groups = {};
+    CALL_STATUSES_LIST.forEach(s => groups[s] = []);
+    pastApplicants.forEach(a => { (groups[a.status] || (groups[a.status] = [])).push(a); });
+
+    const sectionsOrder = ['不通', '対応中', '終了', '新規'];
+    const sectionLabels = {
+      '不通': '🔁 再架電リスト（不通）', '対応中': '🔵 対応中',
+      '終了': '✅ 終了', '新規': '🆕 新規',
+    };
+    const sections = sectionsOrder.filter(s => (groups[s] || []).length).map(s => {
+      const rows = groups[s].map(a => `
+        <tr data-company="${esc(a.company || '')}" data-media="${esc(a.media || '')}" data-status="${esc(a.status || '')}" data-month="${esc((a.applied_at || '').slice(0, 7))}">
+          <td class="name-col">${esc(a.name || '')}</td>
+          <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
+          <td>${esc(a.email || '')}</td>
+          <td>${esc(a.gender || '')}</td>
+          <td>${a.age || ''}</td>
+          <td>${esc(a.address || '')}</td>
+          <td>${esc(a.job_title || '')}</td>
+          <td>${esc(a.current_job || '')}</td>
+          <td>${esc(a.education || '')}</td>
+          <td style="white-space:nowrap">
+            <span style="font-size:12px">${companyName(a.company)}</span>
+            <button onclick="moveCompany('${esc(a.id)}','${esc(a.company || '')}')" style="margin-left:4px;padding:1px 5px;font-size:10px;border:1px solid #cbd5e1;border-radius:3px;background:#f8fafc;cursor:pointer" title="会社変更">↔</button>
+          </td>
+          <td>${esc(mediaName(a.media))}</td>
+          <td style="white-space:nowrap">${esc((a.applied_at || '').slice(0, 10))}</td>
+          <td class="num">${a.call_count || 0}</td>
+          <td style="white-space:nowrap">${esc((a.last_called_at || '').slice(0, 10))}</td>
+          <td>${esc(a.notes || '')}</td>
+        </tr>`).join('');
+      return `
+        <details class="past-section" open data-status="${esc(s)}">
+          <summary><span class="dot" style="background:${CALL_STATUS_COLORS[s] || '#999'}"></span>${sectionLabels[s] || s} <span class="count section-count">${groups[s].length}件</span></summary>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead><tr>
+                <th class="name-col">名前</th><th>電話番号</th><th>メール</th><th>性別</th><th>年齢</th>
+                <th>居住地</th><th>求人タイトル</th><th>現在の職業</th><th>学歴</th>
+                <th>会社</th><th>媒体</th><th>応募日</th><th>架電回数</th><th>最終架電</th><th>メモ</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </details>`;
+    }).join('');
+
+    // 初期のスプレッドシート出力リンク（URLパラメータからのディープリンク用）。
+    // 以降は絞り込み操作に応じて opsPastFilter() が href を更新する。
+    const exportQS = new URLSearchParams();
+    if (filter.company !== 'all') exportQS.set('company', filter.company);
+    if (filter.media   !== 'all') exportQS.set('media',   filter.media);
+    if (filter.status  !== 'all') exportQS.set('status',  filter.status);
+    if (filter.month   !== 'all') exportQS.set('month',   filter.month);
+    const exportHref = '/api/ops/calls/export' + (exportQS.toString() ? `?${exportQS.toString()}` : '');
+
+    body = `
+      <section class="card">
+        <div class="card-head">
+          <h2>絞り込み <span class="count" id="past-total">${pastApplicants.length}件</span></h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="callImport()" title="過去応募者データ（CSV / Excel）を取り込む">📥 過去応募者を取り込む</button>
+            <button class="btn btn-secondary btn-sm" onclick="callSmartImport()" title="全会社・全媒体が1つに混在したExcelを自動振り分けで取り込む">🪄 まとめてExcel取込</button>
+            <button class="btn btn-primary btn-sm" onclick="sheetsPushPast()" title="過去応募者を架電用とは別の専用スプレッドシートへ出力（GOOGLE_PAST_SHEET_ID）">📤 過去リストを別シート出力</button>
+            <a id="past-export" href="${exportHref}" class="btn btn-secondary btn-sm" download>📊 CSV出力（全件）</a>
+          </div>
+        </div>
+        <form id="past-filter" class="filter-bar">
+          ${sel('company', companyOpts, filter.company || 'all')}
+          ${sel('media', mediaOpts, filter.media || 'all')}
+          ${sel('status', statusOpts, filter.status || 'all')}
+          ${sel('month', monthOpts, filter.month || 'all')}
+        </form>
+        <p class="muted" id="past-conditions" style="margin:10px 0 0;display:none"></p>
+      </section>
+      <div id="past-results">
+        ${sections}
+        <section class="card" id="past-empty" style="display:none"><p class="empty">該当する応募者がいません。</p></section>
+      </div>
+      ${callImportModalHtml(co, OPS_MEDIA[0].id)}`;
+  }
+
+  const PAGE_TITLES = { posts: '📋 掲載管理', new: '🆕 新規応募', past: '📚 過去応募者' };
+  const content = `
+    <div class="page-head"><h1>${PAGE_TITLES[tab] || '📋 掲載管理'}</h1></div>
+    ${tabBar}
+    ${body}
+    ${tab === 'posts' ? postModalHtml(co) : ''}`;
+
+  return adminLayout(PAGE_TITLES[tab] || '掲載管理', content, tab, co);
+}
+
+// 掲載管理タブ内の「自動掲載・媒体運用」パネル（会社サブタブで切替）
+function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
+  const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
+  const company = COMPANIES[co] || COMPANIES.sq;
+  const coTabs = COMPANIES_ORDER.map(c =>
+    `<a href="/admin/ops?tab=posts&co=${c}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`
+  ).join('');
+
+  return `
+  <section class="card">
+    <div class="card-head" style="align-items:center">
+      <h2>📡 媒体運用</h2>
+      <span id="vpn-badge" class="vpn-badge vpn-checking" onclick="refreshVpn()" title="クリックで再確認">
+        <span class="dot"></span> 確認中...
+      </span>
+    </div>
+    <p class="muted" style="margin:-4px 0 12px">各媒体への投稿には VPN 接続が必要です。上のランプが「接続中」であることを確認してから投稿してください。</p>
+    <div class="call-co-tabs">${coTabs}</div>
+    <p class="muted" style="margin:8px 0 16px">対象会社: <strong style="color:${company.color}">${company.full}</strong></p>
+
+    <div class="action-section">
+      <div class="media-op-section">
+        <div class="media-op-label">求人ボックス <span class="text-muted text-sm">（スクレイピング投稿・VPN必須）</span></div>
+        <div class="btn-group" style="align-items:center">
+          <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox('${co}')">🚀 求人ボックスに投稿する（未投稿のみ）</button>
+          <button id="btn-post-kyujinbox-force" class="btn btn-ghost btn-sm" onclick="startPostKyujinboxForce('${co}')" title="投稿済み求人も含めて全件投稿">🔄 強制再投稿</button>
+          <button class="btn btn-ghost btn-sm" onclick="resetKyujinboxPosted('${co}')" title="投稿済みフラグをリセット">♻️ フラグリセット</button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">1度投稿した求人は次回スキップ（スキップしたくない場合は強制再投稿 or フラグリセット）</div>
+        <div id="progress-kyujinbox-wrap" class="progress-wrap hidden"><div id="progress-kyujinbox" class="progress-box"></div></div>
+      </div>
+
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">スタンバイ <span class="text-muted text-sm">（スクレイピング投稿・VPN必須）</span></div>
+        <div class="btn-group" style="align-items:center">
+          <button id="btn-post-stanby" class="btn btn-warning" onclick="startPostStanby('${co}')">🚀 スタンバイに16件投稿する</button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">ボタン1回で1日分（16件）を一括投稿します。</div>
+        <div id="progress-stanby-wrap" class="progress-wrap hidden"><div id="progress-stanby" class="progress-box"></div></div>
+      </div>
+    </div>
+  </section>`;
+}
+
+function postModalHtml(co) {
+  const mediaOpts = OPS_MEDIA.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+  const coOpts = COMPANIES_ORDER.map(c => `<option value="${c}"${c === co ? ' selected' : ''}>${COMPANIES[c].label}</option>`).join('');
+  return `
+  <div id="post-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="post-modal-title">掲載を追加</h3>
+      <input type="hidden" id="pm-id">
+      <div class="form-grid">
+        <label>会社<select id="pm-company">${coOpts}</select></label>
+        <label>媒体<select id="pm-media">${mediaOpts}</select></label>
+        <label class="full">求人タイトル<input type="text" id="pm-title"></label>
+        <label>掲載日<input type="date" id="pm-post-date"></label>
+        <label>期限<input type="date" id="pm-expire-date"></label>
+        <label>状態<select id="pm-status"><option>掲載中</option><option>審査中</option><option>停止</option></select></label>
+        <label>応募数<input type="number" id="pm-count" value="0" min="0"></label>
+        <label class="full">メモ<input type="text" id="pm-notes"></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="opsCloseModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="opsSavePost()">保存</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 架電リストページ（会社タブ × 媒体サブタブ）
+// ══════════════════════════════════════════════════════════════
+function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter = 'all', search = '' } = {}) {
+  const companyName = id => (COMPANIES[id] ? COMPANIES[id].label : id.toUpperCase());
+  const baseHref = (c, m) => `/admin/calls?co=${c}&media=${m}`;
+  const isAll = co === 'all';
+
+  const companyTabs = [
+    `<a href="/admin/calls?co=all&media=${media}" class="call-co-tab ${isAll ? 'active' : ''}">🏢 全社まとめ</a>`,
+    ...COMPANIES_ORDER.map(c =>
+      `<a href="${baseHref(c, media)}" class="call-co-tab ${c === co ? 'active' : ''}">${companyName(c)}</a>`)
+  ].join('');
+
+  const mediaTabs = [
+    `<a href="${baseHref(isAll ? 'all' : co, 'all')}" class="call-media-tab ${media === 'all' ? 'active' : ''}">すべての媒体</a>`,
+    ...OPS_MEDIA.map(m =>
+      `<a href="${baseHref(isAll ? 'all' : co, m.id)}" class="call-media-tab ${m.id === media ? 'active' : ''}">${m.name}</a>`),
+  ].join('');
+
+  const countOpts = n => Array.from({ length: 11 }, (_, i) =>
+    `<option value="${i}"${i === (n || 0) ? ' selected' : ''}>${i}</option>`).join('');
+  const statusOpts = cur => CALL_STATUSES_LIST.map(s =>
+    `<option value="${s}"${s === cur ? ' selected' : ''}>${s}</option>`).join('');
+  const statusFilterOpts = [{ v: 'all', l: '全ての対応状況' }, ...CALL_STATUSES_LIST.map(s => ({ v: s, l: s }))].map(o =>
+    `<option value="${o.v}"${o.v === statusFilter ? ' selected' : ''}>${o.l}</option>`).join('');
+
+  // 全社まとめ時は会社列、全媒体表示時は媒体列を追加
+  const showMedia = media === 'all';
+  const NCOLS = 18 + (isAll ? 1 : 0) + (showMedia ? 1 : 0);
+  const coCell = a => isAll ? `<td style="white-space:nowrap;font-size:12px"><span style="display:inline-block;background:${COMPANIES[a.company]?.color || '#94a3b8'};color:#fff;padding:1px 6px;border-radius:4px">${companyName(a.company)}</span></td>` : '';
+  const mediaCell = a => showMedia ? `<td style="white-space:nowrap;font-size:12px">${esc(mediaName(a.media))}</td>` : '';
+  const rows = applicants.length ? applicants.map((a, i) => `
+    <tr data-id="${esc(a.id)}" data-status="${esc(a.status || '')}" style="background:${(CALL_STATUS_COLORS[a.status] || '#fff')}15">
+      <td class="num">${i + 1}</td>
+      ${coCell(a)}
+      ${mediaCell(a)}
+      <td class="name-col">${esc(a.name || '')}${a.is_duplicate ? ` <span class="dup-badge" onclick="showDupInfo('${esc(a.id)}')" style="cursor:pointer" title="重複元を見る">重複</span>` : ''}${a.returning_from_id ? ` <span style="background:#e0f2fe;color:#0369a1;font-size:10px;padding:1px 5px;border-radius:3px;cursor:pointer" onclick="showReturningInfo('${esc(a.id)}')" title="前回応募を見る">再応募</span>` : ''}</td>
+      <td style="white-space:nowrap;color:#555">${esc(a.furigana || '')}</td>
+      <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
+      <td>${esc(a.email || '')}</td>
+      <td>${esc(a.gender || '')}</td>
+      <td style="white-space:nowrap">${esc(a.birth_date || '')}</td>
+      <td class="num">${a.age || ''}</td>
+      <td>${esc(a.address || '')}</td>
+      <td>${esc(a.current_job || '')}</td>
+      <td>${esc(a.job_title || '')}</td>
+      <td class="exp-cell" title="${esc(a.experience || '')}">${esc((a.experience || '').slice(0, 30))}${(a.experience || '').length > 30 ? '…' : ''}</td>
+      <td>${esc(a.education || '')}</td>
+      <td style="white-space:nowrap">${esc((a.applied_at || '').slice(0, 10))}</td>
+      <td><select class="call-count-sel" onchange="callUpdate('${esc(a.id)}','call_count',this.value)">${countOpts(a.call_count)}</select></td>
+      <td><select class="call-status-sel" onchange="callUpdate('${esc(a.id)}','status',this.value)">${statusOpts(a.status)}</select></td>
+      <td style="white-space:nowrap">${esc((a.last_called_at || '').slice(0, 10))}</td>
+      <td><input class="call-memo" value="${esc(a.notes || '')}" onblur="callUpdate('${esc(a.id)}','notes',this.value)" placeholder="メモ"></td>
+    </tr>`).join('') : `<tr><td colspan="${NCOLS}" class="empty">応募者はいません。CSVをインポートしてください。</td></tr>`;
+
+  const headingLabel = isAll
+    ? `全社まとめ / ${mediaName(media)}`
+    : `${companyName(co)} / ${mediaName(media)}`;
+  const exportCoParam = isAll ? '' : `&co=${esc(co)}`;
+  const morningExportHref = `/api/ops/calls/export?active=1&media=${esc(media)}${exportCoParam}`;
+
+  const content = `
+    <div class="page-head">
+      <h1>📞 架電リスト</h1>
+      <div class="head-actions">
+        <button class="btn btn-primary btn-sm" onclick="sheetsPush()" title="応募者情報をスプレッドシートに反映（重複情報も自動記載）">📤 スプレッドシートへ反映</button>
+        <button class="btn btn-warning btn-sm" onclick="sheetsPull()" title="共有スプレッドシートで更新した対応状況・架電回数・メモをDBに取り込む">📥 スプレッドシートから取込</button>
+        <a id="sheets-open" href="#" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="display:none">🔗 シートを開く</a>
+        <button class="btn btn-secondary btn-sm" onclick="sheetsInitRecruitment()" title="スプレッドシートに推薦管理・案件精査タブを作成（既存タブは上書きしません）">📋 推薦・案件精査シート作成</button>
+        <span style="width:1px;height:24px;background:#e2e8f0;margin:0 2px"></span>
+        <button class="btn btn-ghost btn-sm" onclick="callImport()" title="各媒体のCSV/Excelを取り込む">⬆ CSV/Excel取込</button>
+        <a href="${morningExportHref}" class="btn btn-ghost btn-sm" download>📞 朝の架電リスト(xlsx)</a>
+        <button class="btn btn-ghost btn-sm" onclick="callCheckDup()">♻️ 重複チェック</button>
+      </div>
+    </div>
+    <div class="call-co-tabs">${companyTabs}</div>
+    <div class="call-media-tabs">${mediaTabs}</div>
+    <section class="card">
+      <div class="card-head">
+        <h2>${headingLabel} <span class="count" id="calls-count">${applicants.length}件</span></h2>
+      </div>
+      <div class="filter-bar" style="padding:0 0 12px">
+        <input type="text" id="cf-search" class="filter-input" placeholder="名前・電話・住所・求人名で検索..." value="${esc(search)}" oninput="callsLocalFilter()">
+        <select id="cf-status" class="filter-select" onchange="callsLocalFilter()">${statusFilterOpts}</select>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table calls-table" id="calls-table">
+          <thead><tr>
+            <th class="num">#</th>${isAll ? '<th>会社</th>' : ''}${showMedia ? '<th>媒体</th>' : ''}<th class="name-col">名前</th><th>ふりがな</th><th>電話番号</th><th>メール</th>
+            <th>性別</th><th>生年月日</th><th>年齢</th><th>居住地</th>
+            <th>現在の職業</th><th>求人タイトル</th><th>経験</th><th>学歴</th>
+            <th>応募日</th><th>架電回数</th><th>対応状況</th><th>最終架電</th><th>メモ</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </section>
+    ${callImportModalHtml(isAll ? COMPANIES_ORDER[0] : co, media)}`;
+
+  return adminLayout('架電リスト', content, 'calls', isAll ? COMPANIES_ORDER[0] : co);
+}
+
+function callImportModalHtml(co, media) {
+  const coOpts = COMPANIES_ORDER.map(c => `<option value="${c}"${c === co ? ' selected' : ''}>${COMPANIES[c].label}</option>`).join('');
+  const mediaOpts = OPS_MEDIA.map(m => `<option value="${m.id}"${m.id === media ? ' selected' : ''}>${m.name}</option>`).join('');
+  return `
+  <div id="call-import-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>データインポート（CSV / Excel）</h3>
+      <div class="form-grid">
+        <label class="full">取込モード<select id="ci-mode" onchange="callImportModeHint()">
+          <option value="insert">新規追加（応募者を取り込む）</option>
+          <option value="update">架電結果を反映（既存の対応状況・架電回数・メモを更新）</option>
+        </select></label>
+        <label>会社<select id="ci-company">${coOpts}</select></label>
+        <label>媒体<select id="ci-media">${mediaOpts}</select></label>
+        <label class="full">CSV / Excelファイル<input type="file" id="ci-file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      </div>
+      <p id="ci-mode-hint" class="muted" style="font-size:12px;margin:0 0 8px">新規の応募者を取り込みます。CSV・Excel(.xlsx)・スプレッドシートに対応。電話番号・メールが既存と一致する場合は重複として記録します。</p>
+      <div id="ci-result" class="import-result"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="callCloseImport()">閉じる</button>
+        <button class="btn btn-primary" onclick="callDoImport()">取込実行</button>
+      </div>
+    </div>
+  </div>
+  <div id="call-smart-import-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>🪄 まとめてExcel取込</h3>
+      <p class="muted" style="font-size:12px;margin:0 0 10px">
+        全会社・全媒体が1つに混在したExcel（シート＝媒体、シート内の会社見出し行＝会社）を自動で振り分けて取り込みます。<br>
+        ・シート名から媒体を判定（indeed / engage / 求人ボックス 等）<br>
+        ・「合同会社ピープル」「株式会社ライフテイラー」「ニクール」等の見出し行で会社を判定<br>
+        ・電話番号／メールが既存と一致する応募者は重複として記録します
+      </p>
+      <div class="form-grid">
+        <label class="full">既定の会社（見出しが無い場合の振り分け先）
+          <select id="si-company">${COMPANIES_ORDER.map(c => `<option value="${c}">${COMPANIES[c].label}</option>`).join('')}</select>
+        </label>
+        <label class="full">Excelファイル(.xlsx)<input type="file" id="si-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        <label class="full" style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="si-split" style="width:auto">
+          架電回数で振り分ける（未架電→架電リスト / 架電済み→過去リスト）
+        </label>
+        <label class="full" style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="si-countnew" style="width:auto">
+          <strong>本日の新着として計上する</strong>（本日の新規応募・会社別×媒体別に反映）
+        </label>
+      </div>
+      <p class="muted" style="font-size:11px;margin:0 0 8px">※「本日の新着」にチェック＝今日入ってきた新規応募として計上し架電リストへ。<br>チェックを外す＝過去バックログ（新規応募に計上しない）として取り込みます。</p>
+      <div id="si-result" class="import-result"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="callCloseSmartImport()">閉じる</button>
+        <button class="btn btn-primary" onclick="callDoSmartImport()">自動振り分けで取込</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 運用テンプレ用のヘルパ定数
+const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx'];
+const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
+function mediaName(id) { if (id === 'all') return 'すべての媒体'; const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
+
+module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, privacyPolicyPage, esc, opsPage, callsPage };
