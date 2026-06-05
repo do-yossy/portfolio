@@ -1,4 +1,4 @@
-app = "sales-platform"
+app = "sq-sales-tanto20"
 primary_region = "nrt"
 
 [build]
