@@ -138,18 +138,11 @@ const server = http.createServer(async (req, res) => {
             title: it.title || (it.text || '').slice(0, 40) || '無題案件', source: it.source || 'lancers',
             stage: 'lead', raw: it.text || '', link: it.url || '', ...pick(s)
           });
-          // 取込と同時に、提案文＋成果物をClaudeで生成して deal.proposal に保存（APIキーがあれば）
-          if (process.env.ANTHROPIC_API_KEY) {
-            try {
-              const g = await claude.generate(deal);
-              const combined = (g.proposal || '') + '\n\n――― 添付用の成果物（' + (g.deliverable_type || '') + '） ―――\n' + (g.deliverable || '') + '\n\n参考デモ: ' + (g.demo_url || '');
-              Deals.update(deal.id, { proposal: combined });
-              deal.proposal = combined;
-            } catch (e) { Logs.create('claude', 'error', e.message); }
-          }
+          // 取込時は採点のみ（成果物の自動生成はしない＝無駄なAPI消費を防ぐ）。
+          // 提案文＋成果物は、各カードの ✨生成 ボタンを押したときだけ生成する。
           created.push(deal);
         }
-        Logs.create('ingest', 'success', `${created.length}件を採点${process.env.ANTHROPIC_API_KEY ? '＋提案文/成果物を生成' : ''}`);
+        Logs.create('ingest', 'success', `${created.length}件を採点（自動生成なし）`);
         return json(res, 200, { created: created.length, deals: created });
       }
       if (p === '/api/quote' && m === 'POST') { const b = await parseJSON(req); return json(res, 200, L.quote(b)); }
