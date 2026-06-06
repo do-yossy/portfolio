@@ -12,9 +12,11 @@ primary_region = "nrt"
 [http_service]
   internal_port = 3100
   force_https = true
-  auto_stop_machines = true
+  # 常時起動（眠らせない）: アクセス時の自動起動が不安定で「Not Found」になるため、
+  # マシンを停止させず最低1台を常に稼働させる。
+  auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
 # データ永続化（SQLite）。本番は fly volume を作成してマウント:
 #   fly volumes create sales_data --size 1
