@@ -696,10 +696,95 @@ def find_draft_url_by_title(page, title):
         return ''
 
 
-def publish_draft(page, draft_url):
+def _refill_empty_fields(page, job, full_payload=None):
+    """下書き再読み込み後に空の必須フィールドを再入力する。
+    すでに値が入っているフィールドは上書きしない。
+    """
+    salary_str = job.get('salary', '')
+    pay_type, pay_min, pay_max = parse_salary(salary_str)
+    location = job.get('location', '')
+    pref = extract_prefecture(location)
+    emp_type = job.get('employmentType') or job.get('employment_type', '')
+
+    # タイトル
+    try:
+        v = page.evaluate("() => (document.querySelector('input[name=\"title\"]') || {}).value || ''")
+        if not v.strip():
+            fill_text(page, 'input[name="title"]', job.get('title', ''), timeout=3000)
+            progress("  🔄 タイトル再入力", "info")
+    except Exception:
+        pass
+
+    # 仕事内容
+    try:
+        v = page.evaluate("() => (document.querySelector('textarea[name=\"description\"]') || {}).value || ''")
+        if not v.strip():
+            fill_text(page, 'textarea[name="description"]', job.get('description', ''), timeout=3000)
+            progress("  🔄 仕事内容再入力", "info")
+    except Exception:
+        pass
+
+    # 都道府県
+    if pref:
+        try:
+            v = page.evaluate("() => (document.querySelector('select[name=\"prefVal\"]') || {}).value || '0'")
+            if not v or v in ('0', ''):
+                select_option_safe(page, 'select[name="prefVal"]', label=pref, debug=False)
+                progress(f"  🔄 都道府県再選択: {pref}", "info")
+        except Exception:
+            pass
+
+    # 給与タイプ
+    try:
+        v = page.evaluate("() => (document.querySelector('select[name=\"payType\"]') || {}).value || '0'")
+        if not v or v in ('0', ''):
+            select_option_safe(page, 'select[name="payType"]', label=pay_type, debug=False)
+            progress(f"  🔄 給与タイプ再選択: {pay_type}", "info")
+    except Exception:
+        pass
+
+    # 給与最小
+    try:
+        v = page.evaluate("() => (document.querySelector('input[name=\"payMin\"]') || {}).value || ''")
+        if not v.strip() and pay_min:
+            fill_text(page, 'input[name="payMin"]', pay_min, timeout=3000)
+            progress(f"  🔄 給与最小再入力: {pay_min}", "info")
+    except Exception:
+        pass
+
+    # 雇用形態チェックボックス (employTypes)
+    if emp_type:
+        try:
+            has_checked = page.evaluate(
+                "() => Array.from(document.querySelectorAll('input[name=\"employTypes\"]')).some(cb => cb.checked)"
+            )
+            if not has_checked:
+                emp_map = {'正社員': '正社員', 'アルバイト': 'アルバイト', 'パート': 'パート',
+                           '契約社員': '契約社員', '業務委託': '業務委託', '派遣': '派遣'}
+                emp_label = next((v for k, v in emp_map.items() if k in emp_type), None)
+                page.evaluate("""(target) => {
+                    const cbs = document.querySelectorAll('input[name="employTypes"]');
+                    for (const cb of cbs) {
+                        const lbl = cb.closest('label') || cb.nextElementSibling
+                            || document.querySelector('label[for="' + cb.id + '"]');
+                        const txt = lbl ? lbl.textContent.trim() : '';
+                        if (target && txt.includes(target)) { lbl ? lbl.click() : cb.click(); return; }
+                    }
+                    if (cbs.length > 0) {
+                        const l = cbs[0].closest('label') || cbs[0].nextElementSibling;
+                        l ? l.click() : cbs[0].click();
+                    }
+                }""", emp_label or '')
+                progress(f"  🔄 雇用形態再選択: {emp_label or 'first'}", "info")
+        except Exception:
+            pass
+
+    rand_delay(0.5, 1.0)
+
+
+def publish_draft(page, draft_url, job=None, full_payload=None):
     """保存済み下書きを開き直し、必要項目ラジオを実クリックで選択して「公開する」を押す。
-    下書き再読込でVueに保存データがロードされるため、ラジオの実クリックでVueが確実に更新され、
-    全必須項目が揃って「公開する」が有効化される。
+    job / full_payload を渡すと、空フィールドを自動補填してから公開を試みる。
     戻り値: 公開成功なら True
     """
     try:
@@ -710,11 +795,28 @@ def publish_draft(page, draft_url):
         except Exception:
             pass
         rand_delay(2.0, 3.0)
+
         # 全セクション描画のためスクロール
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         rand_delay(1.5, 2.5)
         page.evaluate("window.scrollTo(0, 0)")
         rand_delay(0.5, 1.0)
+
+        # ── Vueがドラフトデータをロードするまで待機 ──
+        try:
+            page.wait_for_function(
+                "() => document.querySelectorAll('input:not([type=\"hidden\"]), textarea').length >= 3",
+                timeout=10000
+            )
+        except Exception:
+            pass
+        rand_delay(1.0, 1.5)
+
+        # ── 空の必須フィールドを再入力（下書きロード後に Vue state が欠けている場合の対策）──
+        if job:
+            progress("  🔄 空フィールド補填中...", "info")
+            _refill_empty_fields(page, job, full_payload)
+            rand_delay(0.5, 1.0)
 
         # ── 必要項目「基本情報」ラジオを実クリック（完全一致・Vue更新）──
         try:
@@ -724,94 +826,81 @@ def publish_draft(page, draft_url):
             progress(f"  ⚠️ 必要項目クリック失敗: {e}", "warn")
         rand_delay(1.0, 1.5)
 
-        # ── 「公開する」ボタン ──
-        pub = page.locator('button:has-text("公開する")').last
-        if pub.count() == 0:
-            progress("  ⚠️ 公開するボタンが見つかりません", "warn")
-            return False
-        cls = pub.get_attribute('class') or ''
-        if 'is-disab' in cls:
-            progress("  ⚠️ 公開するがまだ無効。残っている必須項目を調査します...", "warn")
-            # 「必須」ラベル付きで未入力のセクション見出しを収集
+        # ── 「公開する」ボタンを最大3回試みる ──
+        clicked_pub = False
+        for attempt in range(3):
             try:
-                missing = page.evaluate("""() => {
-                    const out = [];
-                    // 必須バッジを持つ見出し近辺で、空のinput/textarea/未選択radioを探す
-                    document.querySelectorAll('*').forEach(el => {
-                        const t = (el.textContent || '').trim();
-                        if (t === '必須' && el.children.length === 0) {
-                            // 見出しテキスト（親や前要素）
-                            let head = '';
-                            let p = el.closest('div,section,li,dl,tr');
-                            for (let i=0; i<3 && p; i++) {
-                                const h = p.querySelector('label,h2,h3,h4,dt,legend');
-                                if (h && h.textContent.trim() && h.textContent.trim() !== '必須') {
-                                    head = h.textContent.trim().slice(0,30); break;
-                                }
-                                p = p.parentElement;
-                            }
-                            if (head) out.push(head);
-                        }
-                    });
-                    return Array.from(new Set(out)).slice(0,15);
-                }""")
-                if missing:
-                    progress(f"  📋 必須セクション: {', '.join(missing)}", "warn")
-            except Exception:
-                pass
-            # 念のためクラス強制除去でクリックを試みる（最終手段）
-            try:
-                pub.evaluate("e => { e.classList.remove('is-disab'); e.removeAttribute('disabled'); }")
-                rand_delay(0.2, 0.4)
-                pub.click()
-                progress("  ⚠️ is-disab除去後にクリック（公開可否は要確認）", "warn")
-                rand_delay(2.0, 3.0)
-                # 確認ダイアログのOKも押す（mouse.click）
-                for _a in range(12):
+                pub_loc = page.locator('button:has-text("公開する")')
+                if pub_loc.count() == 0:
+                    progress("  ⚠️ 公開するボタンが見つかりません", "warn")
+                    return False
+                pub = pub_loc.last
+                cls = pub.get_attribute('class') or ''
+                pub_disabled = 'is-disab' in cls or pub.get_attribute('disabled') is not None
+
+                if pub_disabled and attempt < 2:
+                    progress(f"  ⚠️ 公開するが無効（試行{attempt+1}/3）。フィールドを再補填して再試行...", "warn")
+                    # スクロールで Vue 遅延描画を促す
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    rand_delay(1.0, 1.5)
+                    page.evaluate("window.scrollTo(0, 0)")
+                    rand_delay(0.5, 1.0)
+                    if job:
+                        _refill_empty_fields(page, job, full_payload)
+                    click_radio_by_label(page, ['基本情報'])
+                    rand_delay(1.0, 1.5)
+                    continue
+
+                if pub_disabled:
+                    # 最終手段: is-disab クラス強制除去
+                    progress("  ⚠️ 公開するが無効（最終手段: is-disab強制除去してクリック）", "warn")
                     try:
-                        pos = page.evaluate("""() => {
-                            const btns = Array.from(document.querySelectorAll('button'));
-                            for (const b of btns.filter(b => (b.textContent||'').trim()==='OK')) {
-                                const r = b.getBoundingClientRect();
-                                const s = window.getComputedStyle(b);
-                                if (r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && s.opacity!=='0')
-                                    return {x: r.left+r.width/2, y: r.top+r.height/2};
-                            }
-                            return null;
+                        missing = page.evaluate("""() => {
+                            const out = [];
+                            document.querySelectorAll('*').forEach(el => {
+                                const t = (el.textContent || '').trim();
+                                if (t === '必須' && el.children.length === 0) {
+                                    let head = '', p = el.closest('div,section,li,dl,tr');
+                                    for (let i=0; i<3 && p; i++) {
+                                        const h = p.querySelector('label,h2,h3,h4,dt,legend');
+                                        if (h && h.textContent.trim() && h.textContent.trim() !== '必須') {
+                                            head = h.textContent.trim().slice(0,30); break;
+                                        }
+                                        p = p.parentElement;
+                                    }
+                                    if (head) out.push(head);
+                                }
+                            });
+                            return Array.from(new Set(out)).slice(0,15);
                         }""")
-                        if pos:
-                            page.mouse.click(pos['x'], pos['y'])
-                            progress("  ✅ 確認ダイアログ「OK」mouse.click(is-disab後)", "success")
-                            break
+                        if missing:
+                            progress(f"  📋 未入力の必須セクション: {', '.join(missing)}", "warn")
                     except Exception:
                         pass
-                    rand_delay(0.5, 1.0)
-                rand_delay(3.0, 5.0)
-                try:
-                    page.wait_for_load_state('networkidle', timeout=15000)
-                except Exception:
-                    pass
-                # クリック後にエラーが出ていないか確認
-                final = page.url
-                if '/jobs/edit/' in final:
-                    # まだ編集ページ → 公開失敗の可能性
-                    return False
-                return True
-            except Exception:
-                return False
-        pub.scroll_into_view_if_needed()
-        rand_delay(0.3, 0.6)
-        pub.click()
-        progress("  ✅ 公開するをクリックしました", "info")
+                    pub.evaluate("e => { e.classList.remove('is-disab'); e.removeAttribute('disabled'); }")
+                    rand_delay(0.2, 0.4)
+
+                pub.scroll_into_view_if_needed()
+                rand_delay(0.3, 0.6)
+                pub.click()
+                progress(f"  ✅ 公開するをクリック（試行{attempt+1}）", "info")
+                clicked_pub = True
+                break
+            except Exception as e:
+                progress(f"  ⚠️ 公開するクリック失敗（試行{attempt+1}）: {e}", "warn")
+                rand_delay(1.0, 1.5)
+
+        if not clicked_pub:
+            progress("  ❌ 公開するボタンをクリックできませんでした", "warn")
+            save_screenshot(page, 'publish_btn_failed')
+            return False
+
         rand_delay(2.0, 3.0)
 
         # ── 確認ダイアログ「求人を公開します。」→ OK をクリック ──
-        # 8個あるOKボタンのうち実際に画面に表示されているものの座標を取得し
-        # page.mouse.click(x, y) で信頼されたマウスイベントを発火する。
         ok_clicked = False
         for _attempt in range(12):
             try:
-                # 画面に実際に表示されているOKボタンの座標を取得
                 pos = page.evaluate("""() => {
                     const btns = Array.from(document.querySelectorAll('button'));
                     const okBtns = btns.filter(b => (b.textContent || '').trim() === 'OK');
@@ -833,7 +922,7 @@ def publish_draft(page, draft_url):
                         save_screenshot(page, 'before_ok_click')
                     progress(f"  🖱️ OKボタン座標: ({pos['x']:.0f}, {pos['y']:.0f}) cls={pos['cls']}", "info")
                     page.mouse.click(pos['x'], pos['y'])
-                    progress(f"  ✅ 確認ダイアログ「OK」mouse.click成功 (試行{_attempt+1})", "success")
+                    progress(f"  ✅ 確認ダイアログ「OK」mouse.click成功（試行{_attempt+1}）", "success")
                     ok_clicked = True
                     break
                 else:
@@ -852,8 +941,16 @@ def publish_draft(page, draft_url):
             page.wait_for_load_state('networkidle', timeout=15000)
         except Exception:
             pass
-        progress("  🎉 公開処理完了", "success")
-        return ok_clicked
+
+        # ── 成功判定: 編集ページから離脱できたか ──
+        final_url = page.url
+        if '/jobs/edit/' in final_url:
+            progress(f"  ❌ 公開失敗（まだ編集ページ: {final_url[-60:]}）", "warn")
+            save_screenshot(page, 'publish_failed')
+            return False
+
+        progress(f"  🎉 公開完了: {final_url[-60:]}", "success")
+        return True
     except Exception as e:
         progress(f"  ⚠️ 公開処理エラー: {e}", "warn")
         return False
@@ -2212,7 +2309,7 @@ def main():
                             draft_url = find_draft_url_by_title(page, job['title'])
                         # ── 下書きを開き直して公開を試みる ──
                         if draft_url:
-                            published = publish_draft(page, draft_url)
+                            published = publish_draft(page, draft_url, job=job, full_payload=full_payload)
                             if published:
                                 progress(f"🎉 「{job['title']}」を公開しました", "success")
                             else:
@@ -2220,11 +2317,15 @@ def main():
                         else:
                             progress(f"  ℹ️ 下書きの編集URLを特定できず自動公開はスキップ（下書きは保存済み）", "info")
                     elif went_edit or has_job_id or went_draft:
-                        label = "一時保存" if not went_edit else "投稿"
-                        progress(f"✅ 「{job['title']}」を{label}しました (URL: {final_url})", "success")
+                        progress(f"✅ 「{job['title']}」を下書き保存しました (URL: {final_url})", "success")
                         success_count += 1
                         if job_id:
                             posted_event(job_id)
+                        # 編集URLに遷移した場合もそのまま公開を試みる
+                        if went_edit or has_job_id:
+                            published = publish_draft(page, final_url, job=job, full_payload=full_payload)
+                            if published:
+                                progress(f"🎉 「{job['title']}」を公開しました", "success")
                     elif url_changed and 'login' not in final_url and '/new' not in final_url:
                         # URL変化あり・ログインでもなく新規ページでもない
                         progress(f"✅ 「{job['title']}」を投稿しました (URL: {final_url})", "success")
