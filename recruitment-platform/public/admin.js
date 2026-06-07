@@ -351,6 +351,22 @@ async function resetKyujinboxPosted(co) {
   }
 }
 
+async function expireGoogleJobs() {
+  if (!confirm('掲載から7日以上経過した求人をGoogleしごと検索から除外します。\n（求人はサイトに残り、Googleのみ除外されます）\nよろしいですか？')) return;
+  try {
+    const r = await fetch('/api/google/expire', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days: 7 })
+    });
+    const d = await r.json();
+    if (d.ok) toast(d.expired > 0 ? `${d.expired}件をGoogleしごと検索から除外しました` : '除外対象の求人はありませんでした', 'success');
+    else toast('除外処理に失敗しました', 'error');
+  } catch {
+    toast('通信エラー', 'error');
+  }
+}
+
 // ── Stanby Post（ボタン1回で16件）──
 function startPostStanby(co) {
   startMediaPost({

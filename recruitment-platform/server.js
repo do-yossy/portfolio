@@ -2087,6 +2087,17 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return sendJSON(res, 200, { ok: true, reset: posted.length });
   }
 
+  // Googleしごと検索 7日経過求人を手動除外
+  if (pathname === '/api/google/expire' && method === 'POST') {
+    const body = await parseJSON(req);
+    const days = parseInt(body.days, 10) || 7;
+    const count = Jobs.expireGoogleJobs(days);
+    if (count > 0) {
+      Logs.create('google_expire', 'success', `手動実行: Googleしごと検索から除外 ${count}件（掲載${days}日経過）`);
+    }
+    return sendJSON(res, 200, { ok: true, expired: count, days });
+  }
+
   // ── スタンバイ投稿（ポーリング方式・ボタン1回で16件）──
   if (pathname === '/api/post/stanby' && method === 'POST') {
     const vpnOk = await checkVPN();
@@ -2365,6 +2376,15 @@ server.listen(PORT, () => {
     }
   } catch (e) { console.error('[auto-expire] startup error:', e.message); }
 
+  // Google Jobs 7日経過除外（起動時）
+  try {
+    const ng = Jobs.expireGoogleJobs(7);
+    if (ng > 0) {
+      Logs.create('google_expire', 'success', `起動時にGoogleしごと検索から除外: ${ng}件（掲載7日経過）`);
+      console.log(`[google-expire] ${ng}件をGoogleしごと検索から除外しました`);
+    }
+  } catch (e) { console.error('[google-expire] startup error:', e.message); }
+
   // Hourly auto-expire
   setInterval(() => {
     try {
@@ -2374,6 +2394,15 @@ server.listen(PORT, () => {
         console.log(`[auto-expire] ${n}件の求人を非公開にしました`);
       }
     } catch (e) { console.error('[auto-expire] interval error:', e.message); }
+
+    // Google Jobs 7日経過除外（毎時）
+    try {
+      const ng = Jobs.expireGoogleJobs(7);
+      if (ng > 0) {
+        Logs.create('google_expire', 'success', `定期チェック: Googleしごと検索から除外 ${ng}件（掲載7日経過）`);
+        console.log(`[google-expire] ${ng}件をGoogleしごと検索から除外しました`);
+      }
+    } catch (e) { console.error('[google-expire] interval error:', e.message); }
   }, 60 * 60 * 1000);
 });
 

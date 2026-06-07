@@ -353,6 +353,16 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
       </div>
 
       <div class="media-op-section mt-14">
+        <div class="media-op-label">Googleしごと検索 <span class="text-muted text-sm">（JSON-LD自動掲載・掲載7日で自動除外）</span></div>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="expireGoogleJobs()" title="掲載から7日経過した求人をGoogleしごと検索から除外">
+            🗑️ 7日経過求人をGoogle除外（手動）
+          </button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">公開求人に自動掲載。掲載7日後にGoogleしごと検索から除外されます（毎時自動チェック）</div>
+      </div>
+
+      <div class="media-op-section mt-14">
         <div class="media-op-label">Indeed <span class="text-muted text-sm">（手動掲載・3日ごとに再掲載）</span></div>
         <div class="btn-group">
           <button id="btn-post-indeed" class="btn btn-warning btn-sm" onclick="startPostIndeed()">

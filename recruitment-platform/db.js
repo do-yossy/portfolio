@@ -290,6 +290,24 @@ const Jobs = {
     `).run(ts, ts);
     return result.changes;
   },
+  // Googleしごと検索掲載から7日経過した求人の target_media から 'google' を除外
+  expireGoogleJobs(days = 7) {
+    const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const ts = now();
+    const rows = db.prepare(`SELECT id, target_media FROM jobs WHERE is_published = 1`).all();
+    let count = 0;
+    for (const row of rows) {
+      const media = JSON.parse(row.target_media || '[]');
+      if (!media.includes('google')) continue;
+      // published_at が threshold より古い行を取得
+      const job = db.prepare(`SELECT published_at FROM jobs WHERE id = ?`).get(row.id);
+      if (!job || !job.published_at || job.published_at > threshold) continue;
+      const newMedia = JSON.stringify(media.filter(m => m !== 'google'));
+      db.prepare(`UPDATE jobs SET target_media = ?, updated_at = ? WHERE id = ?`).run(newMedia, ts, row.id);
+      count++;
+    }
+    return count;
+  },
   todayCountByMedia(media) {
     const today = new Date().toISOString().slice(0, 10);
     const rows = db.prepare(`
