@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>株式会社Social Quality｜Web制作スタジオ（大阪）</title>
+<meta name="description" content="大阪のWeb制作スタジオ 株式会社Social Quality。成果から逆算するWebデザイン。LP・コーポレートサイト制作、業務システム開発、コンテンツ運用。">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f4f2ec;--ink:#15120d;--muted:#6c665d;--line:#e1ddd2;--accent:#ff3b1f;--dark:#15120d;
+  --ease:cubic-bezier(.19,1,.22,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--paper);color:var(--ink);line-height:1.85;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.disp{font-family:'Syne','Noto Sans JP',sans-serif;font-weight:800;letter-spacing:-.025em;line-height:1.04}
+.wrap{width:min(91%,1180px);margin:0 auto}
+.accent{color:var(--accent)}
+@media (prefers-reduced-motion:no-preference){
+  html.js [data-rv]{opacity:0;transform:translateY(30px)}
+  html.js [data-rv].in{opacity:1;transform:none;transition:opacity .9s var(--ease),transform .9s var(--ease)}
+  .mask{display:block;overflow:hidden;padding-bottom:.04em}
+  .mask>span{display:block;transform:translateY(110%);transition:transform 1.05s var(--ease)}
+  .in .mask>span,.lded .mask>span{transform:translateY(0)}
+}
+/* progress + cursor */
+.prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:9999}
+.cur{position:fixed;top:0;left:0;width:34px;height:34px;border:1.5px solid var(--ink);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:9998;transition:width .3s var(--ease),height .3s var(--ease),background .3s,border-color .3s;mix-blend-mode:difference}
+.cur.big{width:78px;height:78px;background:#fff;border-color:#fff}
+@media(hover:none){.cur{display:none}}
+/* btn */
+.btn{position:relative;display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--paper);padding:16px 32px;border-radius:50px;font-weight:700;font-size:.92rem;transition:background .3s,color .3s;overflow:hidden}
+.btn span{position:relative;z-index:1;display:inline-flex;align-items:center;gap:10px}
+.btn::after{content:"";position:absolute;inset:0;background:var(--accent);transform:translateY(101%);transition:transform .45s var(--ease)}
+.btn:hover::after{transform:translateY(0)}
+.btn.line{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+.btn.line::after{background:var(--ink)}.btn.line:hover{color:var(--paper)}
+.btn svg{width:15px;height:15px}
+.ey{font-family:'Syne',sans-serif;font-weight:700;font-size:.74rem;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);display:inline-flex;align-items:center;gap:12px}
+.ey::before{content:"";width:30px;height:1.5px;background:var(--accent)}
+/* header */
+header{position:fixed;inset:0 0 auto 0;z-index:200;transition:.4s var(--ease)}
+header.sc{background:rgba(244,242,236,.82);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0;width:min(91%,1180px);margin:0 auto}
+.brand{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem}.brand i{color:var(--accent);font-style:normal}
+.menu{display:flex;gap:34px;font-size:.85rem;font-weight:500}
+.menu a{position:relative}.menu a::after{content:"";position:absolute;left:0;bottom:-3px;width:0;height:1.5px;background:var(--accent);transition:width .35s var(--ease)}.menu a:hover::after{width:100%}
+.nav .btn{padding:11px 22px;font-size:.8rem}
+@media(max-width:880px){.menu{display:none}}
+/* hero */
+.hero{position:relative;padding:190px 0 110px;overflow:hidden}
+.hero .orb{position:absolute;border-radius:50%;filter:blur(80px);z-index:0}
+.hero .o1{width:380px;height:380px;background:rgba(255,59,31,.16);top:120px;right:4%}
+.hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.15fr .85fr;gap:56px;align-items:center}
+@media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:40px}}
+.hero .ey{margin-bottom:30px}
+.hero h1{font-size:clamp(2.5rem,5.6vw,4.4rem);margin-bottom:28px}
+.hero p.lead{color:var(--muted);font-size:clamp(1rem,1.4vw,1.15rem);max-width:480px;margin-bottom:38px}
+.hero .ctas{display:flex;gap:14px;flex-wrap:wrap}
+.hero-visual{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 70px rgba(21,18,13,.16);aspect-ratio:4/3;background:#eceae2;will-change:transform}
+.hero-visual iframe{width:1100px;height:825px;border:0;transform-origin:0 0;pointer-events:none;background:#fff}
+.hero-visual .pill{position:absolute;top:14px;left:14px;z-index:2;background:rgba(21,18,13,.85);color:#fff;font-size:.64rem;letter-spacing:.1em;padding:6px 12px;border-radius:50px;font-family:'Syne';font-weight:700}
+.scrollhint{margin-top:54px;font-family:'Syne';font-size:.7rem;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:12px}
+.scrollhint::after{content:"";width:46px;height:1px;background:var(--muted);animation:sh 1.8s ease-in-out infinite}
+@keyframes sh{0%,100%{transform:scaleX(.4);opacity:.4;transform-origin:left}50%{transform:scaleX(1);opacity:1;transform-origin:left}}
+/* marquee */
+.mq-wrap{overflow:hidden;white-space:nowrap;padding:24px 0;background:var(--ink);color:var(--paper)}
+.mq{display:inline-block;animation:mq 30s linear infinite;font-family:'Syne';font-weight:800;font-size:1.6rem;letter-spacing:-.01em}
+.mq span{margin:0 24px}.mq .d{color:var(--accent)}
+@keyframes mq{to{transform:translateX(-50%)}}
+/* section */
+section{padding:clamp(80px,10vw,140px) 0;position:relative}
+.shead{max-width:760px;margin-bottom:58px}
+.shead h2{font-size:clamp(1.9rem,4.4vw,3.2rem);margin:18px 0 14px}
+.shead p{color:var(--muted)}
+.statement{font-family:'Syne','Noto Sans JP';font-weight:700;font-size:clamp(1.5rem,3.6vw,2.6rem);line-height:1.5;letter-spacing:-.01em;max-width:1000px}
+.statement .accent{display:inline}
+.statement .sm{display:block;font-family:'Noto Sans JP';font-size:1rem;font-weight:500;color:var(--muted);margin-top:28px;line-height:1.95;letter-spacing:0}
+/* works */
+.works{display:grid;grid-template-columns:repeat(2,1fr);gap:40px}
+@media(max-width:820px){.works{grid-template-columns:1fr;gap:30px}}
+.work{display:block;will-change:transform}
+.wframe{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);aspect-ratio:16/10;background:#eceae2;box-shadow:0 16px 40px rgba(21,18,13,.1);transition:box-shadow .5s var(--ease),transform .5s var(--ease)}
+.work:hover .wframe{transform:translateY(-6px);box-shadow:0 36px 80px rgba(21,18,13,.2)}
+.wframe iframe{width:1100px;height:688px;border:0;transform-origin:0 0;pointer-events:none;background:#fff;transition:transform .7s var(--ease)}
+.wframe .ov{position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,59,31,0) 50%,rgba(21,18,13,.78));opacity:0;display:flex;align-items:flex-end;padding:22px;transition:opacity .4s var(--ease);z-index:2}
+.work:hover .wframe .ov{opacity:1}
+.ov .v{color:#fff;font-family:'Syne';font-weight:700;display:inline-flex;align-items:center;gap:9px}
+.wframe .no{position:absolute;top:16px;right:18px;z-index:2;font-family:'Syne';font-weight:800;font-size:1.1rem;color:rgba(255,255,255,.0);-webkit-text-stroke:1px rgba(255,255,255,.6);mix-blend-mode:difference}
+.wmeta{display:flex;justify-content:space-between;align-items:baseline;margin-top:18px;gap:14px}
+.wmeta .t{font-size:1.18rem;font-weight:700}
+.wmeta .c{font-family:'Syne';font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;white-space:nowrap}
+.wdesc{color:var(--muted);font-size:.86rem;margin-top:4px}
+/* stats */
+.stats{background:var(--ink);color:var(--paper);border-radius:24px;padding:64px 44px;display:grid;grid-template-columns:repeat(4,1fr);gap:30px}
+@media(max-width:740px){.stats{grid-template-columns:1fr 1fr;gap:42px 20px;padding:48px 28px}}
+.stat .n{font-family:'Syne';font-weight:800;font-size:clamp(2.6rem,6vw,4rem);line-height:1;color:var(--accent)}
+.stat .l{color:#a89f93;font-size:.82rem;margin-top:12px}
+/* services */
+.svc{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+@media(max-width:860px){.svc{grid-template-columns:1fr}}
+.sc{background:var(--paper);padding:42px 34px;transition:background .4s var(--ease)}
+.sc:hover{background:#fff}
+.sc .no{font-family:'Syne';font-weight:800;color:var(--accent)}
+.sc h3{font-size:1.32rem;margin:14px 0 12px}
+.sc p{font-size:.9rem;color:var(--muted);min-height:78px}
+.sc .pr{margin-top:16px;font-family:'Syne';font-weight:800;font-size:1.2rem}
+.sc .pr small{font-size:.7rem;color:var(--muted);font-weight:500;font-family:'Noto Sans JP'}
+/* why / flow */
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:26px}
+@media(max-width:820px){.grid4{grid-template-columns:1fr 1fr}}@media(max-width:520px){.grid4{grid-template-columns:1fr}}
+.cell .no{font-family:'Syne';font-weight:800;color:var(--accent);font-size:.9rem;border-top:2px solid var(--ink);padding-top:16px;display:block}
+.cell h4{font-size:1.08rem;margin:12px 0 7px}.cell p{font-size:.85rem;color:var(--muted)}
+/* company */
+.info{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;max-width:820px}
+.info th,.info td{text-align:left;padding:18px 24px;border-bottom:1px solid var(--line);font-size:.92rem}
+.info th{width:32%;color:var(--muted);font-weight:500}.info tr:last-child th,.info tr:last-child td{border-bottom:none}
+.req{color:var(--accent);font-size:.78rem}
+/* cta */
+.cta{position:relative;background:var(--ink);color:var(--paper);border-radius:28px;padding:clamp(64px,9vw,110px) 30px;text-align:center;overflow:hidden}
+.cta .orb{position:absolute;width:380px;height:380px;border-radius:50%;background:rgba(255,59,31,.4);filter:blur(120px);top:-100px;left:50%;transform:translateX(-50%)}
+.cta h2{position:relative;font-size:clamp(1.9rem,5vw,3.2rem);margin-bottom:16px}
+.cta p{position:relative;color:#a89f93;margin-bottom:34px}
+.cta .btn{position:relative;background:var(--accent);color:#fff}.cta .btn::after{background:#fff}.cta .btn:hover{color:var(--ink)}
+/* footer */
+footer{padding:54px 0 46px;border-top:1px solid var(--line)}
+.foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;align-items:center;color:var(--muted);font-size:.83rem}
+.foot .brand{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="prog" id="prog"></div>
+<div class="cur" id="cur"></div>
+
+<header id="hd"><div class="nav">
+  <div class="brand">Social<i>.</i>Quality</div>
+  <nav class="menu"><a href="#works">Works</a><a href="#services">Services</a><a href="#why">Why</a><a href="#company">Company</a></nav>
+  <a href="#contact" class="btn" data-mag><span>お問い合わせ</span></a>
+</div></header>
+
+<section class="hero" id="top">
+  <div class="orb o1"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <div class="ey" data-rv>Web Design Studio — Osaka</div>
+      <h1 class="disp"><span class="mask"><span>成果を、</span></span><span class="mask"><span><em style="font-style:normal" class="accent">デザイン</em>する。</span></span></h1>
+      <p class="lead" data-rv>大阪のWeb制作・AIスタジオ。LP・サイト制作から、AI業務自動化・コンテンツ運用まで。「作る」で終わらせず、成果から逆算して設計します。</p>
+      <div class="ctas" data-rv>
+        <a href="#contact" class="btn" data-mag><span>無料で相談する <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+        <a href="#works" class="btn line" data-mag><span>制作実績を見る</span></a>
+      </div>
+      <div class="scrollhint">Scroll</div>
+    </div>
+    <div class="hero-visual" data-parallax="-26"><span class="pill">実績：法律事務所サイト</span>
+      <iframe loading="lazy" src="https://do-yossy.github.io/portfolio/%E6%B3%95%E5%BE%8B%E4%BA%8B%E5%8B%99%E6%89%80%E3%82%B3%E3%83%BC%E3%83%9D%E3%83%AC%E3%83%BC%E3%83%88%E3%82%B5%E3%82%A4%E3%83%88.html" title="実績"></iframe>
+    </div>
+  </div>
+</section>
+
+<div class="mq-wrap"><div class="mq">
+  <span>WEB DESIGN</span><span class="d">/</span><span>LANDING PAGE</span><span class="d">/</span><span>CORPORATE</span><span class="d">/</span><span>WEB SYSTEM</span><span class="d">/</span>
+  <span>WEB DESIGN</span><span class="d">/</span><span>LANDING PAGE</span><span class="d">/</span><span>CORPORATE</span><span class="d">/</span><span>WEB SYSTEM</span><span class="d">/</span>
+</div></div>
+
+<section id="about"><div class="wrap">
+  <p class="statement" data-rv>デザインの力で、<span class="accent">「伝わる」「売れる」</span>を、確かな形に。
+    <span class="sm">私たちは大阪発のWeb制作スタジオです。見た目の美しさだけでなく、問い合わせ・売上・業務効率という"成果"から逆算して設計します。企画から制作・運用までワンストップで。</span>
+  </p>
+</div></section>
+
+<section id="works"><div class="wrap">
+  <div class="shead"><div class="ey" data-rv>Selected Works</div><h2 class="disp" data-rv>制作実績</h2><p data-rv>実際に制作したサイト・アプリです。各カードから実物をご覧いただけます。</p></div>
+  <div class="works">
+    <a class="work" data-rv data-parallax="-18" href="https://do-yossy.github.io/portfolio/EC%E3%82%B7%E3%83%A7%E3%83%83%E3%83%94%E3%83%B3%E3%82%B0%E3%82%A2%E3%83%97%E3%83%AA.html" target="_blank" rel="noopener">
+      <div class="wframe"><span class="no">01</span><iframe loading="lazy" src="https://do-yossy.github.io/portfolio/EC%E3%82%B7%E3%83%A7%E3%83%83%E3%83%94%E3%83%B3%E3%82%B0%E3%82%A2%E3%83%97%E3%83%AA.html" title="ECショッピングアプリ"></iframe><div class="ov"><span class="v">実物を見る →</span></div></div>
+      <div class="wmeta"><span class="t">ECショッピングアプリ</span><span class="c">E-Commerce</span></div><div class="wdesc">閲覧〜カート〜購入を備えたモダンなUI。</div>
+    </a>
+    <a class="work" data-rv data-parallax="18" href="https://do-yossy.github.io/portfolio/%E3%83%97%E3%83%AD%E3%82%B8%E3%82%A7%E3%82%AF%E3%83%88%E7%AE%A1%E7%90%86%E3%83%84%E3%83%BC%E3%83%AB.html" target="_blank" rel="noopener">
+      <div class="wframe"><span class="no">02</span><iframe loading="lazy" src="https://do-yossy.github.io/portfolio/%E3%83%97%E3%83%AD%E3%82%B8%E3%82%A7%E3%82%AF%E3%83%88%E7%AE%A1%E7%90%86%E3%83%84%E3%83%BC%E3%83%AB.html" title="プロジェクト管理ツール"></iframe><div class="ov"><span class="v">実物を見る →</span></div></div>
+      <div class="wmeta"><span class="t">プロジェクト管理ツール</span><span class="c">Web App</span></div><div class="wdesc">タスク・進捗を一元管理するダッシュボード。</div>
+    </a>
+    <a class="work" data-rv data-parallax="-18" href="https://do-yossy.github.io/portfolio/%E5%AE%B6%E8%A8%88%E7%AE%A1%E7%90%86%E3%83%80%E3%83%83%E3%82%B7%E3%83%A5%E3%83%9C%E3%83%BC%E3%83%89.html" target="_blank" rel="noopener">
+      <div class="wframe"><span class="no">03</span><iframe loading="lazy" src="https://do-yossy.github.io/portfolio/%E5%AE%B6%E8%A8%88%E7%AE%A1%E7%90%86%E3%83%80%E3%83%83%E3%82%B7%E3%83%A5%E3%83%9C%E3%83%BC%E3%83%89.html" title="家計管理ダッシュボード"></iframe><div class="ov"><span class="v">実物を見る →</span></div></div>
+      <div class="wmeta"><span class="t">家計管理ダッシュボード</span><span class="c">Dashboard</span></div><div class="wdesc">収支をグラフで可視化する管理画面。</div>
+    </a>
+    <a class="work" data-rv data-parallax="18" href="https://do-yossy.github.io/portfolio/%E4%BA%88%E7%B4%84%E7%AE%A1%E7%90%86%E3%83%84%E3%83%BC%E3%83%AB.html" target="_blank" rel="noopener">
+      <div class="wframe"><span class="no">04</span><iframe loading="lazy" src="https://do-yossy.github.io/portfolio/%E4%BA%88%E7%B4%84%E7%AE%A1%E7%90%86%E3%83%84%E3%83%BC%E3%83%AB.html" title="予約管理ツール"></iframe><div class="ov"><span class="v">実物を見る →</span></div></div>
+      <div class="wmeta"><span class="t">予約管理ツール</span><span class="c">Web App</span></div><div class="wdesc">予約・顧客を管理する店舗向けシステム。</div>
+    </a>
+  </div>
+</div></section>
+
+<section id="stats"><div class="wrap"><div class="stats" data-rv>
+  <div class="stat"><div class="n"><span data-count="18">0</span>+</div><div class="l">制作実績</div></div>
+  <div class="stat"><div class="n">∞</div><div class="l">修正対応</div></div>
+  <div class="stat"><div class="n"><span data-count="24">0</span>h</div><div class="l">以内に返信</div></div>
+  <div class="stat"><div class="n"><span data-count="100">0</span>%</div><div class="l">オンライン完結</div></div>
+</div></div></section>
+
+<section id="services"><div class="wrap">
+  <div class="shead"><div class="ey" data-rv>Services</div><h2 class="disp" data-rv>提供サービス</h2></div>
+  <div class="svc">
+    <div class="sc" data-rv><div class="no">01</div><h3>Webサイト／LP制作</h3><p>構成・コピー・コーディングまで一括。問い合わせにつながる成果重視のサイト。</p><div class="pr">¥300,000<small>〜</small></div></div>
+    <div class="sc" data-rv><div class="no">02</div><h3>業務システム・Webツール開発</h3><p>予約・在庫・管理画面など、業務を効率化するWebシステムを開発します。</p><div class="pr">¥300,000<small>〜</small></div></div>
+    <div class="sc" data-rv><div class="no">03</div><h3>コンテンツ運用（月額）</h3><p>SEO記事・SNS投稿を毎月代行。集客基盤を継続的に育てます。</p><div class="pr">¥150,000<small>〜／月</small></div></div>
+  </div>
+</div></section>
+
+<section id="why"><div class="wrap">
+  <div class="shead"><div class="ey" data-rv>Why us</div><h2 class="disp" data-rv>選ばれる理由</h2></div>
+  <div class="grid4">
+    <div class="cell" data-rv><span class="no">01</span><h4>スピード対応</h4><p>短納期でも品質を落としません。</p></div>
+    <div class="cell" data-rv><span class="no">02</span><h4>明朗価格</h4><p>着手金・分割にも対応します。</p></div>
+    <div class="cell" data-rv><span class="no">03</span><h4>即レス・修正対応</h4><p>納得いただくまで対応します。</p></div>
+    <div class="cell" data-rv><span class="no">04</span><h4>全国オンライン</h4><p>相談〜納品まで完結します。</p></div>
+  </div>
+</div></section>
+
+<section id="flow"><div class="wrap">
+  <div class="shead"><div class="ey" data-rv>Process</div><h2 class="disp" data-rv>ご依頼の流れ</h2></div>
+  <div class="grid4">
+    <div class="cell" data-rv><span class="no">STEP 01</span><h4>無料相談</h4><p>課題をヒアリング。</p></div>
+    <div class="cell" data-rv><span class="no">STEP 02</span><h4>提案・見積</h4><p>無料モックを提示。</p></div>
+    <div class="cell" data-rv><span class="no">STEP 03</span><h4>制作</h4><p>着手金後に制作。</p></div>
+    <div class="cell" data-rv><span class="no">STEP 04</span><h4>納品</h4><p>確認・修正のうえ納品。</p></div>
+  </div>
+</div></section>
+
+<section id="company"><div class="wrap">
+  <div class="shead"><div class="ey" data-rv>Company</div><h2 class="disp" data-rv>会社概要</h2></div>
+  <table class="info" data-rv>
+    <tr><th>会社名</th><td>株式会社Social Quality</td></tr>
+    <tr><th>所在地</th><td>大阪府大阪市</td></tr>
+    <tr><th>設立</th><td>2021年7月</td></tr>
+    <tr><th>事業内容</th><td>Web制作・LP制作／業務システム開発／コンテンツ制作・運用</td></tr>
+    <tr><th>法人番号</th><td>2120001239111</td></tr>
+    <tr><th>お問い合わせ</th><td><a href="お問い合わせ.html" style="color:var(--accent);font-weight:700">お問い合わせフォーム</a>よりご連絡ください</td></tr>
+  </table>
+</div></section>
+
+<section id="contact"><div class="wrap"><div class="cta" data-rv>
+  <div class="orb"></div>
+  <h2 class="disp">成果の出るWeb、つくりませんか。</h2>
+  <p>ご相談・お見積りは無料。24時間以内に返信します。</p>
+  <a href="お問い合わせ.html" class="btn" data-mag><span>無料で相談する</span></a>
+</div></div></section>
+
+<footer><div class="wrap foot">
+  <div class="brand disp" style="font-size:1.2rem">Social<span class="accent">.</span>Quality</div>
+  <div>株式会社Social Quality（大阪）｜Web制作・業務システム開発　© 2026</div>
+</div></footer>
+
+<script>
+const D=document, root=D.documentElement; root.classList.add('js');
+const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+// hero mask reveal on load
+addEventListener('load',()=>D.querySelector('.hero').classList.add('lded'));
+// header + progress
+const hd=D.getElementById('hd'),prog=D.getElementById('prog');
+function onScroll(){const y=scrollY;hd.classList.toggle('sc',y>20);const h=D.documentElement.scrollHeight-innerHeight;prog.style.width=(h>0?y/h*100:0)+'%';}
+addEventListener('scroll',onScroll,{passive:true});onScroll();
+// reveal
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+D.querySelectorAll('[data-rv]').forEach(el=>io.observe(el));
+// count up
+const cio=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){const el=e.target,t=+el.dataset.count;let n=0,s=Math.max(1,Math.round(t/45));const tm=setInterval(()=>{n+=s;if(n>=t){n=t;clearInterval(tm)}el.textContent=n},24);cio.unobserve(el)}}),{threshold:.6});
+D.querySelectorAll('[data-count]').forEach(el=>cio.observe(el));
+// fit iframes
+function fit(){D.querySelectorAll('.hero-visual,.wframe').forEach(p=>{const f=p.querySelector('iframe');if(f)f.style.transform='scale('+(p.clientWidth/(p.classList.contains('hero-visual')?1100:1100))+')'})}
+addEventListener('load',fit);addEventListener('resize',fit);fit();
+if(!reduce && matchMedia('(hover:hover)').matches){
+  // custom cursor (lerp)
+  const cur=D.getElementById('cur');let cx=innerWidth/2,cy=innerHeight/2,tx=cx,ty=cy;
+  addEventListener('mousemove',e=>{tx=e.clientX;ty=e.clientY},{passive:true});
+  (function loop(){cx+=(tx-cx)*.18;cy+=(ty-cy)*.18;cur.style.left=cx+'px';cur.style.top=cy+'px';requestAnimationFrame(loop)})();
+  D.querySelectorAll('a,button,[data-mag]').forEach(el=>{el.addEventListener('mouseenter',()=>cur.classList.add('big'));el.addEventListener('mouseleave',()=>cur.classList.remove('big'))});
+  // magnetic
+  D.querySelectorAll('[data-mag]').forEach(b=>{const s=b.querySelector('span')||b;b.addEventListener('mousemove',e=>{const r=b.getBoundingClientRect();s.style.transform='translate('+((e.clientX-r.left-r.width/2)*.3)+'px,'+((e.clientY-r.top-r.height/2)*.4)+'px)'});b.addEventListener('mouseleave',()=>s.style.transform='')});
+  // parallax
+  const px=[...D.querySelectorAll('[data-parallax]')];
+  let tick=false;
+  function par(){tick=false;const vh=innerHeight;px.forEach(el=>{const r=el.getBoundingClientRect();const p=(r.top+r.height/2-vh/2)/vh;el.style.transform='translateY('+(p*(+el.dataset.parallax))+'px)'})}
+  addEventListener('scroll',()=>{if(!tick){tick=true;requestAnimationFrame(par)}},{passive:true});par();
+}
+</script>
+</body>
+</html>
