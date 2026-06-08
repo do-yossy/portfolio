@@ -363,11 +363,10 @@ async function opsNewStats() {
   const { db } = require('./db');
   const today = new Date().toISOString().slice(0, 10);
   const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
-  // 「本日の新規応募」は created_at（登録日時）基準でカウント。
-  // CSV取り込み分（is_imported=1）も含め、今日登録された全応募者を数える。
-  // これにより会社別×媒体別 新規応募数の合計と一致する。
-  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(today + 'T00:00:00Z').c;
-  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(monday + 'T00:00:00Z').c;
+  // 「本日の新規応募」は is_imported=0（フォーム応募・countAsNew取込）のみカウント。
+  // スプレッドシートのバックログ取込（is_imported=1）は除外する。
+  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND is_imported = 0 AND created_at >= ?`).get(today + 'T00:00:00Z').c;
+  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND is_imported = 0 AND created_at >= ?`).get(monday + 'T00:00:00Z').c;
   const activeTotal = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND status IN ('新規','架電済(不通)','対応中')`).get().c;
   return { todayNew, weekNew, activeTotal };
 }
