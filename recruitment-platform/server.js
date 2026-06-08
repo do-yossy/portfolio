@@ -282,8 +282,13 @@ function mapOpsCSVRow(row, company, media) {
     if (parts.length) base.education = parts.join(' ');
   }
 
-  // ── 求人タイトル: engageは「応募求人-職種名」──
-  if (!base.jobTitle) base.jobTitle = col(['応募求人-職種名','応募求人名','求人タイトル','応募職種']);
+  // ── 求人タイトル: engageは「応募求人 - 職種名」（スペース付きハイフン形式）を優先 ──
+  const engageTitle = col(['応募求人 - 職種名','応募求人-職種名','応募求人名']);
+  if (media === 'engage' && engageTitle) {
+    base.jobTitle = engageTitle;
+  } else if (!base.jobTitle) {
+    base.jobTitle = engageTitle || col(['求人タイトル','応募職種','応募求人名']);
+  }
 
   // ── 求人ボックス形式: 生年月日 "1994年03月05日 (32歳)" から年齢を抽出 ──
   if (!base.age) {
