@@ -88,7 +88,10 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
       //  - 本日の新着として計上(countAsNew): 全件 架電リスト
       //  - それ以外(過去バックログ): 全件 過去リスト（アーカイブ）
       const callCount = parseInt(mapped.callCount || 0) || 0;
-      const archived = splitByCallCount ? (callCount >= 1 ? 1 : 0) : (countAsNew ? 0 : 1);
+      // 終了・対応中・不通ステータスは取込モードに関わらず過去リストへ
+      const PAST_STATUSES = ['終了', '対応中', '架電済(不通)', '不通'];
+      const forcePast = PAST_STATUSES.includes(mapped.status || '');
+      const archived = forcePast ? 1 : (splitByCallCount ? (callCount >= 1 ? 1 : 0) : (countAsNew ? 0 : 1));
       // 新着計上時は新規応募にカウント(is_imported=0)し、応募日を本日に設定して
       // 「本日の新規応募」に確実に反映させる。過去バックログ時はカウントせず(is_imported=1)、
       // 応募日が空ならそのまま空に保持する。
