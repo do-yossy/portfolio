@@ -207,6 +207,16 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { return json(res, 200, { error: e.message }); }
       }
 
+      // 相手メッセージへの返信文を生成（全媒体：ランサーズ/ココナラ/CW/LP）
+      const rp = p.match(/^\/api\/deals\/([^/]+)\/reply$/);
+      if (rp && m === 'POST') {
+        const d = Deals.findById(rp[1]); if (!d) return json(res, 404, { error: 'not found' });
+        const b = await parseJSON(req);
+        if (!(b.message || '').trim()) return json(res, 400, { error: 'message required' });
+        try { return json(res, 200, { reply: await claude.replyToMessage(d, b.message) }); }
+        catch (e) { return json(res, 200, { error: e.message }); }
+      }
+
       if (p === '/api/generate-all' && m === 'POST') {
         let n = 0;
         for (const d of Deals.findAll()) {
