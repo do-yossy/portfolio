@@ -193,6 +193,13 @@ const server = http.createServer(async (req, res) => {
           return json(res, 200, { proposal: free, free: true });
         }
         try {
+          // LP問い合わせは「応募提案文」ではなく「お客様への返信ドラフト」を生成
+          if (d.source === 'lp') {
+            let inquiry = {}; try { inquiry = JSON.parse(d.raw || '{}'); } catch { /* noop */ }
+            const draft = await claude.draftReply(inquiry, L.quote({ type: d.type }));
+            Deals.update(d.id, { proposal: draft });
+            return json(res, 200, { proposal: draft });
+          }
           const g = await claude.generate(d);
           const combined = (g.proposal || '') + '\n\n――― 添付用の成果物（' + (g.deliverable_type || '') + '） ―――\n' + (g.deliverable || '') + '\n\n参考デモ: ' + (g.demo_url || '');
           Deals.update(d.id, { proposal: combined });
