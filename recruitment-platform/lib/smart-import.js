@@ -49,11 +49,11 @@ function hasContact(row) {
 
 // メイン: parseXlsxSheets の結果を受け取り、会社・媒体を割り当てて取り込む。
 //   deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs }
-async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCount = false, countAsNew = false }) {
+async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCount = false, countAsNew = false, fillMissing = false }) {
   const { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Ops, Logs } = deps;
   const summary = {};   // "会社/媒体" → { imported, duplicates }
   const skippedSheets = [];
-  let imported = 0, duplicates = 0, skipped = 0, headerRows = 0;
+  let imported = 0, duplicates = 0, skipped = 0, headerRows = 0, filled = 0;
   let toCallList = 0, toPast = 0;   // 振り分け結果（架電リスト / 過去リスト）
   const today = new Date().toISOString().slice(0, 10);   // 新着計上時の応募日
 
@@ -101,7 +101,12 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
         : { isImported: 1, allowEmptyDate: true };
 
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
-      if (dupId && countAsNew && Applicants.promoteToNew) {
+      if (dupId && fillMissing) {
+        // 空欄補完モード: 既存レコードの空フィールドのみ更新（重複レコードは作らない）
+        const changes = Applicants.fillMissingFields(dupId, mapped);
+        if (changes > 0) filled++;
+        else skipped++;
+      } else if (dupId && countAsNew && Applicants.promoteToNew) {
         // 新着モードで既存（先に取込済みのバックログ等）が見つかった場合は、
         // 重複にせず「本日の新着」へ昇格して新規応募に計上する。
         await Applicants.promoteToNew(dupId, today);
@@ -125,7 +130,7 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
       (skippedSheets.length ? ` ※媒体不明でスキップ:${skippedSheets.join(',')}` : ''));
   }
 
-  return { imported, duplicates, skipped, headerRows, summary, skippedSheets, toCallList, toPast };
+  return { imported, duplicates, skipped, filled, headerRows, summary, skippedSheets, toCallList, toPast };
 }
 
 module.exports = { smartImport, mediaFromSheetName, companyFromHeaderText };

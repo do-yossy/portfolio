@@ -1689,8 +1689,12 @@ function callImportModalHtml(co, media) {
           <input type="checkbox" id="si-countnew" style="width:auto">
           <strong>本日の新着として計上する</strong>（本日の新規応募・会社別×媒体別に反映）
         </label>
+        <label class="full" style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="si-fillmissing" style="width:auto">
+          <strong>空欄補完モード</strong>（既存レコードの生年月日・フリガナ等の空欄を補完、新規追加はしない）
+        </label>
       </div>
-      <p class="muted" style="font-size:11px;margin:0 0 8px">※「本日の新着」にチェック＝今日入ってきた新規応募として計上し架電リストへ。<br>チェックを外す＝過去バックログ（新規応募に計上しない）として取り込みます。</p>
+      <p class="muted" style="font-size:11px;margin:0 0 8px">※「本日の新着」にチェック＝今日入ってきた新規応募として計上し架電リストへ。<br>「空欄補完」にチェック＝既存レコードの空欄のみ埋める（重複・新規レコードは作らない）。</p>
       <div id="si-result" class="import-result"></div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="callCloseSmartImport()">閉じる</button>

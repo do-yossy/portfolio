@@ -677,6 +677,23 @@ const Ops = {
     return Applicants.findById(id);
   },
 
+  // 既存レコードの空フィールドのみを補完（生年月日・フリガナ等）
+  fillMissingFields(id, fields) {
+    const FILLABLE = ['furigana', 'birth_date', 'age', 'address', 'gender', 'education', 'experience', 'current_job', 'job_title'];
+    const parts = [];
+    const vals = [];
+    for (const col of FILLABLE) {
+      const jsKey = col.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+      const val = fields[jsKey] ?? fields[col];
+      if (val == null || val === '') continue;
+      parts.push(`${col} = CASE WHEN (${col} IS NULL OR ${col} = '') THEN ? ELSE ${col} END`);
+      vals.push(String(val));
+    }
+    if (!parts.length) return 0;
+    vals.push(now(), id);
+    return db.prepare(`UPDATE applicants SET ${parts.join(', ')}, updated_at = ? WHERE id = ?`).run(...vals).changes;
+  },
+
   // 会社×媒体でフィルタした応募者一覧
   listCalls({ company, media, status, month, archived, search, excludeDuplicate } = {}) {
     const conds = [];
