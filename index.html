@@ -142,17 +142,22 @@ section{padding:clamp(80px,10vw,140px) 0;position:relative}
 .info th{width:32%;color:var(--muted);font-weight:500}.info tr:last-child th,.info tr:last-child td{border-bottom:none}
 .req{color:var(--accent);font-size:.78rem}
 /* compare */
-.compare{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;max-width:920px}
-.compare th,.compare td{padding:16px 18px;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:middle}
-.compare thead th{background:var(--ink);color:var(--paper);font-family:'Syne','Noto Sans JP';font-weight:700;font-size:.82rem;text-align:center}
-.compare thead th:first-child{text-align:left}
-.compare thead th .b{color:var(--accent)}
-.compare tbody th{text-align:left;font-weight:700;color:var(--ink);width:26%}
-.compare td{text-align:center;color:var(--muted)}
-.compare td.us{background:rgba(255,59,31,.06);color:var(--ink);font-weight:600}
-.compare .ok{color:#1f9d55;font-weight:800}
+.cmp-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:16px}
+.compare{width:100%;min-width:680px;border-collapse:collapse;background:#fff;font-size:.88rem}
+.compare th,.compare td{padding:13px 11px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:center;vertical-align:middle}
+.compare th:last-child,.compare td:last-child{border-right:none}
+.compare thead th{background:#efece4;color:var(--muted);font-family:'Syne','Noto Sans JP';font-weight:700;font-size:.8rem}
+.compare thead th.us{background:var(--ink);color:#fff}
+.compare thead th.us b{display:block;font-size:.98rem}
+.compare thead th.us .badge{display:inline-block;font-size:.58rem;font-weight:800;color:var(--ink);background:var(--accent);padding:2px 8px;border-radius:20px;margin-bottom:5px;letter-spacing:.04em}
+.compare tbody th{background:#faf9f5;color:var(--ink);font-weight:700;text-align:left;width:17%;min-width:92px;font-size:.82rem}
+.compare td.us{background:rgba(255,59,31,.07)}
+.compare .mk{display:block;font-size:1.1rem;font-weight:800;line-height:1.1}
+.compare .g{color:var(--accent)}.compare .o{color:#1f9d55}.compare .t{color:#c0b9ad}
+.compare .sub{display:block;font-size:.72rem;color:var(--muted);margin-top:2px}
+.compare td.us .sub{color:#9a5a4d;font-weight:700}
 .compare tr:last-child th,.compare tr:last-child td{border-bottom:none}
-@media(max-width:640px){.compare th,.compare td{padding:12px 10px;font-size:.79rem}.compare tbody th{width:30%}}
+@media(max-width:640px){.compare{font-size:.8rem}.compare th,.compare td{padding:10px 7px}.compare .mk{font-size:.96rem}.compare .sub{font-size:.66rem}}
 /* cta */
 .cta{position:relative;background:var(--ink);color:var(--paper);border-radius:28px;padding:clamp(64px,9vw,110px) 30px;text-align:center;overflow:hidden}
 .cta .orb{position:absolute;width:380px;height:380px;border-radius:50%;background:rgba(255,59,31,.4);filter:blur(120px);top:-100px;left:50%;transform:translateX(-50%)}
@@ -255,22 +260,53 @@ footer{padding:54px 0 46px;border-top:1px solid var(--line)}
 </div></section>
 
 <section id="compare"><div class="wrap">
-  <div class="shead"><div class="ey" data-rv>Comparison</div><h2 class="disp" data-rv>他社との違い</h2><p data-rv>同じ「Web制作」でも、中身は大きく変わります。</p></div>
-  <table class="compare" data-rv>
-    <thead>
-      <tr><th>比較項目</th><th><span class="b">Social.Quality</span></th><th>一般的な制作会社</th></tr>
-    </thead>
-    <tbody>
-      <tr><th>料金</th><td class="us">LP¥50,000〜（相場より大幅に安い）</td><td>LP・サイトで数十万円が相場</td></tr>
-      <tr><th>修正対応</th><td class="us"><span class="ok">無制限</span></td><td>回数制限あり</td></tr>
-      <tr><th>返信スピード</th><td class="us"><span class="ok">24時間以内</span></td><td>数日かかることも</td></tr>
-      <tr><th>対応範囲</th><td class="us">企画〜制作〜運用まで一括</td><td>制作のみが多い</td></tr>
-      <tr><th>実績の確認</th><td class="us">実物デモを多数公開</td><td>画像のみ／非公開も</td></tr>
-      <tr><th>エリア</th><td class="us">全国オンライン完結</td><td>対面前提のことも</td></tr>
-      <tr><th>スタンス</th><td class="us">成果から逆算</td><td>「作って終わり」になりがち</td></tr>
-    </tbody>
-  </table>
-  <p style="font-size:.78rem;color:var(--muted);margin-top:14px;max-width:920px">※修正は無制限。ただし、当初の仕様を大きく超える変更は別途お見積りとなります。</p>
+  <div class="shead"><div class="ey" data-rv>Comparison</div><h2 class="disp" data-rv>料金・サービス比較</h2><p data-rv>一般的な相場と比べると、コスパの違いがひと目で分かります。</p></div>
+  <div class="cmp-scroll" data-rv>
+    <table class="compare">
+      <thead>
+        <tr>
+          <th></th>
+          <th class="us"><span class="badge">おすすめ</span><b>Social.Quality</b></th>
+          <th>一般的な<br>制作会社</th>
+          <th>大手<br>制作会社</th>
+          <th>フリーランス</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th>制作費用</th>
+          <td class="us"><span class="mk g">◎</span><span class="sub">LP¥50,000〜</span></td>
+          <td><span class="mk t">△</span><span class="sub">30〜80万円</span></td>
+          <td><span class="mk t">△</span><span class="sub">80〜300万円</span></td>
+          <td><span class="mk o">○</span><span class="sub">5〜30万円</span></td></tr>
+        <tr><th>制作期間</th>
+          <td class="us"><span class="mk g">◎</span><span class="sub">最短即日〜</span></td>
+          <td><span class="mk t">△</span><span class="sub">1〜3ヶ月</span></td>
+          <td><span class="mk t">△</span><span class="sub">2〜4ヶ月</span></td>
+          <td><span class="mk o">○</span><span class="sub">人による</span></td></tr>
+        <tr><th>修正対応</th>
+          <td class="us"><span class="mk g">◎</span><span class="sub">無制限※</span></td>
+          <td><span class="mk t">△</span><span class="sub">回数制限</span></td>
+          <td><span class="mk t">△</span><span class="sub">回数制限</span></td>
+          <td><span class="mk t">△</span><span class="sub">人による</span></td></tr>
+        <tr><th>返信・対応</th>
+          <td class="us"><span class="mk g">◎</span><span class="sub">24時間以内</span></td>
+          <td><span class="mk o">○</span><span class="sub">数日</span></td>
+          <td><span class="mk t">△</span><span class="sub">数日〜</span></td>
+          <td><span class="mk t">△</span><span class="sub">人による</span></td></tr>
+        <tr><th>対応範囲</th>
+          <td class="us"><span class="mk g">◎</span><span class="sub">企画〜運用</span></td>
+          <td><span class="mk o">○</span><span class="sub">制作中心</span></td>
+          <td><span class="mk g">◎</span><span class="sub">企画〜運用</span></td>
+          <td><span class="mk t">△</span><span class="sub">制作のみ</span></td></tr>
+        <tr><th>信頼性</th>
+          <td class="us"><span class="mk g">◎</span><span class="sub">法人・継続</span></td>
+          <td><span class="mk g">◎</span><span class="sub">法人</span></td>
+          <td><span class="mk g">◎</span><span class="sub">法人</span></td>
+          <td><span class="mk t">△</span><span class="sub">個人</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:.78rem;color:var(--muted);margin-top:14px">※費用は一般的な相場の目安です。修正は無制限ですが、当初の仕様を大きく超える変更は別途お見積りとなります。スマホは表を横にスクロールできます。</p>
 </div></section>
 
 <section id="flow"><div class="wrap">
