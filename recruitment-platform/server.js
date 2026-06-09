@@ -242,12 +242,11 @@ function mapOpsCSVRow(row, company, media) {
     return '';
   };
 
-  // ── engage / Indeed形式: 氏名（姓）＋氏名（名）結合 ──
-  if (!base.name) {
-    const sei = col(['氏名（姓）','姓','sei']);
-    const mei = col(['氏名（名）','名','mei']);
-    const joined = `${sei} ${mei}`.trim();
-    if (joined) base.name = joined.replace(/[（(][^）)]*[）)]/g, '').trim();
+  // ── engage / Indeed形式: 氏名（姓）＋氏名（名）結合（姓・名列があれば常に上書き）──
+  const sei = col(['氏名（姓）','姓','sei']);
+  const mei = col(['氏名（名）','名','mei']);
+  if (sei || mei) {
+    base.name = `${sei} ${mei}`.trim().replace(/[（(][^）)]*[）)]/g, '').trim();
   }
   if (!base.name) base.name = col(['氏名','名前']).replace(/[（(][^）)]*[）)]/g, '').trim();
 
