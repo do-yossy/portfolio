@@ -7,4 +7,4 @@ Disallow: /営業案件管理ツール.html
 Disallow: /応募コックピット.html
 Disallow: /recruitment-platform/
 
-Sitemap: https://do-yossy.github.io/portfolio/sitemap.xml
+Sitemap: https://www.social-quality.com/sitemap.xml
