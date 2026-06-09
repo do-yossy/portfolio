@@ -13,6 +13,7 @@ const { URL } = require('url');
 const { Deals, Logs } = require('./db');
 const L = require('./logic');
 const claude = require('./lib/claude');
+const mail = require('./lib/mail');
 
 const PORT = process.env.PORT || 3100;
 const GOAL = +process.env.SALES_GOAL || 1000000;
@@ -43,6 +44,24 @@ function notify(message, details = '') {
     const r = https.request({ method: 'POST', hostname: u.hostname, path: u.pathname + u.search, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } });
     r.on('error', () => {}); r.write(data); r.end();
   } catch { /* noop */ }
+}
+
+// 問い合わせ受付の自動処理（非同期・既存フローを壊さない）。
+//  ① 顧客へ自動受付メール（Resend。未設定ならスキップ）
+//  ② 担当者向けにAIが一次返信ドラフト＋概算を生成し、管制塔/Slackへ通知（担当が確認して送る）
+async function autoReply(deal, b) {
+  const customer = b.メール || b.email || '';
+  let quote = null;
+  try { quote = L.quote({ type: deal.type, rush: /即日|1週間/.test(b.納期 || '') }); } catch { /* noop */ }
+  let mr = { skipped: true };
+  try { mr = await mail.sendAck({ to: customer, inquiry: b }); } catch (e) { mr = { ok: false, error: e.message }; }
+  let draft = '';
+  try { draft = await claude.draftReply(b, quote); }
+  catch (e) { draft = `（AIドラフト生成スキップ：${e.message}）`; }
+  try { Deals.update(deal.id, { proposal: draft, amount: (quote && quote.total) || deal.amount || 0 }); } catch { /* noop */ }
+  const qline = quote && quote.total ? `概算の目安：¥${quote.total.toLocaleString()}（税別）` : '概算：要ヒアリング';
+  const ack = mr.skipped ? '受付メール：未設定(未送信)' : mr.ok ? '受付メール：送信済' : `受付メール：失敗(${mr.status || mr.error || ''})`;
+  notify('LP問い合わせ＋AI返信ドラフト', `${deal.title}\n顧客：${customer}\n${ack}\n${qline}\n\n──── 返信ドラフト（確認のうえ送信）────\n${draft}`);
 }
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
@@ -92,8 +111,10 @@ const server = http.createServer(async (req, res) => {
         type: mapType(b.依頼内容), amount: 0, priority: 'A', score: 60, pred_win_rate: 55,
         next_action: '要件確認→見積もり提示', raw: JSON.stringify(b), notes: b.ご相談内容 || b.message || ''
       });
-      notify('LPから新規問い合わせ', `${deal.title} / ${deal.email}`);
-      return json(res, 200, { ok: true, id: deal.id }, CORS);
+      // フォームを待たせないよう即レスし、受付メール送信とAI返信ドラフト生成は非同期で行う。
+      json(res, 200, { ok: true, id: deal.id }, CORS);
+      autoReply(deal, b).catch(e => Logs.create('autoreply', 'error', (e && e.message) || String(e)));
+      return;
     }
 
     if (p === '/login' && m === 'GET') return serveFile(res, 'login.html');

@@ -24,6 +24,7 @@ ok(q.net === q.total - q.fee, '受取=合計-手数料');
 // mediaFee
 ok(L.mediaFee(100000, 'lp') === 0, 'LP直契約は手数料0');
 ok(L.mediaFee(250000, 'crowdworks') === 32500, 'CW段階手数料 (' + L.mediaFee(250000, 'crowdworks') + ')');
+ok(L.mediaFee(100000, 'coconala') === 22000, 'ココナラ手数料22% (' + L.mediaFee(100000, 'coconala') + ')');
 
 // proposal
 const p = L.proposal({ title: 'テスト案件', type: 'system', industry: '医療', amount: 200000 });
