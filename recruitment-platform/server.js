@@ -597,17 +597,21 @@ async function checkVPN() {
     const out = await vpncmdAccountList(vpncmdPath);
     // "Connected" はSoftEtherの英語ステータス文字列
     // "接続完了" は日本語表示時
-    const connected = isVpnConnectedFromOutput(out);
-    vpnCache = { connected, ts: Date.now() };
-    return connected;
+    if (isVpnConnectedFromOutput(out)) {
+      vpnCache = { connected: true, ts: Date.now() };
+      return true;
+    }
+    // vpncmdが未接続でも、SoftEther以外のVPNクライアントで接続している
+    // 可能性があるため、VPN_IP_RANGES設定時はIP範囲チェックにフォールバック
   }
 
-  // vpncmd未インストール → IP範囲チェックにフォールバック
   const vpnRanges = (process.env.VPN_IP_RANGES || '').split(',').map(s => s.trim()).filter(Boolean);
   if (!vpnRanges.length) {
-    // 設定なし = 開発環境（常にOK）
-    vpnCache = { connected: true, ts: Date.now() };
-    return true;
+    // IP範囲未設定: vpncmdで未接続判定済みならそれを尊重、
+    // vpncmd未インストールなら開発環境とみなし常にOK
+    const connected = !vpncmdPath;
+    vpnCache = { connected, ts: Date.now() };
+    return connected;
   }
   try {
     const externalIp = await new Promise((resolve, reject) => {
