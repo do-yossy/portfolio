@@ -110,4 +110,52 @@ function draftReply(inquiry = {}, quote = null) {
   });
 }
 
-module.exports = { generate, draftReply, MODEL };
+// ── 取引メッセージへの返信ドラフト（ランサーズ/ココナラ/CW/LP 全媒体対応）──
+const SRC_LABEL = { lancers: 'ランサーズ', coconala: 'ココナラ', crowdworks: 'クラウドワークス', cw: 'クラウドワークス', cwtech: 'CWテック', lp: 'ホームページ(メール)' };
+
+function replyToMessage(deal = {}, clientMessage = '') {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return reject(new Error('ANTHROPIC_API_KEY が未設定です'));
+    const src = deal.source || 'lancers';
+    const isPlatform = ['lancers', 'coconala', 'crowdworks', 'cw'].includes(src);
+    const sys =
+      'あなたはWeb制作会社「株式会社Social Quality」の営業担当です。クライアントから届いたメッセージへの返信文を作成します。\n' +
+      `媒体：${SRC_LABEL[src] || src}。` +
+      (isPlatform
+        ? 'プラットフォームのメッセージ欄に貼る前提（件名・宛名・署名は不要）。規約遵守のため、外部連絡先の交換や直接取引を促す内容は絶対に書かない。\n'
+        : 'メール本文として使う前提（署名は不要・システム側で付与）。\n') +
+      '構成：相手のメッセージに的確に回答→必要な確認事項→次の一歩の提案。確定金額の断定はしない（「概算」「目安」と明記）。です・ます調。出力は返信本文のみ（前置き・コードフェンス不要）。';
+    const ctx = `案件：${deal.title || ''}（種別:${deal.type || ''} / 金額:${deal.amount || 0}円）\n` +
+      (deal.notes ? `メモ：${String(deal.notes).slice(0, 400)}\n` : '') +
+      (deal.raw ? `案件本文（抜粋）：${String(deal.raw).slice(0, 800)}\n` : '');
+    const payload = JSON.stringify({
+      model: MODEL,
+      max_tokens: 1200,
+      system: [{ type: 'text', text: sys, cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: `${ctx}\nクライアントからのメッセージ:\n${clientMessage}\n\n返信文を作成してください。` }]
+    });
+    const req = https.request({
+      method: 'POST', hostname: 'api.anthropic.com', path: '/v1/messages',
+      headers: {
+        'content-type': 'application/json', 'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01', 'content-length': Buffer.byteLength(payload)
+      }
+    }, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        if (res.statusCode !== 200) return reject(new Error('Claude API ' + res.statusCode + ': ' + d.slice(0, 200)));
+        try {
+          const j = JSON.parse(d);
+          resolve((j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim());
+        } catch (e) { reject(new Error('応答の解析に失敗: ' + e.message)); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+module.exports = { generate, draftReply, replyToMessage, MODEL };
