@@ -65,4 +65,49 @@ function generate(deal) {
   });
 }
 
-module.exports = { generate, MODEL };
+// ── 問い合わせへの一次返信ドラフト（担当者がレビューして送る用）──
+const REPLY_SYSTEM =
+'あなたは大阪のWeb制作会社「株式会社Social Quality」の営業担当です。ホームページの問い合わせフォームに届いた見込み客へ、丁寧で具体的な「一次返信メールの本文」を作成します。\n' +
+'構成：①お礼 ②要件の理解を示す ③ざっくりの進め方 ④概算（提示があれば「目安」として柔らかく。確定金額ではない旨を必ず添える）⑤次の一歩（無料相談・ヒアリング）の提案 ⑥実績URL(https://www.social-quality.com/)。\n' +
+'強み：LP¥50,000〜の低価格・修正無制限・24時間以内返信・オンライン完結・大阪。\n' +
+'制約：金額の断定・確約はしない（「概算」「目安」と明記）。誇大表現や事実でない実績は書かない。署名は付けない（システム側で付与）。出力は返信本文のみ（前置き・コードフェンス不要、です・ます調）。';
+
+function draftReply(inquiry = {}, quote = null) {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return reject(new Error('ANTHROPIC_API_KEY が未設定です'));
+    const lines = Object.entries(inquiry)
+      .filter(([k, v]) => v && typeof v === 'string' && k !== '_hp')
+      .map(([k, v]) => `${k}: ${v}`).join('\n');
+    const q = quote && quote.total ? `概算の目安: ¥${(quote.total).toLocaleString()}（税別）` : '概算: 要ヒアリング';
+    const payload = JSON.stringify({
+      model: MODEL,
+      max_tokens: 1200,
+      system: [{ type: 'text', text: REPLY_SYSTEM, cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: `問い合わせ内容:\n${lines}\n\n${q}\n\n上記への一次返信メール本文を作成してください。` }]
+    });
+    const req = https.request({
+      method: 'POST', hostname: 'api.anthropic.com', path: '/v1/messages',
+      headers: {
+        'content-type': 'application/json', 'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01', 'content-length': Buffer.byteLength(payload)
+      }
+    }, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        if (res.statusCode !== 200) return reject(new Error('Claude API ' + res.statusCode + ': ' + d.slice(0, 200)));
+        try {
+          const j = JSON.parse(d);
+          const text = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+          resolve(text);
+        } catch (e) { reject(new Error('応答の解析に失敗: ' + e.message)); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+module.exports = { generate, draftReply, MODEL };
