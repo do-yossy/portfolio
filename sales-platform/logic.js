@@ -32,6 +32,7 @@ const stageProb = k => (STAGES.find(s => s.key === k) || {}).prob || 0;
 // ── 手数料 ──
 function mediaFee(amount, channel) {
   if (channel === 'lancers') return Math.round(amount * 0.165);
+  if (channel === 'coconala') return Math.round(amount * 0.22);
   if (channel === 'crowdworks' || channel === 'cw') {
     let f = Math.min(amount, 100000) * 0.20;
     if (amount > 100000) f += Math.min(amount - 100000, 100000) * 0.10;
