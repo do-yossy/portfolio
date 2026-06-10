@@ -926,72 +926,72 @@ function jobDetailPage(job) {
 // ── 新デザイン求人一覧ページ（ディンプル風・プレビュー用） ──────────
 // /preview/jobs で表示。未公開求人には「未公開」バッジを付けて表示する。
 function jobsListPageV2(jobs, search = '') {
-  const cards = jobs.length === 0
+  const rows = jobs.length === 0
     ? `<div style="text-align:center;padding:60px 20px;color:#999">現在募集中の求人はありません</div>`
     : jobs.map(j => {
-        const tags = JSON.parse(j.tags || '[]').slice(0, 4)
-          .map(t => `<span class="v2l-tag">${esc(t)}</span>`).join('');
-        const draftBadge = j.is_published ? '' : '<span class="v2l-draft">未公開</span>';
+        const draftBadge = j.is_published ? '' : '<span class="hpl-draft">未公開</span>';
         const catchcopy = j.catchcopy || '';
-        return `<a href="/preview/jobs/${j.id}" class="v2l-card">
-          <div class="v2l-card-head">
-            <span class="v2l-badge">${esc(j.employment_type)}</span>
-            <span class="v2l-jobtype">${esc(j.job_type)}</span>
+        return `<div class="hpl-item">
+          <div class="hpl-item-head">
+            <span class="hpl-emp">${esc(j.employment_type)}</span>
+            <span class="hpl-jobtype">${esc(j.job_type)}</span>
             ${draftBadge}
           </div>
-          ${catchcopy ? `<div class="v2l-catch">${esc(catchcopy)}</div>` : ''}
-          <h3 class="v2l-title">${esc(j.title)}</h3>
-          <div class="v2l-meta">
-            <span class="v2l-meta-item">📍 ${esc(j.location)}</span>
-            <span class="v2l-meta-item v2l-salary">￥ ${esc(j.salary)}</span>
-          </div>
-          <div class="v2l-tags">${tags}</div>
-          <div class="v2l-more">詳細を見る →</div>
-        </a>`;
+          ${catchcopy ? `<div class="hpl-catch">${esc(catchcopy)}</div>` : ''}
+          <h3 class="hpl-title"><a href="/preview/jobs/${j.id}">${esc(j.title)}</a></h3>
+          <table class="hpl-table"><tbody>
+            <tr><th>勤務地</th><td>${esc(j.location)}</td></tr>
+            <tr><th>給与</th><td>${esc(j.salary)}</td></tr>
+          </tbody></table>
+          <div class="hpl-more"><a href="/preview/jobs/${j.id}" class="hpl-btn">詳細を見る</a></div>
+        </div>`;
       }).join('');
 
   const content = `
 <style>
-  .v2l-wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px 60px; }
-  .v2l-hero { background: linear-gradient(135deg, #fdeef5 0%, #fce4ef 50%, #f8e8f8 100%); border-radius: 0 0 24px 24px; padding: 48px 20px 40px; text-align: center; margin-bottom: 28px; }
-  .v2l-hero h1 { font-size: 26px; font-weight: 700; color: #333; margin: 0 0 8px; }
-  .v2l-hero p { font-size: 14px; color: #777; margin: 0 0 24px; }
-  .v2l-search { display: flex; max-width: 560px; margin: 0 auto; background: #fff; border-radius: 999px; box-shadow: 0 2px 12px rgba(232,82,152,.12); overflow: hidden; }
-  .v2l-search input { flex: 1; border: none; outline: none; padding: 15px 24px; font-size: 14px; }
-  .v2l-search button { border: none; background: #e85298; color: #fff; font-weight: 700; font-size: 14px; padding: 0 32px; cursor: pointer; }
-  .v2l-search button:hover { background: #d33f85; }
-  .v2l-count { font-size: 13px; color: #888; margin-bottom: 16px; }
-  .v2l-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
-  .v2l-card { display: block; background: #fff; border-radius: 14px; padding: 22px 24px; box-shadow: 0 2px 10px rgba(0,0,0,.05); text-decoration: none; color: inherit; transition: box-shadow .15s, transform .15s; border: 1px solid #f3e3ec; }
-  .v2l-card:hover { box-shadow: 0 6px 22px rgba(232,82,152,.16); transform: translateY(-2px); }
-  .v2l-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-  .v2l-badge { background: #e85298; color: #fff; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px; }
-  .v2l-jobtype { font-size: 12px; color: #999; }
-  .v2l-draft { background: #64748b; color: #fff; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px; }
-  .v2l-catch { font-size: 12px; color: #e85298; margin-bottom: 6px; }
-  .v2l-title { font-size: 15.5px; font-weight: 700; line-height: 1.5; color: #222; margin: 0 0 12px; }
-  .v2l-meta { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-  .v2l-meta-item { font-size: 13px; color: #555; }
-  .v2l-salary { color: #e85298; font-weight: 700; }
-  .v2l-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  .v2l-tag { background: #fdf0f6; color: #c2447e; font-size: 11px; padding: 3px 10px; border-radius: 999px; }
-  .v2l-more { text-align: right; font-size: 13px; font-weight: 600; color: #e85298; }
+  .hpl-band { background: #2e75b6; padding: 20px 16px; }
+  .hpl-band-inner { max-width: 1000px; margin: 0 auto; color: #fff; }
+  .hpl-band-title { font-size: 21px; font-weight: 700; letter-spacing: .12em; }
+  .hpl-band-sub { font-size: 11px; color: #cfe3f5; letter-spacing: .25em; margin-top: 2px; }
+  .hpl-wrap { max-width: 1000px; margin: 0 auto; padding: 0 16px 60px; }
+  .hpl-search { display: flex; gap: 0; max-width: 520px; margin: 24px 0 8px; border: 1px solid #c9d4e0; border-radius: 4px; overflow: hidden; }
+  .hpl-search input { flex: 1; border: none; outline: none; padding: 12px 16px; font-size: 14px; }
+  .hpl-search button { border: none; background: #2e75b6; color: #fff; font-weight: 600; font-size: 14px; padding: 0 28px; cursor: pointer; }
+  .hpl-search button:hover { background: #245e94; }
+  .hpl-count { font-size: 13px; color: #888; margin: 10px 0 20px; }
+  .hpl-item { border: 1px solid #d5dce4; border-radius: 4px; padding: 22px 26px; margin-bottom: 18px; background: #fff; }
+  .hpl-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .hpl-emp { background: #2e75b6; color: #fff; font-size: 11px; font-weight: 600; padding: 3px 12px; border-radius: 3px; }
+  .hpl-jobtype { font-size: 12px; color: #999; }
+  .hpl-draft { background: #64748b; color: #fff; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 3px; }
+  .hpl-catch { font-size: 12.5px; color: #2e75b6; font-weight: 600; margin-bottom: 4px; }
+  .hpl-title { font-size: 17px; font-weight: 700; line-height: 1.5; margin: 0 0 14px; }
+  .hpl-title a { color: #222; text-decoration: none; }
+  .hpl-title a:hover { color: #2e75b6; text-decoration: underline; }
+  .hpl-table { border-collapse: collapse; font-size: 13.5px; margin-bottom: 14px; width: 100%; max-width: 560px; }
+  .hpl-table th { width: 90px; background: #eef1f5; color: #333; font-weight: 600; text-align: left; padding: 8px 12px; border: 1px solid #d5dce4; }
+  .hpl-table td { padding: 8px 14px; border: 1px solid #d5dce4; color: #333; }
+  .hpl-more { text-align: right; }
+  .hpl-btn { display: inline-block; background: #f29600; color: #fff; border: none; font-size: 13px; font-weight: 700; padding: 9px 30px; border-radius: 4px; text-decoration: none; }
+  .hpl-btn:hover { background: #d98700; }
   @media (max-width: 640px) {
-    .v2l-hero h1 { font-size: 20px; }
-    .v2l-grid { grid-template-columns: 1fr; }
+    .hpl-item { padding: 16px; }
+    .hpl-title { font-size: 15px; }
   }
 </style>
-<div class="v2l-hero">
-  <h1>あなたにぴったりの仕事が見つかる</h1>
-  <p>全国の正社員求人を多数掲載中</p>
-  <form class="v2l-search" action="/preview/jobs" method="get">
+<div class="hpl-band">
+  <div class="hpl-band-inner">
+    <div class="hpl-band-title">求人情報</div>
+    <div class="hpl-band-sub">RECRUIT</div>
+  </div>
+</div>
+<div class="hpl-wrap">
+  <form class="hpl-search" action="/preview/jobs" method="get">
     <input type="search" name="q" value="${esc(search)}" placeholder="職種・勤務地・キーワードで検索">
     <button type="submit">検索</button>
   </form>
-</div>
-<div class="v2l-wrap">
-  <div class="v2l-count">${jobs.length}件の求人${search ? `（「${esc(search)}」の検索結果）` : ''}</div>
-  <div class="v2l-grid">${cards}</div>
+  <div class="hpl-count">${jobs.length}件の求人${search ? `（「${esc(search)}」の検索結果）` : ''}</div>
+  ${rows}
 </div>`;
 
   return publicLayout('求人情報一覧 | 採用サイト', content, {
@@ -1061,138 +1061,158 @@ function jobDetailPageV2(job) {
   };
   const jsonld = `<script type="application/ld+json">${JSON.stringify(jsonldObj, null, 2)}<\/script>`;
 
-  // キャッチコピー（catchcopy が無ければタグ先頭3つから生成）
-  const catchcopy = job.catchcopy || tags.slice(0, 3).join('・');
+  // キャッチコピー
+  const catchcopy = job.catchcopy || '';
 
-  // ここがポイント: タグを箇条書きで表示
-  const pointsHtml = tags.length > 0
-    ? `<div class="v2-points">
-        <div class="v2-points-title">ここがポイント</div>
-        <ul>${tags.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+  // 仕事内容の【見出し】をセクションに分解
+  const descParts = String(job.description || '').split(/【([^】]+)】/);
+  const introText = (descParts[0] || '').trim();
+  const secMap = {};
+  const secOrder = [];
+  for (let i = 1; i < descParts.length; i += 2) {
+    const h = (descParts[i] || '').trim();
+    const body = (descParts[i + 1] || '').trim();
+    if (h && body) { secMap[h] = body; secOrder.push(h); }
+  }
+  const used = new Set();
+  const pick = (...names) => {
+    for (const n of names) if (secMap[n]) { used.add(n); return secMap[n]; }
+    return '';
+  };
+
+  // お仕事情報テーブル（イーストアジア風の項目順）
+  const mainDesc = pick('仕事内容', 'お仕事内容') || introText || String(job.description || '').trim();
+  const salaryDetail = pick('給与内訳', '給与・待遇');
+  const shiftText = pick('労働時間', '勤務時間', 'シフト・勤務時間');
+  const infoRows = [
+    ['お仕事内容', mainDesc],
+    ['給与', job.salary + (salaryDetail ? '\n\n' + salaryDetail : '')],
+    ['所在地', job.location],
+    ['雇用形態', job.employment_type],
+    ['シフト・勤務時間', shiftText],
+    ['休日・休暇', pick('休日・休暇', '休日')],
+    ['応募資格', pick('応募資格', 'こんな方に向いています', 'こんな方におすすめ')],
+    ['待遇・福利厚生', pick('福利厚生', '待遇・福利厚生', '待遇')],
+    ['入社後の流れ', pick('入社後の流れ', '研修', '入社後の研修')],
+    ...secOrder.filter(h => !used.has(h)).map(h => [h, secMap[h]]),
+  ].filter(([, v]) => v);
+
+  // 注目ポイント: タグ（✔リスト）＋導入文
+  const pointsText = [
+    tags.map(t => `✔ ${t}`).join('\n'),
+    introText && mainDesc !== introText ? introText : '',
+  ].filter(Boolean).join('\n\n');
+
+  const faqHtml = faq.length > 0
+    ? `<div class="ea-secband">よくある質問</div>
+      <div class="ea-secbody">${faq.map(f =>
+        `<div class="ea-faq-q">Q. ${esc(f.q)}</div><div class="ea-faq-a">A. ${esc(f.a)}</div>`).join('')}
       </div>`
     : '';
 
-  const faqHtml = faq.length > 0
-    ? `<section class="v2-section">
-        <h2 class="v2-h2">よくある質問</h2>
-        ${faq.map(f => `
-          <div class="v2-faq-item">
-            <div class="v2-faq-q">Q. ${esc(f.q)}</div>
-            <div class="v2-faq-a">A. ${esc(f.a)}</div>
-          </div>`).join('')}
-      </section>`
-    : '';
-
   const imageHtml = job.image_url
-    ? `<div class="v2-image"><img src="${esc(job.image_url)}" alt="${esc(job.title)}"></div>`
+    ? `<div class="ea-image"><img src="${esc(job.image_url)}" alt="${esc(job.title)}"></div>`
     : '';
 
   const content = `
 <style>
-  .v2-wrap { max-width: 920px; margin: 0 auto; padding: 16px 16px 120px; }
-  .v2-breadcrumb { font-size: 12px; color: #8a8a8a; margin-bottom: 18px; line-height: 1.8; }
-  .v2-breadcrumb a { color: #8a8a8a; text-decoration: none; }
-  .v2-breadcrumb a:hover { text-decoration: underline; }
-  .v2-card { background: #fff; border-radius: 14px; padding: 32px 36px; box-shadow: 0 2px 14px rgba(0,0,0,.06); }
-  .v2-jobnum { text-align: right; font-size: 12px; color: #9a9a9a; margin-bottom: 8px; }
-  .v2-badge { display: inline-block; background: #e85298; color: #fff; font-size: 12px; font-weight: 600; padding: 4px 14px; border-radius: 4px; margin-bottom: 14px; }
-  .v2-catch { font-size: 14px; color: #555; margin-bottom: 8px; }
-  .v2-title { font-size: 26px; font-weight: 700; line-height: 1.45; color: #222; margin: 0 0 22px; padding-bottom: 20px; border-bottom: 1px dashed #ccc; }
-  .v2-image { margin: 20px 0; }
-  .v2-image img { max-width: 400px; width: 100%; border-radius: 8px; }
-  .v2-meta { margin: 22px 0; }
-  .v2-meta-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; font-size: 15px; color: #333; }
-  .v2-meta-icon { color: #e85298; width: 22px; text-align: center; flex-shrink: 0; }
-  .v2-meta-row strong { color: #e85298; }
-  .v2-points { background: #fdf0f6; border-radius: 10px; padding: 20px 24px; margin: 24px 0; }
-  .v2-points-title { font-weight: 700; font-size: 16px; color: #333; border-left: 4px solid #e85298; padding-left: 10px; margin-bottom: 12px; }
-  .v2-points ul { margin: 0; padding-left: 20px; }
-  .v2-points li { font-size: 14px; color: #444; line-height: 2; }
-  .v2-section { margin-top: 30px; }
-  .v2-h2 { font-size: 18px; font-weight: 700; color: #333; border-left: 4px solid #e85298; padding-left: 10px; margin-bottom: 14px; }
-  .v2-desc { font-size: 14.5px; line-height: 2; color: #3a3a3a; white-space: pre-wrap; }
-  .v2-faq-item { margin-bottom: 16px; }
-  .v2-faq-q { font-weight: 700; color: #e85298; margin-bottom: 4px; font-size: 14.5px; }
-  .v2-faq-a { font-size: 14px; color: #444; line-height: 1.9; }
-  .v2-applybar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.97); border-top: 1px solid #eee; box-shadow: 0 -4px 16px rgba(0,0,0,.07); padding: 12px 16px; display: flex; gap: 12px; justify-content: center; z-index: 100; }
-  .v2-btn-keep { flex: 0 1 220px; text-align: center; padding: 14px 10px; border: 1.5px solid #e85298; color: #e85298; border-radius: 8px; font-weight: 600; font-size: 15px; background: #fff; cursor: pointer; }
-  .v2-btn-entry { flex: 0 1 380px; text-align: center; padding: 14px 10px; background: #e85298; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 15px; cursor: pointer; }
-  .v2-btn-entry:hover { background: #d33f85; }
-  .v2-apply { background: #fdf0f6; border-radius: 14px; padding: 28px 32px; margin-top: 36px; }
-  .v2-apply h2 { font-size: 18px; color: #333; margin-bottom: 6px; }
-  .v2-apply p { font-size: 13px; color: #666; margin-bottom: 18px; }
+  .ea-titlebar { background: #b6322c; }
+  .ea-titlebar-in { max-width: 1000px; margin: 0 auto; display: flex; align-items: center; gap: 14px; padding: 10px 16px; }
+  .ea-titlebar h1 { color: #fff; font-size: 15.5px; font-weight: 700; line-height: 1.5; margin: 0; flex: 1; }
+  .ea-apply-top { background: #f29600; color: #fff; font-weight: 700; font-size: 14px; border: none; border-radius: 3px; padding: 10px 26px; cursor: pointer; white-space: nowrap; }
+  .ea-apply-top:hover { background: #d98700; }
+  .ea-wrap { max-width: 1000px; margin: 0 auto; padding: 0 16px 70px; }
+  .ea-breadcrumb { font-size: 11.5px; color: #888; margin: 10px 0 16px; }
+  .ea-breadcrumb a { color: #2e75b6; text-decoration: none; }
+  .ea-breadcrumb a:hover { text-decoration: underline; }
+  .ea-headline { font-size: 16px; font-weight: 700; color: #222; line-height: 1.8; margin: 6px 0 16px; white-space: pre-wrap; }
+  .ea-summary { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 18px; }
+  .ea-summary th { width: 92px; background: #eef1f5; border: 1px solid #d5dce4; padding: 9px 12px; color: #333; font-weight: 600; text-align: left; }
+  .ea-summary td { border: 1px solid #d5dce4; padding: 9px 14px; color: #333; }
+  .ea-image { margin: 14px 0; }
+  .ea-image img { max-width: 430px; width: 100%; }
+  .ea-secband { background: #2e75b6; color: #fff; font-size: 15px; font-weight: 700; padding: 9px 16px; margin: 28px 0 0; }
+  .ea-secbody { border: 1px solid #d5dce4; border-top: none; padding: 18px 20px; font-size: 14px; line-height: 2; color: #333; white-space: pre-wrap; background: #fff; }
+  .ea-table { width: 100%; border-collapse: collapse; font-size: 13.5px; border: 1px solid #d5dce4; }
+  .ea-table th { width: 150px; background: #eef1f5; border: 1px solid #d5dce4; padding: 13px 14px; font-weight: 600; color: #333; text-align: left; vertical-align: top; }
+  .ea-table td { border: 1px solid #d5dce4; padding: 13px 16px; color: #333; line-height: 1.9; white-space: pre-wrap; }
+  .ea-faq-q { font-weight: 700; color: #2e75b6; margin: 10px 0 2px; }
+  .ea-faq-a { margin-bottom: 8px; }
+  .ea-applybtn-wrap { text-align: center; margin: 36px 0 0; }
+  .ea-applybtn { background: #f29600; color: #fff; font-size: 17px; font-weight: 700; border: none; border-radius: 4px; padding: 15px 90px; cursor: pointer; box-shadow: 0 2px 8px rgba(242,150,0,.3); }
+  .ea-applybtn:hover { background: #d98700; }
   @media (max-width: 640px) {
-    .v2-card { padding: 22px 18px; }
-    .v2-title { font-size: 20px; }
+    .ea-titlebar-in { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .ea-table th { width: 100px; padding: 10px; }
+    .ea-table td { padding: 10px 12px; }
+    .ea-summary th { width: 70px; }
+    .ea-applybtn { width: 100%; padding: 15px 0; }
   }
 </style>
-<div class="v2-wrap">
-  <div class="v2-breadcrumb">
-    <a href="/jobs">お仕事をお探しの方 TOP</a> ＞
-    <a href="/jobs?q=${encodeURIComponent(job.location)}">${esc(job.location)}</a> ＞
-    <a href="/jobs?q=${encodeURIComponent(job.job_type)}">${esc(job.job_type)}</a> ＞
-    ${esc(job.title)}
-  </div>
-  <div class="v2-card">
-    <div class="v2-jobnum">お仕事ナンバー: ${esc(job.id.slice(0, 12))}</div>
-    <span class="v2-badge">${esc(job.employment_type)}</span>
-    ${catchcopy ? `<div class="v2-catch">${esc(catchcopy)}</div>` : ''}
-    <h1 class="v2-title">${esc(job.title)}</h1>
-    ${imageHtml}
-    <div class="v2-meta">
-      <div class="v2-meta-row"><span class="v2-meta-icon">💼</span><span>${esc(job.job_type)}</span></div>
-      <div class="v2-meta-row"><span class="v2-meta-icon">📍</span><span>${esc(job.location)}</span></div>
-      <div class="v2-meta-row"><span class="v2-meta-icon">￥</span><strong>${esc(job.salary)}</strong></div>
-    </div>
-    ${pointsHtml}
-    <section class="v2-section">
-      <h2 class="v2-h2">仕事内容</h2>
-      <div class="v2-desc">${esc(job.description)}</div>
-    </section>
-    ${faqHtml}
-    <div id="apply-wrap" class="v2-apply">
-      <h2>この求人にエントリーする</h2>
-      <p>必要事項を入力して送信してください。担当者より3営業日以内にご連絡いたします。</p>
-      <form id="apply-form">
-        <input type="hidden" name="jobId" value="${job.id}">
-        <input type="hidden" name="jobTitle" value="${esc(job.title)}">
-        <input type="hidden" name="sourceMedia" id="apply-source-media" value="direct">
-        <div class="form-row">
-          <div class="form-group">
-            <label>お名前<span class="req">*</span></label>
-            <input type="text" name="name" required placeholder="山田 太郎">
-          </div>
-          <div class="form-group">
-            <label>電話番号<span class="req">*</span></label>
-            <input type="tel" name="phone" required placeholder="090-0000-0000">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>メールアドレス<span class="req">*</span></label>
-            <input type="email" name="email" required placeholder="taro@example.com">
-          </div>
-          <div class="form-group">
-            <label>年齢</label>
-            <input type="number" name="age" placeholder="25" min="15" max="99">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>住所</label>
-          <input type="text" name="address" placeholder="東京都新宿区...">
-        </div>
-        <div class="form-group">
-          <label>メッセージ（任意）</label>
-          <textarea name="notes" rows="3" placeholder="志望動機・質問等があればご記入ください"></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary btn-lg w-full" style="background:#e85298;border-color:#e85298">エントリーする</button>
-      </form>
-    </div>
+<div class="ea-titlebar">
+  <div class="ea-titlebar-in">
+    <h1>${esc(job.title)}</h1>
+    <button class="ea-apply-top" onclick="document.getElementById('apply-wrap').scrollIntoView({behavior:'smooth'})">応募する</button>
   </div>
 </div>
-<div class="v2-applybar">
-  <button class="v2-btn-keep" onclick="alert('キープ機能は準備中です')">♡ キープ</button>
-  <button class="v2-btn-entry" onclick="document.getElementById('apply-wrap').scrollIntoView({behavior:'smooth'})">✈ この求人にエントリーする</button>
+<div class="ea-wrap">
+  <div class="ea-breadcrumb">
+    <a href="/preview/jobs">求人情報トップ</a> ＞ ${esc(job.location)} ＞ ${esc(job.title)}
+  </div>
+  ${catchcopy ? `<div class="ea-headline">${esc(catchcopy)}</div>` : ''}
+  <table class="ea-summary"><tbody>
+    <tr><th>給与</th><td>${esc(job.salary)}</td><th>シフト</th><td>${esc((shiftText.split('\n')[0] || 'シフト制'))}</td></tr>
+    <tr><th>勤務地</th><td>${esc(job.location)}</td><th>雇用形態</th><td>${esc(job.employment_type)}</td></tr>
+  </tbody></table>
+  ${imageHtml}
+  ${pointsText ? `
+  <div class="ea-secband">注目ポイント</div>
+  <div class="ea-secbody">${esc(pointsText)}</div>` : ''}
+  <div class="ea-secband">お仕事情報</div>
+  <table class="ea-table"><tbody>
+    ${infoRows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}
+  </tbody></table>
+  ${faqHtml}
+  <div class="ea-secband">応募情報</div>
+  <div class="ea-secbody" style="white-space:normal" id="apply-wrap">
+    <p style="margin:0 0 16px">下記フォームより応募してください。担当者より3営業日以内にご連絡いたします。</p>
+    <form id="apply-form">
+      <input type="hidden" name="jobId" value="${job.id}">
+      <input type="hidden" name="jobTitle" value="${esc(job.title)}">
+      <input type="hidden" name="sourceMedia" id="apply-source-media" value="direct">
+      <div class="form-row">
+        <div class="form-group">
+          <label>お名前<span class="req">*</span></label>
+          <input type="text" name="name" required placeholder="山田 太郎">
+        </div>
+        <div class="form-group">
+          <label>電話番号<span class="req">*</span></label>
+          <input type="tel" name="phone" required placeholder="090-0000-0000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>メールアドレス<span class="req">*</span></label>
+          <input type="email" name="email" required placeholder="taro@example.com">
+        </div>
+        <div class="form-group">
+          <label>年齢</label>
+          <input type="number" name="age" placeholder="25" min="15" max="99">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>住所</label>
+        <input type="text" name="address" placeholder="東京都新宿区...">
+      </div>
+      <div class="form-group">
+        <label>メッセージ（任意）</label>
+        <textarea name="notes" rows="3" placeholder="志望動機・質問等があればご記入ください"></textarea>
+      </div>
+      <div class="ea-applybtn-wrap" style="margin-top:8px">
+        <button type="submit" class="ea-applybtn">応募する</button>
+      </div>
+    </form>
+  </div>
 </div>
 <script>
 (function(){
