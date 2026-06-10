@@ -20,6 +20,10 @@ body{font-family:'Noto Sans JP',system-ui,sans-serif;background:var(--bg);color:
 .ingest{display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap}
 .ingest textarea{flex:1;min-width:240px;min-height:42px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.78rem;padding:.5rem}
 .ingest select{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.78rem;padding:.5rem;align-self:flex-start}
+.search{margin:0 0 .7rem;display:flex;align-items:center;gap:.6rem}
+.search input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.9rem;padding:.6rem .8rem}
+.search input:focus{outline:none;border-color:var(--cyan)}
+.qhit{font-size:.78rem;color:var(--cyan);white-space:nowrap;font-weight:700}
 .board{display:grid;grid-template-columns:repeat(7,minmax(170px,1fr));gap:.55rem;overflow-x:auto;padding-bottom:1rem}
 .col{background:var(--surface);border:1px solid var(--border);border-radius:11px;min-height:120px}
 .col-h{padding:.5rem .6rem;border-bottom:1px solid var(--border)}.col-h .n{font-size:.76rem;font-weight:700}.col-h .w{font-size:.58rem;color:var(--text3)}.col-h .m{font-size:.64rem;color:var(--text2);margin-top:.2rem}
@@ -66,6 +70,7 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
     <button class="btn" onclick="ingest()">候補に取込</button>
   </div>
   <div class="inbox" id="inbox"></div>
+  <div class="search"><input id="q" type="search" placeholder="🔍 案件をワード検索（候補・応募・打ち合わせ…タイトル/客名/メモ/媒体/種別/本文）" autocomplete="off"><span class="qhit" id="qhit"></span></div>
   <div class="board" id="board"></div>
 </div>
 
@@ -100,7 +105,10 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
 const $=id=>document.getElementById(id);
 const yen=n=>'¥'+Math.round(n||0).toLocaleString('ja-JP');
 const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-let STAGES=[], DEALS=[];
+let STAGES=[], DEALS=[], Q='';
+const _SRCJP={lancers:'ランサーズ',coconala:'ココナラ',crowdworks:'クラウドワークス',cwtech:'CWテック',lp:'LP'};
+function searchText(d){const sl=(STAGES.find(s=>s.key===d.stage)||{}).label||'';return [d.title,d.client,d.industry,d.email,d.type,d.source,_SRCJP[d.source],d.notes,d.next_action,d.raw,d.priority,sl].filter(Boolean).join(' ').toLowerCase();}
+function match(d){return !Q||searchText(d).includes(Q);}
 const api=(u,o={})=>fetch(u,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...o}).then(r=>{if(r.status===401){location.href='/login';throw 0}return r.json()});
 
 async function load(){
@@ -139,11 +147,12 @@ function card(d){
 }
 function renderBoard(){
   $('board').innerHTML=STAGES.map(st=>{
-    const items=DEALS.filter(d=>d.stage===st.key);
+    const items=DEALS.filter(d=>d.stage===st.key && match(d));
     const sum=items.reduce((s,d)=>s+(d.amount||0),0);
     return `<div class="col"><div class="col-h"><div class="n">${st.label}</div><div class="w">${st.who} ${st.key!=='won'&&st.key!=='lead'?'・着地'+Math.round(st.prob*100)+'%':''}</div><div class="m">${items.length}件 ・ ${yen(sum)}</div></div>
-     <div class="col-b">${items.length?items.map(card).join(''):'<div class="empty">—</div>'}</div></div>`;
+     <div class="col-b">${items.length?items.map(card).join(''):`<div class="empty">${Q?'該当なし':'—'}</div>`}</div></div>`;
   }).join('');
+  const qh=$('qhit'); if(qh){ qh.textContent=Q?`🔍 ${DEALS.filter(match).length}件ヒット`:''; }
 }
 const NEXT={lead:{to:'applied',label:'✅ 応募する'},applied:{to:'meeting',label:'💬 打合せへ'},meeting:{to:'build',label:'🛠 着手OK'},build:{to:'qa',label:'🔍 チェックへ'},qa:{to:'deliver',label:'📦 納品へ'},deliver:{to:'won',label:'🎉 受注/完了'}};
 function renderInbox(){
@@ -192,6 +201,7 @@ async function genReply(){ const msg=$('rmsg').value.trim(); if(!msg){ alert('�
   $('ptext').textContent=_ptext; setMail(DEALS.find(x=>x.id===_rid)); }
 async function genAll(){ if(!confirm('提案文が空の全カードに、提案文＋成果物を一括生成します（無料・種別も再判定）。よろしいですか？'))return; const r=await api('/api/generate-all',{method:'POST'}); alert((r.generated||0)+'件に生成しました。📝で提案文＋成果物、📄内容で募集本文を確認できます'); load(); }
 function copyP(){ navigator.clipboard?.writeText(_ptext); }
+$('q').addEventListener('input',e=>{Q=e.target.value.trim().toLowerCase();renderBoard();});
 load();
 </script>
 </body>
