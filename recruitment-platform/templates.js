@@ -1156,6 +1156,7 @@ function jobsListPageV2(jobs, search = '') {
   </div>
 </div>
 <div class="hpl-wrap">
+  <div style="font-size:11.5px;color:#888;margin:14px 0 0"><a href="/preview/top" style="color:#2e75b6;text-decoration:none">求人情報トップ</a> ＞ お仕事一覧</div>
   <form class="hpl-search" action="/preview/jobs" method="get">
     <input type="search" name="q" value="${esc(search)}" placeholder="職種・勤務地・キーワードで検索">
     <button type="submit">検索</button>
@@ -1327,7 +1328,7 @@ function jobDetailPageV2(job) {
 </div>
 <div class="ea-wrap">
   <div class="ea-breadcrumb">
-    <a href="/preview/jobs">求人情報トップ</a> ＞ ${esc(job.location)} ＞ ${esc(job.title)}
+    <a href="/preview/top">求人情報トップ</a> ＞ <a href="/preview/jobs">お仕事一覧</a> ＞ ${esc(job.location)} ＞ ${esc(job.title)}
   </div>
   ${catchcopy ? `<div class="ea-headline">${esc(catchcopy)}</div>` : ''}
   <table class="ea-summary"><tbody>
