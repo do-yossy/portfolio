@@ -157,7 +157,7 @@ const server = http.createServer(async (req, res) => {
           const s = L.scoreFromText(it.text || it.title || '', it);
           const deal = Deals.create({
             title: it.title || (it.text || '').slice(0, 40) || '無題案件', source: it.source || 'lancers',
-            stage: 'lead', raw: it.text || '', link: it.url || '', ...pick(s)
+            stage: 'lead', raw: it.text || '', link: it.url || '', ref: it.ref || '', ...pick(s)
           });
           // 取込時は採点のみ（成果物の自動生成はしない＝無駄なAPI消費を防ぐ）。
           // 提案文＋成果物は、各カードの ✨生成 ボタンを押したときだけ生成する。
