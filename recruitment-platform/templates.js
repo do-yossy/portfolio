@@ -923,6 +923,176 @@ function jobDetailPage(job) {
   });
 }
 
+// ── 新デザイン採用トップページ（イーストアジア風・プレビュー用） ──────────
+// /preview/top で表示。
+function topPageV2(jobs) {
+  const companyName = process.env.COMPANY_NAME || '株式会社Social Quality';
+  const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+
+  const typeCounts = {};
+  const prefCounts = {};
+  for (const j of jobs) {
+    typeCounts[j.job_type] = (typeCounts[j.job_type] || 0) + 1;
+    const p = PREFS.find(pf => (j.location || '').includes(pf));
+    if (p) prefCounts[p] = (prefCounts[p] || 0) + 1;
+  }
+  const typeIcon = t => {
+    if (/配送|ドライバー/.test(t)) return '🚚';
+    if (/製造|工場/.test(t)) return '🏭';
+    if (/倉庫|軽作業/.test(t)) return '📦';
+    if (/営業/.test(t)) return '💼';
+    if (/カウンセラー|アドバイザー|事務/.test(t)) return '💬';
+    if (/介護|看護/.test(t)) return '🤝';
+    return '👷';
+  };
+  const typeCards = Object.entries(typeCounts)
+    .sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([t, c]) => `<a href="/preview/jobs?q=${encodeURIComponent(t)}" class="et-typecard">
+      <div class="et-typecard-icon">${typeIcon(t)}</div>
+      <div class="et-typecard-label">${esc(t)}<span>${c}件</span></div>
+    </a>`).join('');
+
+  const areaList = Object.entries(prefCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([p, c]) => `<a href="/preview/jobs?q=${encodeURIComponent(p)}" class="et-area">${esc(p)}<span>${c}件</span></a>`).join('');
+
+  const voices = [
+    { no: '01', meta: '配送スタッフ / 20代', text: '未経験からのスタートでしたが、研修と先輩のサポートで安心して始められました。' },
+    { no: '02', meta: '製造スタッフ / 30代', text: '人間関係のストレスゼロ！こんな職場ってあるんですね。毎日気持ちよく働けています。' },
+    { no: '03', meta: '倉庫スタッフ / 40代', text: '転職回数が多くても前向きに評価してくれる会社です。頑張りがきちんと給与に反映されます。' },
+  ].map(v => `<div class="et-voice">
+      <div class="et-voice-no">${v.no}</div>
+      <div class="et-voice-meta">${esc(v.meta)}</div>
+      <div class="et-voice-text">${esc(v.text)}</div>
+    </div>`).join('');
+
+  const flow = [
+    { t: '応募', d: 'まずはWEBまたはお電話でご応募ください♪' },
+    { t: '面接日決定', d: '応募確認後、担当者よりご連絡し面接日を決定します！' },
+    { t: '面接実施', d: '履歴書をご持参のうえ、リラックスしてお越しください。' },
+    { t: '合否連絡', d: '面接後、数日以内に合否のご連絡をいたします！採用後の日程もご案内♪' },
+  ].map((s, i) => `<div class="et-step">
+      <div class="et-step-no">STEP ${i + 1}</div>
+      <div class="et-step-t">${esc(s.t)}</div>
+      <div class="et-step-d">${esc(s.d)}</div>
+    </div>`).join('');
+
+  const faqs = [
+    { q: '異業種からの転職でも大丈夫でしょうか？', a: 'はい、大丈夫です。未経験から始めたスタッフが多数活躍しています。研修・OJTで丁寧にサポートします。' },
+    { q: '家庭の事情で扶養内でお仕事をしたいのですが可能でしょうか？', a: '職種・勤務地によって柔軟に対応可能です。面接時にご希望をお聞かせください。' },
+    { q: '契約社員から正社員を目指すことはできますか？', a: 'はい、正社員登用制度があります。実績・勤務態度に応じて積極的に登用しています。' },
+    { q: '働きながら資格を取得できますか？', a: '資格取得支援制度があり、フォークリフトなど業務に必要な資格は会社負担で取得できます。' },
+    { q: '交通費は支給されますか？', a: 'はい、規定内で支給いたします。詳細は各求人の募集要項をご確認ください。' },
+  ].map(f => `<details class="et-faq">
+      <summary><span class="et-faq-qmark">Q</span>${esc(f.q)}</summary>
+      <div class="et-faq-a">${esc(f.a)}</div>
+    </details>`).join('');
+
+  const content = `
+<style>
+  .et-hero { position: relative; background: linear-gradient(120deg, #2e75b6 0%, #1f5fa0 100%); overflow: hidden; padding: 64px 16px 72px; }
+  .et-hero::after { content: ''; position: absolute; right: -120px; top: -60px; width: 420px; height: 420px; background: rgba(255,255,255,.08); transform: rotate(35deg); }
+  .et-hero::before { content: ''; position: absolute; right: 40px; bottom: -80px; width: 260px; height: 260px; background: rgba(242,150,0,.25); transform: rotate(25deg); }
+  .et-hero-in { max-width: 1000px; margin: 0 auto; position: relative; }
+  .et-hero-script { font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: #f8b133; font-size: 20px; margin-bottom: 10px; }
+  .et-hero h1 { color: #fff; font-size: 34px; font-weight: 800; line-height: 1.5; margin: 0 0 16px; letter-spacing: .04em; }
+  .et-hero-co { display: inline-block; background: rgba(255,255,255,.92); color: #1f5fa0; font-size: 13px; font-weight: 700; padding: 6px 18px; border-radius: 3px; }
+  .et-nav { background: #fff; border-bottom: 1px solid #e3e8ee; position: sticky; top: 0; z-index: 50; }
+  .et-nav-in { max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; }
+  .et-nav a { font-size: 13px; font-weight: 600; color: #1f5fa0; text-decoration: none; padding: 13px 16px; }
+  .et-nav a:hover { background: #eef4fa; }
+  .et-sec { max-width: 1000px; margin: 0 auto; padding: 52px 16px 8px; }
+  .et-h2 { display: flex; align-items: center; gap: 18px; justify-content: center; font-size: 23px; font-weight: 700; color: #1f5fa0; margin: 0; }
+  .et-h2::before, .et-h2::after { content: ''; height: 1px; background: #1f5fa0; flex: 0 0 70px; }
+  .et-h2sub { text-align: center; font-family: Georgia, serif; font-style: italic; color: #f29600; font-size: 14px; margin: 6px 0 30px; }
+  .et-typegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .et-typecard { background: #fff; border: 1px solid #dfe6ee; border-radius: 4px; overflow: hidden; text-decoration: none; transition: box-shadow .15s; }
+  .et-typecard:hover { box-shadow: 0 4px 16px rgba(31,95,160,.18); }
+  .et-typecard-icon { font-size: 46px; text-align: center; padding: 26px 0 18px; background: #eef4fa; }
+  .et-typecard-label { background: #f29600; color: #fff; font-size: 13.5px; font-weight: 700; padding: 9px 12px; display: flex; justify-content: space-between; }
+  .et-typecard-label span { font-weight: 600; font-size: 12px; }
+  .et-areawrap { display: flex; flex-wrap: wrap; gap: 10px; }
+  .et-area { border: 1px solid #1f5fa0; color: #1f5fa0; font-size: 13.5px; font-weight: 600; padding: 9px 18px; border-radius: 3px; text-decoration: none; display: inline-flex; gap: 8px; align-items: center; background: #fff; }
+  .et-area span { color: #f29600; font-size: 12px; }
+  .et-area:hover { background: #1f5fa0; color: #fff; }
+  .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+  .et-voice { background: #fff; border: 1px solid #dfe6ee; border-radius: 4px; padding: 22px; position: relative; }
+  .et-voice-no { font-family: Georgia, serif; font-style: italic; font-size: 34px; color: #2e75b6; font-weight: 700; line-height: 1; margin-bottom: 10px; border-bottom: 2px solid #f29600; display: inline-block; padding: 0 6px 4px 0; }
+  .et-voice-meta { font-size: 11px; color: #f29600; font-weight: 700; margin-bottom: 6px; }
+  .et-voice-text { font-size: 13.5px; color: #333; line-height: 1.9; font-weight: 600; }
+  .et-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .et-step { background: #fdf6ea; border-radius: 4px; padding: 20px 18px; text-align: center; }
+  .et-step-no { font-family: Georgia, serif; font-style: italic; color: #f29600; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .et-step-t { font-size: 16px; font-weight: 700; color: #1f5fa0; margin-bottom: 8px; }
+  .et-step-d { font-size: 12.5px; color: #555; line-height: 1.8; }
+  .et-faq { background: #2e75b6; border-radius: 4px; margin-bottom: 10px; overflow: hidden; }
+  .et-faq summary { color: #fff; font-size: 14px; font-weight: 600; padding: 14px 18px; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 12px; }
+  .et-faq summary::-webkit-details-marker { display: none; }
+  .et-faq-qmark { background: #fff; color: #2e75b6; font-weight: 800; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .et-faq-a { background: #fff; border: 1px solid #2e75b6; border-top: none; padding: 14px 18px 14px 56px; font-size: 13.5px; color: #333; line-height: 1.9; }
+  .et-cta { text-align: center; padding: 50px 16px 60px; }
+  .et-cta a { display: inline-block; background: #f29600; color: #fff; font-size: 17px; font-weight: 700; padding: 16px 70px; border-radius: 4px; text-decoration: none; box-shadow: 0 2px 10px rgba(242,150,0,.3); }
+  .et-cta a:hover { background: #d98700; }
+  .et-footer { background: #1f3f63; color: #cfdbe9; font-size: 12px; text-align: center; padding: 26px 16px; }
+  .et-footer a { color: #cfdbe9; text-decoration: none; margin: 0 12px; }
+  @media (max-width: 640px) {
+    .et-hero h1 { font-size: 24px; }
+    .et-h2 { font-size: 19px; }
+  }
+</style>
+<div class="et-hero">
+  <div class="et-hero-in">
+    <div class="et-hero-script">Recruit Information</div>
+    <h1>それぞれが、<br>活躍できる場所</h1>
+    <span class="et-hero-co">${esc(companyName)}</span>
+  </div>
+</div>
+<nav class="et-nav">
+  <div class="et-nav-in">
+    <a href="#type">職種から探す</a>
+    <a href="#area">エリアから探す</a>
+    <a href="#voice">スタッフからの一言</a>
+    <a href="#flow">応募の流れ</a>
+    <a href="#faq">よくある質問</a>
+    <a href="/preview/jobs">お仕事一覧</a>
+  </div>
+</nav>
+<section class="et-sec" id="type">
+  <h2 class="et-h2">職種から探す</h2>
+  <div class="et-h2sub">Search by job</div>
+  <div class="et-typegrid">${typeCards}</div>
+</section>
+<section class="et-sec" id="area">
+  <h2 class="et-h2">エリアから探す</h2>
+  <div class="et-h2sub">Search by area</div>
+  <div class="et-areawrap">${areaList}</div>
+</section>
+<section class="et-sec" id="voice">
+  <h2 class="et-h2">スタッフからの一言</h2>
+  <div class="et-h2sub">Staff Message</div>
+  <div class="et-voices">${voices}</div>
+</section>
+<section class="et-sec" id="flow">
+  <h2 class="et-h2">応募から採用までの流れ</h2>
+  <div class="et-h2sub">About The Flow</div>
+  <div class="et-steps">${flow}</div>
+</section>
+<section class="et-sec" id="faq">
+  <h2 class="et-h2">よくある質問</h2>
+  <div class="et-h2sub">Q and A</div>
+  ${faqs}
+</section>
+<div class="et-cta"><a href="/preview/jobs">お仕事一覧へ</a></div>
+<div class="et-footer">
+  <a href="/preview/jobs">求人情報</a><a href="/privacy">プライバシーポリシー</a>
+  <div style="margin-top:10px">© ${esc(companyName)} All Rights Reserved.</div>
+</div>`;
+
+  return publicLayout(`採用情報 | ${esc(companyName)}`, content, {
+    description: `${companyName}の採用情報サイト。職種・エリアから求人を探せます。`
+  });
+}
+
 // ── 新デザイン求人一覧ページ（ディンプル風・プレビュー用） ──────────
 // /preview/jobs で表示。未公開求人には「未公開」バッジを付けて表示する。
 function jobsListPageV2(jobs, search = '') {
@@ -1947,6 +2117,10 @@ function callImportModalHtml(co, media) {
         <label>会社<select id="ci-company">${coOpts}</select></label>
         <label>媒体<select id="ci-media">${mediaOpts}</select></label>
         <label class="full">CSV / Excelファイル<input type="file" id="ci-file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        <label class="full" style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="ci-countnew" style="width:auto">
+          <strong>本日の新着として計上する</strong>（本日の新規応募・会社別×媒体別に反映）
+        </label>
       </div>
       <p id="ci-mode-hint" class="muted" style="font-size:12px;margin:0 0 8px">新規の応募者を取り込みます。CSV・Excel(.xlsx)・スプレッドシートに対応。電話番号・メールが既存と一致する場合は重複として記録します。</p>
       <div id="ci-result" class="import-result"></div>
@@ -1998,4 +2172,4 @@ const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx'];
 const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
 function mediaName(id) { if (id === 'all') return 'すべての媒体'; const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobsListPageV2, jobDetailPage, jobDetailPageV2, privacyPolicyPage, esc, opsPage, callsPage };
+module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobsListPageV2, jobDetailPage, jobDetailPageV2, topPageV2, privacyPolicyPage, esc, opsPage, callsPage };

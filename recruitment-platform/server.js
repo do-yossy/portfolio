@@ -883,6 +883,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── Preview: 採用トップページ（イーストアジア風） ──
+  if (pathname === '/preview/top' && method === 'GET') {
+    const jobs = (await Jobs.findAll()).filter(j => j.is_published);
+    send(res, 200, T.topPageV2(jobs));
+    return;
+  }
+
   // ── Preview: 新デザイン求人一覧（未公開求人も「未公開」バッジ付きで表示） ──
   if (pathname === '/preview/jobs' && method === 'GET') {
     let jobs = await Jobs.findAll();
@@ -1379,7 +1386,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
     const ct = req.headers['content-type'] || '';
     const buf = await readBody(req);
-    let fileBuf = null, importCompany = co, importMedia = 'indeed', importMode = 'insert';
+    let fileBuf = null, importCompany = co, importMedia = 'indeed', importMode = 'insert', importCountNew = false;
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=(.+)$/);
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
@@ -1387,6 +1394,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         if (/name="company"/.test(p.header)) importCompany = p.content.toString('utf8').trim();
         else if (/name="media"/.test(p.header)) importMedia = p.content.toString('utf8').trim();
         else if (/name="mode"/.test(p.header)) importMode = p.content.toString('utf8').trim();
+        else if (/name="countnew"/.test(p.header)) importCountNew = p.content.toString('utf8').trim() === '1';
         else if (/filename=/.test(p.header)) fileBuf = p.content;
       }
     } else {
@@ -1394,6 +1402,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       importCompany = query.company || co;
       importMedia = query.media || 'indeed';
       importMode = query.mode || 'insert';
+      importCountNew = query.countnew === '1';
     }
 
     // Excel(.xlsx) は ZIP署名(PK\x03\x04)で判定。それ以外は CSV として解析。
@@ -1434,19 +1443,33 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
 
     // ── 新規取込モード（デフォルト）──
+    // importCountNew=true: 本日(JST)の新着として計上（applied_at=今日・架電リストへ）。
+    //   既存（重複）が見つかった場合は重複登録せず本日の新着へ昇格する。
     let imported = 0, duplicates = 0, skipped = 0;
     const skipReasons = [];
+    const todayJST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
     for (const row of rows) {
       const mapped = mapOpsCSVRow(row, importCompany, importMedia);
       if (!mapped.name || (!mapped.phone && !mapped.email)) { skipped++; skipReasons.push('名前/連絡先なし'); continue; }
       const nPhone = normalizePhone(mapped.phone);
       const nEmail = normalizeEmail(mapped.email);
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
-      if (dupId) duplicates++;
-      await Applicants.create({ ...mapped, isImported: 1 });
-      imported++;
+      if (dupId && importCountNew && Applicants.promoteToNew) {
+        await Applicants.promoteToNew(dupId, todayJST);
+        imported++;
+      } else if (dupId) {
+        // 重複は架電リストに出さずアーカイブ＋重複フラグで記録
+        await Applicants.create({ ...mapped, isImported: 1, allowEmptyDate: true, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        duplicates++;
+      } else if (importCountNew) {
+        await Applicants.create({ ...mapped, isImported: 0, appliedAt: todayJST, isArchived: 0 });
+        imported++;
+      } else {
+        await Applicants.create({ ...mapped, isImported: 1 });
+        imported++;
+      }
     }
-    await Logs.create('ops_csv_import', 'success', `${importCompany}/${importMedia}: ${imported}件取込・${duplicates}件重複`);
+    await Logs.create('ops_csv_import', 'success', `${importCompany}/${importMedia}: ${imported}件取込・${duplicates}件重複${importCountNew ? '（本日の新着として計上）' : ''}`);
     sendJSON(res, 200, { ok: true, imported, duplicates, skipped, skipReasons: skipReasons.slice(0, 5), rows: rows.length });
     return;
   }

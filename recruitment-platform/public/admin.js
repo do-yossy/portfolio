@@ -917,6 +917,7 @@ async function callDoImport() {
   fd.append('mode', mode);
   fd.append('company', company);
   fd.append('media', media);
+  fd.append('countnew', document.getElementById('ci-countnew')?.checked ? '1' : '0');
   fd.append('file', file);
   const resultEl = document.getElementById('ci-result');
   resultEl.innerHTML = mode === 'update' ? '<p>架電結果を反映中...</p>' : '<p>取込中...</p>';
