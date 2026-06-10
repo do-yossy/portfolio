@@ -1283,7 +1283,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
         <tfoot><tr><th>合計</th>${footCells}<td class="num total">${grand}</td></tr></tfoot>
       </table>`;
   };
-  const POSTS_MEDIA = OPS_MEDIA.filter(m => m.id !== 'indeed' && m.id !== 'stanby');
+  const POSTS_MEDIA = OPS_MEDIA.filter(m => m.id !== 'indeed');
 
   let body = '';
 
