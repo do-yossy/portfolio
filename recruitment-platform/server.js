@@ -883,6 +883,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── Preview: 新デザイン求人一覧（未公開求人も「未公開」バッジ付きで表示） ──
+  if (pathname === '/preview/jobs' && method === 'GET') {
+    let jobs = await Jobs.findAll();
+    const search = (query.q || '').trim();
+    if (search) {
+      const s = search.toLowerCase();
+      jobs = jobs.filter(j =>
+        j.title.toLowerCase().includes(s) ||
+        j.location.toLowerCase().includes(s) ||
+        j.job_type.toLowerCase().includes(s) ||
+        (j.tags || '').toLowerCase().includes(s)
+      );
+    }
+    send(res, 200, T.jobsListPageV2(jobs, search));
+    return;
+  }
+
   // ── Preview: 新デザイン求人詳細（承認後 /jobs/:id へ切り替え予定） ──
   const previewJobMatch = pathname.match(/^\/preview\/jobs\/([^/]+)$/);
   if (previewJobMatch && method === 'GET') {

@@ -923,6 +923,82 @@ function jobDetailPage(job) {
   });
 }
 
+// ── 新デザイン求人一覧ページ（ディンプル風・プレビュー用） ──────────
+// /preview/jobs で表示。未公開求人には「未公開」バッジを付けて表示する。
+function jobsListPageV2(jobs, search = '') {
+  const cards = jobs.length === 0
+    ? `<div style="text-align:center;padding:60px 20px;color:#999">現在募集中の求人はありません</div>`
+    : jobs.map(j => {
+        const tags = JSON.parse(j.tags || '[]').slice(0, 4)
+          .map(t => `<span class="v2l-tag">${esc(t)}</span>`).join('');
+        const draftBadge = j.is_published ? '' : '<span class="v2l-draft">未公開</span>';
+        const catchcopy = j.catchcopy || '';
+        return `<a href="/preview/jobs/${j.id}" class="v2l-card">
+          <div class="v2l-card-head">
+            <span class="v2l-badge">${esc(j.employment_type)}</span>
+            <span class="v2l-jobtype">${esc(j.job_type)}</span>
+            ${draftBadge}
+          </div>
+          ${catchcopy ? `<div class="v2l-catch">${esc(catchcopy)}</div>` : ''}
+          <h3 class="v2l-title">${esc(j.title)}</h3>
+          <div class="v2l-meta">
+            <span class="v2l-meta-item">📍 ${esc(j.location)}</span>
+            <span class="v2l-meta-item v2l-salary">￥ ${esc(j.salary)}</span>
+          </div>
+          <div class="v2l-tags">${tags}</div>
+          <div class="v2l-more">詳細を見る →</div>
+        </a>`;
+      }).join('');
+
+  const content = `
+<style>
+  .v2l-wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px 60px; }
+  .v2l-hero { background: linear-gradient(135deg, #fdeef5 0%, #fce4ef 50%, #f8e8f8 100%); border-radius: 0 0 24px 24px; padding: 48px 20px 40px; text-align: center; margin-bottom: 28px; }
+  .v2l-hero h1 { font-size: 26px; font-weight: 700; color: #333; margin: 0 0 8px; }
+  .v2l-hero p { font-size: 14px; color: #777; margin: 0 0 24px; }
+  .v2l-search { display: flex; max-width: 560px; margin: 0 auto; background: #fff; border-radius: 999px; box-shadow: 0 2px 12px rgba(232,82,152,.12); overflow: hidden; }
+  .v2l-search input { flex: 1; border: none; outline: none; padding: 15px 24px; font-size: 14px; }
+  .v2l-search button { border: none; background: #e85298; color: #fff; font-weight: 700; font-size: 14px; padding: 0 32px; cursor: pointer; }
+  .v2l-search button:hover { background: #d33f85; }
+  .v2l-count { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .v2l-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+  .v2l-card { display: block; background: #fff; border-radius: 14px; padding: 22px 24px; box-shadow: 0 2px 10px rgba(0,0,0,.05); text-decoration: none; color: inherit; transition: box-shadow .15s, transform .15s; border: 1px solid #f3e3ec; }
+  .v2l-card:hover { box-shadow: 0 6px 22px rgba(232,82,152,.16); transform: translateY(-2px); }
+  .v2l-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .v2l-badge { background: #e85298; color: #fff; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px; }
+  .v2l-jobtype { font-size: 12px; color: #999; }
+  .v2l-draft { background: #64748b; color: #fff; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px; }
+  .v2l-catch { font-size: 12px; color: #e85298; margin-bottom: 6px; }
+  .v2l-title { font-size: 15.5px; font-weight: 700; line-height: 1.5; color: #222; margin: 0 0 12px; }
+  .v2l-meta { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .v2l-meta-item { font-size: 13px; color: #555; }
+  .v2l-salary { color: #e85298; font-weight: 700; }
+  .v2l-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .v2l-tag { background: #fdf0f6; color: #c2447e; font-size: 11px; padding: 3px 10px; border-radius: 999px; }
+  .v2l-more { text-align: right; font-size: 13px; font-weight: 600; color: #e85298; }
+  @media (max-width: 640px) {
+    .v2l-hero h1 { font-size: 20px; }
+    .v2l-grid { grid-template-columns: 1fr; }
+  }
+</style>
+<div class="v2l-hero">
+  <h1>あなたにぴったりの仕事が見つかる</h1>
+  <p>全国の正社員求人を多数掲載中</p>
+  <form class="v2l-search" action="/preview/jobs" method="get">
+    <input type="search" name="q" value="${esc(search)}" placeholder="職種・勤務地・キーワードで検索">
+    <button type="submit">検索</button>
+  </form>
+</div>
+<div class="v2l-wrap">
+  <div class="v2l-count">${jobs.length}件の求人${search ? `（「${esc(search)}」の検索結果）` : ''}</div>
+  <div class="v2l-grid">${cards}</div>
+</div>`;
+
+  return publicLayout('求人情報一覧 | 採用サイト', content, {
+    description: '全国の正社員求人情報一覧。配送・物流・製造など多数掲載。'
+  });
+}
+
 // ── 新デザイン求人詳細ページ（ディンプル風・プレビュー用） ──────────
 // /preview/jobs/:id で表示。承認後に /jobs/:id へ切り替える。
 function jobDetailPageV2(job) {
@@ -1902,4 +1978,4 @@ const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx'];
 const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
 function mediaName(id) { if (id === 'all') return 'すべての媒体'; const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, jobDetailPageV2, privacyPolicyPage, esc, opsPage, callsPage };
+module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobsListPageV2, jobDetailPage, jobDetailPageV2, privacyPolicyPage, esc, opsPage, callsPage };
