@@ -44,17 +44,8 @@ const targets = db.prepare(`
   ORDER BY created_at DESC
 `).all(cutoffUTC);
 
-// is_archived=0 だが applied_at が古い（本日新着として数えられていない）ものも確認
-const misApplied = db.prepare(`
-  SELECT id, name, company, media, status, applied_at, created_at
-  FROM applicants
-  WHERE created_at >= ? AND is_archived = 0 AND applied_at < ?
-  ORDER BY created_at DESC
-`).all(cutoffUTC, todayJST);
-
-if (targets.length === 0 && misApplied.length === 0) {
-  console.log('\n本日取り込んで補正が必要な応募者はいません。');
-  // 参考: 本日の架電リスト件数を表示
+if (targets.length === 0) {
+  console.log('\n本日取り込んで過去リストにある応募者はいません。');
   const inList = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(todayJST).c;
   console.log(`現在の本日新規応募数: ${inList}件`);
   process.exit(0);
@@ -62,30 +53,15 @@ if (targets.length === 0 && misApplied.length === 0) {
 
 const nowISO = new Date().toISOString();
 
-if (targets.length > 0) {
-  console.log(`\n【過去リスト → 架電リストに移動】${targets.length}件`);
-  targets.forEach(r => console.log(`  ${r.name} | ${r.company}/${r.media} | ${r.status} | applied_at: ${r.applied_at}`));
+console.log(`\n【過去リスト → 架電リストに移動】${targets.length}件`);
+targets.forEach(r => console.log(`  ${r.name} | ${r.company}/${r.media} | ${r.status} | applied_at: ${r.applied_at}`));
 
-  const r1 = db.prepare(`
-    UPDATE applicants
-    SET is_archived = 0, is_imported = 0,
-        applied_at = ?, applied_month = ?,
-        status = '新規', updated_at = ?
-    WHERE created_at >= ? AND is_archived = 1
-  `).run(todayJST, todayJST.slice(0, 7), nowISO, cutoffUTC);
-  console.log(`✅ ${r1.changes}件を架電リストに移動しました。`);
-}
-
-if (misApplied.length > 0) {
-  console.log(`\n【applied_at補正（架電リスト内・応募日が古い）】${misApplied.length}件`);
-  misApplied.forEach(r => console.log(`  ${r.name} | ${r.company}/${r.media} | applied_at: ${r.applied_at} → ${todayJST}`));
-
-  const r2 = db.prepare(`
-    UPDATE applicants
-    SET applied_at = ?, applied_month = ?, updated_at = ?
-    WHERE created_at >= ? AND is_archived = 0 AND applied_at < ?
-  `).run(todayJST, todayJST.slice(0, 7), nowISO, cutoffUTC, todayJST);
-  console.log(`✅ ${r2.changes}件の応募日を本日に補正しました。`);
-}
-
+const r1 = db.prepare(`
+  UPDATE applicants
+  SET is_archived = 0, is_imported = 0,
+      applied_at = ?, applied_month = ?,
+      status = '新規', updated_at = ?
+  WHERE created_at >= ? AND is_archived = 1
+`).run(todayJST, todayJST.slice(0, 7), nowISO, cutoffUTC);
+console.log(`✅ ${r1.changes}件を架電リストに移動しました。`);
 console.log('\n管理画面 /admin をリロードして確認してください。');
