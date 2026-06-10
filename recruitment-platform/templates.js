@@ -954,16 +954,31 @@ function topPageV2(jobs) {
 
   const areaList = Object.entries(prefCounts)
     .sort((a, b) => b[1] - a[1])
-    .map(([p, c]) => `<a href="/preview/jobs?q=${encodeURIComponent(p)}" class="et-area">${esc(p)}<span>${c}件</span></a>`).join('');
+    .map(([p, c]) => `<details class="et-areabox">
+      <summary>${esc(p)}（${c}件）</summary>
+      <div class="et-areabox-body"><a href="/preview/jobs?q=${encodeURIComponent(p)}">${esc(p)}の求人を見る →</a></div>
+    </details>`).join('');
 
   const voices = [
-    { no: '01', meta: '配送スタッフ / 20代', text: '未経験からのスタートでしたが、研修と先輩のサポートで安心して始められました。' },
-    { no: '02', meta: '製造スタッフ / 30代', text: '人間関係のストレスゼロ！こんな職場ってあるんですね。毎日気持ちよく働けています。' },
-    { no: '03', meta: '倉庫スタッフ / 40代', text: '転職回数が多くても前向きに評価してくれる会社です。頑張りがきちんと給与に反映されます。' },
+    { no: '01', meta: '配送スタッフ / 20代男性', text: '地味じゃなくても問題なし！未経験でもご安心を♪' },
+    { no: '02', meta: '製造スタッフ / 30代男性', text: '人間関係のストレス0！こんな会社ってありますか？' },
+    { no: '03', meta: '倉庫スタッフ / 40代女性', text: '夢中になれること、僕たちと一緒に見つけませんか？' },
   ].map(v => `<div class="et-voice">
-      <div class="et-voice-no">${v.no}</div>
+      <div class="et-voice-no">${v.no}<span class="et-voice-slash"></span></div>
       <div class="et-voice-meta">${esc(v.meta)}</div>
       <div class="et-voice-text">${esc(v.text)}</div>
+      <a class="et-voice-more" href="/preview/jobs">Read More <span>→</span></a>
+    </div>`).join('');
+
+  const features = [
+    { icon: '🎓', t: '資格取得支援', d: '業務に必要な資格は費用会社負担で取得できます。フォークリフト・危険物など、キャリアに活かせる資格多数。' },
+    { icon: '🏅', t: '正社員登用制度', d: '長期的なキャリア形成が見込めます。実績・勤務態度に応じて積極的に登用しています。' },
+    { icon: '🛡️', t: '社会保険完備', d: '健康保険・厚生年金・雇用保険・労災保険を完備。安心して長く働ける環境です。' },
+    { icon: '🗾', t: '多彩な職種と勤務地', d: '配送・製造・倉庫など多彩な職種を全国で募集中。あなたに合った働き方が見つかります。' },
+  ].map(f => `<div class="et-feature">
+      <div class="et-feature-icon">${f.icon}</div>
+      <div class="et-feature-t">${esc(f.t)}</div>
+      <div class="et-feature-d">${esc(f.d)}</div>
     </div>`).join('');
 
   const flow = [
@@ -990,73 +1005,121 @@ function topPageV2(jobs) {
 
   const content = `
 <style>
-  .et-hero { position: relative; background: linear-gradient(120deg, #2e75b6 0%, #1f5fa0 100%); overflow: hidden; padding: 64px 16px 72px; }
-  .et-hero::after { content: ''; position: absolute; right: -120px; top: -60px; width: 420px; height: 420px; background: rgba(255,255,255,.08); transform: rotate(35deg); }
-  .et-hero::before { content: ''; position: absolute; right: 40px; bottom: -80px; width: 260px; height: 260px; background: rgba(242,150,0,.25); transform: rotate(25deg); }
-  .et-hero-in { max-width: 1000px; margin: 0 auto; position: relative; }
-  .et-hero-script { font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: #f8b133; font-size: 20px; margin-bottom: 10px; }
-  .et-hero h1 { color: #fff; font-size: 34px; font-weight: 800; line-height: 1.5; margin: 0 0 16px; letter-spacing: .04em; }
-  .et-hero-co { display: inline-block; background: rgba(255,255,255,.92); color: #1f5fa0; font-size: 13px; font-weight: 700; padding: 6px 18px; border-radius: 3px; }
-  .et-nav { background: #fff; border-bottom: 1px solid #e3e8ee; position: sticky; top: 0; z-index: 50; }
-  .et-nav-in { max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; }
-  .et-nav a { font-size: 13px; font-weight: 600; color: #1f5fa0; text-decoration: none; padding: 13px 16px; }
-  .et-nav a:hover { background: #eef4fa; }
-  .et-sec { max-width: 1000px; margin: 0 auto; padding: 52px 16px 8px; }
-  .et-h2 { display: flex; align-items: center; gap: 18px; justify-content: center; font-size: 23px; font-weight: 700; color: #1f5fa0; margin: 0; }
-  .et-h2::before, .et-h2::after { content: ''; height: 1px; background: #1f5fa0; flex: 0 0 70px; }
-  .et-h2sub { text-align: center; font-family: Georgia, serif; font-style: italic; color: #f29600; font-size: 14px; margin: 6px 0 30px; }
-  .et-typegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
-  .et-typecard { background: #fff; border: 1px solid #dfe6ee; border-radius: 4px; overflow: hidden; text-decoration: none; transition: box-shadow .15s; }
+  /* ヒーロー: 写真エリア＋左の青い斜めパネル */
+  .et-hero { position: relative; height: 340px; background:
+    repeating-linear-gradient(45deg, #c8d6e4 0 18px, #bccddd 18px 36px); overflow: hidden; }
+  .et-hero-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 62%; max-width: 640px;
+    background: linear-gradient(120deg, #1f5fa0 0%, #2e75b6 100%);
+    clip-path: polygon(0 0, 78% 0, 100% 100%, 0 100%); display: flex; align-items: center; }
+  .et-hero-panel::after { content: ''; position: absolute; right: 8%; top: 0; bottom: 0; width: 10px; background: #f29600; transform: skewX(-12deg); }
+  .et-hero-txt { padding: 0 18% 0 24px; }
+  .et-hero-txt h1 { color: #fff; font-size: 30px; font-weight: 800; line-height: 1.6; margin: 0 0 14px; letter-spacing: .06em; text-shadow: 0 1px 4px rgba(0,0,0,.15); }
+  .et-hero-script { font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: #f8b133; font-size: 19px; margin-bottom: 6px; }
+  .et-hero-co { display: inline-block; background: #f29600; color: #fff; font-size: 13px; font-weight: 700; padding: 6px 18px; }
+  /* ヘッダー（ロゴ＋ナビ） */
+  .et-head { background: #fff; border-bottom: 1px solid #e3e8ee; position: sticky; top: 0; z-index: 50; }
+  .et-head-in { max-width: 1040px; margin: 0 auto; display: flex; align-items: center; gap: 10px; padding: 0 16px; flex-wrap: wrap; }
+  .et-logo { font-size: 14.5px; font-weight: 800; color: #1f3f63; padding: 12px 0; margin-right: auto; white-space: nowrap; }
+  .et-nav { display: flex; flex-wrap: wrap; }
+  .et-nav a { font-size: 12.5px; font-weight: 600; color: #1f3f63; text-decoration: none; padding: 14px 12px; }
+  .et-nav a:hover { color: #2e75b6; }
+  /* セクション共通 */
+  .et-sec { max-width: 1000px; margin: 0 auto; padding: 56px 16px 8px; }
+  .et-h2 { display: flex; align-items: center; gap: 18px; justify-content: center; font-size: 24px; font-weight: 700; color: #1f5fa0; margin: 0; letter-spacing: .1em; }
+  .et-h2::before, .et-h2::after { content: ''; height: 1px; background: #1f5fa0; flex: 0 0 80px; }
+  .et-h2sub { text-align: center; font-family: Georgia, serif; font-style: italic; color: #f29600; font-size: 15px; margin: 6px 0 32px; }
+  /* 職種カード */
+  .et-typegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  .et-typecard { background: #fff; border: 1px solid #dfe6ee; overflow: hidden; text-decoration: none; transition: box-shadow .15s; }
   .et-typecard:hover { box-shadow: 0 4px 16px rgba(31,95,160,.18); }
-  .et-typecard-icon { font-size: 46px; text-align: center; padding: 26px 0 18px; background: #eef4fa; }
+  .et-typecard-icon { font-size: 48px; text-align: center; padding: 30px 0 22px; background: linear-gradient(160deg, #dde8f2, #c9d9e9); }
   .et-typecard-label { background: #f29600; color: #fff; font-size: 13.5px; font-weight: 700; padding: 9px 12px; display: flex; justify-content: space-between; }
   .et-typecard-label span { font-weight: 600; font-size: 12px; }
-  .et-areawrap { display: flex; flex-wrap: wrap; gap: 10px; }
-  .et-area { border: 1px solid #1f5fa0; color: #1f5fa0; font-size: 13.5px; font-weight: 600; padding: 9px 18px; border-radius: 3px; text-decoration: none; display: inline-flex; gap: 8px; align-items: center; background: #fff; }
-  .et-area span { color: #f29600; font-size: 12px; }
-  .et-area:hover { background: #1f5fa0; color: #fff; }
-  .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
-  .et-voice { background: #fff; border: 1px solid #dfe6ee; border-radius: 4px; padding: 22px; position: relative; }
-  .et-voice-no { font-family: Georgia, serif; font-style: italic; font-size: 34px; color: #2e75b6; font-weight: 700; line-height: 1; margin-bottom: 10px; border-bottom: 2px solid #f29600; display: inline-block; padding: 0 6px 4px 0; }
-  .et-voice-meta { font-size: 11px; color: #f29600; font-weight: 700; margin-bottom: 6px; }
-  .et-voice-text { font-size: 13.5px; color: #333; line-height: 1.9; font-weight: 600; }
+  /* エリア */
+  .et-areagrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .et-areabox { border: 1px solid #c9d4e0; background: #fff; }
+  .et-areabox summary { list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 13px 18px; font-size: 14px; font-weight: 700; color: #1f3f63; cursor: pointer; }
+  .et-areabox summary::-webkit-details-marker { display: none; }
+  .et-areabox summary::after { content: '▾'; color: #2e75b6; }
+  .et-areabox[open] summary::after { content: '▴'; }
+  .et-areabox-body { border-top: 1px solid #e3e8ee; padding: 10px 18px; font-size: 13px; }
+  .et-areabox-body a { color: #2e75b6; text-decoration: none; font-weight: 600; }
+  .et-areabox-body a:hover { text-decoration: underline; }
+  /* スタッフの一言 */
+  .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; }
+  .et-voice { padding: 6px 4px; }
+  .et-voice-no { font-family: Georgia, serif; font-style: italic; font-size: 54px; color: #2e75b6; font-weight: 700; line-height: 1; position: relative; display: inline-block; padding-right: 26px; margin-bottom: 14px; }
+  .et-voice-slash { position: absolute; right: 0; top: 4px; bottom: -4px; width: 2px; background: #f29600; transform: rotate(20deg); }
+  .et-voice-meta { display: inline-block; background: #f29600; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 10px; margin-bottom: 8px; }
+  .et-voice-text { font-size: 15px; color: #1f3f63; line-height: 1.9; font-weight: 700; margin-bottom: 14px; }
+  .et-voice-more { display: inline-flex; align-items: center; gap: 22px; border: 1px solid #1f3f63; color: #1f3f63; font-size: 12px; font-weight: 600; padding: 9px 22px; text-decoration: none; letter-spacing: .1em; }
+  .et-voice-more:hover { background: #1f3f63; color: #fff; }
+  /* 会社の特徴 */
+  .et-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .et-feature { background: #fff; border: 1px solid #dfe6ee; padding: 26px 22px; text-align: center; }
+  .et-feature-icon { font-size: 40px; margin-bottom: 10px; }
+  .et-feature-t { font-size: 15.5px; font-weight: 700; color: #1f5fa0; margin-bottom: 8px; }
+  .et-feature-d { font-size: 12.5px; color: #555; line-height: 1.9; text-align: left; }
+  /* 応募の流れ（オレンジ帯） */
+  .et-flowband { background: linear-gradient(120deg, #f29600 0%, #f8b133 100%); margin-top: 56px; padding: 44px 16px 50px; position: relative; overflow: hidden; }
+  .et-flowband::before { content: ''; position: absolute; left: -60px; top: -40px; width: 240px; height: 300px; background: rgba(255,255,255,.12); transform: rotate(18deg); }
+  .et-flowband .et-h2 { color: #fff; }
+  .et-flowband .et-h2::before, .et-flowband .et-h2::after { background: #fff; }
+  .et-flowband .et-h2sub { color: #fff; }
+  .et-flow-in { max-width: 1000px; margin: 0 auto; position: relative; }
   .et-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
-  .et-step { background: #fdf6ea; border-radius: 4px; padding: 20px 18px; text-align: center; }
+  .et-step { background: #fdf6ea; padding: 22px 18px; text-align: center; }
+  .et-step:nth-child(even) { background: #fff; }
   .et-step-no { font-family: Georgia, serif; font-style: italic; color: #f29600; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
   .et-step-t { font-size: 16px; font-weight: 700; color: #1f5fa0; margin-bottom: 8px; }
   .et-step-d { font-size: 12.5px; color: #555; line-height: 1.8; }
-  .et-faq { background: #2e75b6; border-radius: 4px; margin-bottom: 10px; overflow: hidden; }
+  /* FAQ */
+  .et-faq { background: #2e75b6; margin-bottom: 10px; overflow: hidden; }
   .et-faq summary { color: #fff; font-size: 14px; font-weight: 600; padding: 14px 18px; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 12px; }
   .et-faq summary::-webkit-details-marker { display: none; }
+  .et-faq summary::after { content: '＋'; margin-left: auto; font-weight: 700; }
+  .et-faq[open] summary::after { content: '−'; }
   .et-faq-qmark { background: #fff; color: #2e75b6; font-weight: 800; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .et-faq-a { background: #fff; border: 1px solid #2e75b6; border-top: none; padding: 14px 18px 14px 56px; font-size: 13.5px; color: #333; line-height: 1.9; }
-  .et-cta { text-align: center; padding: 50px 16px 60px; }
-  .et-cta a { display: inline-block; background: #f29600; color: #fff; font-size: 17px; font-weight: 700; padding: 16px 70px; border-radius: 4px; text-decoration: none; box-shadow: 0 2px 10px rgba(242,150,0,.3); }
-  .et-cta a:hover { background: #d98700; }
+  /* 下部CTA（青帯） */
+  .et-ctaband { background: linear-gradient(120deg, #1f5fa0, #2e75b6); margin-top: 56px; padding: 36px 16px; }
+  .et-ctaband-in { max-width: 1000px; margin: 0 auto; display: flex; gap: 16px; justify-content: flex-end; flex-wrap: wrap; }
+  .et-ctabtn { display: inline-block; border: 1.5px solid #fff; color: #fff; font-size: 14px; font-weight: 700; padding: 13px 40px; text-decoration: none; letter-spacing: .08em; }
+  .et-ctabtn:hover { background: #fff; color: #1f5fa0; }
+  .et-ctabtn.orange { background: #f29600; border-color: #f29600; }
+  .et-ctabtn.orange:hover { background: #d98700; color: #fff; }
   .et-footer { background: #1f3f63; color: #cfdbe9; font-size: 12px; text-align: center; padding: 26px 16px; }
   .et-footer a { color: #cfdbe9; text-decoration: none; margin: 0 12px; }
   @media (max-width: 640px) {
-    .et-hero h1 { font-size: 24px; }
+    .et-hero { height: 260px; }
+    .et-hero-panel { width: 86%; }
+    .et-hero-txt h1 { font-size: 22px; }
     .et-h2 { font-size: 19px; }
+    .et-ctaband-in { justify-content: center; }
   }
 </style>
 <div class="et-hero">
-  <div class="et-hero-in">
-    <div class="et-hero-script">Recruit Information</div>
-    <h1>それぞれが、<br>活躍できる場所</h1>
-    <span class="et-hero-co">${esc(companyName)}</span>
+  <div class="et-hero-panel">
+    <div class="et-hero-txt">
+      <h1>それぞれが、<br>活躍できる場所</h1>
+      <div class="et-hero-script">Recruit Information</div>
+      <span class="et-hero-co">${esc(companyName)}</span>
+    </div>
   </div>
 </div>
-<nav class="et-nav">
-  <div class="et-nav-in">
-    <a href="#type">職種から探す</a>
-    <a href="#area">エリアから探す</a>
-    <a href="#voice">スタッフからの一言</a>
-    <a href="#flow">応募の流れ</a>
-    <a href="#faq">よくある質問</a>
-    <a href="/preview/jobs">お仕事一覧</a>
+<header class="et-head">
+  <div class="et-head-in">
+    <div class="et-logo">${esc(companyName)}</div>
+    <nav class="et-nav">
+      <a href="#type">職種から探す</a>
+      <a href="#area">エリアから探す</a>
+      <a href="#voice">スタッフからの一言</a>
+      <a href="#about">会社の特徴</a>
+      <a href="#flow">応募の流れ</a>
+      <a href="#faq">よくある質問</a>
+    </nav>
   </div>
-</nav>
+</header>
 <section class="et-sec" id="type">
   <h2 class="et-h2">職種から探す</h2>
   <div class="et-h2sub">Search by job</div>
@@ -1065,24 +1128,36 @@ function topPageV2(jobs) {
 <section class="et-sec" id="area">
   <h2 class="et-h2">エリアから探す</h2>
   <div class="et-h2sub">Search by area</div>
-  <div class="et-areawrap">${areaList}</div>
+  <div class="et-areagrid">${areaList}</div>
 </section>
 <section class="et-sec" id="voice">
   <h2 class="et-h2">スタッフからの一言</h2>
   <div class="et-h2sub">Staff Message</div>
   <div class="et-voices">${voices}</div>
 </section>
-<section class="et-sec" id="flow">
-  <h2 class="et-h2">応募から採用までの流れ</h2>
-  <div class="et-h2sub">About The Flow</div>
-  <div class="et-steps">${flow}</div>
+<section class="et-sec" id="about">
+  <h2 class="et-h2">会社の特徴</h2>
+  <div class="et-h2sub">About company</div>
+  <div class="et-features">${features}</div>
 </section>
+<div class="et-flowband" id="flow">
+  <div class="et-flow-in">
+    <h2 class="et-h2">応募から採用までの流れ</h2>
+    <div class="et-h2sub">About The Flow</div>
+    <div class="et-steps">${flow}</div>
+  </div>
+</div>
 <section class="et-sec" id="faq">
   <h2 class="et-h2">よくある質問</h2>
   <div class="et-h2sub">Q and A</div>
   ${faqs}
 </section>
-<div class="et-cta"><a href="/preview/jobs">お仕事一覧へ</a></div>
+<div class="et-ctaband">
+  <div class="et-ctaband-in">
+    <a class="et-ctabtn" href="/preview/jobs">お仕事一覧へ</a>
+    <a class="et-ctabtn orange" href="/preview/jobs">応募はこちら</a>
+  </div>
+</div>
 <div class="et-footer">
   <a href="/preview/jobs">求人情報</a><a href="/privacy">プライバシーポリシー</a>
   <div style="margin-top:10px">© ${esc(companyName)} All Rights Reserved.</div>
