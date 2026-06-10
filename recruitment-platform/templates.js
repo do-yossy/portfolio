@@ -1161,7 +1161,38 @@ function topPageV2(jobs) {
 <div class="et-footer">
   <a href="/preview/jobs">求人情報</a><a href="/privacy">プライバシーポリシー</a>
   <div style="margin-top:10px">© ${esc(companyName)} All Rights Reserved.</div>
-</div>`;
+</div>
+<style>
+  /* スクロール表示アニメーション */
+  .et-reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s ease, transform .7s ease; }
+  .et-reveal.is-visible { opacity: 1; transform: none; }
+  .et-reveal-d1 { transition-delay: .1s; } .et-reveal-d2 { transition-delay: .2s; } .et-reveal-d3 { transition-delay: .3s; }
+  /* ヒーローの文字をふわっと表示 */
+  .et-hero-txt h1, .et-hero-script, .et-hero-co { opacity: 0; transform: translateY(16px); animation: etFadeUp .8s ease forwards; }
+  .et-hero-script { animation-delay: .25s; }
+  .et-hero-co { animation-delay: .5s; }
+  @keyframes etFadeUp { to { opacity: 1; transform: none; } }
+  html { scroll-behavior: smooth; }
+  .et-typecard, .et-feature, .et-step { transition: transform .25s ease, box-shadow .25s ease; }
+  .et-typecard:hover, .et-feature:hover { transform: translateY(-4px); }
+</style>
+<script>
+(function(){
+  // セクション・カードにスクロール表示アニメーションを適用
+  const targets = [];
+  document.querySelectorAll('.et-sec, .et-flowband').forEach(sec => {
+    sec.classList.add('et-reveal'); targets.push(sec);
+  });
+  document.querySelectorAll('.et-typecard, .et-voice, .et-feature, .et-step').forEach((el, i) => {
+    el.classList.add('et-reveal', 'et-reveal-d' + ((i % 3) + 1)); targets.push(el);
+  });
+  if (!('IntersectionObserver' in window)) { targets.forEach(t => t.classList.add('is-visible')); return; }
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  targets.forEach(t => io.observe(t));
+})();
+</script>`;
 
   return publicLayout(`採用情報 | ${esc(companyName)}`, content, {
     description: `${companyName}の採用情報サイト。職種・エリアから求人を探せます。`
