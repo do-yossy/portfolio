@@ -883,6 +883,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── Preview: 新デザイン求人詳細（承認後 /jobs/:id へ切り替え予定） ──
+  const previewJobMatch = pathname.match(/^\/preview\/jobs\/([^/]+)$/);
+  if (previewJobMatch && method === 'GET') {
+    const job = await Jobs.findById(previewJobMatch[1]);
+    // プレビューは未公開求人も表示可能（デザイン確認用）
+    if (!job) { send(res, 404, '<h1>求人が見つかりません</h1>'); return; }
+    send(res, 200, T.jobDetailPageV2(job));
+    return;
+  }
+
   // ── API: Apply ──
   if (pathname === '/api/apply' && method === 'POST') {
     const body = await parseJSON(req);

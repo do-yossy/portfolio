@@ -923,6 +923,221 @@ function jobDetailPage(job) {
   });
 }
 
+// ── 新デザイン求人詳細ページ（ディンプル風・プレビュー用） ──────────
+// /preview/jobs/:id で表示。承認後に /jobs/:id へ切り替える。
+function jobDetailPageV2(job) {
+  const tags = JSON.parse(job.tags || '[]');
+  const faq = JSON.parse(job.faq || '[]');
+
+  const salaryParsed = parseSalary(job.salary);
+  const salarySchema = salaryParsed ? {
+    "@type": "MonetaryAmount",
+    "currency": "JPY",
+    "value": {
+      "@type": "QuantitativeValue",
+      ...(salaryParsed.min   ? { "minValue": salaryParsed.min }   : {}),
+      ...(salaryParsed.max   ? { "maxValue": salaryParsed.max }   : {}),
+      "unitText": salaryParsed.unitText
+    }
+  } : undefined;
+
+  const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+  const jobUrl  = `${siteUrl}/jobs/${job.id}`;
+
+  const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+  const addressRegion = PREFS.find(p => job.location.includes(p)) || '';
+
+  const datePosted = (job.published_at || job.created_at || '').slice(0, 10);
+  const validThrough = job.expires_at
+    ? job.expires_at.slice(0, 10)
+    : (() => {
+        const d = new Date(datePosted || Date.now());
+        d.setDate(d.getDate() + 60);
+        return d.toISOString().slice(0, 10);
+      })();
+
+  const jsonldObj = {
+    "@context": "https://schema.org/",
+    "@type": "JobPosting",
+    "title": job.title,
+    "description": job.description,
+    "url": jobUrl,
+    "identifier": { "@type": "PropertyValue", "name": process.env.COMPANY_NAME || "採用企業", "value": job.id },
+    "datePosted": datePosted,
+    "validThrough": validThrough,
+    "directApply": true,
+    "employmentType": mapEmploymentType(job.employment_type),
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": process.env.COMPANY_NAME || "採用企業",
+      ...(process.env.SITE_URL ? { "sameAs": process.env.SITE_URL } : {})
+    },
+    "jobLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": job.location,
+        ...(addressRegion ? { "addressRegion": addressRegion } : {}),
+        "addressCountry": "JP"
+      }
+    },
+    ...(salarySchema ? { "baseSalary": salarySchema } : {})
+  };
+  const jsonld = `<script type="application/ld+json">${JSON.stringify(jsonldObj, null, 2)}<\/script>`;
+
+  // キャッチコピー（catchcopy が無ければタグ先頭3つから生成）
+  const catchcopy = job.catchcopy || tags.slice(0, 3).join('・');
+
+  // ここがポイント: タグを箇条書きで表示
+  const pointsHtml = tags.length > 0
+    ? `<div class="v2-points">
+        <div class="v2-points-title">ここがポイント</div>
+        <ul>${tags.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+      </div>`
+    : '';
+
+  const faqHtml = faq.length > 0
+    ? `<section class="v2-section">
+        <h2 class="v2-h2">よくある質問</h2>
+        ${faq.map(f => `
+          <div class="v2-faq-item">
+            <div class="v2-faq-q">Q. ${esc(f.q)}</div>
+            <div class="v2-faq-a">A. ${esc(f.a)}</div>
+          </div>`).join('')}
+      </section>`
+    : '';
+
+  const imageHtml = job.image_url
+    ? `<div class="v2-image"><img src="${esc(job.image_url)}" alt="${esc(job.title)}"></div>`
+    : '';
+
+  const content = `
+<style>
+  .v2-wrap { max-width: 920px; margin: 0 auto; padding: 16px 16px 120px; }
+  .v2-breadcrumb { font-size: 12px; color: #8a8a8a; margin-bottom: 18px; line-height: 1.8; }
+  .v2-breadcrumb a { color: #8a8a8a; text-decoration: none; }
+  .v2-breadcrumb a:hover { text-decoration: underline; }
+  .v2-card { background: #fff; border-radius: 14px; padding: 32px 36px; box-shadow: 0 2px 14px rgba(0,0,0,.06); }
+  .v2-jobnum { text-align: right; font-size: 12px; color: #9a9a9a; margin-bottom: 8px; }
+  .v2-badge { display: inline-block; background: #e85298; color: #fff; font-size: 12px; font-weight: 600; padding: 4px 14px; border-radius: 4px; margin-bottom: 14px; }
+  .v2-catch { font-size: 14px; color: #555; margin-bottom: 8px; }
+  .v2-title { font-size: 26px; font-weight: 700; line-height: 1.45; color: #222; margin: 0 0 22px; padding-bottom: 20px; border-bottom: 1px dashed #ccc; }
+  .v2-image { margin: 20px 0; }
+  .v2-image img { max-width: 400px; width: 100%; border-radius: 8px; }
+  .v2-meta { margin: 22px 0; }
+  .v2-meta-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; font-size: 15px; color: #333; }
+  .v2-meta-icon { color: #e85298; width: 22px; text-align: center; flex-shrink: 0; }
+  .v2-meta-row strong { color: #e85298; }
+  .v2-points { background: #fdf0f6; border-radius: 10px; padding: 20px 24px; margin: 24px 0; }
+  .v2-points-title { font-weight: 700; font-size: 16px; color: #333; border-left: 4px solid #e85298; padding-left: 10px; margin-bottom: 12px; }
+  .v2-points ul { margin: 0; padding-left: 20px; }
+  .v2-points li { font-size: 14px; color: #444; line-height: 2; }
+  .v2-section { margin-top: 30px; }
+  .v2-h2 { font-size: 18px; font-weight: 700; color: #333; border-left: 4px solid #e85298; padding-left: 10px; margin-bottom: 14px; }
+  .v2-desc { font-size: 14.5px; line-height: 2; color: #3a3a3a; white-space: pre-wrap; }
+  .v2-faq-item { margin-bottom: 16px; }
+  .v2-faq-q { font-weight: 700; color: #e85298; margin-bottom: 4px; font-size: 14.5px; }
+  .v2-faq-a { font-size: 14px; color: #444; line-height: 1.9; }
+  .v2-applybar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.97); border-top: 1px solid #eee; box-shadow: 0 -4px 16px rgba(0,0,0,.07); padding: 12px 16px; display: flex; gap: 12px; justify-content: center; z-index: 100; }
+  .v2-btn-keep { flex: 0 1 220px; text-align: center; padding: 14px 10px; border: 1.5px solid #e85298; color: #e85298; border-radius: 8px; font-weight: 600; font-size: 15px; background: #fff; cursor: pointer; }
+  .v2-btn-entry { flex: 0 1 380px; text-align: center; padding: 14px 10px; background: #e85298; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 15px; cursor: pointer; }
+  .v2-btn-entry:hover { background: #d33f85; }
+  .v2-apply { background: #fdf0f6; border-radius: 14px; padding: 28px 32px; margin-top: 36px; }
+  .v2-apply h2 { font-size: 18px; color: #333; margin-bottom: 6px; }
+  .v2-apply p { font-size: 13px; color: #666; margin-bottom: 18px; }
+  @media (max-width: 640px) {
+    .v2-card { padding: 22px 18px; }
+    .v2-title { font-size: 20px; }
+  }
+</style>
+<div class="v2-wrap">
+  <div class="v2-breadcrumb">
+    <a href="/jobs">お仕事をお探しの方 TOP</a> ＞
+    <a href="/jobs?q=${encodeURIComponent(job.location)}">${esc(job.location)}</a> ＞
+    <a href="/jobs?q=${encodeURIComponent(job.job_type)}">${esc(job.job_type)}</a> ＞
+    ${esc(job.title)}
+  </div>
+  <div class="v2-card">
+    <div class="v2-jobnum">お仕事ナンバー: ${esc(job.id.slice(0, 12))}</div>
+    <span class="v2-badge">${esc(job.employment_type)}</span>
+    ${catchcopy ? `<div class="v2-catch">${esc(catchcopy)}</div>` : ''}
+    <h1 class="v2-title">${esc(job.title)}</h1>
+    ${imageHtml}
+    <div class="v2-meta">
+      <div class="v2-meta-row"><span class="v2-meta-icon">💼</span><span>${esc(job.job_type)}</span></div>
+      <div class="v2-meta-row"><span class="v2-meta-icon">📍</span><span>${esc(job.location)}</span></div>
+      <div class="v2-meta-row"><span class="v2-meta-icon">￥</span><strong>${esc(job.salary)}</strong></div>
+    </div>
+    ${pointsHtml}
+    <section class="v2-section">
+      <h2 class="v2-h2">仕事内容</h2>
+      <div class="v2-desc">${esc(job.description)}</div>
+    </section>
+    ${faqHtml}
+    <div id="apply-wrap" class="v2-apply">
+      <h2>この求人にエントリーする</h2>
+      <p>必要事項を入力して送信してください。担当者より3営業日以内にご連絡いたします。</p>
+      <form id="apply-form">
+        <input type="hidden" name="jobId" value="${job.id}">
+        <input type="hidden" name="jobTitle" value="${esc(job.title)}">
+        <input type="hidden" name="sourceMedia" id="apply-source-media" value="direct">
+        <div class="form-row">
+          <div class="form-group">
+            <label>お名前<span class="req">*</span></label>
+            <input type="text" name="name" required placeholder="山田 太郎">
+          </div>
+          <div class="form-group">
+            <label>電話番号<span class="req">*</span></label>
+            <input type="tel" name="phone" required placeholder="090-0000-0000">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>メールアドレス<span class="req">*</span></label>
+            <input type="email" name="email" required placeholder="taro@example.com">
+          </div>
+          <div class="form-group">
+            <label>年齢</label>
+            <input type="number" name="age" placeholder="25" min="15" max="99">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>住所</label>
+          <input type="text" name="address" placeholder="東京都新宿区...">
+        </div>
+        <div class="form-group">
+          <label>メッセージ（任意）</label>
+          <textarea name="notes" rows="3" placeholder="志望動機・質問等があればご記入ください"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-full" style="background:#e85298;border-color:#e85298">エントリーする</button>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="v2-applybar">
+  <button class="v2-btn-keep" onclick="alert('キープ機能は準備中です')">♡ キープ</button>
+  <button class="v2-btn-entry" onclick="document.getElementById('apply-wrap').scrollIntoView({behavior:'smooth'})">✈ この求人にエントリーする</button>
+</div>
+<script>
+(function(){
+  const field = document.getElementById('apply-source-media');
+  if (!field) return;
+  const params = new URLSearchParams(window.location.search);
+  const utmSource = (params.get('utm_source') || '').toLowerCase();
+  const ref = (document.referrer || '').toLowerCase();
+  if (utmSource.includes('google') || ref.includes('google.com')) {
+    field.value = 'google';
+  }
+})();
+</script>`;
+
+  return publicLayout(`${esc(job.title)} | 求人詳細`, content, {
+    description: `${job.location}・${job.salary}・${job.employment_type}。${job.description.slice(0, 100)}`,
+    jsonld,
+    canonical: `${siteUrl}/jobs/${job.id}`
+  });
+}
+
 function mapEmploymentType(t) {
   const m = { '正社員': 'FULL_TIME', 'パート・アルバイト': 'PART_TIME', '契約社員': 'CONTRACTOR', '派遣社員': 'TEMPORARY', '業務委託': 'OTHER' };
   return m[t] || 'OTHER';
@@ -1687,4 +1902,4 @@ const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx'];
 const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
 function mediaName(id) { if (id === 'all') return 'すべての媒体'; const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, privacyPolicyPage, esc, opsPage, callsPage };
+module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, jobDetailPageV2, privacyPolicyPage, esc, opsPage, callsPage };
