@@ -27,14 +27,14 @@ const fs   = require('fs');
 
 const { db } = require('../db');
 
-// JST midnight → UTC
+// JST 05:00 → UTC（前日20:00 UTC）を基準にする
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const nowMs = Date.now();
 const todayJST = new Date(nowMs + JST_OFFSET_MS).toISOString().slice(0, 10); // 'YYYY-MM-DD' in JST
-const todayMidnightUTC = new Date(todayJST + 'T00:00:00+09:00').toISOString(); // JST midnight in UTC
+const cutoffUTC = new Date(todayJST + 'T05:00:00+09:00').toISOString(); // JST 05:00 in UTC
 
-console.log(`日本時間 ${todayJST} に取り込まれた応募者を対象に検索します...`);
-console.log(`(UTC基準: ${todayMidnightUTC} 以降)`);
+console.log(`日本時間 ${todayJST} 05:00以降に取り込まれた応募者を対象に検索します...`);
+console.log(`(UTC基準: ${cutoffUTC} 以降)`);
 
 // 本日JST created_at で is_archived=1 の応募者を確認
 const targets = db.prepare(`
@@ -42,7 +42,7 @@ const targets = db.prepare(`
   FROM applicants
   WHERE created_at >= ? AND is_archived = 1
   ORDER BY created_at DESC
-`).all(todayMidnightUTC);
+`).all(cutoffUTC);
 
 // is_archived=0 だが applied_at が古い（本日新着として数えられていない）ものも確認
 const misApplied = db.prepare(`
@@ -50,7 +50,7 @@ const misApplied = db.prepare(`
   FROM applicants
   WHERE created_at >= ? AND is_archived = 0 AND applied_at < ?
   ORDER BY created_at DESC
-`).all(todayMidnightUTC, todayJST);
+`).all(cutoffUTC, todayJST);
 
 if (targets.length === 0 && misApplied.length === 0) {
   console.log('\n本日取り込んで補正が必要な応募者はいません。');
@@ -72,7 +72,7 @@ if (targets.length > 0) {
         applied_at = ?, applied_month = ?,
         status = '新規', updated_at = ?
     WHERE created_at >= ? AND is_archived = 1
-  `).run(todayJST, todayJST.slice(0, 7), nowISO, todayMidnightUTC);
+  `).run(todayJST, todayJST.slice(0, 7), nowISO, cutoffUTC);
   console.log(`✅ ${r1.changes}件を架電リストに移動しました。`);
 }
 
@@ -84,7 +84,7 @@ if (misApplied.length > 0) {
     UPDATE applicants
     SET applied_at = ?, applied_month = ?, updated_at = ?
     WHERE created_at >= ? AND is_archived = 0 AND applied_at < ?
-  `).run(todayJST, todayJST.slice(0, 7), nowISO, todayMidnightUTC, todayJST);
+  `).run(todayJST, todayJST.slice(0, 7), nowISO, cutoffUTC, todayJST);
   console.log(`✅ ${r2.changes}件の応募日を本日に補正しました。`);
 }
 
