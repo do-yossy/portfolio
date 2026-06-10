@@ -360,8 +360,10 @@ function companyFullName(id) {
 // 新規応募者タブ統計
 async function opsNewStats() {
   const { db } = require('./db');
-  const today = new Date().toISOString().slice(0, 10);
-  const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
+  // 日付はJST（UTC+9）基準。UTC基準だと日本の0:00〜8:59に前日扱いになる
+  const JST = 9 * 60 * 60 * 1000;
+  const today = new Date(Date.now() + JST).toISOString().slice(0, 10);
+  const monday = (() => { const d = new Date(Date.now() + JST); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
   // 「本日の新規応募」は applied_at（応募日）基準でカウント。
   // バックログ取込は applied_at が過去日付になるため自動的に除外される。
   const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(today).c;

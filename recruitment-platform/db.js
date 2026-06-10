@@ -721,7 +721,7 @@ const Ops = {
     const conds = ['is_archived = 0'];
     const vals = [];
     if (activeOnly) conds.push(`status IN (${ACTIVE_CALL_STATUSES.map(() => '?').join(',')})`), vals.push(...ACTIVE_CALL_STATUSES);
-    if (todayOnly) { conds.push('applied_at >= ?'); vals.push(new Date().toISOString().slice(0, 10)); }
+    if (todayOnly) { conds.push('applied_at >= ?'); vals.push(new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)); } // JST基準
     let q = 'SELECT company, media, COUNT(*) as c FROM applicants';
     if (conds.length) q += ' WHERE ' + conds.join(' AND ');
     q += ' GROUP BY company, media';
