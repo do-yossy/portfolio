@@ -20,6 +20,11 @@ body{font-family:'Noto Sans JP',system-ui,sans-serif;background:var(--bg);color:
 .ingest{display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap}
 .ingest textarea{flex:1;min-width:240px;min-height:42px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.78rem;padding:.5rem}
 .ingest select{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.78rem;padding:.5rem;align-self:flex-start}
+.ingest input{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.78rem;padding:.5rem;align-self:flex-start;width:130px}
+.search{margin:0 0 .7rem;display:flex;align-items:center;gap:.6rem}
+.search input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:.9rem;padding:.6rem .8rem}
+.search input:focus{outline:none;border-color:var(--cyan)}
+.qhit{font-size:.78rem;color:var(--cyan);white-space:nowrap;font-weight:700}
 .board{display:grid;grid-template-columns:repeat(7,minmax(170px,1fr));gap:.55rem;overflow-x:auto;padding-bottom:1rem}
 .col{background:var(--surface);border:1px solid var(--border);border-radius:11px;min-height:120px}
 .col-h{padding:.5rem .6rem;border-bottom:1px solid var(--border)}.col-h .n{font-size:.76rem;font-weight:700}.col-h .w{font-size:.58rem;color:var(--text3)}.col-h .m{font-size:.64rem;color:var(--text2);margin-top:.2rem}
@@ -63,9 +68,11 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
   <div class="ingest">
     <textarea id="ingest" placeholder="案件の募集本文を貼り付け（1回＝1案件）。複数まとめる時だけ、案件の間に @@@ だけの行を入れて区切る → 候補に取込"></textarea>
     <select id="i_source" title="取込元の媒体（手数料計算に使用）"><option value="lancers">ランサーズ</option><option value="coconala">ココナラ</option><option value="crowdworks">CW</option></select>
+    <input id="i_ref" placeholder="案件No(任意)" title="案件ナンバー（任意）" autocomplete="off">
     <button class="btn" onclick="ingest()">候補に取込</button>
   </div>
   <div class="inbox" id="inbox"></div>
+  <div class="search"><input id="q" type="search" placeholder="🔍 案件をワード検索（候補・応募・打ち合わせ…タイトル/客名/メモ/媒体/種別/本文）" autocomplete="off"><span class="qhit" id="qhit"></span></div>
   <div class="board" id="board"></div>
 </div>
 
@@ -85,6 +92,7 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
     <div class="f"><label>優先度</label><select id="m_priority"><option>S</option><option>A</option><option>B</option></select></div>
     <div class="f"><label>スコア</label><input type="number" id="m_score" value="0"></div>
   </div>
+  <div class="f"><label>案件No（任意）</label><input id="m_ref" placeholder="例：12345 / 自分の管理番号"></div>
   <div class="f"><label>メール（任意・✉️返信のメール作成で使用）</label><input id="m_email" type="email" placeholder="client@example.com"></div>
   <div class="f"><label>次アクション</label><input id="m_na"></div>
   <div class="f"><label>メモ</label><textarea id="m_notes"></textarea></div>
@@ -100,7 +108,10 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
 const $=id=>document.getElementById(id);
 const yen=n=>'¥'+Math.round(n||0).toLocaleString('ja-JP');
 const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-let STAGES=[], DEALS=[];
+let STAGES=[], DEALS=[], Q='';
+const _SRCJP={lancers:'ランサーズ',coconala:'ココナラ',crowdworks:'クラウドワークス',cwtech:'CWテック',lp:'LP'};
+function searchText(d){const sl=(STAGES.find(s=>s.key===d.stage)||{}).label||'';return [d.ref,d.title,d.client,d.industry,d.email,d.type,d.source,_SRCJP[d.source],d.notes,d.next_action,d.raw,d.priority,sl].filter(Boolean).join(' ').toLowerCase();}
+function match(d){return !Q||searchText(d).includes(Q);}
 const api=(u,o={})=>fetch(u,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...o}).then(r=>{if(r.status===401){location.href='/login';throw 0}return r.json()});
 
 async function load(){
@@ -121,7 +132,7 @@ function card(d){
   const i=STAGES.findIndex(s=>s.key===d.stage);
   return `<div class="card ${isIn?'in':''}">
     <div class="t">${esc(d.title)}</div>
-    <div class="tags"><span class="tag">${src}</span><span class="tag">${esc(d.type)}</span>${d.priority?`<span class="tag ${d.priority}">${d.priority}</span>`:''}${d.score?`<span class="tag">${d.score}点</span>`:''}</div>
+    <div class="tags">${d.ref?`<span class="tag" title="案件No">No.${esc(d.ref)}</span>`:''}<span class="tag">${src}</span><span class="tag">${esc(d.type)}</span>${d.priority?`<span class="tag ${d.priority}">${d.priority}</span>`:''}${d.score?`<span class="tag">${d.score}点</span>`:''}</div>
     <div class="amt">${yen(d.amount)}${d.maintenance?` <span style="font-size:.58rem;color:var(--green)">+保守${yen(d.maintenance)}</span>`:''}</div>
     ${d.email?`<div class="na">✉ ${esc(d.email)}</div>`:''}
     ${d.next_action?`<div class="na"><b style="color:var(--cyan)">次:</b> ${esc(d.next_action)}</div>`:''}
@@ -139,11 +150,12 @@ function card(d){
 }
 function renderBoard(){
   $('board').innerHTML=STAGES.map(st=>{
-    const items=DEALS.filter(d=>d.stage===st.key);
+    const items=DEALS.filter(d=>d.stage===st.key && match(d));
     const sum=items.reduce((s,d)=>s+(d.amount||0),0);
     return `<div class="col"><div class="col-h"><div class="n">${st.label}</div><div class="w">${st.who} ${st.key!=='won'&&st.key!=='lead'?'・着地'+Math.round(st.prob*100)+'%':''}</div><div class="m">${items.length}件 ・ ${yen(sum)}</div></div>
-     <div class="col-b">${items.length?items.map(card).join(''):'<div class="empty">—</div>'}</div></div>`;
+     <div class="col-b">${items.length?items.map(card).join(''):`<div class="empty">${Q?'該当なし':'—'}</div>`}</div></div>`;
   }).join('');
+  const qh=$('qhit'); if(qh){ qh.textContent=Q?`🔍 ${DEALS.filter(match).length}件ヒット`:''; }
 }
 const NEXT={lead:{to:'applied',label:'✅ 応募する'},applied:{to:'meeting',label:'💬 打合せへ'},meeting:{to:'build',label:'🛠 着手OK'},build:{to:'qa',label:'🔍 チェックへ'},qa:{to:'deliver',label:'📦 納品へ'},deliver:{to:'won',label:'🎉 受注/完了'}};
 function renderInbox(){
@@ -158,15 +170,15 @@ function renderInbox(){
 async function adv(id){ await api('/api/deals/'+id+'/advance',{method:'POST'}); load(); }
 async function delDeal(id){ if(!confirm('この案件を削除しますか？'))return; await api('/api/deals/'+id,{method:'DELETE'}); load(); }
 async function setStage(id,stage){ await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify({stage})}); load(); }
-async function ingest(){ const t=$('ingest').value.trim(); if(!t)return; const src=$('i_source').value; const items=t.split(/\n[ \t]*@{3,}[ \t]*\n/).map(x=>({text:x.trim(),source:src})).filter(x=>x.text); const ta=$('ingest'); const keep=ta.value; ta.disabled=true; ta.value='⏳ 採点＋提案文＋成果物を生成中…（30秒ほど）'; try{ const r=await api('/api/ingest',{method:'POST',body:JSON.stringify({items})}); ta.value=''; alert(r.created+'件を候補に追加しました（📝ボタンで提案文＋成果物を確認）'); load(); }catch(e){ ta.value=keep; } finally{ ta.disabled=false; } }
+async function ingest(){ const t=$('ingest').value.trim(); if(!t)return; const src=$('i_source').value; const ref=$('i_ref').value.trim(); const items=t.split(/\n[ \t]*@{3,}[ \t]*\n/).map(x=>({text:x.trim(),source:src,ref})).filter(x=>x.text); const ta=$('ingest'); const keep=ta.value; ta.disabled=true; ta.value='⏳ 採点＋提案文＋成果物を生成中…（30秒ほど）'; try{ const r=await api('/api/ingest',{method:'POST',body:JSON.stringify({items})}); ta.value=''; $('i_ref').value=''; alert(r.created+'件を候補に追加しました（📝ボタンで提案文＋成果物を確認）'); load(); }catch(e){ ta.value=keep; } finally{ ta.disabled=false; } }
 
 function ov(s){ $('ov').classList.toggle('show',s); }
 function fillStages(){ $('m_stage').innerHTML=STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('')+'<option value="lost">失注</option>'; }
-function openAdd(){ fillStages(); $('mt').textContent='案件を追加'; ['m_id','m_title','m_na','m_notes','m_email'].forEach(i=>$(i).value=''); $('m_amount').value=0;$('m_score').value=0;$('m_source').value='lancers';$('m_type').value='LP';$('m_priority').value='A';$('m_stage').value='lead'; ov(true); }
-function edit(id){ const d=DEALS.find(x=>x.id===id); if(!d)return; fillStages(); $('mt').textContent='案件を編集'; $('m_id').value=d.id;$('m_title').value=d.title||'';$('m_source').value=d.source;$('m_type').value=d.type;$('m_amount').value=d.amount||0;$('m_stage').value=d.stage;$('m_priority').value=d.priority||'A';$('m_score').value=d.score||0;$('m_na').value=d.next_action||'';$('m_notes').value=d.notes||'';$('m_email').value=d.email||''; ov(true); }
+function openAdd(){ fillStages(); $('mt').textContent='案件を追加'; ['m_id','m_title','m_na','m_notes','m_email','m_ref'].forEach(i=>$(i).value=''); $('m_amount').value=0;$('m_score').value=0;$('m_source').value='lancers';$('m_type').value='LP';$('m_priority').value='A';$('m_stage').value='lead'; ov(true); }
+function edit(id){ const d=DEALS.find(x=>x.id===id); if(!d)return; fillStages(); $('mt').textContent='案件を編集'; $('m_id').value=d.id;$('m_title').value=d.title||'';$('m_source').value=d.source;$('m_type').value=d.type;$('m_amount').value=d.amount||0;$('m_stage').value=d.stage;$('m_priority').value=d.priority||'A';$('m_score').value=d.score||0;$('m_na').value=d.next_action||'';$('m_notes').value=d.notes||'';$('m_email').value=d.email||'';$('m_ref').value=d.ref||''; ov(true); }
 async function saveDeal(){
   const id=$('m_id').value;
-  const body={title:$('m_title').value,source:$('m_source').value,type:$('m_type').value,amount:+$('m_amount').value,stage:$('m_stage').value,priority:$('m_priority').value,score:+$('m_score').value,next_action:$('m_na').value,notes:$('m_notes').value,email:$('m_email').value.trim()};
+  const body={title:$('m_title').value,source:$('m_source').value,type:$('m_type').value,amount:+$('m_amount').value,stage:$('m_stage').value,priority:$('m_priority').value,score:+$('m_score').value,next_action:$('m_na').value,notes:$('m_notes').value,email:$('m_email').value.trim(),ref:$('m_ref').value.trim()};
   if(id) await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify(body)});
   else await api('/api/deals',{method:'POST',body:JSON.stringify(body)});
   ov(false); load();
@@ -192,6 +204,7 @@ async function genReply(){ const msg=$('rmsg').value.trim(); if(!msg){ alert('�
   $('ptext').textContent=_ptext; setMail(DEALS.find(x=>x.id===_rid)); }
 async function genAll(){ if(!confirm('提案文が空の全カードに、提案文＋成果物を一括生成します（無料・種別も再判定）。よろしいですか？'))return; const r=await api('/api/generate-all',{method:'POST'}); alert((r.generated||0)+'件に生成しました。📝で提案文＋成果物、📄内容で募集本文を確認できます'); load(); }
 function copyP(){ navigator.clipboard?.writeText(_ptext); }
+$('q').addEventListener('input',e=>{Q=e.target.value.trim().toLowerCase();renderBoard();});
 load();
 </script>
 </body>
