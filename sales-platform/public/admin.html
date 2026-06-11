@@ -52,52 +52,38 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
 .irow .am{color:var(--gold);font-weight:700;margin-left:.4rem}.irow .act{display:flex;gap:.3rem;flex-wrap:wrap}
 .inbox-h.nh{color:var(--cyan)}.irow.clk{cursor:pointer}.irow.clk:hover{background:var(--surface2)}
 .tag.new,.irow .st.new{background:var(--green);color:#04210f;font-weight:800}
-.tabs{display:flex;gap:.2rem;margin:0 0 .8rem;border-bottom:1px solid var(--border2);flex-wrap:wrap}
-.tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text2);font-family:inherit;font-size:.82rem;font-weight:700;padding:.5rem .75rem;cursor:pointer}
-.tab:hover{color:var(--text)}.tab.on{color:var(--text);border-bottom-color:var(--accent)}
-.tbadge{display:inline-block;min-width:1rem;padding:.02rem .32rem;background:var(--green);color:#04210f;border-radius:99px;font-size:.62rem;margin-left:.3rem;text-align:center}
-.tbadge:empty{display:none}
-.ihint{font-size:.72rem;color:var(--text2);margin:.5rem .1rem}
+.bell{position:relative;background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:7px;font-size:1rem;line-height:1;padding:.4rem .55rem;cursor:pointer}
+.bell:hover{border-color:var(--accent)}.bell.has{border-color:var(--red)}
+.bdot{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;background:var(--red);color:#fff;border-radius:99px;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+.bdot:empty{display:none}
+.npop{position:fixed;top:54px;right:1.1rem;width:min(380px,92vw);max-height:72vh;overflow:auto;background:var(--surface);border:1px solid var(--border2);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);z-index:60;display:none}
+.npop.show{display:block}.npop .inbox-h{position:sticky;top:0;background:var(--surface);z-index:1}
 @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.kpi.goal{grid-column:span 3}}
 </style>
 </head>
 <body>
 <div class="top">
   <div class="brand">Social<span>.</span>Quality 管制塔<small>営業バックエンド（DB連携・本格システム）</small></div>
-  <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
+    <button class="bell" id="bell" onclick="toggleNew(event)" title="新着（直近48時間）">🔔<span class="bdot" id="bdot"></span></button>
     <button class="btn" onclick="openAdd()">＋案件</button>
     <button class="btn" onclick="genAll()">✨全件生成</button>
     <button class="btn btn-ghost" onclick="load()">↻ 更新</button>
     <a class="btn btn-ghost" href="/logout">ログアウト</a>
   </div>
 </div>
+<div class="npop" id="npop"></div>
 <div class="wrap">
-  <div class="tabs">
-    <button class="tab" id="tab-t-new" onclick="showTab('t-new')">🔔 新着・アクション<span class="tbadge" id="tb_new"></span></button>
-    <button class="tab" id="tab-t-board" onclick="showTab('t-board')">📋 案件ボード</button>
-    <button class="tab" id="tab-t-ingest" onclick="showTab('t-ingest')">📥 取込</button>
-    <button class="tab" id="tab-t-kpi" onclick="showTab('t-kpi')">📊 成績</button>
+  <div class="kpis" id="kpis"></div>
+  <div class="ingest">
+    <textarea id="ingest" placeholder="案件の募集本文を貼り付け（1回＝1案件）。複数まとめる時だけ、案件の間に @@@ だけの行を入れて区切る → 候補に取込"></textarea>
+    <select id="i_source" title="取込元の媒体（手数料計算に使用）"><option value="lancers">ランサーズ</option><option value="coconala">ココナラ</option><option value="crowdworks">CW</option></select>
+    <input id="i_ref" placeholder="案件No(任意)" title="案件ナンバー（任意）" autocomplete="off">
+    <button class="btn" onclick="ingest()">候補に取込</button>
   </div>
-  <div class="tabp" id="t-new">
-    <div class="inbox" id="newbox"></div>
-    <div class="inbox" id="inbox"></div>
-  </div>
-  <div class="tabp" id="t-board" hidden>
-    <div class="search"><input id="q" type="search" placeholder="🔍 案件をワード検索（候補・応募・打ち合わせ…タイトル/客名/メモ/媒体/種別/本文）" autocomplete="off"><span class="qhit" id="qhit"></span></div>
-    <div class="board" id="board"></div>
-  </div>
-  <div class="tabp" id="t-ingest" hidden>
-    <div class="ingest">
-      <textarea id="ingest" placeholder="案件の募集本文を貼り付け（1回＝1案件）。複数まとめる時だけ、案件の間に @@@ だけの行を入れて区切る → 候補に取込"></textarea>
-      <select id="i_source" title="取込元の媒体（手数料計算に使用）"><option value="lancers">ランサーズ</option><option value="coconala">ココナラ</option><option value="crowdworks">CW</option></select>
-      <input id="i_ref" placeholder="案件No(任意)" title="案件ナンバー（任意）" autocomplete="off">
-      <button class="btn" onclick="ingest()">候補に取込</button>
-    </div>
-    <p class="ihint">貼り付けて「候補に取込」→ 採点に加えて<b>返信/提案文の下書きまで自動作成</b>します（1件30秒ほどで順に完成）。できあがった下書きは <b>🔔新着・アクション</b> の「📝下書きあり」から開けます。</p>
-  </div>
-  <div class="tabp" id="t-kpi" hidden>
-    <div class="kpis" id="kpis"></div>
-  </div>
+  <div class="inbox" id="inbox"></div>
+  <div class="search"><input id="q" type="search" placeholder="🔍 案件をワード検索（候補・応募・打ち合わせ…タイトル/客名/メモ/媒体/種別/本文）" autocomplete="off"><span class="qhit" id="qhit"></span></div>
+  <div class="board" id="board"></div>
 </div>
 
 <div class="ov" id="ov"><div class="modal">
@@ -159,7 +145,7 @@ function card(d){
   const i=STAGES.findIndex(s=>s.key===d.stage);
   return `<div class="card ${isIn?'in':''}">
     <div class="t">${esc(d.title)}</div>
-    <div class="tags">${isNew(d)?'<span class="tag new">NEW</span>':''}${d.ref?`<span class="tag" title="案件No">No.${esc(d.ref)}</span>`:''}<span class="tag">${src}</span><span class="tag">${esc(d.type)}</span>${d.priority?`<span class="tag ${d.priority}">${d.priority}</span>`:''}${d.score?`<span class="tag">${d.score}点</span>`:''}</div>
+    <div class="tags">${+d.needs_reply===1?'<span class="tag" style="background:rgba(232,69,69,.2);color:var(--red);font-weight:800">要返信</span>':''}${isNew(d)?'<span class="tag new">NEW</span>':''}${d.ref?`<span class="tag" title="案件No">No.${esc(d.ref)}</span>`:''}<span class="tag">${src}</span><span class="tag">${esc(d.type)}</span>${d.priority?`<span class="tag ${d.priority}">${d.priority}</span>`:''}${d.score?`<span class="tag">${d.score}点</span>`:''}</div>
     <div class="amt">${yen(d.amount)}${d.maintenance?` <span style="font-size:.58rem;color:var(--green)">+保守${yen(d.maintenance)}</span>`:''}</div>
     ${d.email?`<div class="na">✉ ${esc(d.email)}</div>`:''}
     ${d.next_action?`<div class="na"><b style="color:var(--cyan)">次:</b> ${esc(d.next_action)}</div>`:''}
@@ -184,18 +170,25 @@ function renderBoard(){
   const qh=$('qhit'); if(qh){ qh.textContent=Q?`🔍 ${DEALS.filter(match).length}件ヒット`:''; }
 }
 function renderNew(){
-  const items=DEALS.filter(isNew).sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
   const sn=k=>(STAGES.find(s=>s.key===k)||{}).label||k;
-  $('newbox').innerHTML=`<div class="inbox-h nh">🔔 新着（Gmail案件・LP問い合わせ）<span>${items.length}件 ・ 直近48時間</span></div>`+
-    (items.length?items.map(d=>{const src=_SRCJP[d.source]||d.source;const hasDraft=!!(d.proposal||'').trim();const act=d.source==='lp'?`reply('${d.id}')`:(hasDraft?`prop('${d.id}')`:`edit('${d.id}')`);
-      return `<div class="irow clk" onclick="${act}"><div class="m2"><span class="st new">NEW</span><span class="st">${esc(src)}</span><b>${esc(d.title)}</b><span class="am">${yen(d.amount)}</span>${hasDraft?'<span class="st" style="background:rgba(34,197,94,.16);color:var(--green)">📝下書きあり</span>':'<span class="st">⏳下書き作成中</span>'}<span style="font-size:.62rem;color:var(--text2);margin-left:.45rem">${sn(d.stage)}・${tago(d.created_at)}</span></div></div>`;
-    }).join(''):'<div class="empty" style="padding:.7rem .8rem">直近48時間の新着はありません。</div>');
-  const tb=$('tb_new'); if(tb) tb.textContent=items.length?String(items.length):'';
+  const reply=DEALS.filter(d=>+d.needs_reply===1).sort((a,b)=>Date.parse(b.updated_at||b.created_at||0)-Date.parse(a.updated_at||a.created_at||0));
+  const fresh=DEALS.filter(d=>isNew(d)&&+d.needs_reply!==1).sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
+  // バッジ＝「要返信」件数（要返信が無ければ非表示）
+  const bd=$('bdot'); if(bd) bd.textContent=reply.length?(reply.length>9?'9+':String(reply.length)):'';
+  const bell=$('bell'); if(bell) bell.classList.toggle('has',reply.length>0);
+  const draftTag=d=>(d.proposal||'').trim()?'<span class="st" style="background:rgba(34,197,94,.16);color:var(--green)">📝下書きあり</span>':'<span class="st">⏳下書き作成中</span>';
+  const replyRows=reply.length?reply.map(d=>{const src=_SRCJP[d.source]||d.source;
+    return `<div class="irow"><div class="m2 clk" onclick="closeNew();reply('${d.id}')" style="cursor:pointer;flex:1"><span class="st" style="background:rgba(232,69,69,.18);color:var(--red);font-weight:800">要返信</span><span class="st">${esc(src)}</span><b>${esc(d.title)}</b>${draftTag(d)}<span style="font-size:.62rem;color:var(--text2);margin-left:.45rem">${tago(d.updated_at||d.created_at)}</span></div><div class="act"><button class="mini" onclick="event.stopPropagation();markReplied('${d.id}')">✓返信済み</button></div></div>`;
+  }).join(''):'<div class="empty" style="padding:.7rem .8rem">要返信はありません。</div>';
+  const freshRows=fresh.length?fresh.map(d=>{const src=_SRCJP[d.source]||d.source;const act=d.source==='lp'?`reply('${d.id}')`:`edit('${d.id}')`;
+    return `<div class="irow clk" onclick="closeNew();${act}"><div class="m2"><span class="st new">NEW</span><span class="st">${esc(src)}</span><b>${esc(d.title)}</b><span class="am">${yen(d.amount)}</span><span style="font-size:.62rem;color:var(--text2);margin-left:.45rem">${sn(d.stage)}・${tago(d.created_at)}</span></div></div>`;
+  }).join(''):'<div class="empty" style="padding:.7rem .8rem">直近48時間の新着はありません。</div>';
+  $('npop').innerHTML=`<div class="inbox-h nh" style="color:var(--red)">🔴 要返信（媒体メッセージ）<span>${reply.length}件</span></div>${replyRows}<div class="inbox-h nh">🔔 新着<span>${fresh.length}件 ・ 直近48時間</span></div>${freshRows}`;
 }
-function showTab(id){
-  ['t-new','t-board','t-ingest','t-kpi'].forEach(t=>{ $(t).hidden=(t!==id); const b=$('tab-'+t); if(b)b.classList.toggle('on',t===id); });
-  try{localStorage.setItem('sq_tab',id)}catch(e){}
-}
+function toggleNew(e){ if(e)e.stopPropagation(); const pop=$('npop'); const show=!pop.classList.contains('show'); if(show){ const t=document.querySelector('.top'); pop.style.top=((t?t.getBoundingClientRect().bottom:50)+6)+'px'; } pop.classList.toggle('show',show); }
+function closeNew(){ $('npop').classList.remove('show'); }
+async function markReplied(id){ await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify({needs_reply:0})}); load(); }
+document.addEventListener('click',e=>{ const pop=$('npop'),bell=$('bell'); if(pop&&pop.classList.contains('show')&&!pop.contains(e.target)&&bell&&!bell.contains(e.target)) pop.classList.remove('show'); });
 const NEXT={lead:{to:'applied',label:'✅ 応募する'},applied:{to:'meeting',label:'💬 打合せへ'},meeting:{to:'build',label:'🛠 着手OK'},build:{to:'qa',label:'🔍 チェックへ'},qa:{to:'deliver',label:'📦 納品へ'},deliver:{to:'won',label:'🎉 受注/完了'}};
 function renderInbox(){
   const items=DEALS.filter(d=>NEXT[d.stage]).sort((a,b)=>(b.score||0)-(a.score||0));
@@ -210,7 +203,7 @@ async function adv(id){ await api('/api/deals/'+id+'/advance',{method:'POST'}); 
 async function delDeal(id){ if(!id)return; if(!confirm('この案件を完全に削除しますか？\n記録ごと消え、元に戻せません。'))return; await api('/api/deals/'+id,{method:'DELETE'}); ov(false); load(); }
 function delCurrent(){ delDeal($('m_id').value); }
 async function setStage(id,stage){ await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify({stage})}); load(); }
-async function ingest(){ const t=$('ingest').value.trim(); if(!t)return; const src=$('i_source').value; const ref=$('i_ref').value.trim(); const items=t.split(/\n[ \t]*@{3,}[ \t]*\n/).map(x=>({text:x.trim(),source:src,ref})).filter(x=>x.text); const ta=$('ingest'); const keep=ta.value; ta.disabled=true; ta.value='⏳ 取込中…'; try{ const r=await api('/api/ingest',{method:'POST',body:JSON.stringify({items})}); ta.value=''; $('i_ref').value=''; alert(r.created+'件を候補に追加しました。AIが返信/提案文を自動作成中（1件30秒ほど）。🔔新着の「📝下書きあり」から確認できます'); showTab('t-new'); load(); setTimeout(load,45000); setTimeout(load,120000); }catch(e){ ta.value=keep; } finally{ ta.disabled=false; } }
+async function ingest(){ const t=$('ingest').value.trim(); if(!t)return; const src=$('i_source').value; const ref=$('i_ref').value.trim(); const items=t.split(/\n[ \t]*@{3,}[ \t]*\n/).map(x=>({text:x.trim(),source:src,ref})).filter(x=>x.text); const ta=$('ingest'); const keep=ta.value; ta.disabled=true; ta.value='⏳ 採点＋提案文＋成果物を生成中…（30秒ほど）'; try{ const r=await api('/api/ingest',{method:'POST',body:JSON.stringify({items})}); ta.value=''; $('i_ref').value=''; alert(r.created+'件を候補に追加しました（📝ボタンで提案文＋成果物を確認）'); load(); }catch(e){ ta.value=keep; } finally{ ta.disabled=false; } }
 
 function ov(s){ $('ov').classList.toggle('show',s); }
 function fillStages(){ $('m_stage').innerHTML=STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('')+'<option value="lost">失注</option>'; }
@@ -245,10 +238,8 @@ async function genReply(){ const msg=$('rmsg').value.trim(); if(!msg){ alert('�
 async function genAll(){ if(!confirm('提案文が空の全カードに、提案文＋成果物を一括生成します（無料・種別も再判定）。よろしいですか？'))return; const r=await api('/api/generate-all',{method:'POST'}); alert((r.generated||0)+'件に生成しました。📝で提案文＋成果物、📄内容で募集本文を確認できます'); load(); }
 function copyP(){ navigator.clipboard?.writeText(_ptext); }
 $('q').addEventListener('input',e=>{Q=e.target.value.trim().toLowerCase();renderBoard();});
-let _t='t-new'; try{const v=localStorage.getItem('sq_tab'); if(['t-new','t-board','t-ingest','t-kpi'].includes(v))_t=v;}catch(e){}
-showTab(_t);
 load();
-setInterval(()=>{ if(!document.hidden) load().catch(()=>{}); },60000); // 1分ごとに自動更新（新着・下書き完成を反映）
+setInterval(()=>{ if(!document.hidden) load().catch(()=>{}); },60000); // 1分ごとに新着をベルへ反映
 </script>
 </body>
 </html>

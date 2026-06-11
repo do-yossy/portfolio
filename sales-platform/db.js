@@ -39,6 +39,8 @@ db.exec(`
     notes TEXT DEFAULT '',
     raw TEXT DEFAULT '',
     ref TEXT DEFAULT '',
+    needs_reply INTEGER DEFAULT 0,
+    last_msg TEXT DEFAULT '',
     created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     won_at TEXT DEFAULT NULL
@@ -55,12 +57,15 @@ db.exec(`
 
 // 既存DBに ref（案件No）列を追加（無ければ）
 try { db.exec("ALTER TABLE deals ADD COLUMN ref TEXT DEFAULT ''"); } catch { /* 既に存在 */ }
+// 媒体メッセージの「要返信」フラグと直近の受信メッセージ
+try { db.exec("ALTER TABLE deals ADD COLUMN needs_reply INTEGER DEFAULT 0"); } catch { /* 既に存在 */ }
+try { db.exec("ALTER TABLE deals ADD COLUMN last_msg TEXT DEFAULT ''"); } catch { /* 既に存在 */ }
 
 const generateId = () => crypto.randomUUID().replace(/-/g, '').slice(0, 20);
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 const COLS = ['title','client','industry','email','source','type','stage','amount','score','priority',
-  'pred_win_rate','est_hours','profit_rate','maintenance','template','proposal','next_action','link','notes','raw','ref','won_at'];
+  'pred_win_rate','est_hours','profit_rate','maintenance','template','proposal','next_action','link','notes','raw','ref','needs_reply','last_msg','won_at'];
 
 const Deals = {
   findAll({ stage, source } = {}) {
