@@ -1164,7 +1164,7 @@ function topPageV2(jobs) {
         <img src="https://images.unsplash.com/photo-1567808291548-fc3ee04dbcf0?auto=format&fit=crop&w=430&h=322&q=80" alt="ドライバー職種">
       </div>
       <div class="et-hi et-hi-3">
-        <img src="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=444&h=333&q=80" alt="IT職種">
+        <img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=444&h=333&q=80" alt="IT職種">
       </div>
     </div>
   </div>
