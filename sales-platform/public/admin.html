@@ -52,19 +52,27 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
 .irow .am{color:var(--gold);font-weight:700;margin-left:.4rem}.irow .act{display:flex;gap:.3rem;flex-wrap:wrap}
 .inbox-h.nh{color:var(--cyan)}.irow.clk{cursor:pointer}.irow.clk:hover{background:var(--surface2)}
 .tag.new,.irow .st.new{background:var(--green);color:#04210f;font-weight:800}
+.bell{position:relative;background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:7px;font-size:1rem;line-height:1;padding:.4rem .55rem;cursor:pointer}
+.bell:hover{border-color:var(--accent)}.bell.has{border-color:var(--red)}
+.bdot{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;background:var(--red);color:#fff;border-radius:99px;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+.bdot:empty{display:none}
+.npop{position:fixed;top:54px;right:1.1rem;width:min(380px,92vw);max-height:72vh;overflow:auto;background:var(--surface);border:1px solid var(--border2);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);z-index:60;display:none}
+.npop.show{display:block}.npop .inbox-h{position:sticky;top:0;background:var(--surface);z-index:1}
 @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.kpi.goal{grid-column:span 3}}
 </style>
 </head>
 <body>
 <div class="top">
   <div class="brand">Social<span>.</span>Quality 管制塔<small>営業バックエンド（DB連携・本格システム）</small></div>
-  <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
+    <button class="bell" id="bell" onclick="toggleNew(event)" title="新着（直近48時間）">🔔<span class="bdot" id="bdot"></span></button>
     <button class="btn" onclick="openAdd()">＋案件</button>
     <button class="btn" onclick="genAll()">✨全件生成</button>
     <button class="btn btn-ghost" onclick="load()">↻ 更新</button>
     <a class="btn btn-ghost" href="/logout">ログアウト</a>
   </div>
 </div>
+<div class="npop" id="npop"></div>
 <div class="wrap">
   <div class="kpis" id="kpis"></div>
   <div class="ingest">
@@ -73,7 +81,6 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);bor
     <input id="i_ref" placeholder="案件No(任意)" title="案件ナンバー（任意）" autocomplete="off">
     <button class="btn" onclick="ingest()">候補に取込</button>
   </div>
-  <div class="inbox" id="newbox"></div>
   <div class="inbox" id="inbox"></div>
   <div class="search"><input id="q" type="search" placeholder="🔍 案件をワード検索（候補・応募・打ち合わせ…タイトル/客名/メモ/媒体/種別/本文）" autocomplete="off"><span class="qhit" id="qhit"></span></div>
   <div class="board" id="board"></div>
@@ -165,11 +172,16 @@ function renderBoard(){
 function renderNew(){
   const items=DEALS.filter(isNew).sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
   const sn=k=>(STAGES.find(s=>s.key===k)||{}).label||k;
-  $('newbox').innerHTML=`<div class="inbox-h nh">🔔 新着（Gmail案件・LP問い合わせ）<span>${items.length}件 ・ 直近48時間</span></div>`+
+  const bd=$('bdot'); if(bd) bd.textContent=items.length?(items.length>9?'9+':String(items.length)):'';
+  const bell=$('bell'); if(bell) bell.classList.toggle('has',items.length>0);
+  $('npop').innerHTML=`<div class="inbox-h nh">🔔 新着（Gmail案件・LP問い合わせ）<span>${items.length}件 ・ 直近48時間</span></div>`+
     (items.length?items.map(d=>{const src=_SRCJP[d.source]||d.source;const act=d.source==='lp'?`reply('${d.id}')`:`edit('${d.id}')`;
-      return `<div class="irow clk" onclick="${act}"><div class="m2"><span class="st new">NEW</span><span class="st">${esc(src)}</span><b>${esc(d.title)}</b><span class="am">${yen(d.amount)}</span><span style="font-size:.62rem;color:var(--text2);margin-left:.45rem">${sn(d.stage)}・${tago(d.created_at)}</span></div></div>`;
+      return `<div class="irow clk" onclick="closeNew();${act}"><div class="m2"><span class="st new">NEW</span><span class="st">${esc(src)}</span><b>${esc(d.title)}</b><span class="am">${yen(d.amount)}</span><span style="font-size:.62rem;color:var(--text2);margin-left:.45rem">${sn(d.stage)}・${tago(d.created_at)}</span></div></div>`;
     }).join(''):'<div class="empty" style="padding:.7rem .8rem">直近48時間の新着はありません。</div>');
 }
+function toggleNew(e){ if(e)e.stopPropagation(); const pop=$('npop'); const show=!pop.classList.contains('show'); if(show){ const t=document.querySelector('.top'); pop.style.top=((t?t.getBoundingClientRect().bottom:50)+6)+'px'; } pop.classList.toggle('show',show); }
+function closeNew(){ $('npop').classList.remove('show'); }
+document.addEventListener('click',e=>{ const pop=$('npop'),bell=$('bell'); if(pop&&pop.classList.contains('show')&&!pop.contains(e.target)&&bell&&!bell.contains(e.target)) pop.classList.remove('show'); });
 const NEXT={lead:{to:'applied',label:'✅ 応募する'},applied:{to:'meeting',label:'💬 打合せへ'},meeting:{to:'build',label:'🛠 着手OK'},build:{to:'qa',label:'🔍 チェックへ'},qa:{to:'deliver',label:'📦 納品へ'},deliver:{to:'won',label:'🎉 受注/完了'}};
 function renderInbox(){
   const items=DEALS.filter(d=>NEXT[d.stage]).sort((a,b)=>(b.score||0)-(a.score||0));
@@ -220,6 +232,7 @@ async function genAll(){ if(!confirm('提案文が空の全カードに、提案
 function copyP(){ navigator.clipboard?.writeText(_ptext); }
 $('q').addEventListener('input',e=>{Q=e.target.value.trim().toLowerCase();renderBoard();});
 load();
+setInterval(()=>{ if(!document.hidden) load().catch(()=>{}); },60000); // 1分ごとに新着をベルへ反映
 </script>
 </body>
 </html>
