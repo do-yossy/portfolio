@@ -6,6 +6,36 @@
 > このページはGitHubのリポジトリトップ（`do-yossy/portfolio`）からいつでも読めます。
 > 新PCでは、まずスマホ等でこのページを開きながら進めると楽です。
 
+> **Windowsの方へ**：下の「⚡ Windowsクイックスタート」を使えば、ほぼ自動でセットアップできます。
+
+---
+
+## ⚡ Windowsクイックスタート（自動セットアップ）
+
+Windowsなら、最初に **Git だけ** 入れれば、あとは付属スクリプト（`setup.ps1`）が
+Node・VS Codeの導入〜`npm install`〜`.env`作成まで**自動**でやります。
+
+1. **Gitを入れる**：<https://git-scm.com/download/win>（または PowerShellで `winget install Git.Git`）
+2. **PowerShellを開く**（スタート → `powershell` と入力）。コードを取得：
+   ```powershell
+   cd ~\Documents
+   git clone https://github.com/do-yossy/portfolio.git
+   cd portfolio
+   ```
+3. **自動セットアップを実行**（これ1行でOK）：
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\setup.ps1
+   ```
+4. **管制塔を起動**：
+   ```powershell
+   cd sales-platform
+   npm run dev:local
+   ```
+   → ブラウザで <http://localhost:3100/admin> を開き、`.env` の `ADMIN_PASSWORD` でログイン。
+
+> 💡 Node や VS Code が新規インストールされた場合は、一度 **PowerShellを閉じて開き直し**、手順3をもう一度実行すると確実です（PATH反映のため）。
+> 1つずつ手動でやりたい場合は、下の「詳しい手順」を参照してください。
+
 ---
 
 ## このプロジェクトの中身（全体像）
@@ -19,6 +49,11 @@
 ポイント：**`main` ブランチに push すると、GitHub Actions が自動でFly.ioへデプロイ**します（手動デプロイ作業は不要）。
 
 ---
+
+## 詳しい手順（1つずつ手動で／Mac共通）
+
+> Windowsで `setup.ps1`（上のクイックスタート）を使った場合、1〜4は自動で完了しています。
+> この章は「手動でやりたい時」「Macの時」「中身を知りたい時」の参照用です。
 
 ## 1. 必要なソフトを入れる（4つ）
 
