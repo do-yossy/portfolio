@@ -1074,15 +1074,9 @@ function topPageV2(jobs) {
   .et-jobtab-desc { font-size: 11.5px; color: #777; text-align: center; line-height: 1.7; }
   @media (max-width: 640px) { .et-jobtabs { grid-template-columns: repeat(2, 1fr); } }
   /* エリア */
-  .et-areagrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-  .et-areabox { background: #fff; border: none; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.05); overflow: hidden; }
-  .et-areabox summary { list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; font-size: 14px; font-weight: 700; color: #111; cursor: pointer; }
-  .et-areabox summary::-webkit-details-marker { display: none; }
-  .et-areabox summary::after { content: '＋'; color: #e0371f; font-weight: 700; }
-  .et-areabox[open] summary::after { content: '−'; }
-  .et-areabox-body { border-top: 1px solid #efece4; padding: 12px 20px; font-size: 13px; }
-  .et-areabox-body a { color: #e0371f; text-decoration: none; font-weight: 700; }
-  .et-areabox-body a:hover { text-decoration: underline; }
+  .et-areachips { display: flex; flex-wrap: wrap; gap: 12px; }
+  .et-areachip { background: #fff; border: 1.5px solid #111; border-radius: 999px; color: #111; font-size: 14px; font-weight: 700; padding: 11px 30px; text-decoration: none; transition: all .2s; }
+  .et-areachip:hover { background: #111; color: #fff; }
   /* スタッフの一言 */
   .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; }
   .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
@@ -1140,6 +1134,7 @@ function topPageV2(jobs) {
     <div class="et-logo">${esc(companyName)}</div>
     <nav class="et-nav">
       <a href="#type">職種から探す</a>
+      <a href="#area">エリアから探す</a>
       <a href="#voice">スタッフの一言</a>
       <a href="#about">会社の特徴</a>
       <a href="#faq">よくある質問</a>
@@ -1195,6 +1190,20 @@ function topPageV2(jobs) {
       <div class="et-jobtab-icon">🚚</div>
       <div class="et-jobtab-name">配送ドライバー</div>
     </a>
+  </div>
+</section>
+<section class="et-sec" id="area">
+  <h2 class="et-h2">エリアから探す</h2>
+  <div class="et-h2sub">Search by area</div>
+  <div class="et-areachips">
+    <a href="/preview/jobs?q=${encodeURIComponent('東京都')}" class="et-areachip">東京都</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('神奈川県')}" class="et-areachip">神奈川県</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('埼玉県')}" class="et-areachip">埼玉県</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('千葉県')}" class="et-areachip">千葉県</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('大阪府')}" class="et-areachip">大阪府</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('兵庫県')}" class="et-areachip">兵庫県</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('京都府')}" class="et-areachip">京都府</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('和歌山県')}" class="et-areachip">和歌山県</a>
   </div>
 </section>
 <section class="et-sec" id="voice">

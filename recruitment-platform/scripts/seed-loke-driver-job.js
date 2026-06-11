@@ -31,7 +31,7 @@ const { Jobs } = require('../db-factory');
 
 const JOB = {
   title: 'ロケ同行ドライバー／＜月給39万円〜45万円＞未経験歓迎・完全週休2日制・年間休日120日以上★',
-  location: '東京都',  // ★勤務地未指定のため仮設定。管理画面で修正してください（転勤なし）
+  location: '大阪府大阪市北区茶屋町',
   salary: '月給39万円〜45万円',
   jobType: '送迎ドライバー',
   employmentType: '正社員',
@@ -131,26 +131,17 @@ const JOB = {
 5週目以降：担当ラインを独立して担当開始
 
 【勤務地】
+大阪府大阪市北区茶屋町
 転勤なし
 
 【アクセス】
-車通勤可能
+◆阪急「大阪梅田駅」茶屋町口より徒歩5分
+◆Osaka Metro御堂筋線「梅田駅」徒歩7分
+◆JR「大阪駅」徒歩10分
+車通勤可能（規定あり）
 
 【勤務期間】
-長期
-
-【選考フロー／注意事項】
-ご応募後、担当者よりメッセージおよびお電話にてご連絡いたします。
-
-スムーズなご案内のため、応募後にメッセージにて「お電話が繋がりやすい日時」を第3希望までご送信ください。
-
-＜対応可能日時＞
-・曜日：月曜〜木曜
-・時間帯：11:00〜19:00
-・所要時間：約10分程度
-
-※ご連絡が取れない場合は、改めてメッセージにてご案内いたします。
-※ご希望に沿って順次ご連絡いたしますが、状況により前後する場合がございます。あらかじめご了承ください。`,
+長期`,
   tags: [
     '未経験歓迎',
     '月給39万円以上',
@@ -184,35 +175,46 @@ const JOB = {
 };
 
 async function main() {
-  console.log('\n🚀 ロケ同行ドライバー求人の登録を開始します...\n');
+  console.log('\n🚀 ロケ同行ドライバー求人の登録/更新を開始します...\n');
 
-  const existing = await Jobs.findAll();
-  if (existing.some(j => j.title === JOB.title)) {
-    console.log('⏭️  同タイトルの求人が既に存在するためスキップしました。');
-    return;
+  // タイトルの先頭部分で既存求人を検索（再実行時は内容を最新版に更新する）
+  const existing = (await Jobs.findAll()).find(j => j.title.startsWith('ロケ同行ドライバー'));
+
+  let job;
+  if (existing) {
+    job = await Jobs.update(existing.id, {
+      title:          JOB.title,
+      location:       JOB.location,
+      salary:         JOB.salary,
+      jobType:        JOB.jobType,
+      employmentType: JOB.employmentType,
+      description:    JOB.description,
+      tags:           JOB.tags,
+      catchcopy:      JOB.catchcopy,
+      faq:            JOB.faq,
+    });
+    console.log(`🔄 既存求人を更新しました: ${JOB.title}`);
+  } else {
+    job = await Jobs.create({
+      title:          JOB.title,
+      location:       JOB.location,
+      salary:         JOB.salary,
+      jobType:        JOB.jobType,
+      employmentType: JOB.employmentType,
+      description:    JOB.description,
+      tags:           JOB.tags,
+      catchcopy:      JOB.catchcopy,
+      imageUrl:       '',
+      faq:            JOB.faq,
+      isPublished:    false,                 // 未公開（プレビュー確認後に公開）
+      targetMedia:    ['自社サイト'],
+      company:        'sq',
+    });
+    console.log(`✅ 登録完了: ${JOB.title}`);
   }
 
-  const job = await Jobs.create({
-    title:          JOB.title,
-    location:       JOB.location,
-    salary:         JOB.salary,
-    jobType:        JOB.jobType,
-    employmentType: JOB.employmentType,
-    description:    JOB.description,
-    tags:           JOB.tags,
-    catchcopy:      JOB.catchcopy,
-    imageUrl:       '',
-    faq:            JOB.faq,
-    isPublished:    false,                 // 未公開（プレビュー確認後に公開）
-    targetMedia:    ['自社サイト'],
-    company:        'sq',
-  });
-
-  console.log(`✅ 登録完了: ${JOB.title}`);
   console.log(`\n📋 プレビューURL: http://localhost:3000/preview/jobs/${job.id}`);
   console.log('   求人一覧: http://localhost:3000/preview/jobs');
-  console.log('\n⚠️  勤務地は「東京都」で仮登録しています。');
-  console.log('   実際の勤務地が違う場合は管理画面 /admin/jobs から修正してください。');
 }
 
 main().catch(e => { console.error('❌ エラー:', e.message); process.exit(1); });
