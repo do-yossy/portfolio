@@ -2244,7 +2244,7 @@ function callImportModalHtml(co, media) {
         <label>会社<select id="ci-company">${coOpts}</select></label>
         <label>媒体<select id="ci-media">${mediaOpts}</select></label>
         <label class="full">CSV / Excelファイル<input type="file" id="ci-file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
-        <label class="full" style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <label class="full" id="ci-countnew-row" style="display:flex;align-items:center;gap:8px;font-size:13px">
           <input type="checkbox" id="ci-countnew" style="width:auto">
           <strong>本日の新着として計上する</strong>（本日の新規応募・会社別×媒体別に反映）
         </label>
