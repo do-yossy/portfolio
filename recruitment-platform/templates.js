@@ -85,7 +85,7 @@ ${content}
 </html>`;
 }
 
-function publicLayout(title, content, { description = '', jsonld = '', canonical = '' } = {}) {
+function publicLayout(title, content, { description = '', jsonld = '', canonical = '', bare = false } = {}) {
   const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
   const canonicalUrl = canonical || siteUrl + '/jobs';
   return `<!DOCTYPE html>
@@ -106,23 +106,23 @@ ${jsonld}
 <link rel="stylesheet" href="/styles.css?v=${process.env.ASSET_VERSION || '1'}">
 </head>
 <body class="pub-body">
-<header class="pub-header">
+${bare ? '' : `<header class="pub-header">
   <div class="pub-header-inner">
     <a href="/jobs" class="pub-header-logo">採用情報</a>
     <nav class="pub-header-nav">
       <a href="/jobs">求人一覧</a>
     </nav>
   </div>
-</header>
+</header>`}
 <main>
 ${content}
 </main>
-<footer class="pub-footer">
+${bare ? '' : `<footer class="pub-footer">
   <div class="pub-footer-inner">
     <span>${esc(process.env.COMPANY_NAME || '採用企業')}</span>
     <a href="/privacy">プライバシーポリシー</a>
   </div>
-</footer>
+</footer>`}
 <div id="toast-container"></div>
 <script src="/admin.js?v=${process.env.ASSET_VERSION || '1'}"></script>
 </body>
@@ -1158,10 +1158,10 @@ function topPageV2(jobs) {
     </div>
     <div class="et-hero-imgs">
       <div class="et-hi et-hi-1">
-        <img src="https://images.unsplash.com/photo-1581244277943-fe4a9c777189?auto=format&fit=crop&w=460&h=345&q=80" alt="製造・工場職種">
+        <img src="https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=460&h=345&q=80" alt="製造・工場職種">
       </div>
       <div class="et-hi et-hi-2">
-        <img src="https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=430&h=322&q=80" alt="ドライバー職種">
+        <img src="https://images.unsplash.com/photo-1567808291548-fc3ee04dbcf0?auto=format&fit=crop&w=430&h=322&q=80" alt="ドライバー職種">
       </div>
       <div class="et-hi et-hi-3">
         <img src="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=444&h=333&q=80" alt="IT職種">
@@ -1272,7 +1272,8 @@ function topPageV2(jobs) {
 </script>`;
 
   return publicLayout(`採用情報 | ${esc(companyName)}`, content, {
-    description: `${companyName}の採用情報サイト。職種・エリアから求人を探せます。`
+    description: `${companyName}の採用情報サイト。職種・エリアから求人を探せます。`,
+    bare: true,
   });
 }
 
