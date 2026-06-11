@@ -119,9 +119,9 @@ const server = http.createServer(async (req, res) => {
 
     // ── 媒体メッセージ受信（Apps Script等が token 付きでPOST）→「要返信」登録＋返信下書き生成 ──
     if (p === '/api/inbound' && m === 'POST') {
-      const token = process.env.INBOUND_TOKEN;
+      const token = process.env.INBOUND_TOKEN || (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD !== 'changeme' ? process.env.ADMIN_PASSWORD : '');
       const given = req.headers['x-inbound-token'] || u.searchParams.get('token') || '';
-      if (!token) return json(res, 503, { error: 'inbound無効（INBOUND_TOKEN未設定）' });
+      if (!token) return json(res, 503, { error: 'inbound無効（INBOUND_TOKEN/ADMIN_PASSWORD未設定）' });
       if (given !== token) return json(res, 401, { error: 'bad token' });
       const b = await parseJSON(req);
       const source = b.source || 'lancers';

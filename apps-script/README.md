@@ -38,8 +38,8 @@ A=媒体 / B=募集本文(入力) / C=案件名 / D=スコア / E=優先度 / F=
 1. <https://script.google.com> で**新規プロジェクト** → `媒体メール通知.gs` の中身を貼り付けて保存
 2. 左の **歯車（プロジェクトの設定）→ スクリプト プロパティ** に2つ追加：
    - `API_BASE` = `https://sq-sales-tanto20.fly.dev`
-   - `INBOUND_TOKEN` = 任意の秘密文字列（管制塔と一致させる）
-3. 管制塔側に同じ秘密を設定：`fly secrets set INBOUND_TOKEN="その文字列"`（sales-platform で実行）
+   - `INBOUND_TOKEN` = **管制塔のログインパスワード**（＝ADMIN_PASSWORD。専用トークンを使う場合のみ別の値）
+3. （任意）専用トークンにしたい時だけ：`fly secrets set INBOUND_TOKEN="その文字列"`。未設定ならログインPWが使われる。
 4. 関数 `checkMediaMail` を **▶実行** → 初回は権限を**許可**
 5. 時計アイコン（トリガー）→ `checkMediaMail` を **時間主導・5分おき** に追加（または `createTrigger` を1回実行）
 
