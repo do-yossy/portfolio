@@ -1745,7 +1745,7 @@ function loginPage(error = '') {
 <div class="login-wrap">
   <div class="login-card">
     <div class="login-logo">
-      <h1>SEO採用プラットフォーム</h1>
+      <h1>ATS採用プラットフォーム</h1>
       <p>管理画面へのログイン</p>
     </div>
     ${error ? `<div class="login-error">⚠️ ${esc(error)}</div>` : ''}
