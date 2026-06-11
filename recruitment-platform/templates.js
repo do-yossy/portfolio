@@ -1018,7 +1018,15 @@ function topPageV2(jobs) {
   /* ヒーロー */
   .et-hero { position: relative; background: #f4f1ea; overflow: hidden; padding: 80px 20px 64px; }
   .et-hero::before { content: ''; position: absolute; top: -160px; right: -100px; width: 520px; height: 520px; background: radial-gradient(circle, rgba(236,118,88,.38), rgba(244,241,234,0) 64%); pointer-events: none; }
-  .et-hero-in { max-width: 1080px; margin: 0 auto; position: relative; }
+  .et-hero-in { max-width: 1080px; margin: 0 auto; position: relative; display: flex; align-items: flex-start; gap: 40px; }
+  .et-hero-text { flex: 0 0 52%; min-width: 0; }
+  .et-hero-imgs { flex: 1; position: relative; height: 380px; }
+  .et-hi { position: absolute; border-radius: 16px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,.18); }
+  .et-hi img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .et-hi-1 { width: 230px; height: 172px; top: 0; right: 0; z-index: 3; }
+  .et-hi-2 { width: 215px; height: 161px; top: 110px; right: 170px; z-index: 2; }
+  .et-hi-3 { width: 222px; height: 167px; top: 210px; right: 40px; z-index: 1; }
+  @media (max-width: 760px) { .et-hero-imgs { display: none; } .et-hero-text { flex: 1; } }
   .et-hero-label { color: #e0371f; font-size: 12px; font-weight: 700; letter-spacing: .24em; margin-bottom: 24px; }
   .et-hero h1 { font-size: 52px; font-weight: 800; color: #111; line-height: 1.35; letter-spacing: .03em; margin: 0 0 22px; }
   .et-hero h1 .red { color: #e0371f; }
@@ -1040,13 +1048,14 @@ function topPageV2(jobs) {
   .et-h2::before { content: '—'; color: #e0371f; font-weight: 700; }
   .et-h2::after { content: none; }
   .et-h2sub { color: #e0371f; font-size: 12px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; margin: 8px 0 36px 40px; }
-  /* 職種カード */
-  .et-typegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
-  .et-typecard { background: #fff; border-radius: 18px; overflow: hidden; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
-  .et-typecard:hover { box-shadow: 0 14px 30px rgba(0,0,0,.10); }
-  .et-typecard-icon { font-size: 48px; text-align: center; padding: 30px 0 22px; background: #ebe6db; }
-  .et-typecard-label { color: #111; font-size: 14px; font-weight: 700; padding: 13px 16px; display: flex; justify-content: space-between; align-items: center; }
-  .et-typecard-label span { color: #e0371f; font-size: 12px; font-weight: 700; }
+  /* 職種タブ（4固定） */
+  .et-jobtabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .et-jobtab { background: #fff; border-radius: 18px; overflow: hidden; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: transform .25s, box-shadow .25s; display: flex; flex-direction: column; align-items: center; padding: 28px 16px 22px; }
+  .et-jobtab:hover { transform: translateY(-5px); box-shadow: 0 14px 30px rgba(0,0,0,.10); }
+  .et-jobtab-icon { font-size: 48px; margin-bottom: 10px; }
+  .et-jobtab-name { font-size: 15px; font-weight: 800; color: #111; margin-bottom: 6px; text-align: center; }
+  .et-jobtab-desc { font-size: 11.5px; color: #777; text-align: center; line-height: 1.7; }
+  @media (max-width: 640px) { .et-jobtabs { grid-template-columns: repeat(2, 1fr); } }
   /* エリア */
   .et-areagrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .et-areabox { background: #fff; border: none; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.05); overflow: hidden; }
@@ -1122,23 +1131,57 @@ function topPageV2(jobs) {
 </header>
 <div class="et-hero">
   <div class="et-hero-in">
-    <div class="et-hero-label">RECRUIT INFORMATION — ${esc(companyName)}</div>
-    <h1><span class="red">あなたらしく</span>、<br>働ける場所。</h1>
-    <p class="et-hero-lead">配送・製造・倉庫内作業など、全国の正社員求人を多数掲載。未経験からでも安心して始められる環境と、頑張りがきちんと評価される待遇をご用意しています。</p>
-    <a class="et-btn black" href="/preview/jobs">お仕事一覧を見る →</a>
-    <a class="et-btn line" href="#flow" style="margin-left:10px">応募の流れ</a>
+    <div class="et-hero-text">
+      <div class="et-hero-label">RECRUIT INFORMATION — ${esc(companyName)}</div>
+      <h1><span class="red">あなたらしく</span>、<br>働ける場所。</h1>
+      <p class="et-hero-lead">配送・製造・倉庫内作業など、全国の正社員求人を多数掲載。未経験からでも安心して始められる環境と、頑張りがきちんと評価される待遇をご用意しています。</p>
+      <a class="et-btn black" href="/preview/jobs">お仕事一覧を見る →</a>
+      <a class="et-btn line" href="#flow" style="margin-left:10px">応募の流れ</a>
+    </div>
+    <div class="et-hero-imgs">
+      <div class="et-hi et-hi-1">
+        <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=460&h=345&q=80" alt="IT職種">
+      </div>
+      <div class="et-hi et-hi-2">
+        <img src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=430&h=322&q=80" alt="ドライバー職種">
+      </div>
+      <div class="et-hi et-hi-3">
+        <img src="https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=444&h=333&q=80" alt="製造・工場職種">
+      </div>
+    </div>
   </div>
 </div>
 <div class="et-marquee">
   <div class="et-marquee-track">
-    <span>DELIVERY DRIVER</span><span class="sl">/</span><span>FACTORY STAFF</span><span class="sl">/</span><span>WAREHOUSE</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
-    <span>DELIVERY DRIVER</span><span class="sl">/</span><span>FACTORY STAFF</span><span class="sl">/</span><span>WAREHOUSE</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
+    <span>IT</span><span class="sl">/</span><span>製造・工場</span><span class="sl">/</span><span>送迎ドライバー</span><span class="sl">/</span><span>配送ドライバー</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
+    <span>IT</span><span class="sl">/</span><span>製造・工場</span><span class="sl">/</span><span>送迎ドライバー</span><span class="sl">/</span><span>配送ドライバー</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
   </div>
 </div>
 <section class="et-sec" id="type">
   <h2 class="et-h2">職種から探す</h2>
   <div class="et-h2sub">Search by job</div>
-  <div class="et-typegrid">${typeCards}</div>
+  <div class="et-jobtabs">
+    <a class="et-jobtab" href="/preview/jobs?type=IT">
+      <div class="et-jobtab-icon">💻</div>
+      <div class="et-jobtab-name">IT</div>
+      <div class="et-jobtab-desc">SE・エンジニア<br>ITサポート</div>
+    </a>
+    <a class="et-jobtab" href="/preview/jobs?type=製造">
+      <div class="et-jobtab-icon">🏭</div>
+      <div class="et-jobtab-name">製造・工場</div>
+      <div class="et-jobtab-desc">軽作業・組み立て<br>品質管理</div>
+    </a>
+    <a class="et-jobtab" href="/preview/jobs?type=送迎">
+      <div class="et-jobtab-icon">🚐</div>
+      <div class="et-jobtab-name">送迎ドライバー</div>
+      <div class="et-jobtab-desc">デイサービス<br>福祉送迎</div>
+    </a>
+    <a class="et-jobtab" href="/preview/jobs?type=配送">
+      <div class="et-jobtab-icon">🚚</div>
+      <div class="et-jobtab-name">配送ドライバー</div>
+      <div class="et-jobtab-desc">EC配送・荷物配達<br>長距離輸送</div>
+    </a>
+  </div>
 </section>
 <section class="et-sec" id="area">
   <h2 class="et-h2">エリアから探す</h2>
@@ -1187,6 +1230,10 @@ function topPageV2(jobs) {
   .et-hero h1 { animation-delay: .15s; }
   .et-hero-lead { animation-delay: .3s; }
   .et-hero .et-btn { animation-delay: .45s; }
+  .et-hi { opacity: 0; animation: etFadeUp .9s ease forwards; }
+  .et-hi-1 { animation-delay: .25s; }
+  .et-hi-2 { animation-delay: .45s; }
+  .et-hi-3 { animation-delay: .65s; }
   @keyframes etFadeUp { to { opacity: 1; transform: none; } }
   html { scroll-behavior: smooth; }
   .et-typecard, .et-feature, .et-step { transition: transform .25s ease, box-shadow .25s ease; }
