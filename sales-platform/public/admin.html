@@ -145,7 +145,7 @@ function card(d){
   const i=STAGES.findIndex(s=>s.key===d.stage);
   return `<div class="card ${isIn?'in':''}">
     <div class="t">${esc(d.title)}</div>
-    <div class="tags">${isNew(d)?'<span class="tag new">NEW</span>':''}${d.ref?`<span class="tag" title="案件No">No.${esc(d.ref)}</span>`:''}<span class="tag">${src}</span><span class="tag">${esc(d.type)}</span>${d.priority?`<span class="tag ${d.priority}">${d.priority}</span>`:''}${d.score?`<span class="tag">${d.score}点</span>`:''}</div>
+    <div class="tags">${+d.needs_reply===1?'<span class="tag" style="background:rgba(232,69,69,.2);color:var(--red);font-weight:800">要返信</span>':''}${isNew(d)?'<span class="tag new">NEW</span>':''}${d.ref?`<span class="tag" title="案件No">No.${esc(d.ref)}</span>`:''}<span class="tag">${src}</span><span class="tag">${esc(d.type)}</span>${d.priority?`<span class="tag ${d.priority}">${d.priority}</span>`:''}${d.score?`<span class="tag">${d.score}点</span>`:''}</div>
     <div class="amt">${yen(d.amount)}${d.maintenance?` <span style="font-size:.58rem;color:var(--green)">+保守${yen(d.maintenance)}</span>`:''}</div>
     ${d.email?`<div class="na">✉ ${esc(d.email)}</div>`:''}
     ${d.next_action?`<div class="na"><b style="color:var(--cyan)">次:</b> ${esc(d.next_action)}</div>`:''}
@@ -170,17 +170,24 @@ function renderBoard(){
   const qh=$('qhit'); if(qh){ qh.textContent=Q?`🔍 ${DEALS.filter(match).length}件ヒット`:''; }
 }
 function renderNew(){
-  const items=DEALS.filter(isNew).sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
   const sn=k=>(STAGES.find(s=>s.key===k)||{}).label||k;
-  const bd=$('bdot'); if(bd) bd.textContent=items.length?(items.length>9?'9+':String(items.length)):'';
-  const bell=$('bell'); if(bell) bell.classList.toggle('has',items.length>0);
-  $('npop').innerHTML=`<div class="inbox-h nh">🔔 新着（Gmail案件・LP問い合わせ）<span>${items.length}件 ・ 直近48時間</span></div>`+
-    (items.length?items.map(d=>{const src=_SRCJP[d.source]||d.source;const act=d.source==='lp'?`reply('${d.id}')`:`edit('${d.id}')`;
-      return `<div class="irow clk" onclick="closeNew();${act}"><div class="m2"><span class="st new">NEW</span><span class="st">${esc(src)}</span><b>${esc(d.title)}</b><span class="am">${yen(d.amount)}</span><span style="font-size:.62rem;color:var(--text2);margin-left:.45rem">${sn(d.stage)}・${tago(d.created_at)}</span></div></div>`;
-    }).join(''):'<div class="empty" style="padding:.7rem .8rem">直近48時間の新着はありません。</div>');
+  const reply=DEALS.filter(d=>+d.needs_reply===1).sort((a,b)=>Date.parse(b.updated_at||b.created_at||0)-Date.parse(a.updated_at||a.created_at||0));
+  const fresh=DEALS.filter(d=>isNew(d)&&+d.needs_reply!==1).sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
+  // バッジ＝「要返信」件数（要返信が無ければ非表示）
+  const bd=$('bdot'); if(bd) bd.textContent=reply.length?(reply.length>9?'9+':String(reply.length)):'';
+  const bell=$('bell'); if(bell) bell.classList.toggle('has',reply.length>0);
+  const draftTag=d=>(d.proposal||'').trim()?'<span class="st" style="background:rgba(34,197,94,.16);color:var(--green)">📝下書きあり</span>':'<span class="st">⏳下書き作成中</span>';
+  const replyRows=reply.length?reply.map(d=>{const src=_SRCJP[d.source]||d.source;
+    return `<div class="irow"><div class="m2 clk" onclick="closeNew();reply('${d.id}')" style="cursor:pointer;flex:1"><span class="st" style="background:rgba(232,69,69,.18);color:var(--red);font-weight:800">要返信</span><span class="st">${esc(src)}</span><b>${esc(d.title)}</b>${draftTag(d)}<span style="font-size:.62rem;color:var(--text2);margin-left:.45rem">${tago(d.updated_at||d.created_at)}</span></div><div class="act"><button class="mini" onclick="event.stopPropagation();markReplied('${d.id}')">✓返信済み</button></div></div>`;
+  }).join(''):'<div class="empty" style="padding:.7rem .8rem">要返信はありません。</div>';
+  const freshRows=fresh.length?fresh.map(d=>{const src=_SRCJP[d.source]||d.source;const act=d.source==='lp'?`reply('${d.id}')`:`edit('${d.id}')`;
+    return `<div class="irow clk" onclick="closeNew();${act}"><div class="m2"><span class="st new">NEW</span><span class="st">${esc(src)}</span><b>${esc(d.title)}</b><span class="am">${yen(d.amount)}</span><span style="font-size:.62rem;color:var(--text2);margin-left:.45rem">${sn(d.stage)}・${tago(d.created_at)}</span></div></div>`;
+  }).join(''):'<div class="empty" style="padding:.7rem .8rem">直近48時間の新着はありません。</div>';
+  $('npop').innerHTML=`<div class="inbox-h nh" style="color:var(--red)">🔴 要返信（媒体メッセージ）<span>${reply.length}件</span></div>${replyRows}<div class="inbox-h nh">🔔 新着<span>${fresh.length}件 ・ 直近48時間</span></div>${freshRows}`;
 }
 function toggleNew(e){ if(e)e.stopPropagation(); const pop=$('npop'); const show=!pop.classList.contains('show'); if(show){ const t=document.querySelector('.top'); pop.style.top=((t?t.getBoundingClientRect().bottom:50)+6)+'px'; } pop.classList.toggle('show',show); }
 function closeNew(){ $('npop').classList.remove('show'); }
+async function markReplied(id){ await api('/api/deals/'+id,{method:'PATCH',body:JSON.stringify({needs_reply:0})}); load(); }
 document.addEventListener('click',e=>{ const pop=$('npop'),bell=$('bell'); if(pop&&pop.classList.contains('show')&&!pop.contains(e.target)&&bell&&!bell.contains(e.target)) pop.classList.remove('show'); });
 const NEXT={lead:{to:'applied',label:'✅ 応募する'},applied:{to:'meeting',label:'💬 打合せへ'},meeting:{to:'build',label:'🛠 着手OK'},build:{to:'qa',label:'🔍 チェックへ'},qa:{to:'deliver',label:'📦 納品へ'},deliver:{to:'won',label:'🎉 受注/完了'}};
 function renderInbox(){

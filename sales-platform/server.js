@@ -117,6 +117,45 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── 媒体メッセージ受信（Apps Script等が token 付きでPOST）→「要返信」登録＋返信下書き生成 ──
+    if (p === '/api/inbound' && m === 'POST') {
+      const token = process.env.INBOUND_TOKEN;
+      const given = req.headers['x-inbound-token'] || u.searchParams.get('token') || '';
+      if (!token) return json(res, 503, { error: 'inbound無効（INBOUND_TOKEN未設定）' });
+      if (given !== token) return json(res, 401, { error: 'bad token' });
+      const b = await parseJSON(req);
+      const source = b.source || 'lancers';
+      const body = String(b.body || b.text || '').slice(0, 4000);
+      if (!body.trim()) return json(res, 400, { error: 'body required' });
+      const all = Deals.findAll();
+      let deal = null;
+      if (b.ref) deal = all.find(d => d.ref && d.ref === String(b.ref));
+      if (!deal && b.title) deal = all.find(d => d.source === source && d.title === b.title && !['won', 'lost'].includes(d.stage));
+      if (!deal) {
+        deal = Deals.create({
+          title: b.title || b.subject || `${source}メッセージ`, source, client: b.from || '',
+          stage: 'meeting', type: 'LP', priority: 'A', score: 50, ref: b.ref ? String(b.ref) : '',
+          next_action: '返信する', needs_reply: 1, last_msg: body, notes: `[受信メッセージ]\n${body}`
+        });
+      } else {
+        Deals.update(deal.id, {
+          needs_reply: 1, last_msg: body, next_action: '返信する',
+          notes: ((deal.notes ? deal.notes + '\n\n' : '') + `[受信メッセージ]\n${body}`).slice(0, 6000)
+        });
+      }
+      json(res, 200, { ok: true, id: deal.id });
+      // 返信下書きを非同期生成（APIキー未設定ならスキップ・要返信フラグは維持）
+      (async () => {
+        try {
+          const d2 = Deals.findById(deal.id);
+          const draft = await claude.replyToMessage(d2, body);
+          Deals.update(deal.id, { proposal: draft });
+          Logs.create('inbound', 'success', `${source} 受信→返信下書き生成: ${d2.title}`);
+        } catch (e) { Logs.create('inbound', 'error', (e && e.message) || String(e)); }
+      })();
+      return;
+    }
+
     if (p === '/login' && m === 'GET') return serveFile(res, 'login.html');
     if (p === '/login' && m === 'POST') {
       const b = await parseJSON(req);
