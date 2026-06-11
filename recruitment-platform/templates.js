@@ -960,13 +960,36 @@ function topPageV2(jobs) {
     </details>`).join('');
 
   const voices = [
-    { no: '01', meta: '配送スタッフ / 20代男性', text: '地味じゃなくても問題なし！未経験でもご安心を♪' },
-    { no: '02', meta: '製造スタッフ / 30代男性', text: '人間関係のストレス0！こんな会社ってありますか？' },
-    { no: '03', meta: '倉庫スタッフ / 40代女性', text: '夢中になれること、僕たちと一緒に見つけませんか？' },
+    {
+      no: '01', meta: '配送ドライバー / 入社2年目 / 20代男性',
+      title: '未経験でも3ヶ月で一人前になれました',
+      text: '前職は飲食店。体力には自信がありましたが、ドライバー経験は全くゼロでした。入社後は先輩が丁寧にルートを教えてくれて、焦らず覚えることができました。今では担当エリアを一人でこなせるようになり、お客様に「ありがとう」と言われるのが毎日の励みです。',
+      before: '飲食店スタッフ → 配送ドライバー',
+    },
+    {
+      no: '02', meta: '製造スタッフ / 入社3年目 / 30代男性',
+      title: '人間関係がシンプルで働きやすい',
+      text: '前の職場は社内政治が激しく、毎日消耗していました。ここに転職してから、余計なストレスがほぼゼロになりました。仕事はライン作業なので黙々と集中できますし、チームワークも自然と生まれます。残業も少なく、プライベートの時間もしっかり取れています。',
+      before: '別業種の製造業 → 現職',
+    },
+    {
+      no: '03', meta: '軽作業スタッフ / 入社1年目 / 40代女性',
+      title: 'ブランクがあっても温かく迎えてもらえた',
+      text: '子育てで10年ほどブランクがあり、再就職に不安を感じていました。面接時から担当者がとても親切で、シフトの相談にも柔軟に対応してもらえました。職場のメンバーも年代がバラバラで、みんなが気にかけてくれる雰囲気。無理なく続けられています。',
+      before: '専業主婦（10年）→ 軽作業スタッフ',
+    },
+    {
+      no: '04', meta: '送迎ドライバー / 入社4年目 / 50代男性',
+      title: '「ありがとう」が毎日もらえる仕事',
+      text: 'デイサービスの送迎を担当しています。最初は福祉の仕事に縁がないと思っていましたが、利用者の方々と顔見知りになり、「今日も来てくれてよかった」と言ってもらえるのが何より嬉しいです。運転が好きな人にはとても向いている仕事だと思います。',
+      before: '長距離トラック運転手 → 送迎ドライバー',
+    },
   ].map(v => `<div class="et-voice">
       <div class="et-voice-no">${v.no}<span class="et-voice-slash"></span></div>
       <div class="et-voice-meta">${esc(v.meta)}</div>
+      <div class="et-voice-title">${esc(v.title)}</div>
       <div class="et-voice-text">${esc(v.text)}</div>
+      <div class="et-voice-before"><span>BEFORE</span>${esc(v.before)}</div>
     </div>`).join('');
 
   const features = [
@@ -1067,13 +1090,15 @@ function topPageV2(jobs) {
   .et-areabox-body a:hover { text-decoration: underline; }
   /* スタッフの一言 */
   .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; }
-  .et-voice { background: #fff; border-radius: 18px; padding: 26px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
+  .et-voice { background: #fff; border-radius: 18px; padding: 26px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); display: flex; flex-direction: column; }
   .et-voice-no { font-family: Georgia, serif; font-style: italic; font-size: 50px; color: #e0371f; font-weight: 700; line-height: 1; position: relative; display: inline-block; padding-right: 24px; margin-bottom: 14px; }
   .et-voice-slash { position: absolute; right: 0; top: 4px; bottom: -4px; width: 2px; background: #111; transform: rotate(20deg); }
-  .et-voice-meta { display: inline-block; background: #111; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 10px; }
-  .et-voice-text { font-size: 15px; color: #111; line-height: 1.9; font-weight: 700; margin-bottom: 16px; }
-  .et-voice-more { display: inline-flex; align-items: center; gap: 18px; border: 1.5px solid #111; border-radius: 999px; color: #111; font-size: 12px; font-weight: 700; padding: 9px 24px; text-decoration: none; letter-spacing: .1em; transition: all .2s; }
-  .et-voice-more:hover { background: #111; color: #fff; }
+  .et-voice-meta { display: inline-block; background: #111; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
+  .et-voice-title { font-size: 16px; font-weight: 800; color: #111; line-height: 1.6; margin-bottom: 10px; }
+  .et-voice-text { font-size: 13.5px; color: #444; line-height: 2; margin-bottom: 16px; flex: 1; }
+  .et-voice-before { margin-top: auto; border-top: 1px solid #efece4; padding-top: 12px; font-size: 12px; color: #777; display: flex; align-items: center; gap: 8px; }
+  .et-voice-before span { background: #e0371f; color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; letter-spacing: .06em; }
   /* 会社の特徴 */
   .et-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
   .et-feature { background: #fff; border: none; border-radius: 18px; padding: 28px 24px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
