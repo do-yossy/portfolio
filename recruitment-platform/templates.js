@@ -1160,7 +1160,7 @@ function topPageV2(jobs) {
         <img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=460&h=345&q=80" alt="IT職種">
       </div>
       <div class="et-hi et-hi-2">
-        <img src="https://images.unsplash.com/photo-1600320254374-ce2d293c324e?auto=format&fit=crop&w=430&h=322&q=80" alt="ドライバー職種">
+        <img src="https://images.pexels.com/photos/9331871/pexels-photo-9331871.jpeg?auto=compress&cs=tinysrgb&w=430&h=322&fit=crop" alt="ドライバー職種">
       </div>
       <div class="et-hi et-hi-3">
         <img src="https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=444&h=333&q=80" alt="製造・工場職種">
