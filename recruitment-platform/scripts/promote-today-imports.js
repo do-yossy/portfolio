@@ -36,16 +36,20 @@ const cutoffUTC = new Date(todayJST + 'T05:00:00+09:00').toISOString(); // JST 0
 console.log(`日本時間 ${todayJST} 05:00以降に取り込まれた応募者を対象に検索します...`);
 console.log(`(UTC基準: ${cutoffUTC} 以降)`);
 
-// 本日JST created_at で is_archived=1 の応募者を確認
+// 本日取り込んだのに新着計上されていない応募者（重複は除く）:
+//   - 過去リスト行き (is_archived=1)
+//   - 取込フラグ付き (is_imported=1) で新着に数えられない
+//   - applied_at が過去日付のまま
 const targets = db.prepare(`
-  SELECT id, name, company, media, status, applied_at, created_at
+  SELECT id, name, company, media, status, applied_at, is_archived, is_imported, created_at
   FROM applicants
-  WHERE created_at >= ? AND is_archived = 1
+  WHERE created_at >= ? AND is_duplicate = 0
+    AND (is_archived = 1 OR is_imported = 1 OR applied_at < ?)
   ORDER BY created_at DESC
-`).all(cutoffUTC);
+`).all(cutoffUTC, todayJST);
 
 if (targets.length === 0) {
-  console.log('\n本日取り込んで過去リストにある応募者はいません。');
+  console.log('\n本日取り込んで補正が必要な応募者はいません。');
   const inList = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(todayJST).c;
   console.log(`現在の本日新規応募数: ${inList}件`);
   process.exit(0);
@@ -53,15 +57,19 @@ if (targets.length === 0) {
 
 const nowISO = new Date().toISOString();
 
-console.log(`\n【過去リスト → 架電リストに移動】${targets.length}件`);
-targets.forEach(r => console.log(`  ${r.name} | ${r.company}/${r.media} | ${r.status} | applied_at: ${r.applied_at}`));
+console.log(`\n【本日の新着応募に昇格】${targets.length}件`);
+targets.forEach(r => console.log(`  ${r.name} | ${r.company}/${r.media} | ${r.status} | applied_at: ${r.applied_at} | archived=${r.is_archived} imported=${r.is_imported}`));
 
 const r1 = db.prepare(`
   UPDATE applicants
   SET is_archived = 0, is_imported = 0,
       applied_at = ?, applied_month = ?,
       status = '新規', updated_at = ?
-  WHERE created_at >= ? AND is_archived = 1
-`).run(todayJST, todayJST.slice(0, 7), nowISO, cutoffUTC);
-console.log(`✅ ${r1.changes}件を架電リストに移動しました。`);
+  WHERE created_at >= ? AND is_duplicate = 0
+    AND (is_archived = 1 OR is_imported = 1 OR applied_at < ?)
+`).run(todayJST, todayJST.slice(0, 7), nowISO, cutoffUTC, todayJST);
+console.log(`✅ ${r1.changes}件を本日の新着応募に昇格しました。`);
+
+const after = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(todayJST).c;
+console.log(`現在の本日新規応募数: ${after}件`);
 console.log('\n管理画面 /admin をリロードして確認してください。');
