@@ -967,7 +967,6 @@ function topPageV2(jobs) {
       <div class="et-voice-no">${v.no}<span class="et-voice-slash"></span></div>
       <div class="et-voice-meta">${esc(v.meta)}</div>
       <div class="et-voice-text">${esc(v.text)}</div>
-      <a class="et-voice-more" href="/preview/jobs">Read More <span>→</span></a>
     </div>`).join('');
 
   const features = [
