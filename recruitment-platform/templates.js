@@ -1446,9 +1446,12 @@ function jobDetailPageV2(job) {
   const mainDesc = pick('仕事内容', 'お仕事内容') || introText || String(job.description || '').trim();
   const salaryDetail = pick('給与内訳', '給与・待遇');
   const shiftText = pick('労働時間', '勤務時間', 'シフト・勤務時間');
+  // 【給与内訳】の先頭行が給与フィールドと同額なら、給与フィールドの重複表示を省く
+  const normSalary = s => String(s || '').replace(/\s/g, '');
+  const salaryDup = salaryDetail && normSalary(salaryDetail.split('\n')[0]) === normSalary(job.salary);
   const infoRows = [
     ['お仕事内容', mainDesc],
-    ['給与', job.salary + (salaryDetail ? '\n\n' + salaryDetail : '')],
+    ['給与', salaryDup ? salaryDetail : job.salary + (salaryDetail ? '\n\n' + salaryDetail : '')],
     ['所在地', job.location],
     ['雇用形態', job.employment_type],
     ['シフト・勤務時間', shiftText],
