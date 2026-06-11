@@ -1023,9 +1023,9 @@ function topPageV2(jobs) {
   .et-hero-imgs { flex: 1; position: relative; height: 380px; }
   .et-hi { position: absolute; border-radius: 16px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,.18); }
   .et-hi img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .et-hi-1 { width: 230px; height: 172px; top: 0; right: 0; z-index: 3; }
-  .et-hi-2 { width: 215px; height: 161px; top: 110px; right: 170px; z-index: 2; }
-  .et-hi-3 { width: 222px; height: 167px; top: 210px; right: 40px; z-index: 1; }
+  .et-hi-1 { width: 230px; height: 172px; top: 0; left: 0; z-index: 3; }
+  .et-hi-2 { width: 215px; height: 161px; top: 110px; left: 170px; z-index: 2; }
+  .et-hi-3 { width: 222px; height: 167px; top: 210px; left: 30px; z-index: 1; }
   @media (max-width: 760px) { .et-hero-imgs { display: none; } .et-hero-text { flex: 1; } }
   .et-hero-label { color: #e0371f; font-size: 12px; font-weight: 700; letter-spacing: .24em; margin-bottom: 24px; }
   .et-hero h1 { font-size: 52px; font-weight: 800; color: #111; line-height: 1.35; letter-spacing: .03em; margin: 0 0 22px; }
@@ -1140,13 +1140,13 @@ function topPageV2(jobs) {
     </div>
     <div class="et-hero-imgs">
       <div class="et-hi et-hi-1">
-        <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=460&h=345&q=80" alt="IT職種">
+        <img src="https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=460&h=345&q=80" alt="製造・工場職種">
       </div>
       <div class="et-hi et-hi-2">
         <img src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=430&h=322&q=80" alt="ドライバー職種">
       </div>
       <div class="et-hi et-hi-3">
-        <img src="https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=444&h=333&q=80" alt="製造・工場職種">
+        <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=444&h=333&q=80" alt="IT職種">
       </div>
     </div>
   </div>
@@ -1164,22 +1164,18 @@ function topPageV2(jobs) {
     <a class="et-jobtab" href="/preview/jobs?type=IT">
       <div class="et-jobtab-icon">💻</div>
       <div class="et-jobtab-name">IT</div>
-      <div class="et-jobtab-desc">SE・エンジニア<br>ITサポート</div>
     </a>
     <a class="et-jobtab" href="/preview/jobs?type=製造">
       <div class="et-jobtab-icon">🏭</div>
       <div class="et-jobtab-name">製造・工場</div>
-      <div class="et-jobtab-desc">軽作業・組み立て<br>品質管理</div>
     </a>
     <a class="et-jobtab" href="/preview/jobs?type=送迎">
       <div class="et-jobtab-icon">🚐</div>
       <div class="et-jobtab-name">送迎ドライバー</div>
-      <div class="et-jobtab-desc">デイサービス<br>福祉送迎</div>
     </a>
     <a class="et-jobtab" href="/preview/jobs?type=配送">
       <div class="et-jobtab-icon">🚚</div>
       <div class="et-jobtab-name">配送ドライバー</div>
-      <div class="et-jobtab-desc">EC配送・荷物配達<br>長距離輸送</div>
     </a>
   </div>
 </section>
