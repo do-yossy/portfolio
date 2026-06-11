@@ -1139,7 +1139,6 @@ function topPageV2(jobs) {
     <div class="et-logo">${esc(companyName)}</div>
     <nav class="et-nav">
       <a href="#type">職種から探す</a>
-      <a href="#area">エリアから探す</a>
       <a href="#voice">スタッフの一言</a>
       <a href="#about">会社の特徴</a>
       <a href="#faq">よくある質問</a>
@@ -1161,7 +1160,7 @@ function topPageV2(jobs) {
         <img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=460&h=345&q=80" alt="IT職種">
       </div>
       <div class="et-hi et-hi-2">
-        <img src="https://images.unsplash.com/photo-1567808291548-fc3ee04dbcf0?auto=format&fit=crop&w=430&h=322&q=80" alt="ドライバー職種">
+        <img src="https://images.unsplash.com/photo-1600320254374-ce2d293c324e?auto=format&fit=crop&w=430&h=322&q=80" alt="ドライバー職種">
       </div>
       <div class="et-hi et-hi-3">
         <img src="https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=444&h=333&q=80" alt="製造・工場職種">
@@ -1197,11 +1196,6 @@ function topPageV2(jobs) {
     </a>
   </div>
 </section>
-<section class="et-sec" id="area">
-  <h2 class="et-h2">エリアから探す</h2>
-  <div class="et-h2sub">Search by area</div>
-  <div class="et-areagrid">${areaList}</div>
-</section>
 <section class="et-sec" id="voice">
   <h2 class="et-h2">スタッフからの一言</h2>
   <div class="et-h2sub">Staff Message</div>
@@ -1231,7 +1225,7 @@ function topPageV2(jobs) {
   </div>
 </div>
 <div class="et-footer">
-  <a href="/preview/jobs">求人情報</a><a href="/privacy">プライバシーポリシー</a>
+  <a href="/privacy">プライバシーポリシー</a>
   <div style="margin-top:10px">© ${esc(companyName)} All Rights Reserved.</div>
 </div>
 <style>
