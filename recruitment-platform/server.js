@@ -894,6 +894,11 @@ const server = http.createServer(async (req, res) => {
   // 掲載先「自社サイト」の求人のみ表示（求人ボックス等の媒体用求人は出さない）
   if (pathname === '/preview/jobs' && method === 'GET') {
     let jobs = (await Jobs.findAll()).filter(j => (j.target_media || '').includes('自社サイト'));
+    // 職種タブからの絞り込み（?type=IT / 製造 / 送迎 / 配送）: job_type の先頭一致で判定
+    const type = (query.type || '').trim();
+    if (type) {
+      jobs = jobs.filter(j => (j.job_type || '').startsWith(type));
+    }
     const search = (query.q || '').trim();
     if (search) {
       const s = search.toLowerCase();
@@ -904,7 +909,7 @@ const server = http.createServer(async (req, res) => {
         (j.tags || '').toLowerCase().includes(s)
       );
     }
-    send(res, 200, T.jobsListPageV2(jobs, search));
+    send(res, 200, T.jobsListPageV2(jobs, search || type));
     return;
   }
 
