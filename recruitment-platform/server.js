@@ -891,8 +891,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── Preview: 新デザイン求人一覧（未公開求人も「未公開」バッジ付きで表示） ──
+  // 掲載先「自社サイト」の求人のみ表示（求人ボックス等の媒体用求人は出さない）
   if (pathname === '/preview/jobs' && method === 'GET') {
-    let jobs = await Jobs.findAll();
+    let jobs = (await Jobs.findAll()).filter(j => (j.target_media || '').includes('自社サイト'));
     const search = (query.q || '').trim();
     if (search) {
       const s = search.toLowerCase();

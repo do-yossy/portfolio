@@ -519,6 +519,7 @@ function jobModalHTML() {
       <label style="font-weight:600;display:block;margin-bottom:8px">配信媒体 <span class="text-muted text-sm" style="font-weight:400">（1媒体のみ・重複掲載を防ぎます）</span></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         <label class="media-radio-label"><input type="radio" name="jf-media" value=""> なし</label>
+        <label class="media-radio-label"><input type="radio" name="jf-media" value="自社サイト"> 自社サイト</label>
         <label class="media-radio-label"><input type="radio" name="jf-media" value="求人ボックス"> 求人ボックス</label>
         <label class="media-radio-label"><input type="radio" name="jf-media" value="スタンバイ"> スタンバイ</label>
         <label class="media-radio-label"><input type="radio" name="jf-media" value="Indeed"> Indeed</label>
