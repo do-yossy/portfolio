@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif">
+  <!-- 朝の空 -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cfe8f7"/>
+      <stop offset="0.7" stop-color="#fdf3df"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa3ab"/>
+      <stop offset="1" stop-color="#7d868e"/>
+    </linearGradient>
+    <linearGradient id="van" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef2f5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#sky)"/>
+
+  <!-- 朝日 -->
+  <circle cx="1010" cy="120" r="58" fill="#ffd98a"/>
+  <circle cx="1010" cy="120" r="80" fill="#ffd98a" opacity="0.35"/>
+
+  <!-- 遠景の山並み -->
+  <path d="M0 300 Q150 240 320 290 T700 285 T1200 295 V330 H0 Z" fill="#cdd9c4" opacity="0.8"/>
+
+  <!-- 福祉施設の建物 -->
+  <g>
+    <rect x="80" y="180" width="360" height="220" rx="6" fill="#f7f4ec" stroke="#d8d2c2" stroke-width="3"/>
+    <rect x="80" y="160" width="360" height="34" rx="6" fill="#7fb77e"/>
+    <!-- 窓 -->
+    <g fill="#bcd9ea" stroke="#9fc3d8" stroke-width="2">
+      <rect x="110" y="220" width="58" height="48" rx="4"/>
+      <rect x="190" y="220" width="58" height="48" rx="4"/>
+      <rect x="352" y="220" width="58" height="48" rx="4"/>
+      <rect x="110" y="300" width="58" height="48" rx="4"/>
+      <rect x="352" y="300" width="58" height="48" rx="4"/>
+    </g>
+    <!-- エントランス -->
+    <rect x="268" y="292" width="70" height="108" rx="4" fill="#a9d3e8" stroke="#8db8cf" stroke-width="2"/>
+    <line x1="303" y1="292" x2="303" y2="400" stroke="#8db8cf" stroke-width="3"/>
+    <!-- エントランス庇 -->
+    <rect x="252" y="278" width="102" height="14" rx="6" fill="#7fb77e"/>
+    <!-- スロープ -->
+    <path d="M338 400 L470 400 L470 388 Z" fill="#c9c2b0"/>
+    <rect x="338" y="396" width="132" height="6" fill="#b5ad99"/>
+    <!-- 施設サイン（ハートマーク） -->
+    <g transform="translate(232,166)">
+      <rect x="-44" y="0" width="88" height="24" rx="12" fill="#fffdf6"/>
+      <path d="M0 18 C-3 14 -10 9 -10 4.5 C-10 1 -7.4 -1 -4.8 -1 C-2.9 -1 -1 0.2 0 2 C1 0.2 2.9 -1 4.8 -1 C7.4 -1 10 1 10 4.5 C10 9 3 14 0 18 Z" transform="translate(0,3)" fill="#e8826e"/>
+    </g>
+  </g>
+
+  <!-- 街路樹 -->
+  <g>
+    <rect x="538" y="330" width="14" height="72" rx="6" fill="#9a7b54"/>
+    <circle cx="545" cy="296" r="52" fill="#8fc08a"/>
+    <circle cx="515" cy="318" r="34" fill="#a3cd9c"/>
+    <circle cx="575" cy="318" r="34" fill="#7cb377"/>
+  </g>
+  <g>
+    <rect x="1106" y="340" width="12" height="62" rx="6" fill="#9a7b54"/>
+    <circle cx="1112" cy="312" r="44" fill="#8fc08a"/>
+    <circle cx="1086" cy="330" r="28" fill="#a3cd9c"/>
+    <circle cx="1138" cy="330" r="28" fill="#7cb377"/>
+  </g>
+
+  <!-- 道路 -->
+  <rect x="0" y="402" width="1200" height="228" fill="url(#road)"/>
+  <g fill="#f4f1ea">
+    <rect x="30" y="506" width="110" height="14" rx="7"/>
+    <rect x="230" y="506" width="110" height="14" rx="7"/>
+    <rect x="430" y="506" width="110" height="14" rx="7"/>
+    <rect x="630" y="506" width="110" height="14" rx="7"/>
+    <rect x="830" y="506" width="110" height="14" rx="7"/>
+    <rect x="1030" y="506" width="110" height="14" rx="7"/>
+  </g>
+
+  <!-- 送迎車（ワゴン車） -->
+  <g transform="translate(620,300)">
+    <!-- 影 -->
+    <ellipse cx="220" cy="206" rx="240" ry="22" fill="#5e676e" opacity="0.35"/>
+    <!-- ボディ -->
+    <path d="M16 130 L26 70 Q30 44 58 40 L150 28 Q170 26 188 26 L356 26 Q392 26 408 54 L430 96 Q438 110 438 128 L438 168 Q438 182 424 182 L30 182 Q16 182 16 168 Z" fill="url(#van)" stroke="#c3ccd3" stroke-width="3"/>
+    <!-- グリーンのライン -->
+    <path d="M18 142 L436 142 L436 158 L18 158 Z" fill="#7fb77e"/>
+    <!-- 窓 -->
+    <path d="M62 52 Q66 46 76 45 L150 38 Q166 36 184 36 L196 36 L196 96 L48 96 Z" fill="#aed4e6" stroke="#8db8cf" stroke-width="2"/>
+    <path d="M210 36 L300 36 L300 96 L210 96 Z" fill="#aed4e6" stroke="#8db8cf" stroke-width="2"/>
+    <path d="M314 36 L352 36 Q380 36 392 58 L408 88 Q411 93 404 96 L314 96 Z" fill="#aed4e6" stroke="#8db8cf" stroke-width="2"/>
+    <!-- ドアライン -->
+    <line x1="203" y1="32" x2="203" y2="178" stroke="#c3ccd3" stroke-width="3"/>
+    <line x1="307" y1="32" x2="307" y2="178" stroke="#c3ccd3" stroke-width="3"/>
+    <!-- ヘッドライト・テールライト -->
+    <rect x="424" y="116" width="14" height="22" rx="5" fill="#ffd98a" stroke="#e7b95e" stroke-width="2"/>
+    <rect x="16" y="116" width="12" height="20" rx="5" fill="#e8826e"/>
+    <!-- 車椅子マーク -->
+    <g transform="translate(255,118)">
+      <circle cx="0" cy="0" r="20" fill="#3f7cac"/>
+      <g stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round">
+        <circle cx="-1" cy="4" r="7.5"/>
+        <path d="M-1 -12 L-1 -2 L7 -2 L10 6"/>
+      </g>
+      <circle cx="-1" cy="-14" r="3" fill="#ffffff"/>
+    </g>
+    <!-- タイヤ -->
+    <g>
+      <circle cx="96" cy="182" r="30" fill="#3a4148"/>
+      <circle cx="96" cy="182" r="14" fill="#d7dde2"/>
+      <circle cx="352" cy="182" r="30" fill="#3a4148"/>
+      <circle cx="352" cy="182" r="14" fill="#d7dde2"/>
+    </g>
+  </g>
+
+  <!-- 飛んでいる鳥 -->
+  <g stroke="#9bb3c4" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M880 90 q10 -10 20 0 q10 -10 20 0"/>
+    <path d="M940 130 q8 -8 16 0 q8 -8 16 0"/>
+  </g>
+</svg>

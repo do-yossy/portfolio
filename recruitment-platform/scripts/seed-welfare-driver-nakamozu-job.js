@@ -189,6 +189,7 @@ async function main() {
       description:    JOB.description,
       tags:           JOB.tags,
       catchcopy:      JOB.catchcopy,
+      imageUrl:       '/images/welfare-driver-nakamozu.svg',
       faq:            JOB.faq,
     });
     console.log(`🔄 既存求人を更新しました: ${JOB.title}`);
@@ -202,7 +203,7 @@ async function main() {
       description:    JOB.description,
       tags:           JOB.tags,
       catchcopy:      JOB.catchcopy,
-      imageUrl:       '',
+      imageUrl:       '/images/welfare-driver-nakamozu.svg',
       faq:            JOB.faq,
       isPublished:    false,
       targetMedia:    ['自社サイト'],

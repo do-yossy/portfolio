@@ -811,6 +811,18 @@ const server = http.createServer(async (req, res) => {
   catch { pathname = parsed.pathname || '/'; }  // 不正な%エンコードでも落とさない
 
   // ── Static files ──
+  if (pathname.startsWith('/images/') && method === 'GET') {
+    const fp = path.join(PUBLIC_DIR, path.normalize(pathname));
+    if (!fp.startsWith(path.join(PUBLIC_DIR, 'images'))) { send(res, 404, 'Not Found'); return; }
+    try {
+      const content = fs.readFileSync(fp);
+      const ext = path.extname(fp).toLowerCase();
+      const types = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
+      res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
+      res.end(content);
+    } catch { send(res, 404, 'Not Found'); }
+    return;
+  }
   if (pathname === '/styles.css' || pathname === '/admin.js') {
     const fp = path.join(PUBLIC_DIR, pathname);
     try {
