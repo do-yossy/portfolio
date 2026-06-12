@@ -32,6 +32,18 @@ const { Jobs } = require('../db-factory');
 
 const TITLE_PREFIX = '福祉施設送迎ドライバー';
 
+// public/images/welfare-driver-nakamozu.(jpg|png|webp) があればそれを優先して使う
+// （フリー素材写真をこのファイル名で保存するだけで差し替わります。なければSVGイラスト）
+function findImageUrl() {
+  const dir = path.join(__dirname, '..', 'public', 'images');
+  for (const ext of ['jpg', 'jpeg', 'png', 'webp', 'svg']) {
+    if (fs.existsSync(path.join(dir, `welfare-driver-nakamozu.${ext}`))) {
+      return `/images/welfare-driver-nakamozu.${ext}`;
+    }
+  }
+  return '';
+}
+
 const JOB = {
   title: '福祉施設送迎ドライバー／＜月給39万円〜44万円＞固定ルート中心・未経験歓迎・日勤シフト・完全週休2日制（シフト制）★',
   location: '大阪府堺市北区中百舌鳥町',
@@ -189,7 +201,7 @@ async function main() {
       description:    JOB.description,
       tags:           JOB.tags,
       catchcopy:      JOB.catchcopy,
-      imageUrl:       '/images/welfare-driver-nakamozu.svg',
+      imageUrl:       findImageUrl(),
       faq:            JOB.faq,
     });
     console.log(`🔄 既存求人を更新しました: ${JOB.title}`);
@@ -203,7 +215,7 @@ async function main() {
       description:    JOB.description,
       tags:           JOB.tags,
       catchcopy:      JOB.catchcopy,
-      imageUrl:       '/images/welfare-driver-nakamozu.svg',
+      imageUrl:       findImageUrl(),
       faq:            JOB.faq,
       isPublished:    false,
       targetMedia:    ['自社サイト'],
