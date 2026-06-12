@@ -108,7 +108,8 @@ $seeds = @(
     "seed-kikai-operator-sagamihara-job.js",
     "seed-factory-hachioji-job.js",
     "seed-factory-hino-job.js",
-    "seed-factory-fuchu-job.js"
+    "seed-factory-fuchu-job.js",
+    "seed-welfare-driver-nakamozu-job.js"
 )
 foreach ($seed in $seeds) {
     $result = node --experimental-sqlite "scripts\$seed" 2>&1
