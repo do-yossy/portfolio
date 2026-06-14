@@ -68,6 +68,17 @@ Write-Host "      OK: installed" -ForegroundColor Green
 
 # -- 5. .env check --------------------------------------------------
 Write-Host "[5/5] Checking .env file..." -ForegroundColor Yellow
+
+# Cloud sync via OneDrive (same Microsoft account on multiple PCs).
+# Shared copy lives outside the git repo so secrets never get committed.
+$envShared = if ($env:OneDrive) { Join-Path $env:OneDrive "recruitment-config\.env" } else { $null }
+
+# If local .env is missing, try to pull it from OneDrive.
+if ((-not (Test-Path ".env")) -and $envShared -and (Test-Path $envShared)) {
+    Write-Host "      Found .env in OneDrive. Copying in..." -ForegroundColor Gray
+    Copy-Item $envShared ".env" -Force
+}
+
 if (-not (Test-Path ".env")) {
     Write-Host ""
     Write-Host "  .env file not found." -ForegroundColor Red
@@ -95,6 +106,14 @@ if (-not (Test-Path ".env")) {
     exit 1
 }
 Write-Host "      OK: .env found" -ForegroundColor Green
+
+# Back up local .env to OneDrive so other PCs (same account) stay in sync.
+if ($envShared) {
+    $sharedDir = Split-Path $envShared
+    New-Item -ItemType Directory -Force -Path $sharedDir | Out-Null
+    Copy-Item ".env" $envShared -Force
+    Write-Host "      Synced .env to OneDrive (recruitment-config)" -ForegroundColor Gray
+}
 
 # -- 6. Seed job data ----------------------------------------------
 Write-Host ""
