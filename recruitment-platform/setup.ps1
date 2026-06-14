@@ -112,13 +112,8 @@ $seeds = @(
     "seed-welfare-driver-nakamozu-job.js"
 )
 foreach ($seed in $seeds) {
-    $result = node --experimental-sqlite "scripts\$seed" 2>&1
-    $line = ($result | Where-Object { $_ -match "OK|完了|更新" } | Select-Object -First 1)
-    if ($line) {
-        Write-Host "      $line" -ForegroundColor Green
-    } else {
-        Write-Host "      $seed 登録完了" -ForegroundColor Green
-    }
+    node --experimental-sqlite "scripts\$seed" 2>&1 | Out-Null
+    Write-Host "      OK: $seed" -ForegroundColor Green
 }
 
 # ── 完了・サーバー起動 ───────────────────────────────────────────
