@@ -6,7 +6,9 @@
 #   .\setup.ps1
 # =====================================================================
 
-$ErrorActionPreference = "Stop"
+# Native commands like git/npm write progress to stderr; with "Stop" that
+# would abort the script, so use "Continue" and check exit codes manually.
+$ErrorActionPreference = "Continue"
 $REPO_URL    = "https://github.com/do-yossy/portfolio.git"
 $BRANCH      = "claude/seo-recruitment-platform-mvp-LBKz5"
 $INSTALL_DIR = "$env:USERPROFILE\portfolio"
@@ -44,20 +46,24 @@ Write-Host "[3/5] Fetching repository..." -ForegroundColor Yellow
 if (Test-Path "$INSTALL_DIR\.git") {
     Write-Host "      Updating existing repository..." -ForegroundColor Gray
     Set-Location $INSTALL_DIR
-    git fetch origin $BRANCH 2>&1 | Out-Null
-    git checkout $BRANCH 2>&1 | Out-Null
-    git pull origin $BRANCH 2>&1 | Out-Null
+    git fetch origin $BRANCH *> $null
+    git checkout $BRANCH *> $null
+    git pull origin $BRANCH *> $null
     Write-Host "      OK: updated" -ForegroundColor Green
 } else {
     Write-Host "      Cloning: $REPO_URL" -ForegroundColor Gray
-    git clone --branch $BRANCH $REPO_URL $INSTALL_DIR 2>&1
+    git clone --branch $BRANCH $REPO_URL $INSTALL_DIR *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ERROR: git clone failed." -ForegroundColor Red
+        exit 1
+    }
     Write-Host "      OK: cloned" -ForegroundColor Green
 }
 Set-Location "$INSTALL_DIR\recruitment-platform"
 
 # -- 4. npm install -------------------------------------------------
 Write-Host "[4/5] Installing packages..." -ForegroundColor Yellow
-npm install --silent 2>&1 | Out-Null
+npm install --silent *> $null
 Write-Host "      OK: installed" -ForegroundColor Green
 
 # -- 5. .env check --------------------------------------------------
@@ -109,7 +115,7 @@ $seeds = @(
     "seed-welfare-driver-nakamozu-job.js"
 )
 foreach ($seed in $seeds) {
-    node --experimental-sqlite "scripts\$seed" 2>&1 | Out-Null
+    node --experimental-sqlite "scripts\$seed" *> $null
     Write-Host "      OK: $seed" -ForegroundColor Green
 }
 
