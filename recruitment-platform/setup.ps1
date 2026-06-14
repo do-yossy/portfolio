@@ -1,101 +1,98 @@
 # =====================================================================
-# 採用プラットフォーム 自動セットアップスクリプト (Windows PowerShell)
+# Recruitment Platform - Auto Setup Script (Windows PowerShell)
 #
-# 実行方法:
-#   1. PowerShell を開く
-#   2. このスクリプトのあるフォルダに移動
-#   3. 以下を実行:
-#        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-#        .\setup.ps1
+# Usage:
+#   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+#   .\setup.ps1
 # =====================================================================
 
 $ErrorActionPreference = "Stop"
-$REPO_URL  = "https://github.com/do-yossy/portfolio.git"
-$BRANCH    = "claude/seo-recruitment-platform-mvp-LBKz5"
+$REPO_URL    = "https://github.com/do-yossy/portfolio.git"
+$BRANCH      = "claude/seo-recruitment-platform-mvp-LBKz5"
 $INSTALL_DIR = "$env:USERPROFILE\portfolio"
 
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "  採用プラットフォーム セットアップ" -ForegroundColor Cyan
+Write-Host "  Recruitment Platform Setup" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ── 1. Node.js チェック ──────────────────────────────────────────
-Write-Host "[1/5] Node.js の確認..." -ForegroundColor Yellow
+# -- 1. Node.js check ------------------------------------------------
+Write-Host "[1/5] Checking Node.js..." -ForegroundColor Yellow
 try {
     $nodeVer = node --version 2>&1
     Write-Host "      OK: $nodeVer" -ForegroundColor Green
 } catch {
-    Write-Host "  ERROR: Node.js が見つかりません。" -ForegroundColor Red
-    Write-Host "  https://nodejs.org から v22以上をインストールしてください。" -ForegroundColor Red
+    Write-Host "  ERROR: Node.js not found." -ForegroundColor Red
+    Write-Host "  Install v22+ from https://nodejs.org" -ForegroundColor Red
     exit 1
 }
 
-# ── 2. Git チェック ──────────────────────────────────────────────
-Write-Host "[2/5] Git の確認..." -ForegroundColor Yellow
+# -- 2. Git check ---------------------------------------------------
+Write-Host "[2/5] Checking Git..." -ForegroundColor Yellow
 try {
     $gitVer = git --version 2>&1
     Write-Host "      OK: $gitVer" -ForegroundColor Green
 } catch {
-    Write-Host "  ERROR: Git が見つかりません。" -ForegroundColor Red
-    Write-Host "  https://git-scm.com からインストールしてください。" -ForegroundColor Red
+    Write-Host "  ERROR: Git not found." -ForegroundColor Red
+    Write-Host "  Install from https://git-scm.com" -ForegroundColor Red
     exit 1
 }
 
-# ── 3. リポジトリ取得 ────────────────────────────────────────────
-Write-Host "[3/5] リポジトリを取得..." -ForegroundColor Yellow
+# -- 3. Get repository ----------------------------------------------
+Write-Host "[3/5] Fetching repository..." -ForegroundColor Yellow
 if (Test-Path "$INSTALL_DIR\.git") {
-    Write-Host "      既存リポジトリを最新版に更新します..." -ForegroundColor Gray
+    Write-Host "      Updating existing repository..." -ForegroundColor Gray
     Set-Location $INSTALL_DIR
     git fetch origin $BRANCH 2>&1 | Out-Null
     git checkout $BRANCH 2>&1 | Out-Null
     git pull origin $BRANCH 2>&1 | Out-Null
-    Write-Host "      OK: 更新完了" -ForegroundColor Green
+    Write-Host "      OK: updated" -ForegroundColor Green
 } else {
-    Write-Host "      クローン中: $REPO_URL" -ForegroundColor Gray
+    Write-Host "      Cloning: $REPO_URL" -ForegroundColor Gray
     git clone --branch $BRANCH $REPO_URL $INSTALL_DIR 2>&1
-    Write-Host "      OK: クローン完了" -ForegroundColor Green
+    Write-Host "      OK: cloned" -ForegroundColor Green
 }
 Set-Location "$INSTALL_DIR\recruitment-platform"
 
-# ── 4. npm install ───────────────────────────────────────────────
-Write-Host "[4/5] パッケージをインストール..." -ForegroundColor Yellow
+# -- 4. npm install -------------------------------------------------
+Write-Host "[4/5] Installing packages..." -ForegroundColor Yellow
 npm install --silent 2>&1 | Out-Null
-Write-Host "      OK: インストール完了" -ForegroundColor Green
+Write-Host "      OK: installed" -ForegroundColor Green
 
-# ── 5. .env チェック ─────────────────────────────────────────────
-Write-Host "[5/5] 環境設定ファイルの確認..." -ForegroundColor Yellow
+# -- 5. .env check --------------------------------------------------
+Write-Host "[5/5] Checking .env file..." -ForegroundColor Yellow
 if (-not (Test-Path ".env")) {
     Write-Host ""
-    Write-Host "  .env ファイルが見つかりません。" -ForegroundColor Red
-    Write-Host "  recruitment-platform フォルダに .env を配置してください。" -ForegroundColor Red
+    Write-Host "  .env file not found." -ForegroundColor Red
+    Write-Host "  Place .env in the recruitment-platform folder." -ForegroundColor Red
     Write-Host ""
-    Write-Host "  .env には以下を記載します（管理者に確認してください）:" -ForegroundColor Yellow
+    Write-Host "  Required keys (ask the administrator for values):" -ForegroundColor Yellow
     Write-Host "    PORT=3000"
     Write-Host "    SITE_URL=https://social-quality.com"
-    Write-Host "    COMPANY_NAME=株式会社Social Quality"
-    Write-Host "    SITE_NAME=採用サイト"
+    Write-Host "    COMPANY_NAME=..."
+    Write-Host "    SITE_NAME=..."
     Write-Host "    ADMIN_USER=admin"
-    Write-Host "    ADMIN_PASSWORD=（パスワード）"
-    Write-Host "    ANTHROPIC_API_KEY=（APIキー）"
+    Write-Host "    ADMIN_PASSWORD=..."
+    Write-Host "    ANTHROPIC_API_KEY=..."
     Write-Host "    SMTP_HOST=smtp.gmail.com"
     Write-Host "    SMTP_PORT=587"
-    Write-Host "    SMTP_USER=（メールアドレス）"
-    Write-Host "    SMTP_PASS=（アプリパスワード）"
-    Write-Host "    FROM_EMAIL=（メールアドレス）"
-    Write-Host "    ADMIN_EMAIL=（メールアドレス）"
+    Write-Host "    SMTP_USER=..."
+    Write-Host "    SMTP_PASS=..."
+    Write-Host "    FROM_EMAIL=..."
+    Write-Host "    ADMIN_EMAIL=..."
     Write-Host "    KYUJINBOX_BATCH_SIZE=5"
     Write-Host "    KYUJINBOX_GROUP_ID=G5922-7577-0001"
     Write-Host "    HEADLESS=1"
     Write-Host ""
-    Write-Host "  .env を配置後、このスクリプトを再実行してください。" -ForegroundColor Cyan
+    Write-Host "  After placing .env, run this script again." -ForegroundColor Cyan
     exit 1
 }
-Write-Host "      OK: .env を確認しました" -ForegroundColor Green
+Write-Host "      OK: .env found" -ForegroundColor Green
 
-# ── 6. 求人データ登録 ────────────────────────────────────────────
+# -- 6. Seed job data ----------------------------------------------
 Write-Host ""
-Write-Host "求人データを登録します..." -ForegroundColor Yellow
+Write-Host "Registering job data..." -ForegroundColor Yellow
 $seeds = @(
     "seed-cosme-factory-job.js",
     "seed-takuhai-driver-job.js",
@@ -116,16 +113,16 @@ foreach ($seed in $seeds) {
     Write-Host "      OK: $seed" -ForegroundColor Green
 }
 
-# ── 完了・サーバー起動 ───────────────────────────────────────────
+# -- Done / start server -------------------------------------------
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "  セットアップ完了！サーバーを起動します" -ForegroundColor Cyan
+Write-Host "  Setup complete. Starting server..." -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  求人サイト: http://localhost:3000/preview/top" -ForegroundColor Cyan
-Write-Host "  管理画面:   http://localhost:3000/admin" -ForegroundColor Cyan
+Write-Host "  Job site:    http://localhost:3000/preview/top" -ForegroundColor Cyan
+Write-Host "  Admin panel: http://localhost:3000/admin" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  停止するには Ctrl+C を押してください。" -ForegroundColor Gray
+Write-Host "  Press Ctrl+C to stop." -ForegroundColor Gray
 Write-Host ""
 
 node --experimental-sqlite server.js
