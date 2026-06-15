@@ -115,6 +115,20 @@ if ($envShared) {
     Write-Host "      Synced .env to OneDrive (recruitment-config)" -ForegroundColor Gray
 }
 
+# Sync the Google service-account key (google-key.json) the same way.
+# It is a secret, so it lives only in OneDrive (never in git).
+if ($env:OneDrive) {
+    $keyShared = Join-Path $env:OneDrive "recruitment-config\google-key.json"
+    if ((-not (Test-Path "google-key.json")) -and (Test-Path $keyShared)) {
+        Copy-Item $keyShared "google-key.json" -Force
+        Write-Host "      Restored google-key.json from OneDrive" -ForegroundColor Gray
+    } elseif (Test-Path "google-key.json") {
+        New-Item -ItemType Directory -Force -Path (Split-Path $keyShared) | Out-Null
+        Copy-Item "google-key.json" $keyShared -Force
+        Write-Host "      Synced google-key.json to OneDrive" -ForegroundColor Gray
+    }
+}
+
 # -- 6. Seed job data ----------------------------------------------
 Write-Host ""
 Write-Host "Registering job data..." -ForegroundColor Yellow
