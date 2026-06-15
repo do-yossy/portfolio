@@ -243,10 +243,11 @@ def upload_job_image(page, job):
                 dlg_present = False
 
             if dlg_present:
-                # 設定/保存/確定/完了 を順に試す（モーダル内の最後のボタン優先）
-                for label in ['設定する', '設定', '保存する', '保存', '確定', '決定', '完了', 'OK']:
+                # 設定/保存/確定/完了 を順に試す（完全一致で。部分一致だと
+                # フォーム内の「特徴を設定する」等を誤クリックするため exact=True）
+                for label in ['設定', '設定する', '保存', '保存する', '確定', '決定', '完了', 'OK']:
                     try:
-                        loc = page.locator(f'button:has-text("{label}")')
+                        loc = page.get_by_role('button', name=label, exact=True)
                         if loc.count() == 0:
                             continue
                         btn = loc.last
