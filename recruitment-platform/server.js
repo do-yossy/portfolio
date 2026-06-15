@@ -48,24 +48,32 @@ const SCRIPTS_DIR = path.join(__dirname, 'scripts');
 // PYTHON_PATH(.env) を指定すれば最優先で使用。
 const PYTHON_CMD = (function detectPython() {
   const { spawnSync } = require('child_process');
+  // 実際にブラウザ操作まで使えるか（greenlet含む深いimport）で判定する。
+  const TEST = 'from playwright.sync_api import sync_playwright';
   const candidates = [];
   if ((process.env.PYTHON_PATH || '').trim()) candidates.push(process.env.PYTHON_PATH.trim());
   if ((process.env.PYTHON_CMD  || '').trim()) candidates.push(process.env.PYTHON_CMD.trim());
   if (process.platform === 'win32') {
-    candidates.push('python', 'py');
     const la = process.env.LOCALAPPDATA || '';
+    const pf = process.env.ProgramFiles || 'C:\\Program Files';
+    // 安定版（3.13/3.12）を優先。Python 3.14 は playwright/greenlet 未対応のことが多い。
+    for (const v of ['313', '312', '311']) {
+      if (la) candidates.push(path.join(la, 'Programs', 'Python', `Python${v}`, 'python.exe'));
+      candidates.push(path.join(pf, `Python${v}`, 'python.exe'));
+    }
+    candidates.push('python', 'py');
     if (la) candidates.push(path.join(la, 'Python', 'bin', 'python.exe'));
   } else {
     candidates.push('python3', 'python');
   }
   for (const c of candidates) {
     try {
-      const r = spawnSync(c, ['-c', 'import playwright'], { timeout: 10000, windowsHide: true });
-      if (r.status === 0) { console.log(`[python] playwright検出: ${c}`); return c; }
+      const r = spawnSync(c, ['-c', TEST], { timeout: 12000, windowsHide: true });
+      if (r.status === 0) { console.log(`[python] playwright動作確認OK: ${c}`); return c; }
     } catch (_) {}
   }
-  const fallback = candidates[0] || (process.platform === 'win32' ? 'python' : 'python3');
-  console.log(`[python] playwright入りPythonが見つからず。フォールバック: ${fallback}`);
+  const fallback = (process.env.PYTHON_PATH || '').trim() || (process.platform === 'win32' ? 'python' : 'python3');
+  console.log(`[python] 動作するplaywright入りPythonが見つかりません。フォールバック: ${fallback}`);
   return fallback;
 })();
 
