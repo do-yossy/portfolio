@@ -1227,8 +1227,8 @@ function topPageV2(jobs) {
     <div class="et-mvv">
       <div class="et-mvv-item">
         <div class="et-mvv-label">MISSION<span>使命</span></div>
-        <div class="et-mvv-title">テクノロジーで、「働く」と「ビジネス」をアップデートする。</div>
-        <div class="et-mvv-text">Web・アプリ・AIの開発力を軸に、人と企業の「できる」を増やす。デジタルの力で、現場の課題を一つずつ解決していきます。</div>
+        <div class="et-mvv-title">つくる力で、人と企業の可能性を解き放つ。</div>
+        <div class="et-mvv-text">Web・アプリ・AIの開発力を軸に、人と企業の「できる」を増やす。テクノロジーと創造力で、まだ無い価値を生み出していきます。</div>
       </div>
       <div class="et-mvv-item">
         <div class="et-mvv-label">VISION<span>目指す姿</span></div>
@@ -1237,8 +1237,8 @@ function topPageV2(jobs) {
       </div>
       <div class="et-mvv-item">
         <div class="et-mvv-label">VALUE<span>価値観</span></div>
-        <div class="et-mvv-title">ユーザーファースト・スピード&amp;改善・学び続ける。</div>
-        <div class="et-mvv-text">まず使う人の価値を第一に。小さく速くつくって改善を回す。新しい技術を学び続け、チームで成果につなげていきます。</div>
+        <div class="et-mvv-title">挑戦を楽しむ・本質にこだわる・仲間を信じる。</div>
+        <div class="et-mvv-text">前例がなくてもまず挑む。流行ではなく本質的な価値にこだわる。立場を越えて仲間を信じ、チームで大きな成果をつくります。</div>
       </div>
     </div>
 
@@ -1570,9 +1570,9 @@ function jobDetailPageV2(job) {
   const companyName = process.env.COMPANY_NAME || '株式会社Social Quality';
   const shortName = companyName.replace(/^(株式会社|有限会社|合同会社)\s*/, '');
   const mvvContent =
-    'MISSION（使命）\nテクノロジーで、「働く」と「ビジネス」をアップデートする。\n\n'
+    'MISSION（使命）\nつくる力で、人と企業の可能性を解き放つ。\n\n'
     + 'VISION（目指す姿）\n確かな価値を提供できる企業へ。\n\n'
-    + 'VALUE（価値観）\nユーザーファースト / スピード&改善 / 学び続ける。';
+    + 'VALUE（価値観）\n挑戦を楽しむ / 本質にこだわる / 仲間を信じる。';
   const valuesContent =
     '１：Good is good\n'
     + '‣ 付加価値のあるものを創り、広く届ける。クライアントやユーザーに価値を生み出し続けることを大切にしています。情熱と想いを強く持ち、自分たちが生み出したモノ・関わったコトで、プロジェクトや世の中を前進させます。\n\n'
