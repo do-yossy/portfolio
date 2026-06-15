@@ -127,22 +127,27 @@ def get_base_url(url):
 
 def resolve_job_image(job):
     """掲載画像のローカルパスを決定する。
-    優先順: 環境変数 KYUJINBOX_JOB_IMAGE > OneDrive共有フォルダ > リポジトリ同梱SVG。
-    OneDrive\\recruitment-config\\job-images\\ec-haisou.(jpg/png/...) に写真を置けば自動採用。"""
+    優先順: 環境変数 KYUJINBOX_JOB_IMAGE > OneDrive共有フォルダ > リポジトリ同梱画像。
+    OneDrive\\recruitment-config\\job-images\\ec-haisou.(jpg/png/...) に写真を置けば自動採用。
+    求人ボックスはSVGを受け付けないため、JPG/PNG/JPEG/WEBP を最優先で探し、SVGは最後の手段。"""
     import pathlib
     env_path = os.environ.get("KYUJINBOX_JOB_IMAGE", "").strip()
     if env_path and os.path.exists(env_path):
         return env_path
+    # ラスター画像を優先（kyujinboxはSVG不可）。svgは最後に回す。
+    raster_exts = ("jpg", "jpeg", "png", "webp")
     onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer") or ""
     if onedrive:
         base = pathlib.Path(onedrive) / "recruitment-config" / "job-images"
-        for name in ("ec-haisou.jpg", "ec-haisou.jpeg", "ec-haisou.png", "ec-haisou.webp", "ec-haisou.svg"):
-            p = base / name
+        for ext in raster_exts + ("svg",):
+            p = base / f"ec-haisou.{ext}"
             if p.exists():
                 return str(p)
-    repo_svg = pathlib.Path(__file__).parent.parent / "public" / "images" / "ec-haisou-driver.svg"
-    if repo_svg.exists():
-        return str(repo_svg)
+    repo_dir = pathlib.Path(__file__).parent.parent / "public" / "images"
+    for ext in raster_exts + ("svg",):
+        p = repo_dir / f"ec-haisou-driver.{ext}"
+        if p.exists():
+            return str(p)
     return ""
 
 def upload_job_image(page, job):
