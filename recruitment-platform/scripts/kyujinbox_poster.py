@@ -219,17 +219,64 @@ def upload_job_image(page, job):
         progress(f"  ✅ 画像アップロード: {os.path.basename(img_path)}", "info")
         rand_delay(1.5, 2.5)  # アップロード反映待ち
 
-        # ③ アップロード後にトリミング/確定ダイアログがあれば「設定」「保存」「OK」を押す
-        for label in ['設定する', '設定', '保存する', '保存', '確定', 'アップロード', 'OK', '完了']:
+        # ③ アップロード後の「選択した写真をトリミングします。」ダイアログで「設定」を確実に押す。
+        #    ダイアログ表示には時間差があるため、最大約14秒・複数回トライして確定する。
+        #    確定しないとモーダルが残り、後続の「公開する」がブロックされる。
+        confirmed = False
+        for attempt in range(14):
+            # トリミングダイアログ or 確定ボタンが出ているか
             try:
-                btn = page.locator(f'button:has-text("{label}")').last
-                if btn.count() > 0 and btn.is_visible():
-                    btn.click()
-                    progress(f"  🖼️ 画像確定ボタン「{label}」をクリック", "info")
-                    rand_delay(1.0, 1.8)
-                    break
+                dlg_present = page.evaluate("""() => {
+                    const txt = document.body.innerText || '';
+                    const hasCrop = txt.includes('トリミング') || txt.includes('切り抜き') || txt.includes('画像を設定');
+                    const btns = Array.from(document.querySelectorAll('button'));
+                    const hasSet = btns.some(b => {
+                        const t = (b.textContent || '').trim();
+                        const r = b.getBoundingClientRect();
+                        return (t === '設定' || t === '設定する' || t === '保存' || t === '保存する'
+                                || t === '確定' || t === '決定' || t === '完了')
+                               && r.width > 0 && r.height > 0;
+                    });
+                    return hasCrop || hasSet;
+                }""")
             except Exception:
-                pass
+                dlg_present = False
+
+            if dlg_present:
+                # 設定/保存/確定/完了 を順に試す（モーダル内の最後のボタン優先）
+                for label in ['設定する', '設定', '保存する', '保存', '確定', '決定', '完了', 'OK']:
+                    try:
+                        loc = page.locator(f'button:has-text("{label}")')
+                        if loc.count() == 0:
+                            continue
+                        btn = loc.last
+                        if btn.is_visible():
+                            btn.scroll_into_view_if_needed()
+                            btn.click(force=True, timeout=3000)
+                            progress(f"  🖼️ トリミング確定「{label}」をクリック", "info")
+                            confirmed = True
+                            break
+                    except Exception:
+                        pass
+                if confirmed:
+                    rand_delay(1.2, 2.0)
+                    # ダイアログが閉じたか確認。残っていれば次ループで再試行。
+                    try:
+                        still = page.evaluate("""() => {
+                            const txt = document.body.innerText || '';
+                            return txt.includes('トリミング') || txt.includes('切り抜き');
+                        }""")
+                    except Exception:
+                        still = False
+                    if not still:
+                        break
+                    confirmed = False  # まだ残っている→再試行
+            rand_delay(0.6, 1.0)
+
+        if confirmed:
+            progress("  ✅ 画像のトリミング確定が完了しました", "info")
+        else:
+            progress("  ℹ️ トリミングダイアログは検出されませんでした（確定不要のUIの可能性）", "info")
         return True
     except Exception as e:
         progress(f"  ⚠️ 画像アップロード失敗（スキップ）: {e}", "warn")
