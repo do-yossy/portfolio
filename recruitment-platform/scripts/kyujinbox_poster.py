@@ -31,6 +31,10 @@ PREFECTURES = [
 def progress(message, level="info"):
     print(json.dumps({"type": "progress", "message": str(message) if message is not None else "", "level": level}), flush=True)
 
+def posted_event(job_id):
+    """Notify Node.js that a job was successfully posted to kyujinbox."""
+    print(json.dumps({"type": "posted", "jobId": str(job_id), "level": "success"}), flush=True)
+
 def rand_delay(min_s=0.5, max_s=1.5):
     time.sleep(random.uniform(min_s, max_s))
 
@@ -120,6 +124,160 @@ def find_input(page, *selectors):
 def get_base_url(url):
     parsed = urlparse(url)
     return f"{parsed.scheme}://{parsed.netloc}"
+
+def resolve_job_image(job):
+    """掲載画像のローカルパスを決定する。
+    優先順:
+      1) 環境変数 KYUJINBOX_JOB_IMAGE（明示指定）
+      2) 求人の imageUrl（/images/xxx.jpg → public/images/xxx.jpg）※求人ごとに別画像
+      3) OneDrive共有フォルダ（ec-haisou.*）
+      4) リポジトリ同梱画像（ec-haisou-driver.*）
+    求人ボックスはSVGを受け付けないため、JPG/PNG/JPEG/WEBP を優先し、SVGは添付しない。"""
+    import pathlib
+    job = job or {}
+    raster_exts = ("jpg", "jpeg", "png", "webp")
+    repo_dir = pathlib.Path(__file__).parent.parent / "public" / "images"
+
+    # 1) 明示指定
+    env_path = os.environ.get("KYUJINBOX_JOB_IMAGE", "").strip()
+    if env_path and os.path.exists(env_path):
+        return env_path
+
+    # 2) 求人ごとの imageUrl（/images/xxx.jpg などローカルパスを解決）
+    img_url = (job.get("imageUrl") or job.get("image_url") or "").strip()
+    if img_url and not img_url.lower().startswith(("http://", "https://")):
+        rel = img_url.lstrip("/")
+        # "images/xxx.jpg" 形式 → public/ 配下
+        cand = pathlib.Path(__file__).parent.parent / "public" / rel
+        if cand.exists() and not cand.suffix.lower() == ".svg":
+            return str(cand)
+        # 拡張子違い（svg指定だがjpgがある等）を救済: 同じ basename で raster を探す
+        stem = pathlib.Path(rel).stem
+        for ext in raster_exts:
+            p = repo_dir / f"{stem}.{ext}"
+            if p.exists():
+                return str(p)
+
+    # 3) OneDrive 共有（汎用フォールバック）
+    onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer") or ""
+    if onedrive:
+        base = pathlib.Path(onedrive) / "recruitment-config" / "job-images"
+        for ext in raster_exts:
+            p = base / f"ec-haisou.{ext}"
+            if p.exists():
+                return str(p)
+
+    # 4) リポジトリ同梱（最終フォールバック）
+    for ext in raster_exts:
+        p = repo_dir / f"ec-haisou-driver.{ext}"
+        if p.exists():
+            return str(p)
+    return ""
+
+def confirm_crop_if_open(page, max_attempts=8):
+    """「選択した写真をトリミングします。」等のモーダルが開いていれば「設定」を押して閉じる。
+    開いていなければ何もしない。タイミングに左右されず、送信前・公開前の保険として呼べる。
+    戻り値: 確定して閉じたら True / 開いていなければ False"""
+    closed = False
+    for _ in range(max_attempts):
+        try:
+            present = page.evaluate("""() => {
+                const txt = document.body.innerText || '';
+                const hasCrop = txt.includes('トリミング') || txt.includes('切り抜き') || txt.includes('画像を設定');
+                const btns = Array.from(document.querySelectorAll('button'));
+                const hasSet = btns.some(b => {
+                    const t = (b.textContent || '').trim();
+                    const r = b.getBoundingClientRect();
+                    return ['設定','設定する','決定','確定','完了'].includes(t)
+                           && r.width > 0 && r.height > 0;
+                });
+                return hasCrop && hasSet;
+            }""")
+        except Exception:
+            present = False
+        if not present:
+            break
+        clicked = False
+        for label in ['設定', '設定する', '確定', '決定', '完了', '保存', 'OK']:
+            try:
+                loc = page.get_by_role('button', name=label, exact=True)
+                if loc.count() == 0:
+                    continue
+                btn = loc.last
+                if btn.is_visible():
+                    btn.scroll_into_view_if_needed()
+                    btn.click(force=True, timeout=3000)
+                    progress(f"  🖼️ トリミング確定「{label}」をクリック", "info")
+                    clicked = True
+                    closed = True
+                    break
+            except Exception:
+                pass
+        if not clicked:
+            break
+        rand_delay(1.0, 1.6)
+    return closed
+
+
+def upload_job_image(page, job):
+    """掲載フォームの画像欄(input[type=file])へ画像をアップロードする。
+    求人ボックスの写真欄は「写真を追加する」ボタンで input[type=file] を出現させる構造のため、
+    まずボタンを押してからファイルをセットする。画像欄が無い／画像が見つからない場合は
+    スキップして処理を続行する（既存フローは壊さない）。"""
+    img_path = resolve_job_image(job)
+    if not img_path:
+        progress("  🖼️ 画像ファイルが見つからないためスキップ", "warn")
+        return False
+    # 求人ボックスはSVG不可。SVGしか無い場合は添付しない。
+    if img_path.lower().endswith('.svg'):
+        progress("  🖼️ SVGは求人ボックス非対応のためスキップ（JPG/PNGを配置してください）", "warn")
+        return False
+    try:
+        # ① まず「写真を追加する」ボタンを押して隠れた file input を出現させる
+        for label in ['写真を追加', '写真を登録', '画像を追加', '画像をアップロード', '写真']:
+            try:
+                btn = page.locator(f'button:has-text("{label}"), a:has-text("{label}")').first
+                if btn.count() > 0 and btn.is_visible():
+                    btn.scroll_into_view_if_needed()
+                    rand_delay(0.2, 0.4)
+                    btn.click()
+                    progress(f"  🖼️ 「{label}」ボタンをクリック", "info")
+                    rand_delay(0.6, 1.0)
+                    break
+            except Exception:
+                pass
+
+        # ② file input を探す（隠れていても set_input_files は可能）
+        file_inputs = page.query_selector_all('input[type="file"]')
+        if not file_inputs:
+            progress("  🖼️ フォームに画像欄(input[type=file])が無いためスキップ", "warn")
+            return False
+        target = None
+        for fi in file_inputs:
+            accept = (fi.get_attribute('accept') or '').lower()
+            if 'image' in accept or accept == '':
+                target = fi
+                break
+        if target is None:
+            target = file_inputs[0]
+        target.set_input_files(img_path)
+        progress(f"  ✅ 画像アップロード: {os.path.basename(img_path)}", "info")
+        rand_delay(2.0, 3.0)  # アップロード＆トリミングダイアログ表示待ち
+
+        # ③ 「選択した写真をトリミングします。」ダイアログが出たら「設定」で確定する。
+        #    確定しないとモーダルが残り、後続の保存／公開がブロックされる。
+        if confirm_crop_if_open(page, max_attempts=10):
+            progress("  ✅ 画像のトリミング確定が完了しました", "info")
+        else:
+            progress("  ℹ️ トリミングダイアログは検出されませんでした", "info")
+        try:
+            save_screenshot(page, 'after_image_upload')
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        progress(f"  ⚠️ 画像アップロード失敗（スキップ）: {e}", "warn")
+        return False
 
 def human_type(page, selector, text, timeout=15000):
     """人間らしいランダム速度でテキストを入力"""
@@ -221,6 +379,11 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
 
 def click_submit_button(page):
     """フォームの送信ボタンをクリック（複数の方法を試す）"""
+    # 保険: トリミング等のモーダルが残っていると送信がブロックされるため先に閉じる
+    try:
+        confirm_crop_if_open(page, max_attempts=4)
+    except Exception:
+        pass
     page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
     rand_delay(0.5, 1.0)
 
@@ -692,10 +855,181 @@ def find_draft_url_by_title(page, title):
         return ''
 
 
-def publish_draft(page, draft_url):
+def _refill_empty_fields(page, job, full_payload=None):
+    """下書き再読み込み後に空の必須フィールドを再入力する。
+    すでに値が入っているフィールドは上書きしない。
+    """
+    salary_str = job.get('salary', '')
+    pay_type, pay_min, pay_max = parse_salary(salary_str)
+    location = job.get('location', '')
+    pref = extract_prefecture(location)
+    emp_type = job.get('employmentType') or job.get('employment_type', '')
+
+    # タイトル
+    try:
+        v = page.evaluate("() => (document.querySelector('input[name=\"title\"]') || {}).value || ''")
+        if not v.strip():
+            fill_text(page, 'input[name="title"]', job.get('title', ''), timeout=3000)
+            progress("  🔄 タイトル再入力", "info")
+    except Exception:
+        pass
+
+    # 仕事内容
+    try:
+        v = page.evaluate("() => (document.querySelector('textarea[name=\"description\"]') || {}).value || ''")
+        if not v.strip():
+            fill_text(page, 'textarea[name="description"]', job.get('description', ''), timeout=3000)
+            progress("  🔄 仕事内容再入力", "info")
+    except Exception:
+        pass
+
+    # 都道府県
+    if pref:
+        try:
+            v = page.evaluate("() => (document.querySelector('select[name=\"prefVal\"]') || {}).value || '0'")
+            if not v or v in ('0', ''):
+                select_option_safe(page, 'select[name="prefVal"]', label=pref, debug=False)
+                progress(f"  🔄 都道府県再選択: {pref}", "info")
+        except Exception:
+            pass
+
+    # 給与タイプ
+    try:
+        v = page.evaluate("() => (document.querySelector('select[name=\"payType\"]') || {}).value || '0'")
+        if not v or v in ('0', ''):
+            select_option_safe(page, 'select[name="payType"]', label=pay_type, debug=False)
+            progress(f"  🔄 給与タイプ再選択: {pay_type}", "info")
+    except Exception:
+        pass
+
+    # 給与最小
+    try:
+        v = page.evaluate("() => (document.querySelector('input[name=\"payMin\"]') || {}).value || ''")
+        if not v.strip() and pay_min:
+            fill_text(page, 'input[name="payMin"]', pay_min, timeout=3000)
+            progress(f"  🔄 給与最小再入力: {pay_min}", "info")
+    except Exception:
+        pass
+
+    # 雇用形態チェックボックス (employTypes)
+    if emp_type:
+        try:
+            has_checked = page.evaluate(
+                "() => Array.from(document.querySelectorAll('input[name=\"employTypes\"]')).some(cb => cb.checked)"
+            )
+            if not has_checked:
+                emp_map = {'正社員': '正社員', 'アルバイト': 'アルバイト', 'パート': 'パート',
+                           '契約社員': '契約社員', '業務委託': '業務委託', '派遣': '派遣'}
+                emp_label = next((v for k, v in emp_map.items() if k in emp_type), None)
+                page.evaluate("""(target) => {
+                    const cbs = document.querySelectorAll('input[name="employTypes"]');
+                    for (const cb of cbs) {
+                        const lbl = cb.closest('label') || cb.nextElementSibling
+                            || document.querySelector('label[for="' + cb.id + '"]');
+                        const txt = lbl ? lbl.textContent.trim() : '';
+                        if (target && txt.includes(target)) { lbl ? lbl.click() : cb.click(); return; }
+                    }
+                    if (cbs.length > 0) {
+                        const l = cbs[0].closest('label') || cbs[0].nextElementSibling;
+                        l ? l.click() : cbs[0].click();
+                    }
+                }""", emp_label or '')
+                progress(f"  🔄 雇用形態再選択: {emp_label or 'first'}", "info")
+        except Exception:
+            pass
+
+    # jobType (職種区分) ← 公開するボタンが有効になる最重要フィールド
+    try:
+        v = page.evaluate(
+            "() => { const el = document.querySelector('select[name=\"jobType\"]'); return el ? el.value : null; }")
+        if not v or str(v) in ('0', '', 'null', 'None'):
+            jt_payload_val = str((full_payload or {}).get('jobType', '')) if full_payload else ''
+            if jt_payload_val and jt_payload_val not in ('None', 'null', '0', ''):
+                ok = select_option_safe(page, 'select[name="jobType"]', value=jt_payload_val, debug=False)
+                if ok:
+                    progress(f"  🔄 職種(jobType)再選択: value={jt_payload_val}", "info")
+    except Exception:
+        pass
+
+    fp = full_payload or {}
+
+    # 住所（市区町村）input[name="address"] ← workLocations.location が null だと公開不可
+    try:
+        v = page.evaluate("() => (document.querySelector('input[name=\"address\"]') || {}).value || ''")
+        addr = str(fp.get('address') or fp.get('_location') or location or '').strip()
+        if not v.strip() and addr:
+            fill_text(page, 'input[name="address"]', addr, timeout=3000)
+            progress(f"  🔄 住所(市区町村)再入力: {addr}", "info")
+    except Exception:
+        pass
+
+    # 給与最大 payMax
+    try:
+        v = page.evaluate("() => (document.querySelector('input[name=\"payMax\"]') || {}).value || ''")
+        pm = str(fp.get('payMax') or pay_max or '').strip()
+        if not v.strip() and pm:
+            fill_text(page, 'input[name="payMax"]', pm, timeout=3000)
+            progress(f"  🔄 給与最大再入力: {pm}", "info")
+    except Exception:
+        pass
+
+    # 応募資格 qualifications（必須・空だと公開不可）
+    try:
+        v = page.evaluate("() => (document.querySelector('textarea[name=\"qualifications\"]') || {}).value || ''")
+        q = str(fp.get('qualifications') or '').strip()
+        if not q:
+            tags = job.get('tags', [])
+            if isinstance(tags, str):
+                try:
+                    tags = json.loads(tags)
+                except Exception:
+                    tags = []
+            if tags:
+                q = ' / '.join(str(t) for t in tags)[:130]
+        if not v.strip() and q:
+            fill_text(page, 'textarea[name="qualifications"]', q, timeout=3000)
+            progress("  🔄 応募資格再入力", "info")
+    except Exception:
+        pass
+
+    # 応募方法 howToApply（必須・空だと公開不可）
+    try:
+        v = page.evaluate("() => (document.querySelector('textarea[name=\"howToApply\"]') || {}).value || ''")
+        h = str(fp.get('howToApply')
+                or job.get('how_to_apply') or job.get('howToApply')
+                or "WEBの応募フォームよりご応募ください。応募後、担当者よりご連絡いたします。").strip()
+        if not v.strip() and h:
+            fill_text(page, 'textarea[name="howToApply"]', h, timeout=3000)
+            progress("  🔄 応募方法再入力", "info")
+    except Exception:
+        pass
+
+    # 特徴チェックボックス characteristics（1つも入っていなければ既定セットをON）
+    try:
+        char_values = fp.get('characteristics') or [1, 19, 23, 24, 43, 52]
+        char_values = [str(c) for c in char_values]
+        page.evaluate("""(targetValues) => {
+            const cbs = document.querySelectorAll('input[name="characteristics"]');
+            if (!cbs.length) return;
+            const anyChecked = Array.from(cbs).some(cb => cb.checked);
+            if (anyChecked) return;
+            for (const cb of cbs) {
+                if (targetValues.includes(String(cb.value)) && !cb.checked) {
+                    const lbl = cb.closest('label') || document.querySelector('label[for="' + cb.id + '"]');
+                    lbl ? lbl.click() : cb.click();
+                }
+            }
+        }""", char_values)
+    except Exception:
+        pass
+
+    rand_delay(0.5, 1.0)
+
+
+def publish_draft(page, draft_url, job=None, full_payload=None, upload_image=False):
     """保存済み下書きを開き直し、必要項目ラジオを実クリックで選択して「公開する」を押す。
-    下書き再読込でVueに保存データがロードされるため、ラジオの実クリックでVueが確実に更新され、
-    全必須項目が揃って「公開する」が有効化される。
+    job / full_payload を渡すと、空フィールドを自動補填してから公開を試みる。
+    upload_image=True のとき、公開前に画像を添付する（既存下書きへの後付け用）。
     戻り値: 公開成功なら True
     """
     try:
@@ -706,11 +1040,64 @@ def publish_draft(page, draft_url):
         except Exception:
             pass
         rand_delay(2.0, 3.0)
+
         # 全セクション描画のためスクロール
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         rand_delay(1.5, 2.5)
         page.evaluate("window.scrollTo(0, 0)")
         rand_delay(0.5, 1.0)
+
+        # ── Vueがドラフトデータをロードするまで待機 ──
+        try:
+            page.wait_for_function(
+                "() => document.querySelectorAll('input:not([type=\"hidden\"]), textarea').length >= 3",
+                timeout=10000
+            )
+        except Exception:
+            pass
+        rand_delay(1.0, 1.5)
+
+        # ── 空の必須フィールドを再入力（下書きロード後に Vue state が欠けている場合の対策）──
+        if job:
+            progress("  🔄 空フィールド補填中...", "info")
+            _refill_empty_fields(page, job, full_payload)
+            rand_delay(0.5, 1.0)
+
+        # ── 電話番号未設定なら「電話番号を入力必須にする」を外す ──
+        # （チェック有りで電話番号が空だと公開時のバリデーションで弾かれる）
+        company_phone = os.environ.get("KYUJINBOX_PHONE", "").strip()
+        if not company_phone:
+            try:
+                res = page.evaluate("""() => {
+                    const cb = document.querySelector('input[name="isPhoneNumberRequired"]');
+                    if (!cb) return 'no checkbox';
+                    if (!cb.checked) return 'already off';
+                    const lbl = cb.closest('label') || document.querySelector('label[for="' + cb.id + '"]');
+                    (lbl || cb).click();
+                    return 'unchecked';
+                }""")
+                if res == 'unchecked':
+                    progress("  📞 電話番号必須チェックを解除（番号未設定のため）", "info")
+                    rand_delay(0.3, 0.6)
+            except Exception:
+                pass
+
+        # ── 画像を後付け（既存下書きに写真が無い場合）──
+        if upload_image:
+            try:
+                has_photo = page.evaluate("""() => {
+                    // アップロード済みのプレビュー画像があるか（blob:/アップロード先URL）
+                    const imgs = Array.from(document.querySelectorAll('img'));
+                    return imgs.some(im => /blob:|cloudfront|kyujinbox|amazonaws|uploads?/i.test(im.src || ''));
+                }""")
+                if has_photo:
+                    progress("  🖼️ すでに写真があるため追加をスキップ", "info")
+                else:
+                    progress("  🖼️ 画像を後付けします", "info")
+                    upload_job_image(page, job or {})
+                    rand_delay(0.5, 1.0)
+            except Exception as e:
+                progress(f"  ⚠️ 画像後付け判定でエラー（スキップ）: {e}", "warn")
 
         # ── 必要項目「基本情報」ラジオを実クリック（完全一致・Vue更新）──
         try:
@@ -720,116 +1107,197 @@ def publish_draft(page, draft_url):
             progress(f"  ⚠️ 必要項目クリック失敗: {e}", "warn")
         rand_delay(1.0, 1.5)
 
-        # ── 「公開する」ボタン ──
-        pub = page.locator('button:has-text("公開する")').last
-        if pub.count() == 0:
-            progress("  ⚠️ 公開するボタンが見つかりません", "warn")
-            return False
-        cls = pub.get_attribute('class') or ''
-        if 'is-disab' in cls:
-            progress("  ⚠️ 公開するがまだ無効。残っている必須項目を調査します...", "warn")
-            # 「必須」ラベル付きで未入力のセクション見出しを収集
+        # 保険: 画像トリミング等のモーダルが残っていれば閉じる（公開ブロック防止）
+        try:
+            confirm_crop_if_open(page, max_attempts=4)
+        except Exception:
+            pass
+
+        # ── 「公開する」ボタンが有効になるまで待機（最大12秒）──
+        # 有効にならない場合は Vue reactive state を直接パッチして強制的に有効化する
+        progress("  ⏳ 「公開する」ボタンの有効化を待機中...", "info")
+        try:
+            page.wait_for_function("""() => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const pub = btns.find(b => (b.textContent||'').trim() === '公開する');
+                if (!pub) return false;
+                return !(pub.className||'').includes('is-disab') && !pub.disabled;
+            }""", timeout=12000)
+            progress("  ✅ 「公開する」ボタンが有効です", "info")
+        except Exception:
+            progress("  ⚠️ 「公開する」が有効にならない → Vue状態をパッチして再試行", "warn")
+            if job:
+                try:
+                    _pt, _pmn, _pmx = parse_salary(job.get('salary', ''))
+                    _ptv = {'時給': 1, '日給': 2, '月給': 3, '年収': 4, '固定報酬': 5}.get(_pt, 3)
+                    _loc = job.get('location', '')
+                    _pref = extract_prefecture(_loc)
+                    _pid = PREF_IDS.get(_pref) if _pref else None
+                    _jtv = (full_payload or {}).get('jobType')
+                    if not _jtv:
+                        try:
+                            _jtv = page.evaluate(
+                                "() => { const el = document.querySelector('select[name=\"jobType\"]'); return el ? el.value : null; }")
+                        except Exception:
+                            pass
+                    patch_vue_kyujin_state(
+                        page, job,
+                        job_type_val=_jtv,
+                        pay_type_val=_ptv,
+                        pay_min=_pmn,
+                        pay_max=_pmx,
+                        pref_id=_pid,
+                        char_values=['1', '19', '23', '24', '43', '52'],
+                        company_phone=os.environ.get("KYUJINBOX_PHONE", "").strip(),
+                    )
+                    rand_delay(1.5, 2.5)
+                    click_radio_by_label(page, ['基本情報'])
+                    rand_delay(0.5, 1.0)
+                except Exception as _e2:
+                    progress(f"  ⚠️ Vue状態パッチ失敗: {_e2}", "warn")
+
+        save_screenshot(page, 'before_publish_btn')
+
+        # ── 「公開する」ボタンを最大3回試みる ──
+        clicked_pub = False
+        for attempt in range(3):
             try:
-                missing = page.evaluate("""() => {
-                    const out = [];
-                    // 必須バッジを持つ見出し近辺で、空のinput/textarea/未選択radioを探す
-                    document.querySelectorAll('*').forEach(el => {
-                        const t = (el.textContent || '').trim();
-                        if (t === '必須' && el.children.length === 0) {
-                            // 見出しテキスト（親や前要素）
-                            let head = '';
-                            let p = el.closest('div,section,li,dl,tr');
-                            for (let i=0; i<3 && p; i++) {
-                                const h = p.querySelector('label,h2,h3,h4,dt,legend');
-                                if (h && h.textContent.trim() && h.textContent.trim() !== '必須') {
-                                    head = h.textContent.trim().slice(0,30); break;
-                                }
-                                p = p.parentElement;
-                            }
-                            if (head) out.push(head);
-                        }
-                    });
-                    return Array.from(new Set(out)).slice(0,15);
-                }""")
-                if missing:
-                    progress(f"  📋 必須セクション: {', '.join(missing)}", "warn")
-            except Exception:
-                pass
-            # 念のためクラス強制除去でクリックを試みる（最終手段）
-            try:
-                pub.evaluate("e => { e.classList.remove('is-disab'); e.removeAttribute('disabled'); }")
-                rand_delay(0.2, 0.4)
-                pub.click()
-                progress("  ⚠️ is-disab除去後にクリック（公開可否は要確認）", "warn")
-                rand_delay(2.0, 3.0)
-                # 確認ダイアログのOKも押す（mouse.click）
-                for _a in range(12):
+                pub_loc = page.locator('button:has-text("公開する")')
+                if pub_loc.count() == 0:
+                    progress("  ⚠️ 公開するボタンが見つかりません", "warn")
+                    return False
+                pub = pub_loc.last
+                cls = pub.get_attribute('class') or ''
+                pub_disabled = 'is-disab' in cls or pub.get_attribute('disabled') is not None
+
+                if pub_disabled and attempt < 2:
+                    progress(f"  ⚠️ 公開するが無効（試行{attempt+1}/3）。フィールドを再補填して再試行...", "warn")
+                    # スクロールで Vue 遅延描画を促す
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    rand_delay(1.0, 1.5)
+                    page.evaluate("window.scrollTo(0, 0)")
+                    rand_delay(0.5, 1.0)
+                    if job:
+                        _refill_empty_fields(page, job, full_payload)
+                    click_radio_by_label(page, ['基本情報'])
+                    rand_delay(1.0, 1.5)
+                    continue
+
+                if pub_disabled:
+                    # 最終手段: is-disab クラス強制除去
+                    progress("  ⚠️ 公開するが無効（最終手段: is-disab強制除去してクリック）", "warn")
                     try:
-                        pos = page.evaluate("""() => {
-                            const btns = Array.from(document.querySelectorAll('button'));
-                            for (const b of btns.filter(b => (b.textContent||'').trim()==='OK')) {
-                                const r = b.getBoundingClientRect();
-                                const s = window.getComputedStyle(b);
-                                if (r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && s.opacity!=='0')
-                                    return {x: r.left+r.width/2, y: r.top+r.height/2};
-                            }
-                            return null;
+                        missing = page.evaluate("""() => {
+                            const out = [];
+                            document.querySelectorAll('*').forEach(el => {
+                                const t = (el.textContent || '').trim();
+                                if (t === '必須' && el.children.length === 0) {
+                                    let head = '', p = el.closest('div,section,li,dl,tr');
+                                    for (let i=0; i<3 && p; i++) {
+                                        const h = p.querySelector('label,h2,h3,h4,dt,legend');
+                                        if (h && h.textContent.trim() && h.textContent.trim() !== '必須') {
+                                            head = h.textContent.trim().slice(0,30); break;
+                                        }
+                                        p = p.parentElement;
+                                    }
+                                    if (head) out.push(head);
+                                }
+                            });
+                            return Array.from(new Set(out)).slice(0,15);
                         }""")
-                        if pos:
-                            page.mouse.click(pos['x'], pos['y'])
-                            progress("  ✅ 確認ダイアログ「OK」mouse.click(is-disab後)", "success")
-                            break
+                        if missing:
+                            progress(f"  📋 未入力の必須セクション: {', '.join(missing)}", "warn")
                     except Exception:
                         pass
-                    rand_delay(0.5, 1.0)
-                rand_delay(3.0, 5.0)
-                try:
-                    page.wait_for_load_state('networkidle', timeout=15000)
-                except Exception:
-                    pass
-                # クリック後にエラーが出ていないか確認
-                final = page.url
-                if '/jobs/edit/' in final:
-                    # まだ編集ページ → 公開失敗の可能性
-                    return False
-                return True
-            except Exception:
-                return False
-        pub.scroll_into_view_if_needed()
-        rand_delay(0.3, 0.6)
-        pub.click()
-        progress("  ✅ 公開するをクリックしました", "info")
+                    pub.evaluate("e => { e.classList.remove('is-disab'); e.removeAttribute('disabled'); }")
+                    rand_delay(0.2, 0.4)
+
+                pub.scroll_into_view_if_needed()
+                rand_delay(0.3, 0.6)
+                pub.click(force=True)
+                progress(f"  ✅ 公開するをクリック（試行{attempt+1}）", "info")
+                clicked_pub = True
+                break
+            except Exception as e:
+                progress(f"  ⚠️ 公開するクリック失敗（試行{attempt+1}）: {e}", "warn")
+                rand_delay(1.0, 1.5)
+
+        if not clicked_pub:
+            progress("  ❌ 公開するボタンをクリックできませんでした", "warn")
+            save_screenshot(page, 'publish_btn_failed')
+            return False
+
         rand_delay(2.0, 3.0)
 
-        # ── 確認ダイアログ「求人を公開します。」→ OK をクリック ──
-        # 8個あるOKボタンのうち実際に画面に表示されているものの座標を取得し
-        # page.mouse.click(x, y) で信頼されたマウスイベントを発火する。
+        # ── 確認ダイアログ「求人を公開します。」→ 利用規約同意にチェック → OK をクリック ──
         ok_clicked = False
         for _attempt in range(12):
             try:
-                # 画面に実際に表示されているOKボタンの座標を取得
+                # ダイアログ内の「利用規約および掲載ガイドラインに同意する」チェックボックスをON
+                # （未チェックだとOKが無効になり下書きのまま止まる）。「無料オプション」側は触らない。
+                try:
+                    agree = page.evaluate("""() => {
+                        const cbs = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+                        for (const cb of cbs) {
+                            const r = cb.getBoundingClientRect();
+                            if (r.width === 0 && r.height === 0) continue;
+                            const lbl = cb.closest('label') || cb.parentElement;
+                            const txt = lbl ? (lbl.textContent || '') : '';
+                            if (txt.includes('利用規約') || txt.includes('ガイドライン') || txt.includes('同意')) {
+                                if (!cb.checked) {
+                                    (cb.closest('label') ? cb.closest('label') : cb).click();
+                                    return 'checked';
+                                }
+                                return 'already';
+                            }
+                        }
+                        return 'not found';
+                    }""")
+                    if agree == 'checked':
+                        progress("  ☑ 利用規約同意にチェック", "info")
+                        rand_delay(0.3, 0.6)
+                except Exception:
+                    pass
+
+                if _attempt == 0:
+                    save_screenshot(page, 'before_ok_click')
+
+                # OKボタンを element.click(force) で押す（座標クリックより確実）
+                ok_loc = page.locator('button:has-text("OK"), button:has-text("ＯＫ")')
+                clicked_this = False
+                if ok_loc.count() > 0:
+                    for idx in range(ok_loc.count()):
+                        b = ok_loc.nth(idx)
+                        try:
+                            if b.is_visible():
+                                b.scroll_into_view_if_needed()
+                                b.click(force=True, timeout=3000)
+                                progress(f"  ✅ 確認ダイアログ「OK」クリック成功（試行{_attempt+1}）", "success")
+                                ok_clicked = True
+                                clicked_this = True
+                                break
+                        except Exception:
+                            pass
+                if clicked_this:
+                    break
+
+                # フォールバック: 座標クリック
                 pos = page.evaluate("""() => {
                     const btns = Array.from(document.querySelectorAll('button'));
-                    const okBtns = btns.filter(b => (b.textContent || '').trim() === 'OK');
+                    const okBtns = btns.filter(b => ['OK','ＯＫ'].includes((b.textContent || '').trim()));
                     for (const b of okBtns) {
                         const r = b.getBoundingClientRect();
                         const s = window.getComputedStyle(b);
-                        if (r.width > 0 && r.height > 0
-                                && s.display !== 'none'
-                                && s.visibility !== 'hidden'
-                                && s.opacity !== '0') {
-                            return {x: r.left + r.width / 2, y: r.top + r.height / 2,
-                                    w: r.width, h: r.height, cls: b.className};
+                        if (r.width > 0 && r.height > 0 && s.display !== 'none'
+                                && s.visibility !== 'hidden' && s.opacity !== '0') {
+                            return {x: r.left + r.width / 2, y: r.top + r.height / 2, cls: b.className};
                         }
                     }
                     return null;
                 }""")
                 if pos:
-                    if _attempt == 0:
-                        save_screenshot(page, 'before_ok_click')
-                    progress(f"  🖱️ OKボタン座標: ({pos['x']:.0f}, {pos['y']:.0f}) cls={pos['cls']}", "info")
+                    progress(f"  🖱️ OK座標クリック: ({pos['x']:.0f}, {pos['y']:.0f})", "info")
                     page.mouse.click(pos['x'], pos['y'])
-                    progress(f"  ✅ 確認ダイアログ「OK」mouse.click成功 (試行{_attempt+1})", "success")
                     ok_clicked = True
                     break
                 else:
@@ -848,8 +1316,16 @@ def publish_draft(page, draft_url):
             page.wait_for_load_state('networkidle', timeout=15000)
         except Exception:
             pass
-        progress("  🎉 公開処理完了", "success")
-        return ok_clicked
+
+        # ── 成功判定: 編集ページから離脱できたか ──
+        final_url = page.url
+        if '/jobs/edit/' in final_url:
+            progress(f"  ❌ 公開失敗（まだ編集ページ: {final_url[-60:]}）", "warn")
+            save_screenshot(page, 'publish_failed')
+            return False
+
+        progress(f"  🎉 公開完了: {final_url[-60:]}", "success")
+        return True
     except Exception as e:
         progress(f"  ⚠️ 公開処理エラー: {e}", "warn")
         return False
@@ -1006,7 +1482,7 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
 
     desc      = job.get('description', '')
     rewarding = (job.get('rewarding') or job.get('rewarding_text') or '').strip()
-    quals     = job.get('qualifications', '')
+    quals     = (job.get('qualifications') or '').strip()
     transport = (job.get('transportation') or job.get('access') or '').strip()
     worktime  = (job.get('worktimeHoliday') or job.get('worktime_holiday') or job.get('workTime') or '').strip()
     benefit   = job.get('salary', '')
@@ -1014,11 +1490,31 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
     location  = job.get('location', '')
     use_phone = bool(company_phone)
 
+    # 応募資格・応募方法は空だと公開バリデーションで弾かれるため既定値を用意
+    if not quals:
+        tags = job.get('tags', [])
+        if isinstance(tags, str):
+            try:
+                tags = json.loads(tags)
+            except Exception:
+                tags = []
+        quals = (' / '.join(str(t) for t in tags)[:130]) if tags else '学歴不問　未経験者歓迎'
+    how_to_apply = (job.get('how_to_apply') or job.get('howToApply')
+                    or "WEBの応募フォームよりご応募ください。応募後、担当者よりご連絡いたします。").strip()
+
+    # 勤務地の市区町村（workLocations[0].location が null だと公開不可）
+    pref_name = extract_prefecture(location) or ''
+    city_text = location
+    if pref_name and pref_name in city_text:
+        city_text = city_text.split(pref_name, 1)[1]
+    city_text = re.sub(r'[（(].*$', '', city_text).strip() or location
+
     patch_data = {
         'title': title,
         'description': desc,
         'rewarding': rewarding or desc[:100],
         'qualifications': quals,
+        'howToApply': how_to_apply,
         'transportation': transport,
         'worktimeHoliday': worktime,
         'benefit': benefit,
@@ -1030,7 +1526,7 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
         'payMax': pay_max or None,
         'isPhoneNumberRequired': use_phone,
         'applicationPhoneNumber': company_phone,
-        'workLocations': [{'prefectureId': pref_id, 'location': location}],
+        'workLocations': [{'prefectureId': pref_id, 'location': city_text or location}],
     }
 
     try:
@@ -1703,6 +2199,11 @@ def fill_kyujinbox_form(page, job, company_name):
     fill_text(page, 'textarea[name="howToApply"]', how_to_apply, timeout=3000)
     rand_delay(0.2, 0.4)
 
+    # ---- 画像アップロード（画像欄があれば添付・無ければスキップ）----
+    progress(f"  🖼️ 画像アップロード処理", "info")
+    upload_job_image(page, job)
+    rand_delay(0.2, 0.4)
+
     # ---- 担当者情報 (relation) ----
     try:
         select_option_safe(page, 'select[name="relation"]', value='2', timeout=3000)
@@ -1939,12 +2440,168 @@ def fill_kyujinbox_form(page, job, company_name):
     return selected_job_type_val, company_phone, full_payload
 
 
+def collect_draft_urls(page, group_id, max_pages=70):
+    """求人一覧を巡回して、ステータスが「下書き」の求人の編集URLを集める。
+    ページ送り（次へ）で全ページを走査し、内容が変わらなくなったら終了する。"""
+    if not group_id:
+        progress("  ⚠️ KYUJINBOX_GROUP_ID 未設定のため下書き一覧を取得できません", "warn")
+        return []
+    list_url = f"https://saiyo.kyujinbox.com/company/groups/{group_id}/jobs"
+    try:
+        page.goto(list_url, timeout=30000)
+        page.wait_for_load_state('networkidle', timeout=15000)
+        rand_delay(1.5, 2.5)
+    except Exception as e:
+        progress(f"  ⚠️ 求人一覧の取得失敗: {e}", "warn")
+        return []
+
+    draft_urls = []
+    seen = set()
+    prev_sig = None
+    for pg in range(max_pages):
+        try:
+            result = page.evaluate("""() => {
+                const drafts = [];
+                const all = [];
+                const rows = document.querySelectorAll('tr, li, article, div');
+                for (const row of rows) {
+                    const a = row.querySelector && row.querySelector('a[href*="/jobs/edit/"]');
+                    if (!a || !a.href) continue;
+                    all.push(a.href);
+                    // 行テキストに「下書き」が含まれる かつ「公開中/審査中」を含まない
+                    const txt = (row.textContent || '');
+                    if (txt.includes('下書き')) drafts.push(a.href);
+                }
+                return {drafts: Array.from(new Set(drafts)), sig: Array.from(new Set(all)).slice(0,5).join('|')};
+            }""")
+        except Exception:
+            break
+        for u in result.get('drafts', []):
+            if u not in seen:
+                seen.add(u)
+                draft_urls.append(u)
+        sig = result.get('sig', '')
+        # 前ページと同じ内容ならページ送り終了
+        if sig and sig == prev_sig:
+            break
+        prev_sig = sig
+        # 次へボタン
+        moved = False
+        for kw in ['次へ', '次の', '＞', '>']:
+            try:
+                nxt = page.locator(f'a:has-text("{kw}"), button:has-text("{kw}")').first
+                if nxt.count() > 0 and nxt.is_visible():
+                    cls = nxt.get_attribute('class') or ''
+                    if 'disab' in cls.lower():
+                        break
+                    nxt.scroll_into_view_if_needed()
+                    nxt.click()
+                    page.wait_for_load_state('networkidle', timeout=10000)
+                    rand_delay(1.0, 2.0)
+                    moved = True
+                    break
+            except Exception:
+                pass
+        if not moved:
+            break
+    return draft_urls
+
+
+def run_publish_drafts():
+    """既存の下書き求人を巡回し、写真を後付けして公開する専用モード。"""
+    email    = os.environ.get("KYUJINBOX_EMAIL", "")
+    password = os.environ.get("KYUJINBOX_PASSWORD", "")
+    group_id = os.environ.get("KYUJINBOX_GROUP_ID", "").strip()
+    headless = os.environ.get("HEADLESS", "1").strip() not in ("0", "false", "no")
+
+    if not email or not password:
+        progress("⚠️ 環境変数 KYUJINBOX_EMAIL / KYUJINBOX_PASSWORD が未設定です", "warn")
+        sys.exit(1)
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        progress(f"❌ playwright の読み込みに失敗（実行Python: {sys.executable}）", "error")
+        progress(f"   原因: {type(e).__name__}: {e}", "error")
+        sys.exit(1)
+
+    keepalive_stop = start_keepalive(12)
+    with sync_playwright() as p:
+        progress("🌐 ブラウザを起動しています...", "info")
+        browser = p.chromium.launch(
+            headless=headless,
+            args=['--disable-blink-features=AutomationControlled', '--no-sandbox',
+                  '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        )
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            viewport={"width": 1440, "height": 900}, locale="ja-JP", timezone_id="Asia/Tokyo",
+        )
+        ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
+        page = ctx.new_page()
+        try:
+            progress("🔑 求人ボックスにログイン中...", "info")
+            page.goto("https://secure.kyujinbox.com/login", timeout=30000)
+            page.wait_for_load_state('networkidle', timeout=15000)
+            rand_delay(1.0, 2.0)
+            email_sel = find_input(page, 'input[name="login[email]"]', 'input[type="email"]', 'input[name="email"]')
+            human_type(page, email_sel, email)
+            rand_delay(0.6, 1.2)
+            pass_sel = find_input(page, 'input[name="login[password]"]', 'input[type="password"]', 'input[name="password"]')
+            human_type(page, pass_sel, password)
+            rand_delay(0.3, 0.8)
+            page.click('button[type="submit"], input[type="submit"], form button')
+            page.wait_for_load_state('networkidle', timeout=15000)
+            if 'login' in page.url.lower():
+                progress("❌ ログイン失敗", "error")
+                browser.close(); sys.exit(1)
+            progress("✅ ログイン成功", "success")
+
+            progress("🔎 下書きの求人を検索中...", "info")
+            draft_urls = collect_draft_urls(page, group_id)
+            progress(f"📋 下書き {len(draft_urls)}件 を公開します", "info")
+            if not draft_urls:
+                progress("✅ 公開対象の下書きはありませんでした", "success")
+                browser.close(); keepalive_stop.set(); return
+
+            published = 0
+            for idx, url in enumerate(draft_urls):
+                progress(f"📝 [{idx+1}/{len(draft_urls)}] 下書きを公開中...", "info")
+                try:
+                    ok = publish_draft(page, url, job=None, full_payload=None, upload_image=True)
+                    if ok:
+                        published += 1
+                        progress(f"🎉 公開しました（{idx+1}/{len(draft_urls)}）", "success")
+                    else:
+                        progress(f"📝 公開できませんでした（下書きのまま）: {url[-40:]}", "warn")
+                except Exception as e:
+                    progress(f"⚠️ 公開処理エラー: {e}", "warn")
+                if idx < len(draft_urls) - 1:
+                    wait = random.uniform(5.0, 12.0)
+                    progress(f"⏳ 次まで {wait:.0f}秒 待機（BAN回避）...", "info")
+                    time.sleep(wait)
+
+            progress(f"✅ {published}/{len(draft_urls)}件 を公開しました", "success")
+        except Exception as e:
+            progress(f"❌ エラー: {e}", "error")
+            browser.close(); keepalive_stop.set(); sys.exit(1)
+        browser.close()
+        keepalive_stop.set()
+
+
 def main():
     try:
         jobs_json = sys.stdin.read().strip()
-        jobs = json.loads(jobs_json) if jobs_json else []
+        parsed = json.loads(jobs_json) if jobs_json else []
     except Exception:
-        jobs = []
+        parsed = []
+
+    # 既存下書きの公開モード: stdin が {"mode": "publish_drafts"} の場合
+    if isinstance(parsed, dict) and parsed.get('mode') == 'publish_drafts':
+        run_publish_drafts()
+        return
+
+    jobs = parsed if isinstance(parsed, list) else []
 
     if not jobs:
         progress("⚠️ 投稿する求人データがありません", "warn")
@@ -1968,8 +2625,10 @@ def main():
 
     try:
         from playwright.sync_api import sync_playwright
-    except ImportError:
-        progress("❌ playwright がインストールされていません: pip install playwright && playwright install chromium", "error")
+    except Exception as e:
+        progress(f"❌ playwright の読み込みに失敗（実行Python: {sys.executable}）", "error")
+        progress(f"   原因: {type(e).__name__}: {e}", "error")
+        progress("   この Python に入れてください: " + f'"{sys.executable}" -m pip install playwright', "error")
         sys.exit(1)
 
     viewports = [
@@ -2112,9 +2771,10 @@ def main():
                         progress(f"  ⚠️ フォーム描画待機タイムアウト（続行）: {fe}", "warn")
                         rand_delay(1.0, 2.0)
 
-                    # Vue描画後に全フィールドをダンプ（毎回）
-                    dump_visible_inputs(page)
-                    save_screenshot(page, f"post_form_{i}")
+                    # Vue描画後フィールドダンプ・スクリーンショット（初回のみ）
+                    if i == 0:
+                        dump_visible_inputs(page)
+                        save_screenshot(page, f"post_form_{i}")
 
                     selected_job_type_val, job_company_phone, full_payload = fill_kyujinbox_form(page, job, company_name)
                     rand_delay(0.8, 1.8)
@@ -2142,7 +2802,8 @@ def main():
                     except Exception as ex:
                         progress(f"  select確認失敗: {ex}", "warn")
 
-                    save_screenshot(page, f"before_submit_{i}")
+                    if i == 0:
+                        save_screenshot(page, f"before_submit_{i}")
 
                     # ---- POSTインターセプター設定 ----
                     intercept_val = selected_job_type_val or '1'
@@ -2172,12 +2833,15 @@ def main():
 
                     final_url = page.url
                     progress(f"📍 送信後URL: {final_url}", "info")
-                    save_screenshot(page, f"after_submit_{i}")
+                    if i == 0:
+                        save_screenshot(page, f"after_submit_{i}")
 
                     url_changed = final_url != actual_url
                     went_edit = '/jobs/edit/' in final_url
                     has_job_id = bool(re.search(r'/jobs/edit/[\w-]+', final_url))
                     went_draft = '/draft' in final_url or (url_changed and '/jobs' in final_url and 'login' not in final_url)
+
+                    job_id = job.get('id', '')
 
                     # 最優先: 保存API(draft/jobs)が2xxを返したら下書き保存成功
                     if intercepted.get('save_ok'):
@@ -2191,6 +2855,8 @@ def main():
                         progress(f"✅ 「{job['title']}」を下書き保存しました "
                                  f"(API status={intercepted.get('save_status')}, id={draft_id})", "success")
                         success_count += 1
+                        if job_id:
+                            posted_event(job_id)
                         # ── 下書きの編集URLを特定 ──
                         draft_url = ''
                         if draft_id:
@@ -2201,7 +2867,7 @@ def main():
                             draft_url = find_draft_url_by_title(page, job['title'])
                         # ── 下書きを開き直して公開を試みる ──
                         if draft_url:
-                            published = publish_draft(page, draft_url)
+                            published = publish_draft(page, draft_url, job=job, full_payload=full_payload)
                             if published:
                                 progress(f"🎉 「{job['title']}」を公開しました", "success")
                             else:
@@ -2209,13 +2875,21 @@ def main():
                         else:
                             progress(f"  ℹ️ 下書きの編集URLを特定できず自動公開はスキップ（下書きは保存済み）", "info")
                     elif went_edit or has_job_id or went_draft:
-                        label = "一時保存" if not went_edit else "投稿"
-                        progress(f"✅ 「{job['title']}」を{label}しました (URL: {final_url})", "success")
+                        progress(f"✅ 「{job['title']}」を下書き保存しました (URL: {final_url})", "success")
                         success_count += 1
+                        if job_id:
+                            posted_event(job_id)
+                        # 編集URLに遷移した場合もそのまま公開を試みる
+                        if went_edit or has_job_id:
+                            published = publish_draft(page, final_url, job=job, full_payload=full_payload)
+                            if published:
+                                progress(f"🎉 「{job['title']}」を公開しました", "success")
                     elif url_changed and 'login' not in final_url and '/new' not in final_url:
                         # URL変化あり・ログインでもなく新規ページでもない
                         progress(f"✅ 「{job['title']}」を投稿しました (URL: {final_url})", "success")
                         success_count += 1
+                        if job_id:
+                            posted_event(job_id)
                     else:
                         # URL変化なし or /new のまま → バリデーションエラー
                         try:

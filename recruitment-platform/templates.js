@@ -85,7 +85,7 @@ ${content}
 </html>`;
 }
 
-function publicLayout(title, content, { description = '', jsonld = '', canonical = '' } = {}) {
+function publicLayout(title, content, { description = '', jsonld = '', canonical = '', bare = false } = {}) {
   const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
   const canonicalUrl = canonical || siteUrl + '/jobs';
   return `<!DOCTYPE html>
@@ -106,23 +106,23 @@ ${jsonld}
 <link rel="stylesheet" href="/styles.css?v=${process.env.ASSET_VERSION || '1'}">
 </head>
 <body class="pub-body">
-<header class="pub-header">
+${bare ? '' : `<header class="pub-header">
   <div class="pub-header-inner">
     <a href="/jobs" class="pub-header-logo">採用情報</a>
     <nav class="pub-header-nav">
       <a href="/jobs">求人一覧</a>
     </nav>
   </div>
-</header>
+</header>`}
 <main>
 ${content}
 </main>
-<footer class="pub-footer">
+${bare ? '' : `<footer class="pub-footer">
   <div class="pub-footer-inner">
     <span>${esc(process.env.COMPANY_NAME || '採用企業')}</span>
     <a href="/privacy">プライバシーポリシー</a>
   </div>
-</footer>
+</footer>`}
 <div id="toast-container"></div>
 <script src="/admin.js?v=${process.env.ASSET_VERSION || '1'}"></script>
 </body>
@@ -289,29 +289,7 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
       <div id="rotation-result" class="text-sm" style="margin-top:8px;white-space:pre-wrap;background:#f8fafc;border-radius:6px;padding:8px;display:none"></div>
     </div>
 
-    <div class="action-section mt-16">
-      <div class="action-section-title">🤖 AI求人自動生成 <span class="text-muted text-sm">（軽配送エリア別・30日で自動削除）</span></div>
-      <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px">
-        <label style="font-size:12px;color:#64748b;white-space:nowrap">媒体:</label>
-        <select id="ai-gen-target" class="form-input" style="width:130px;padding:4px 8px;font-size:13px">
-          <option value="all">全媒体</option>
-          <option value="kyujinbox">求人ボックス</option>
-          <option value="stanby">スタンバイ</option>
-        </select>
-        <label style="font-size:12px;color:#64748b;white-space:nowrap">件数:</label>
-        <select id="ai-gen-count" class="form-input" style="width:70px;padding:4px 8px;font-size:13px">
-          <option value="0">自動</option>
-          <option value="5">5件</option>
-          <option value="10">10件</option>
-          <option value="25">25件</option>
-        </select>
-        <button class="btn btn-primary" onclick="runAIGenerate()" id="btn-ai-generate" style="background:#7c3aed;border-color:#7c3aed">
-          🤖 AI求人を生成する
-        </button>
-        <span class="text-sm text-muted">毎日7:30に自動実行</span>
-      </div>
-      <div id="ai-gen-result" class="text-sm" style="margin-top:8px;white-space:pre-wrap;background:#f8fafc;border-radius:6px;padding:8px;display:none"></div>
-    </div>
+    <!-- AI求人自動生成セクション（無効化中） -->
 
     <div class="action-section mt-16">
       <div class="action-section-title">📡 媒体運用</div>
@@ -327,10 +305,16 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
             <option value="10">10件</option>
           </select>
           <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox()">
-            🚀 求人ボックスに投稿する
+            🚀 求人ボックスに投稿する（未投稿のみ）
+          </button>
+          <button id="btn-post-kyujinbox-force" class="btn btn-ghost btn-sm" onclick="startPostKyujinboxForce()" title="投稿済み求人も含めて全件投稿">
+            🔄 強制再投稿
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="resetKyujinboxPosted()" title="投稿済みフラグをリセット">
+            ♻️ フラグリセット
           </button>
         </div>
-        <div class="text-sm text-muted" style="margin-top:4px">目標25件/日 → 5件 × 5回（数時間おきに実行）</div>
+        <div class="text-sm text-muted" style="margin-top:4px">目標25件/日 → 5件 × 5回（数時間おきに実行）／1度投稿した求人は次回スキップ</div>
         <div id="progress-kyujinbox-wrap" class="progress-wrap hidden">
           <div id="progress-kyujinbox" class="progress-box"></div>
         </div>
@@ -344,6 +328,16 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
           <button class="btn btn-ghost btn-sm" onclick="downloadXML('stanby')">DL</button>
         </div>
         <div class="text-sm text-muted" style="margin-top:4px">このURLをスタンバイ管理画面の「XMLフィード」に登録してください</div>
+      </div>
+
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">Googleしごと検索 <span class="text-muted text-sm">（JSON-LD自動掲載・掲載7日で自動除外）</span></div>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="expireGoogleJobs()" title="掲載から7日経過した求人をGoogleしごと検索から除外">
+            🗑️ 7日経過求人をGoogle除外（手動）
+          </button>
+        </div>
+        <div class="text-sm text-muted" style="margin-top:4px">公開求人に自動掲載。掲載7日後にGoogleしごと検索から除外されます（毎時自動チェック）</div>
       </div>
 
       <div class="media-op-section mt-14">
@@ -455,9 +449,14 @@ function jobModalHTML() {
         <label>タイトル<span class="req">*</span></label>
         <input type="text" id="jf-title" placeholder="例: 介護職員（東京）">
       </div>
-      <div class="form-group">
-        <label>勤務地<span class="req">*</span></label>
-        <input type="text" id="jf-location" placeholder="例: 東京都新宿区">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>勤務地（複数可・選択制・車通勤可）<span class="req">*</span></label>
+        <div id="jf-locations-chips" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;min-height:36px;border:1px solid #d1ccc0;border-radius:8px;background:#faf8f3;margin-bottom:6px;"></div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="jf-location-input" placeholder="例: 大阪府大阪市北区芝田" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addJobLocation();}">
+          <button type="button" onclick="addJobLocation()" style="padding:8px 14px;background:#333;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap">追加</button>
+        </div>
+        <input type="hidden" id="jf-location">
       </div>
     </div>
     <div class="form-row">
@@ -525,6 +524,7 @@ function jobModalHTML() {
       <label style="font-weight:600;display:block;margin-bottom:8px">配信媒体 <span class="text-muted text-sm" style="font-weight:400">（1媒体のみ・重複掲載を防ぎます）</span></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         <label class="media-radio-label"><input type="radio" name="jf-media" value=""> なし</label>
+        <label class="media-radio-label"><input type="radio" name="jf-media" value="自社サイト"> 自社サイト</label>
         <label class="media-radio-label"><input type="radio" name="jf-media" value="求人ボックス"> 求人ボックス</label>
         <label class="media-radio-label"><input type="radio" name="jf-media" value="スタンバイ"> スタンバイ</label>
         <label class="media-radio-label"><input type="radio" name="jf-media" value="Indeed"> Indeed</label>
@@ -929,6 +929,823 @@ function jobDetailPage(job) {
   });
 }
 
+// ── 新デザイン採用トップページ（イーストアジア風・プレビュー用） ──────────
+// /preview/top で表示。
+function topPageV2(jobs) {
+  const companyName = process.env.COMPANY_NAME || '株式会社Social Quality';
+  // ヘッダーロゴ: 本体サイト(social-quality.com)のワードマーク「Social.Quality」に合わせる。
+  // 株式会社などの法人格を外し、語間をドットで連結（例: Social Quality → Social.Quality）。
+  const brandNoPrefix = companyName.replace(/^(株式会社|有限会社|合同会社)\s*/, '');
+  const brandParts = brandNoPrefix.split(/\s+/).filter(Boolean);
+  const logoHtml = brandParts.length >= 2
+    ? `${esc(brandParts[0])}<span class="et-logo-dot">.</span>${esc(brandParts.slice(1).join(''))}`
+    : esc(brandNoPrefix);
+  const PREFS =['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+
+  const typeCounts = {};
+  const prefCounts = {};
+  for (const j of jobs) {
+    typeCounts[j.job_type] = (typeCounts[j.job_type] || 0) + 1;
+    const locs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
+    const descLocMatch = !locs.length && (j.description || '').match(/【所在地】([^\n【]*)/);
+    const descLoc = descLocMatch ? descLocMatch[1].trim() : '';
+    const allLocs = locs.length ? locs : [descLoc || j.location || ''];
+    const seenPrefs = new Set();
+    for (const loc of allLocs) {
+      const p = PREFS.find(pf => (loc || '').includes(pf));
+      if (p && !seenPrefs.has(p)) { seenPrefs.add(p); prefCounts[p] = (prefCounts[p] || 0) + 1; }
+    }
+  }
+  const typeIcon = t => {
+    if (/配送|ドライバー/.test(t)) return '🚚';
+    if (/製造|工場/.test(t)) return '🏭';
+    if (/倉庫|軽作業/.test(t)) return '📦';
+    if (/営業/.test(t)) return '💼';
+    if (/カウンセラー|アドバイザー|事務/.test(t)) return '💬';
+    if (/介護|看護/.test(t)) return '🤝';
+    return '👷';
+  };
+  const typeCards = Object.entries(typeCounts)
+    .sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([t, c]) => `<a href="/preview/jobs?q=${encodeURIComponent(t)}" class="et-typecard">
+      <div class="et-typecard-icon">${typeIcon(t)}</div>
+      <div class="et-typecard-label">${esc(t)}<span>${c}件</span></div>
+    </a>`).join('');
+
+  const areaList = Object.entries(prefCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([p, c]) => `<details class="et-areabox">
+      <summary>${esc(p)}（${c}件）</summary>
+      <div class="et-areabox-body"><a href="/preview/jobs?q=${encodeURIComponent(p)}">${esc(p)}の求人を見る →</a></div>
+    </details>`).join('');
+
+  const voices = [
+    {
+      no: '01', meta: '配送ドライバー / 入社2年目 / 20代男性',
+      title: '未経験でも3ヶ月で一人前になれました',
+      text: '前職は飲食店。体力には自信がありましたが、ドライバー経験は全くゼロでした。入社後は先輩が丁寧にルートを教えてくれて、焦らず覚えることができました。今では担当エリアを一人でこなせるようになり、お客様に「ありがとう」と言われるのが毎日の励みです。',
+      before: '飲食店スタッフ → 配送ドライバー',
+    },
+    {
+      no: '02', meta: '軽作業スタッフ / 入社1年目 / 40代女性',
+      title: 'ブランクがあっても温かく迎えてもらえた',
+      text: '子育てで10年ほどブランクがあり、再就職に不安を感じていました。面接時から担当者がとても親切で、シフトの相談にも柔軟に対応してもらえました。職場のメンバーも年代がバラバラで、みんなが気にかけてくれる雰囲気。無理なく続けられています。',
+      before: '専業主婦（10年）→ 軽作業スタッフ',
+    },
+    {
+      no: '03', meta: '送迎ドライバー / 入社4年目 / 50代男性',
+      title: '「ありがとう」が毎日もらえる仕事',
+      text: 'デイサービスの送迎を担当しています。最初は福祉の仕事に縁がないと思っていましたが、利用者の方々と顔見知りになり、「今日も来てくれてよかった」と言ってもらえるのが何より嬉しいです。運転が好きな人にはとても向いている仕事だと思います。',
+      before: '長距離トラック運転手 → 送迎ドライバー',
+    },
+  ].map(v => `<div class="et-voice">
+      <div class="et-voice-no">${v.no}<span class="et-voice-slash"></span></div>
+      <div class="et-voice-meta">${esc(v.meta)}</div>
+      <div class="et-voice-title">${esc(v.title)}</div>
+      <div class="et-voice-text">${esc(v.text)}</div>
+      <div class="et-voice-before"><span>BEFORE</span>${esc(v.before)}</div>
+    </div>`).join('');
+
+  const features = [
+    { icon: '🎓', t: '資格取得支援', d: '業務に必要な資格は費用会社負担で取得できます。フォークリフト・危険物など、キャリアに活かせる資格多数。' },
+    { icon: '🏅', t: '正社員登用制度', d: '長期的なキャリア形成が見込めます。実績・勤務態度に応じて積極的に登用しています。' },
+    { icon: '🛡️', t: '社会保険完備', d: '健康保険・厚生年金・雇用保険・労災保険を完備。安心して長く働ける環境です。' },
+    { icon: '🗾', t: '多彩な職種と勤務地', d: '配送・製造・倉庫など多彩な職種を全国で募集中。あなたに合った働き方が見つかります。' },
+  ].map(f => `<div class="et-feature">
+      <div class="et-feature-icon">${f.icon}</div>
+      <div class="et-feature-t">${esc(f.t)}</div>
+      <div class="et-feature-d">${esc(f.d)}</div>
+    </div>`).join('');
+
+  const flow = [
+    { t: '応募', d: 'WEBからお申し込みください。24時間いつでも受付しています♪' },
+    { t: '面接日決定', d: '応募確認後、担当者よりご連絡し面接日を決定します！' },
+    { t: 'オンライン面接', d: 'ご自宅からビデオ通話で面接を実施します。リラックスしてご参加ください。' },
+    { t: '合否連絡', d: '面接後、数日以内に合否のご連絡をいたします！採用後の日程もご案内♪' },
+  ].map((s, i) => `<div class="et-step">
+      <div class="et-step-no">STEP ${i + 1}</div>
+      <div class="et-step-t">${esc(s.t)}</div>
+      <div class="et-step-d">${esc(s.d)}</div>
+    </div>`).join('');
+
+  const faqs = [
+    { q: '異業種からの転職でも大丈夫でしょうか？', a: 'はい、大丈夫です。未経験から始めたスタッフが多数活躍しています。研修・OJTで丁寧にサポートします。' },
+    { q: '家庭の事情で扶養内でお仕事をしたいのですが可能でしょうか？', a: '職種・勤務地によって柔軟に対応可能です。面接時にご希望をお聞かせください。' },
+    { q: '契約社員から正社員を目指すことはできますか？', a: 'はい、正社員登用制度があります。実績・勤務態度に応じて積極的に登用しています。' },
+    { q: '働きながら資格を取得できますか？', a: '資格取得支援制度があり、フォークリフトなど業務に必要な資格は会社負担で取得できます。' },
+    { q: '交通費は支給されますか？', a: 'はい、規定内で支給いたします。詳細は各求人の募集要項をご確認ください。' },
+  ].map(f => `<details class="et-faq">
+      <summary><span class="et-faq-qmark">Q</span>${esc(f.q)}</summary>
+      <div class="et-faq-a">${esc(f.a)}</div>
+    </details>`).join('');
+
+  const content = `
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap');
+  /* Social Quality HP準拠: クリーム背景・黒・赤アクセント・書体=Noto Sans JP */
+  body.pub-body { background: #f4f1ea; font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; }
+  .et-head { background: rgba(244,241,234,.95); backdrop-filter: blur(6px); border-bottom: 1px solid #e4dfd4; position: sticky; top: 0; z-index: 50; }
+  .et-head-in { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 20px; flex-wrap: wrap; }
+  .et-logo { font-size: 22px; font-weight: 900; color: #111; letter-spacing: -.01em; padding: 14px 0; margin-right: auto; white-space: nowrap; }
+  .et-logo-dot { color: #e0371f; }
+  .et-nav { display: flex; flex-wrap: wrap; align-items: center; }
+  .et-nav a { font-size: 13px; font-weight: 600; color: #111; text-decoration: none; padding: 14px 12px; }
+  .et-nav a:hover { color: #e0371f; }
+  .et-nav a.et-pill { background: #111; color: #fff; border-radius: 999px; padding: 9px 24px; margin-left: 10px; }
+  .et-nav a.et-pill:hover { background: #e0371f; color: #fff; }
+  /* ヒーロー */
+  .et-hero { position: relative; background: #f4f1ea; overflow: hidden; padding: 80px 20px 64px; }
+  .et-hero::before { content: ''; position: absolute; top: -160px; right: -100px; width: 520px; height: 520px; background: radial-gradient(circle, rgba(236,118,88,.38), rgba(244,241,234,0) 64%); pointer-events: none; }
+  .et-hero-in { max-width: 1080px; margin: 0 auto; position: relative; display: flex; align-items: flex-start; gap: 40px; }
+  .et-hero-text { flex: 0 0 52%; min-width: 0; }
+  .et-hero-imgs { flex: 1; position: relative; height: 380px; }
+  .et-hi { position: absolute; border-radius: 16px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,.18); }
+  .et-hi img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .et-hi-1 { width: 230px; height: 172px; top: 0; left: 0; z-index: 3; }
+  .et-hi-2 { width: 215px; height: 161px; top: 110px; left: 170px; z-index: 2; }
+  .et-hi-3 { width: 222px; height: 167px; top: 210px; left: 30px; z-index: 1; }
+  @media (max-width: 760px) { .et-hero-imgs { display: none; } .et-hero-text { flex: 1; } }
+  .et-hero-label { color: #e0371f; font-size: 12px; font-weight: 700; letter-spacing: .22em; margin-bottom: 24px; display: flex; align-items: center; gap: 14px; }
+  .et-hero-label::before { content: ''; width: 34px; height: 2px; background: #e0371f; display: block; flex-shrink: 0; }
+  .et-hero h1 { font-size: 58px; font-weight: 900; color: #111; line-height: 1.28; letter-spacing: -.01em; margin: 0 0 22px; }
+  .et-hero h1 .red { color: #e0371f; }
+  .et-hero-lead { font-size: 14px; color: #4a4a4a; line-height: 2.1; margin: 0 0 32px; max-width: 560px; }
+  .et-btn { display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; font-size: 14px; font-weight: 700; padding: 14px 34px; text-decoration: none; transition: all .2s; }
+  .et-btn.black { background: #111; color: #fff; }
+  .et-btn.black:hover { background: #e0371f; }
+  .et-btn.line { border: 1.5px solid #111; color: #111; }
+  .et-btn.line:hover { background: #111; color: #fff; }
+  /* 黒マーキー帯 */
+  .et-marquee { background: #111; overflow: hidden; padding: 15px 0; }
+  .et-marquee-track { display: flex; white-space: nowrap; width: max-content; animation: etMarquee 24s linear infinite; }
+  .et-marquee span { color: #f4f1ea; font-size: 19px; font-weight: 800; letter-spacing: .14em; padding: 0 16px; }
+  .et-marquee span.sl { color: #e0371f; padding: 0 4px; }
+  @keyframes etMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* セクション共通 */
+  .et-sec { max-width: 1080px; margin: 0 auto; padding: 76px 20px 8px; }
+  .et-h2 { font-size: 32px; font-weight: 800; color: #111; margin: 0; letter-spacing: .04em; display: flex; align-items: center; gap: 16px; }
+  .et-h2::before { content: '—'; color: #e0371f; font-weight: 700; }
+  .et-h2::after { content: none; }
+  .et-h2sub { color: #e0371f; font-size: 12px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; margin: 8px 0 36px 40px; }
+  /* 職種タブ（4固定） */
+  .et-jobtabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .et-jobtab { background: #fff; border-radius: 18px; overflow: hidden; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: transform .25s, box-shadow .25s; display: flex; flex-direction: column; align-items: center; padding: 28px 16px 22px; }
+  .et-jobtab:hover { transform: translateY(-5px); box-shadow: 0 14px 30px rgba(0,0,0,.10); }
+  .et-jobtab-icon { font-size: 48px; margin-bottom: 10px; }
+  .et-jobtab-name { font-size: 15px; font-weight: 800; color: #111; margin-bottom: 6px; text-align: center; }
+  .et-jobtab-desc { font-size: 11.5px; color: #777; text-align: center; line-height: 1.7; }
+  @media (max-width: 640px) { .et-jobtabs { grid-template-columns: repeat(2, 1fr); } }
+  /* エリア */
+  .et-areachips { display: flex; flex-wrap: wrap; gap: 12px; }
+  .et-areachip { background: #fff; border: 1.5px solid #111; border-radius: 999px; color: #111; font-size: 14px; font-weight: 700; padding: 11px 30px; text-decoration: none; transition: all .2s; }
+  .et-areachip:hover { background: #111; color: #fff; }
+  /* スタッフの一言 */
+  .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; }
+  .et-voices { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
+  .et-voice { background: #fff; border-radius: 18px; padding: 26px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); display: flex; flex-direction: column; }
+  .et-voice-no { font-family: Georgia, serif; font-style: italic; font-size: 50px; color: #e0371f; font-weight: 700; line-height: 1; position: relative; display: inline-block; padding-right: 24px; margin-bottom: 14px; }
+  .et-voice-slash { position: absolute; right: 0; top: 4px; bottom: -4px; width: 2px; background: #111; transform: rotate(20deg); }
+  .et-voice-meta { display: inline-block; background: #111; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
+  .et-voice-title { font-size: 16px; font-weight: 800; color: #111; line-height: 1.6; margin-bottom: 10px; }
+  .et-voice-text { font-size: 13.5px; color: #444; line-height: 2; margin-bottom: 16px; flex: 1; }
+  .et-voice-before { margin-top: auto; border-top: 1px solid #efece4; padding-top: 12px; font-size: 12px; color: #777; display: flex; align-items: center; gap: 8px; }
+  .et-voice-before span { background: #e0371f; color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; letter-spacing: .06em; }
+  /* 会社の特徴 */
+  .et-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .et-feature { background: #fff; border: none; border-radius: 18px; padding: 28px 24px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .et-feature-icon { font-size: 40px; margin-bottom: 10px; }
+  .et-feature-t { font-size: 15.5px; font-weight: 800; color: #111; margin-bottom: 8px; }
+  .et-feature-d { font-size: 12.5px; color: #555; line-height: 1.9; text-align: left; }
+  /* 応募の流れ（黒帯） */
+  .et-flowband { background: #111; margin-top: 76px; padding: 64px 20px 70px; position: relative; overflow: hidden; }
+  .et-flowband::before { content: ''; position: absolute; left: -80px; top: -60px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(224,55,31,.3), transparent 65%); }
+  .et-flowband .et-h2 { color: #f4f1ea; }
+  .et-flowband .et-h2sub { color: #e0371f; }
+  .et-flow-in { max-width: 1080px; margin: 0 auto; position: relative; }
+  .et-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .et-step { background: #1d1d1d; border-radius: 16px; padding: 24px 18px; text-align: center; }
+  .et-step-no { font-family: Georgia, serif; font-style: italic; color: #e0371f; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .et-step-t { font-size: 16px; font-weight: 700; color: #f4f1ea; margin-bottom: 8px; }
+  .et-step-d { font-size: 12.5px; color: #aaa; line-height: 1.8; }
+  /* FAQ */
+  .et-faq { background: #fff; border-radius: 14px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .et-faq summary { color: #111; font-size: 14px; font-weight: 700; padding: 16px 20px; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 12px; }
+  .et-faq summary::-webkit-details-marker { display: none; }
+  .et-faq summary::after { content: '＋'; margin-left: auto; font-weight: 700; color: #e0371f; }
+  .et-faq[open] summary::after { content: '−'; }
+  .et-faq-qmark { background: #e0371f; color: #fff; font-weight: 800; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .et-faq-a { background: #fff; border-top: 1px solid #efece4; padding: 14px 20px 16px 58px; font-size: 13.5px; color: #444; line-height: 1.9; }
+  /* 下部CTA（黒の角丸カード） */
+  .et-ctaband { background: #111; border-radius: 28px; max-width: 1040px; margin: 76px auto 0; padding: 52px 36px; }
+  .et-ctaband-in { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .et-ctabtn { display: inline-block; border: 1.5px solid #fff; border-radius: 999px; color: #fff; font-size: 14px; font-weight: 700; padding: 14px 44px; text-decoration: none; letter-spacing: .08em; transition: all .2s; }
+  .et-ctabtn:hover { background: #fff; color: #111; }
+  .et-ctabtn.orange { background: #e0371f; border-color: #e0371f; }
+  .et-ctabtn.orange:hover { background: #c12c16; color: #fff; }
+  .et-footer { background: #111; color: #999; font-size: 12px; text-align: center; padding: 30px 16px; margin-top: 30px; }
+  .et-footer a { color: #ccc; text-decoration: none; margin: 0 12px; }
+  @media (max-width: 640px) {
+    .et-hero h1 { font-size: 34px; line-height: 1.3; }
+    .et-h2 { font-size: 22px; }
+    .et-h2sub { margin-left: 34px; }
+    .et-marquee span { font-size: 15px; }
+  }
+</style>
+<header class="et-head">
+  <div class="et-head-in">
+    <div class="et-logo">${logoHtml}</div>
+    <nav class="et-nav">
+      <a href="#type">職種から探す</a>
+      <a href="#area">エリアから探す</a>
+      <a href="#voice">スタッフの一言</a>
+      <a href="#about">会社の特徴</a>
+      <a href="#company">企業情報</a>
+      <a href="#faq">よくある質問</a>
+      <a class="et-pill" href="/preview/jobs">応募はこちら</a>
+    </nav>
+  </div>
+</header>
+<div class="et-hero">
+  <div class="et-hero-in">
+    <div class="et-hero-text">
+      <div class="et-hero-label">RECRUIT INFORMATION — ${esc(companyName)}</div>
+      <h1><span class="red">あなたらしく</span>、<br>働ける場所。</h1>
+      <p class="et-hero-lead">配送・製造・倉庫内作業など、全国の正社員求人を多数掲載。未経験からでも安心して始められる環境と、頑張りがきちんと評価される待遇をご用意しています。</p>
+      <a class="et-btn black" href="/preview/jobs">お仕事一覧を見る →</a>
+      <a class="et-btn line" href="#flow" style="margin-left:10px">応募の流れ</a>
+    </div>
+    <div class="et-hero-imgs">
+      <div class="et-hi et-hi-1">
+        <img src="/images/it-office.jpg" alt="IT職種" loading="lazy">
+      </div>
+      <div class="et-hi et-hi-2">
+        <img src="/images/haisou-fleet.jpg" alt="配送ドライバー職種" loading="lazy">
+      </div>
+      <div class="et-hi et-hi-3">
+        <img src="https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=444&h=333&q=80" alt="製造・工場職種" loading="lazy">
+      </div>
+    </div>
+  </div>
+</div>
+<div class="et-marquee">
+  <div class="et-marquee-track">
+    <span>IT・エンジニア</span><span class="sl">/</span><span>製造・工場</span><span class="sl">/</span><span>送迎ドライバー</span><span class="sl">/</span><span>配送ドライバー</span><span class="sl">/</span><span>FULL-TIME JOBS</span><span class="sl">/</span><span>未経験歓迎</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
+    <span>IT・エンジニア</span><span class="sl">/</span><span>製造・工場</span><span class="sl">/</span><span>送迎ドライバー</span><span class="sl">/</span><span>配送ドライバー</span><span class="sl">/</span><span>FULL-TIME JOBS</span><span class="sl">/</span><span>未経験歓迎</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
+  </div>
+</div>
+<section class="et-sec" id="type">
+  <h2 class="et-h2">職種から探す</h2>
+  <div class="et-h2sub">Search by job</div>
+  <div class="et-jobtabs">
+    <a class="et-jobtab" href="/preview/jobs?type=IT">
+      <div class="et-jobtab-icon">💻</div>
+      <div class="et-jobtab-name">IT</div>
+    </a>
+    <a class="et-jobtab" href="/preview/jobs?type=製造">
+      <div class="et-jobtab-icon">🏭</div>
+      <div class="et-jobtab-name">製造・工場</div>
+    </a>
+    <a class="et-jobtab" href="/preview/jobs?type=送迎">
+      <div class="et-jobtab-icon">🚐</div>
+      <div class="et-jobtab-name">送迎ドライバー</div>
+    </a>
+    <a class="et-jobtab" href="/preview/jobs?type=配送">
+      <div class="et-jobtab-icon">🚚</div>
+      <div class="et-jobtab-name">配送ドライバー</div>
+    </a>
+  </div>
+</section>
+<section class="et-sec" id="area">
+  <h2 class="et-h2">エリアから探す</h2>
+  <div class="et-h2sub">Search by area</div>
+  <div class="et-areachips">
+    <a href="/preview/jobs?q=${encodeURIComponent('東京都')}" class="et-areachip">東京都</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('神奈川県')}" class="et-areachip">神奈川県</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('埼玉県')}" class="et-areachip">埼玉県</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('千葉県')}" class="et-areachip">千葉県</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('大阪府')}" class="et-areachip">大阪府</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('兵庫県')}" class="et-areachip">兵庫県</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('京都府')}" class="et-areachip">京都府</a>
+    <a href="/preview/jobs?q=${encodeURIComponent('和歌山県')}" class="et-areachip">和歌山県</a>
+  </div>
+</section>
+<section class="et-sec" id="voice">
+  <h2 class="et-h2">働く人の声</h2>
+  <div class="et-h2sub">Staff Voice</div>
+  <div class="et-voices">${voices}</div>
+</section>
+<section class="et-sec" id="about">
+  <h2 class="et-h2">選ばれる理由</h2>
+  <div class="et-h2sub">Why choose us</div>
+  <div class="et-features">${features}</div>
+</section>
+<section class="et-sec" id="company">
+  <h2 class="et-h2">企業情報</h2>
+  <div class="et-h2sub">About us</div>
+  <div class="et-company-card">
+    <p class="et-company-lead">${esc(companyName)}は、<strong>Webサイト制作・システム / アプリ / AI開発を主力</strong>に、マーケティング支援から物流・配送、製造まで幅広く事業を展開する会社です。</p>
+    <p class="et-company-text">ひとつの専門にとどまらず、企画から開発・運用、現場での実行までを自社で一貫して手がけることで、お客様の「やりたい」を形にしています。事業領域を横断して連携できる体制こそが、私たちの強みです。</p>
+
+    <div class="et-mvv">
+      <div class="et-mvv-item">
+        <div class="et-mvv-label">MISSION<span>使命</span></div>
+        <div class="et-mvv-title">つくる力で、人と企業の可能性を解き放つ。</div>
+        <div class="et-mvv-text">Web・アプリ・AIの開発力を軸に、人と企業の「できる」を増やす。テクノロジーと創造力で、まだ無い価値を生み出していきます。</div>
+      </div>
+      <div class="et-mvv-item">
+        <div class="et-mvv-label">VISION<span>目指す姿</span></div>
+        <div class="et-mvv-title">確かな価値を提供できる企業へ。</div>
+        <div class="et-mvv-text">デジタルの力で誰もが自分らしく活躍できる場をつくり、お客様・働く仲間・社会に、確かな価値を届け続ける企業を目指します。</div>
+      </div>
+      <div class="et-mvv-item">
+        <div class="et-mvv-label">VALUE<span>価値観</span></div>
+        <div class="et-mvv-title">挑戦を楽しむ・本質にこだわる・仲間を信じる。</div>
+        <div class="et-mvv-text">前例がなくてもまず挑む。流行ではなく本質的な価値にこだわる。立場を越えて仲間を信じ、チームで大きな成果をつくります。</div>
+      </div>
+    </div>
+
+    <div class="et-biz">
+      <div class="et-biz-col">
+        <div class="et-biz-head"><span class="et-biz-badge main">MAIN</span>メイン事業</div>
+        <ul class="et-biz-list">
+          <li><b>Web制作・システム / アプリ / AI開発</b><span>企画・設計から開発・運用まで自社一貫</span></li>
+          <li><b>マーケティング・販促支援</b><span>集客から採用広報まで成果ベースで支援</span></li>
+          <li><b>自社プロダクト / SaaS開発</b><span>現場の課題から生まれた仕組みを製品化</span></li>
+          <li><b>AI・DXソリューション</b><span>生成AIを活用した業務効率化・自動化支援</span></li>
+        </ul>
+      </div>
+      <div class="et-biz-col">
+        <div class="et-biz-head"><span class="et-biz-badge next">NEXT</span>これから展開していく事業</div>
+        <ul class="et-biz-list next">
+          <li><b>物流・配送</b><span>EC配送・ルート配送を全国エリアで展開</span></li>
+          <li><b>製造・倉庫管理</b><span>工場内作業・軽作業・倉庫運営を受託</span></li>
+          <li><b>EC・物流プラットフォーム</b><span>自社配送網を活かした通販・物流サービスの展開</span></li>
+          <li><b>全国エリアの事業拡大</b><span>物流・製造拠点を主要都市へ順次拡大</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="et-flowband" id="flow">
+  <div class="et-flow-in">
+    <h2 class="et-h2">応募から採用までの流れ</h2>
+    <div class="et-h2sub">About The Flow</div>
+    <div class="et-steps">${flow}</div>
+  </div>
+</div>
+<section class="et-sec" id="faq">
+  <h2 class="et-h2">よくある質問</h2>
+  <div class="et-h2sub">Q and A</div>
+  ${faqs}
+</section>
+<div class="et-ctaband">
+  <h2 style="color:#fff;font-size:26px;font-weight:800;text-align:center;margin:0 0 8px;letter-spacing:.04em">あなたの次の仕事、ここにある。</h2>
+  <p style="color:#aaa;font-size:13px;text-align:center;margin:0 0 24px">まずはお気軽に求人一覧をご覧ください</p>
+  <div class="et-ctaband-in">
+    <a class="et-ctabtn" href="/preview/jobs">お仕事一覧へ</a>
+    <a class="et-ctabtn orange" href="/preview/jobs">今すぐ応募する</a>
+  </div>
+</div>
+<div class="et-footer">
+  <a href="/privacy">プライバシーポリシー</a>
+  <div style="margin-top:10px">© ${esc(companyName)} All Rights Reserved.</div>
+</div>
+<style>
+  /* スクロール表示アニメーション */
+  .et-reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s ease, transform .7s ease; }
+  .et-reveal.is-visible { opacity: 1; transform: none; }
+  .et-reveal-d1 { transition-delay: .1s; } .et-reveal-d2 { transition-delay: .2s; } .et-reveal-d3 { transition-delay: .3s; }
+  /* ヒーローの文字をふわっと表示 */
+  .et-hero-label, .et-hero h1, .et-hero-lead, .et-hero .et-btn { opacity: 0; transform: translateY(16px); animation: etFadeUp .8s ease forwards; }
+  .et-hero h1 { animation-delay: .15s; }
+  .et-hero-lead { animation-delay: .3s; }
+  .et-hero .et-btn { animation-delay: .45s; }
+  .et-hi { opacity: 0; animation: etFadeUp .9s ease forwards; }
+  .et-hi-1 { animation-delay: .25s; }
+  .et-hi-2 { animation-delay: .45s; }
+  .et-hi-3 { animation-delay: .65s; }
+  @keyframes etFadeUp { to { opacity: 1; transform: none; } }
+  html { scroll-behavior: smooth; }
+  .et-typecard, .et-feature, .et-step { transition: transform .25s ease, box-shadow .25s ease; }
+  .et-typecard:hover, .et-feature:hover { transform: translateY(-4px); }
+  /* 企業情報 */
+  .et-company-card { max-width: 920px; margin: 0 auto; background: #fff; border: 1px solid #e6e1d6; border-radius: 16px; padding: 36px 34px; box-shadow: 0 4px 20px rgba(0,0,0,.04); }
+  .et-company-lead { font-size: 17px; font-weight: 700; line-height: 1.9; color: #1a1a1a; margin: 0 0 14px; }
+  .et-company-lead strong { color: #e0371f; }
+  .et-company-text { font-size: 14.5px; line-height: 2; color: #555; margin: 0 0 30px; }
+  /* MVV */
+  .et-mvv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 34px; }
+  .et-mvv-item { background: #faf8f3; border: 1px solid #ece7dc; border-left: 3px solid #e0371f; border-radius: 12px; padding: 22px 20px; }
+  .et-mvv-label { font-family: Georgia, serif; font-style: italic; font-size: 17px; font-weight: 700; color: #e0371f; letter-spacing: .04em; margin-bottom: 12px; display: flex; align-items: baseline; gap: 8px; }
+  .et-mvv-label span { font-family: inherit; font-style: normal; font-size: 11px; font-weight: 700; color: #999; letter-spacing: .12em; }
+  .et-mvv-title { font-size: 15px; font-weight: 800; color: #111; line-height: 1.6; margin-bottom: 10px; }
+  .et-mvv-text { font-size: 12.5px; color: #666; line-height: 1.95; }
+  @media (max-width: 760px) { .et-mvv { grid-template-columns: 1fr; } }
+  /* 事業（メイン / これから） */
+  .et-biz { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .et-biz-col { background: #faf8f3; border: 1px solid #ece7dc; border-radius: 12px; padding: 22px 22px 8px; }
+  .et-biz-head { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; color: #111; margin-bottom: 16px; }
+  .et-biz-badge { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; padding: 3px 10px; border-radius: 999px; }
+  .et-biz-badge.main { background: #e0371f; color: #fff; }
+  .et-biz-badge.next { background: #111; color: #fff; }
+  .et-biz-list { list-style: none; margin: 0; padding: 0; }
+  .et-biz-list li { padding: 12px 0 12px 22px; border-top: 1px solid #ece7dc; position: relative; }
+  .et-biz-list li:first-child { border-top: none; }
+  .et-biz-list li::before { content: ''; position: absolute; left: 2px; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: #e0371f; }
+  .et-biz-list.next li::before { background: #111; }
+  .et-biz-list li b { display: block; font-size: 13.5px; font-weight: 800; color: #111; line-height: 1.5; }
+  .et-biz-list li span { display: block; font-size: 12px; color: #777; line-height: 1.7; margin-top: 3px; }
+  @media (max-width: 760px) { .et-biz { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    .et-company-card { padding: 24px 18px; }
+    .et-company-lead { font-size: 15.5px; }
+  }
+</style>
+<script>
+(function(){
+  // セクション・カードにスクロール表示アニメーションを適用
+  const targets = [];
+  document.querySelectorAll('.et-sec, .et-flowband').forEach(sec => {
+    sec.classList.add('et-reveal'); targets.push(sec);
+  });
+  document.querySelectorAll('.et-typecard, .et-voice, .et-feature, .et-step').forEach((el, i) => {
+    el.classList.add('et-reveal', 'et-reveal-d' + ((i % 3) + 1)); targets.push(el);
+  });
+  if (!('IntersectionObserver' in window)) { targets.forEach(t => t.classList.add('is-visible')); return; }
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  targets.forEach(t => io.observe(t));
+})();
+</script>`;
+
+  return publicLayout(`採用情報 | ${esc(companyName)}`, content, {
+    description: `${companyName}の採用情報サイト。職種・エリアから求人を探せます。`,
+    bare: true,
+  });
+}
+
+// ── 新デザイン求人一覧ページ（ディンプル風・プレビュー用） ──────────
+// /preview/jobs で表示。未公開求人には「未公開」バッジを付けて表示する。
+function jobsListPageV2(jobs, search = '') {
+  const rows = jobs.length === 0
+    ? `<div style="text-align:center;padding:60px 20px;color:#999">現在募集中の求人はありません</div>`
+    : jobs.map(j => {
+        const draftBadge = j.is_published ? '' : '<span class="hpl-draft">未公開</span>';
+        const catchcopy = j.catchcopy || '';
+        const jlocs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
+        const displayLoc = jlocs.length > 1 ? `複数拠点（選択制・車通勤可）` : (jlocs[0] || '');
+        return `<div class="hpl-item">
+          <div class="hpl-item-head">
+            <span class="hpl-emp">${esc(j.employment_type)}</span>
+            <span class="hpl-jobtype">${esc(j.job_type)}</span>
+            ${draftBadge}
+          </div>
+          ${catchcopy ? `<div class="hpl-catch">${esc(catchcopy)}</div>` : ''}
+          <h3 class="hpl-title"><a href="/preview/jobs/${j.id}">${esc(j.title)}</a></h3>
+          <table class="hpl-table"><tbody>
+            <tr><th>勤務地</th><td>${esc(displayLoc)}</td></tr>
+            <tr><th>給与</th><td>${esc(j.salary)}</td></tr>
+          </tbody></table>
+          <div class="hpl-more"><a href="/preview/jobs/${j.id}" class="hpl-btn">詳細を見る</a></div>
+        </div>`;
+      }).join('');
+
+  const content = `
+<style>
+  body.pub-body { background: #f4f1ea; }
+  .hpl-band { background: #f4f1ea; padding: 44px 16px 0; }
+  .hpl-band-inner { max-width: 1080px; margin: 0 auto; color: #111; }
+  .hpl-band-title { font-size: 30px; font-weight: 800; letter-spacing: .04em; display: flex; align-items: center; gap: 14px; }
+  .hpl-band-title::before { content: '—'; color: #e0371f; font-weight: 700; }
+  .hpl-band-sub { font-size: 12px; color: #e0371f; font-weight: 700; letter-spacing: .25em; margin: 6px 0 0 38px; }
+  .hpl-wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px 60px; }
+  .hpl-search { display: flex; gap: 0; max-width: 540px; margin: 24px 0 8px; background: #fff; border-radius: 999px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .hpl-search input { flex: 1; border: none; outline: none; padding: 14px 24px; font-size: 14px; background: transparent; }
+  .hpl-search button { border: none; background: #111; color: #fff; font-weight: 700; font-size: 14px; padding: 0 32px; cursor: pointer; transition: background .2s; }
+  .hpl-search button:hover { background: #e0371f; }
+  .hpl-count { font-size: 13px; color: #888; margin: 12px 0 20px; }
+  .hpl-item { border: none; border-radius: 18px; padding: 24px 28px; margin-bottom: 16px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.05); transition: box-shadow .2s, transform .2s; }
+  .hpl-item:hover { box-shadow: 0 12px 28px rgba(0,0,0,.10); transform: translateY(-2px); }
+  .hpl-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .hpl-emp { background: #111; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 14px; border-radius: 999px; }
+  .hpl-jobtype { font-size: 12px; color: #999; }
+  .hpl-draft { background: #8a8a8a; color: #fff; font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 999px; }
+  .hpl-catch { font-size: 12.5px; color: #e0371f; font-weight: 700; margin-bottom: 4px; }
+  .hpl-title { font-size: 17px; font-weight: 700; line-height: 1.5; margin: 0 0 14px; }
+  .hpl-title a { color: #111; text-decoration: none; }
+  .hpl-title a:hover { color: #e0371f; }
+  .hpl-table { border-collapse: collapse; font-size: 13.5px; margin-bottom: 14px; width: 100%; max-width: 560px; }
+  .hpl-table th { width: 90px; background: #ebe6db; color: #111; font-weight: 700; text-align: left; padding: 8px 12px; border: 1px solid #e4dfd4; }
+  .hpl-table td { padding: 8px 14px; border: 1px solid #e4dfd4; color: #333; background: #fff; }
+  .hpl-more { text-align: right; }
+  .hpl-btn { display: inline-block; background: #111; color: #fff; border: none; font-size: 13px; font-weight: 700; padding: 10px 32px; border-radius: 999px; text-decoration: none; transition: background .2s; }
+  .hpl-btn:hover { background: #e0371f; }
+  @media (max-width: 640px) {
+    .hpl-item { padding: 16px; }
+    .hpl-title { font-size: 15px; }
+  }
+</style>
+<div class="hpl-band">
+  <div class="hpl-band-inner">
+    <div class="hpl-band-title">求人情報</div>
+    <div class="hpl-band-sub">RECRUIT</div>
+  </div>
+</div>
+<div class="hpl-wrap">
+  <div style="font-size:11.5px;color:#888;margin:14px 0 0"><a href="/preview/top" style="color:#2e75b6;text-decoration:none">求人情報トップ</a> ＞ お仕事一覧</div>
+  <form class="hpl-search" action="/preview/jobs" method="get">
+    <input type="search" name="q" value="${esc(search)}" placeholder="職種・勤務地・キーワードで検索">
+    <button type="submit">検索</button>
+  </form>
+  <div class="hpl-count">${jobs.length}件の求人${search ? `（「${esc(search)}」の検索結果）` : ''}</div>
+  ${rows}
+</div>`;
+
+  return publicLayout('求人情報一覧 | 採用サイト', content, {
+    description: '全国の正社員求人情報一覧。配送・物流・製造など多数掲載。'
+  });
+}
+
+// ── 新デザイン求人詳細ページ（ディンプル風・プレビュー用） ──────────
+// /preview/jobs/:id で表示。承認後に /jobs/:id へ切り替える。
+function jobDetailPageV2(job) {
+  const tags = JSON.parse(job.tags || '[]');
+  const faq = JSON.parse(job.faq || '[]');
+  const jobLocs = (() => { try { return JSON.parse(job.locations || '[]'); } catch { return []; } })();
+  const hasMultiLoc = jobLocs.length > 1;
+  const firstLoc = jobLocs[0] || '';
+  const locSummary = hasMultiLoc ? `複数拠点（選択制・車通勤可）` : firstLoc;
+  const locDetail = hasMultiLoc ? `【選択制・車通勤可】\n` + jobLocs.join('\n') : firstLoc;
+
+  const salaryParsed = parseSalary(job.salary);
+  const salarySchema = salaryParsed ? {
+    "@type": "MonetaryAmount",
+    "currency": "JPY",
+    "value": {
+      "@type": "QuantitativeValue",
+      ...(salaryParsed.min   ? { "minValue": salaryParsed.min }   : {}),
+      ...(salaryParsed.max   ? { "maxValue": salaryParsed.max }   : {}),
+      "unitText": salaryParsed.unitText
+    }
+  } : undefined;
+
+  const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+  const jobUrl  = `${siteUrl}/jobs/${job.id}`;
+
+  const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+  const addressRegion = PREFS.find(p => firstLoc.includes(p)) || '';
+
+  const datePosted = (job.published_at || job.created_at || '').slice(0, 10);
+  const validThrough = job.expires_at
+    ? job.expires_at.slice(0, 10)
+    : (() => {
+        const d = new Date(datePosted || Date.now());
+        d.setDate(d.getDate() + 60);
+        return d.toISOString().slice(0, 10);
+      })();
+
+  const jsonldObj = {
+    "@context": "https://schema.org/",
+    "@type": "JobPosting",
+    "title": job.title,
+    "description": job.description,
+    "url": jobUrl,
+    "identifier": { "@type": "PropertyValue", "name": process.env.COMPANY_NAME || "採用企業", "value": job.id },
+    "datePosted": datePosted,
+    "validThrough": validThrough,
+    "directApply": true,
+    "employmentType": mapEmploymentType(job.employment_type),
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": process.env.COMPANY_NAME || "採用企業",
+      ...(process.env.SITE_URL ? { "sameAs": process.env.SITE_URL } : {})
+    },
+    "jobLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": job.location,
+        ...(addressRegion ? { "addressRegion": addressRegion } : {}),
+        "addressCountry": "JP"
+      }
+    },
+    ...(salarySchema ? { "baseSalary": salarySchema } : {})
+  };
+  const jsonld = `<script type="application/ld+json">${JSON.stringify(jsonldObj, null, 2)}<\/script>`;
+
+  // キャッチコピー
+  const catchcopy = job.catchcopy || '';
+
+  // 仕事内容の【見出し】をセクションに分解
+  const descParts = String(job.description || '').split(/【([^】]+)】/);
+  const introText = (descParts[0] || '').trim();
+  const secMap = {};
+  const secOrder = [];
+  for (let i = 1; i < descParts.length; i += 2) {
+    const h = (descParts[i] || '').trim();
+    const body = (descParts[i + 1] || '').trim();
+    if (h && body) { secMap[h] = body; secOrder.push(h); }
+  }
+  const used = new Set();
+  const pick = (...names) => {
+    for (const n of names) if (secMap[n]) { used.add(n); return secMap[n]; }
+    return '';
+  };
+
+  // お仕事情報テーブル（イーストアジア風の項目順）
+  const mainDesc = pick('仕事内容', 'お仕事内容') || introText || String(job.description || '').trim();
+  const salaryDetail = pick('給与内訳', '給与・待遇');
+  const shiftText = pick('労働時間', '勤務時間', 'シフト・勤務時間');
+  // 給与額は上部の基本情報テーブルにのみ表示する。
+  // お仕事情報の「給与」行は内訳（手当・想定年収など）だけを出し、
+  // 内訳の先頭行が給与フィールドと同額ならその行も取り除く（内訳が無い求人は行ごと省略）。
+  const normSalary = s => String(s || '').replace(/\s/g, '');
+  let salaryCell = salaryDetail;
+  if (salaryCell && normSalary(salaryCell.split('\n')[0]) === normSalary(job.salary)) {
+    salaryCell = salaryCell.split('\n').slice(1).join('\n').trim();
+  }
+  const infoRows = [
+    ['お仕事内容', mainDesc],
+    ['給与', salaryCell],
+    ['所在地', locDetail],
+    ['雇用形態', job.employment_type],
+    ['シフト・勤務時間', shiftText],
+    ['休日・休暇', pick('休日・休暇', '休日')],
+    ['応募資格', pick('応募資格', 'こんな方に向いています', 'こんな方におすすめ')],
+    ['待遇・福利厚生', pick('福利厚生', '待遇・福利厚生', '待遇')],
+    ['入社後の流れ', pick('入社後の流れ', '研修', '入社後の研修')],
+    ...secOrder.filter(h => !used.has(h) && !['勤務地','アクセス'].includes(h)).map(h => [h, secMap[h]]),
+  ].filter(([, v]) => v);
+
+  // 注目ポイント: タグ（✔リスト）＋導入文
+  const pointsText = [
+    tags.map(t => `✔ ${t}`).join('\n'),
+    introText && mainDesc !== introText ? introText : '',
+  ].filter(Boolean).join('\n\n');
+
+  const faqHtml = faq.length > 0
+    ? `<div class="ea-secband">よくある質問</div>
+      <div class="ea-secbody">${faq.map(f =>
+        `<div class="ea-faq-q">Q. ${esc(f.q)}</div><div class="ea-faq-a">A. ${esc(f.a)}</div>`).join('')}
+      </div>`
+    : '';
+
+  const imageHtml = job.image_url
+    ? `<div class="ea-image"><img src="${esc(job.image_url)}" alt="${esc(job.title)}"></div>`
+    : '';
+
+  // 会社情報テーブル（GIG INC.風）。会社名・MVV・大切にしているもの・働く人々で構成。
+  const companyName = process.env.COMPANY_NAME || '株式会社Social Quality';
+  const shortName = companyName.replace(/^(株式会社|有限会社|合同会社)\s*/, '');
+  const mvvContent =
+    'MISSION（使命）\nつくる力で、人と企業の可能性を解き放つ。\n\n'
+    + 'VISION（目指す姿）\n確かな価値を提供できる企業へ。\n\n'
+    + 'VALUE（価値観）\n挑戦を楽しむ・本質にこだわる・仲間を信じる。';
+  const valuesContent =
+    '１：付加価値のあるものを生み出す\n'
+    + 'Web・AI開発から物流・製造の現場まで、どんな仕事にも「もっと良くできる」余地があると信じています。工夫と改善を積み重ね、関わる人すべてに確かな価値を届けることを大切にしています。\n\n'
+    + '２：挑戦を恐れず、前へ進む\n'
+    + '新しいことに踏み出し、ときに失敗しながら経験を糧にする。個人でもチームでも自走し、EC・物流プラットフォームや全国エリア拡大など新事業にも積極的に挑む文化をつくっています。\n\n'
+    + '３：チームで勝ちにいく\n'
+    + '現場スタッフ・ドライバー・エンジニア・プランナー、立場に関係なく意見が言える環境を大切にしています。責任感と当事者意識を持ち、仲間と一緒に結果を出すことが私たちの誇りです。';
+  const companyRows = [
+    ['会社名',                companyName],
+    ['MISSION / VISION / VALUE', mvvContent],
+    ['私たちが大切にしているもの', valuesContent],
+  ].filter(([, v]) => v && String(v).trim());
+  const companyTable = `<table class="ea-table"><tbody>
+    ${companyRows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}
+  </tbody></table>`;
+
+  const content = `
+<style>
+  body.pub-body { background: #f4f1ea; }
+  .ea-titlebar { background: #111; }
+  .ea-titlebar-in { max-width: 1000px; margin: 0 auto; display: flex; align-items: center; gap: 14px; padding: 12px 16px; }
+  .ea-titlebar h1 { color: #f4f1ea; font-size: 15.5px; font-weight: 700; line-height: 1.5; margin: 0; flex: 1; }
+  .ea-apply-top { background: #e0371f; color: #fff; font-weight: 700; font-size: 14px; border: none; border-radius: 999px; padding: 10px 28px; cursor: pointer; white-space: nowrap; transition: background .2s; }
+  .ea-apply-top:hover { background: #c12c16; }
+  .ea-wrap { max-width: 1000px; margin: 0 auto; padding: 0 16px 70px; }
+  .ea-breadcrumb { font-size: 11.5px; color: #888; margin: 12px 0 16px; }
+  .ea-breadcrumb a { color: #e0371f; text-decoration: none; font-weight: 600; }
+  .ea-breadcrumb a:hover { text-decoration: underline; }
+  .ea-headline { font-size: 16px; font-weight: 700; color: #111; line-height: 1.8; margin: 6px 0 16px; white-space: pre-wrap; }
+  .ea-summary { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 18px; }
+  .ea-summary th { width: 92px; background: #ebe6db; border: 1px solid #e4dfd4; padding: 9px 12px; color: #111; font-weight: 700; text-align: left; }
+  .ea-summary td { border: 1px solid #e4dfd4; padding: 9px 14px; color: #333; background: #fff; }
+  .ea-image { margin: 14px 0; }
+  .ea-image img { max-width: 430px; width: 100%; border-radius: 14px; }
+  .ea-secband { background: #111; color: #f4f1ea; font-size: 15px; font-weight: 700; padding: 11px 18px; margin: 28px 0 0; border-radius: 12px 12px 0 0; }
+  .ea-secbody { border: 1px solid #e4dfd4; border-top: none; padding: 18px 20px; font-size: 14px; line-height: 2; color: #333; white-space: pre-wrap; background: #fff; border-radius: 0 0 12px 12px; }
+  .ea-table { width: 100%; border-collapse: collapse; font-size: 13.5px; border: 1px solid #e4dfd4; background: #fff; }
+  .ea-table th { width: 150px; background: #ebe6db; border: 1px solid #e4dfd4; padding: 13px 14px; font-weight: 700; color: #111; text-align: left; vertical-align: top; }
+  .ea-table td { border: 1px solid #e4dfd4; padding: 13px 16px; color: #333; line-height: 1.9; white-space: pre-wrap; }
+  .ea-faq-q { font-weight: 700; color: #e0371f; margin: 10px 0 2px; }
+  .ea-faq-a { margin-bottom: 8px; }
+  .ea-company p { margin: 0 0 14px; }
+  .ea-company .ea-biz-list { margin: 0 0 14px; padding-left: 0; list-style: none; }
+  .ea-company .ea-biz-list li { position: relative; padding: 7px 12px 7px 30px; margin-bottom: 6px; background: #faf8f3; border: 1px solid #e4dfd4; border-radius: 8px; line-height: 1.6; }
+  .ea-company .ea-biz-list li::before { content: "▶"; position: absolute; left: 11px; color: #e0371f; font-size: 10px; top: 11px; }
+  .ea-company .ea-biz-lead { margin-top: 16px; padding: 14px 16px; background: #fff7f5; border-left: 4px solid #e0371f; border-radius: 6px; font-weight: 600; color: #111; }
+  .ea-applybtn-wrap { text-align: center; margin: 36px 0 0; }
+  .ea-applybtn { background: #e0371f; color: #fff; font-size: 17px; font-weight: 700; border: none; border-radius: 999px; padding: 16px 90px; cursor: pointer; box-shadow: 0 2px 10px rgba(224,55,31,.3); transition: background .2s; }
+  .ea-applybtn:hover { background: #c12c16; }
+  @media (max-width: 640px) {
+    .ea-titlebar-in { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .ea-table th { width: 100px; padding: 10px; }
+    .ea-table td { padding: 10px 12px; }
+    .ea-summary th { width: 70px; }
+    .ea-applybtn { width: 100%; padding: 15px 0; }
+  }
+</style>
+<div class="ea-titlebar">
+  <div class="ea-titlebar-in">
+    <h1>${esc(job.title)}</h1>
+    <button class="ea-apply-top" onclick="document.getElementById('apply-wrap').scrollIntoView({behavior:'smooth'})">応募する</button>
+  </div>
+</div>
+<div class="ea-wrap">
+  <div class="ea-breadcrumb">
+    <a href="/preview/top">求人情報トップ</a> ＞ <a href="/preview/jobs">お仕事一覧</a> ＞ ${esc(firstLoc)} ＞ ${esc(job.title)}
+  </div>
+  ${catchcopy ? `<div class="ea-headline">${esc(catchcopy)}</div>` : ''}
+  <table class="ea-summary"><tbody>
+    <tr><th>給与</th><td>${esc(job.salary)}</td><th>シフト</th><td>${esc((shiftText.split('\n')[0] || 'シフト制'))}</td></tr>
+    <tr><th>勤務地</th><td>${esc(locSummary)}</td><th>雇用形態</th><td>${esc(job.employment_type)}</td></tr>
+  </tbody></table>
+  ${imageHtml}
+  ${pointsText ? `
+  <div class="ea-secband">注目ポイント</div>
+  <div class="ea-secbody">${esc(pointsText)}</div>` : ''}
+  <div class="ea-secband">お仕事情報</div>
+  <table class="ea-table"><tbody>
+    ${infoRows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}
+  </tbody></table>
+  ${faqHtml}
+  <div class="ea-secband">会社情報</div>
+  ${companyTable}
+  <div class="ea-secband">応募情報</div>
+  <div class="ea-secbody" style="white-space:normal" id="apply-wrap">
+    <p style="margin:0 0 16px">下記フォームより応募してください。担当者より3営業日以内にご連絡いたします。</p>
+    <form id="apply-form">
+      <input type="hidden" name="jobId" value="${job.id}">
+      <input type="hidden" name="jobTitle" value="${esc(job.title)}">
+      <input type="hidden" name="sourceMedia" id="apply-source-media" value="direct">
+      <div class="form-row">
+        <div class="form-group">
+          <label>お名前<span class="req">*</span></label>
+          <input type="text" name="name" required placeholder="山田 太郎">
+        </div>
+        <div class="form-group">
+          <label>電話番号<span class="req">*</span></label>
+          <input type="tel" name="phone" required placeholder="090-0000-0000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>メールアドレス<span class="req">*</span></label>
+          <input type="email" name="email" required placeholder="taro@example.com">
+        </div>
+        <div class="form-group">
+          <label>年齢</label>
+          <input type="number" name="age" placeholder="25" min="15" max="99">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>住所</label>
+        <input type="text" name="address" placeholder="東京都新宿区...">
+      </div>
+      <div class="form-group">
+        <label>メッセージ（任意）</label>
+        <textarea name="notes" rows="3" placeholder="志望動機・質問等があればご記入ください"></textarea>
+      </div>
+      <div class="ea-applybtn-wrap" style="margin-top:8px">
+        <button type="submit" class="ea-applybtn">応募する</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  const field = document.getElementById('apply-source-media');
+  if (!field) return;
+  const params = new URLSearchParams(window.location.search);
+  const utmSource = (params.get('utm_source') || '').toLowerCase();
+  const ref = (document.referrer || '').toLowerCase();
+  if (utmSource.includes('google') || ref.includes('google.com')) {
+    field.value = 'google';
+  }
+})();
+</script>`;
+
+  return publicLayout(`${esc(job.title)} | 求人詳細`, content, {
+    description: `${job.location}・${job.salary}・${job.employment_type}。${job.description.slice(0, 100)}`,
+    jsonld,
+    canonical: `${siteUrl}/jobs/${job.id}`
+  });
+}
+
 function mapEmploymentType(t) {
   const m = { '正社員': 'FULL_TIME', 'パート・アルバイト': 'PART_TIME', '契約社員': 'CONTRACTOR', '派遣社員': 'TEMPORARY', '業務委託': 'OTHER' };
   return m[t] || 'OTHER';
@@ -1143,7 +1960,7 @@ function loginPage(error = '') {
 <div class="login-wrap">
   <div class="login-card">
     <div class="login-logo">
-      <h1>SEO採用プラットフォーム</h1>
+      <h1>ATS採用プラットフォーム</h1>
       <p>管理画面へのログイン</p>
     </div>
     ${error ? `<div class="login-error">⚠️ ${esc(error)}</div>` : ''}
@@ -1478,9 +2295,12 @@ function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
       <div class="media-op-section">
         <div class="media-op-label">求人ボックス <span class="text-muted text-sm">（スクレイピング投稿・VPN必須）</span></div>
         <div class="btn-group" style="align-items:center">
-          <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox('${co}')">🚀 求人ボックスに25件投稿する</button>
+          <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox('${co}')">🚀 求人ボックスに投稿する（未投稿のみ）</button>
+          <button id="btn-post-kyujinbox-force" class="btn btn-ghost btn-sm" onclick="startPostKyujinboxForce('${co}')" title="投稿済み求人も含めて全件投稿">🔄 強制再投稿</button>
+          <button class="btn btn-ghost btn-sm" onclick="resetKyujinboxPosted('${co}')" title="投稿済みフラグをリセット">♻️ フラグリセット</button>
+          <button id="btn-publish-kyujinbox-drafts" class="btn btn-ghost btn-sm" onclick="startPublishKyujinboxDrafts()" title="求人ボックス側に残っている下書きを巡回して公開（写真も後付け）">📤 下書きを公開＋写真添付</button>
         </div>
-        <div class="text-sm text-muted" style="margin-top:4px">ボタン1回で1日分（25件）を一括投稿します。</div>
+        <div class="text-sm text-muted" style="margin-top:4px">1度投稿した求人は次回スキップ（スキップしたくない場合は強制再投稿 or フラグリセット）。<br>「下書きを公開＋写真添付」は、求人ボックスに下書きのまま残った求人を巡回して公開し、写真も後付けします。</div>
         <div id="progress-kyujinbox-wrap" class="progress-wrap hidden"><div id="progress-kyujinbox" class="progress-box"></div></div>
       </div>
 
@@ -1640,6 +2460,10 @@ function callImportModalHtml(co, media) {
         <label>会社<select id="ci-company">${coOpts}</select></label>
         <label>媒体<select id="ci-media">${mediaOpts}</select></label>
         <label class="full">CSV / Excelファイル<input type="file" id="ci-file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        <label class="full" id="ci-countnew-row" style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="ci-countnew" style="width:auto">
+          <strong>本日の新着として計上する</strong>（本日の新規応募・会社別×媒体別に反映）
+        </label>
       </div>
       <p id="ci-mode-hint" class="muted" style="font-size:12px;margin:0 0 8px">新規の応募者を取り込みます。CSV・Excel(.xlsx)・スプレッドシートに対応。電話番号・メールが既存と一致する場合は重複として記録します。</p>
       <div id="ci-result" class="import-result"></div>
@@ -1671,8 +2495,12 @@ function callImportModalHtml(co, media) {
           <input type="checkbox" id="si-countnew" style="width:auto">
           <strong>本日の新着として計上する</strong>（本日の新規応募・会社別×媒体別に反映）
         </label>
+        <label class="full" style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="si-fillmissing" style="width:auto">
+          <strong>空欄補完モード</strong>（既存レコードの生年月日・フリガナ等の空欄を補完、新規追加はしない）
+        </label>
       </div>
-      <p class="muted" style="font-size:11px;margin:0 0 8px">※「本日の新着」にチェック＝今日入ってきた新規応募として計上し架電リストへ。<br>チェックを外す＝過去バックログ（新規応募に計上しない）として取り込みます。</p>
+      <p class="muted" style="font-size:11px;margin:0 0 8px">※「本日の新着」にチェック＝今日入ってきた新規応募として計上し架電リストへ。<br>「空欄補完」にチェック＝既存レコードの空欄のみ埋める（重複・新規レコードは作らない）。</p>
       <div id="si-result" class="import-result"></div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="callCloseSmartImport()">閉じる</button>
@@ -1687,4 +2515,4 @@ const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx'];
 const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
 function mediaName(id) { if (id === 'all') return 'すべての媒体'; const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobDetailPage, privacyPolicyPage, esc, opsPage, callsPage };
+module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobsListPageV2, jobDetailPage, jobDetailPageV2, topPageV2, privacyPolicyPage, esc, opsPage, callsPage };

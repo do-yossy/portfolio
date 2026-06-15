@@ -146,6 +146,12 @@ try {
   db.exec("UPDATE applicants SET is_archived=1 WHERE is_archived=0 AND status IS NOT NULL AND status != '' AND status != '新規'");
 } catch {}
 
+// Migration v7: kyujinbox posted tracking
+try { db.exec("ALTER TABLE jobs ADD COLUMN kyujinbox_posted_at TEXT DEFAULT NULL"); } catch {}
+
+// Migration v8: multiple locations per job (JSON array)
+try { db.exec("ALTER TABLE jobs ADD COLUMN locations TEXT DEFAULT '[]'"); } catch {}
+
 // Migration v2: 媒体掲載日報テーブル
 db.exec(`
   CREATE TABLE IF NOT EXISTS media_posts (
@@ -188,8 +194,8 @@ const Jobs = {
     const id = generateId();
     const ts = now();
     db.prepare(`
-      INSERT INTO jobs (id, title, location, salary, job_type, employment_type, description, tags, catchcopy, image_url, faq, is_published, target_media, published_at, expires_at, company, rewarding, worktime_holiday, transportation, how_to_apply, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO jobs (id, title, location, salary, job_type, employment_type, description, tags, catchcopy, image_url, faq, is_published, target_media, published_at, expires_at, company, rewarding, worktime_holiday, transportation, how_to_apply, locations, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       data.title, data.location, data.salary,
@@ -209,6 +215,7 @@ const Jobs = {
       data.worktimeHoliday || data.worktime_holiday || '',
       data.transportation || '',
       data.howToApply || data.how_to_apply || '',
+      JSON.stringify(data.locations || []),
       ts, ts
     );
     return Jobs.findById(id);
@@ -243,6 +250,8 @@ const Jobs = {
       worktimeHoliday: 'worktime_holiday', worktime_holiday: 'worktime_holiday',
       transportation: 'transportation',
       howToApply: 'how_to_apply', how_to_apply: 'how_to_apply',
+      kyujinbox_posted_at: 'kyujinbox_posted_at',
+      locations: 'locations',
     };
     for (const [key, col] of Object.entries(map)) {
       if (data[key] !== undefined) {
@@ -285,6 +294,24 @@ const Jobs = {
       WHERE is_published = 1 AND expires_at IS NOT NULL AND expires_at < ?
     `).run(ts, ts);
     return result.changes;
+  },
+  // Googleしごと検索掲載から7日経過した求人の target_media から 'google' を除外
+  expireGoogleJobs(days = 7) {
+    const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const ts = now();
+    const rows = db.prepare(`SELECT id, target_media FROM jobs WHERE is_published = 1`).all();
+    let count = 0;
+    for (const row of rows) {
+      const media = JSON.parse(row.target_media || '[]');
+      if (!media.includes('google')) continue;
+      // published_at が threshold より古い行を取得
+      const job = db.prepare(`SELECT published_at FROM jobs WHERE id = ?`).get(row.id);
+      if (!job || !job.published_at || job.published_at > threshold) continue;
+      const newMedia = JSON.stringify(media.filter(m => m !== 'google'));
+      db.prepare(`UPDATE jobs SET target_media = ?, updated_at = ? WHERE id = ?`).run(newMedia, ts, row.id);
+      count++;
+    }
+    return count;
   },
   todayCountByMedia(media) {
     const today = new Date().toISOString().slice(0, 10);
@@ -655,6 +682,23 @@ const Ops = {
     return Applicants.findById(id);
   },
 
+  // 既存レコードの空フィールドのみを補完（生年月日・フリガナ等）
+  fillMissingFields(id, fields) {
+    const FILLABLE = ['furigana', 'birth_date', 'age', 'address', 'gender', 'education', 'experience', 'current_job', 'job_title'];
+    const parts = [];
+    const vals = [];
+    for (const col of FILLABLE) {
+      const jsKey = col.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+      const val = fields[jsKey] ?? fields[col];
+      if (val == null || val === '') continue;
+      parts.push(`${col} = CASE WHEN (${col} IS NULL OR ${col} = '') THEN ? ELSE ${col} END`);
+      vals.push(String(val));
+    }
+    if (!parts.length) return 0;
+    vals.push(now(), id);
+    return db.prepare(`UPDATE applicants SET ${parts.join(', ')}, updated_at = ? WHERE id = ?`).run(...vals).changes;
+  },
+
   // 会社×媒体でフィルタした応募者一覧
   listCalls({ company, media, status, month, archived, search, excludeDuplicate } = {}) {
     const conds = [];
@@ -682,7 +726,7 @@ const Ops = {
     const conds = ['is_archived = 0'];
     const vals = [];
     if (activeOnly) conds.push(`status IN (${ACTIVE_CALL_STATUSES.map(() => '?').join(',')})`), vals.push(...ACTIVE_CALL_STATUSES);
-    if (todayOnly) { conds.push('created_at >= ?'); vals.push(new Date().toISOString().slice(0, 10) + 'T00:00:00Z'); }
+    if (todayOnly) { conds.push('applied_at >= ?'); vals.push(new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)); } // JST基準
     let q = 'SELECT company, media, COUNT(*) as c FROM applicants';
     if (conds.length) q += ' WHERE ' + conds.join(' AND ');
     q += ' GROUP BY company, media';

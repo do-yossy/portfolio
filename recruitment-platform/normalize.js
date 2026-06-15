@@ -15,10 +15,11 @@ function toHalfWidth(str) {
 function normalizePhone(phone) {
   if (!phone) return '';
   let s = toHalfWidth(phone.toString().trim());
-  s = s.replace(/[\s\-\(\)\.\+]/g, '');
-  s = s.toLowerCase();
-  // 先頭の+81を0に
-  if (s.startsWith('81')) s = '0' + s.slice(2);
+  // 数字以外（空白・ハイフン・括弧・+・Excelが付ける先頭の ' など）をすべて除去
+  s = s.replace(/\D/g, '');
+  // 国際表記 +81 / 0081 を国内表記(先頭0)に変換
+  if (s.startsWith('0081')) s = '0' + s.slice(4);
+  else if (s.startsWith('81')) s = '0' + s.slice(2);
   return s;
 }
 

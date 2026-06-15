@@ -9,13 +9,26 @@
 // 架電リスト用の列定義
 // B列（index 1）= 重複情報、F列（index 5）= ふりがな（名前の隣）
 // S〜V列（index 18〜21）= 入力欄（架電回数・対応状況・最終架電日・メモ）
+// W列（index 22）= 職歴（notesから抽出）
 const SHEET_HEADERS = [
   'ID', '重複', '媒体', '会社', '名前', 'ふりがな',
   '電話番号', 'メールアドレス', '性別', '生年月日', '年齢', '居住地',
   '現在の職業', '求人タイトル', '経験', '学歴', '勤務地', '応募日',
-  '架電回数', '対応状況', '最終架電日', 'メモ',
+  '架電回数', '対応状況', '最終架電日', 'メモ', '職歴',
 ];
-const SHEET_COL = { id: 0, dupInfo: 1, furigana: 5, callCount: 18, status: 19, lastCalled: 20, notes: 21 };
+const SHEET_COL = { id: 0, dupInfo: 1, furigana: 5, callCount: 18, status: 19, lastCalled: 20, notes: 21, workHistory: 22 };
+
+// notesフィールドから【職歴N】/【勤務先N】セクションを抽出してW列用テキストを生成する
+function extractWorkHistory(notes) {
+  if (!notes) return '';
+  const sections = [];
+  const regex = /【(?:職歴|勤務先)\d+】[^【]*/g;
+  let m;
+  while ((m = regex.exec(notes)) !== null) {
+    sections.push(m[0].trim().replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' '));
+  }
+  return sections.join(' | ');
+}
 
 // レイアウト検出用（旧レイアウトのインデックスで退避する）
 const LAYOUTS = [
@@ -41,6 +54,7 @@ function applicantToSheetRow(a, mediaLabel, companyLabel, dupInfo = '') {
     (a.applied_at || '').slice(0, 10),
     String(a.call_count || 0), a.status || '', (a.last_called_at || '').slice(0, 10),
     (a.notes || '').replace(/[\r\n]+/g, ' '),
+    extractWorkHistory(a.notes || ''),
   ].map(v => v == null ? '' : String(v));
 }
 
@@ -69,12 +83,13 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const existingHeader = existing[0] || [];
     const layout = LAYOUTS.find(l => l.detect(existingHeader));
     // 手入力値を退避する列はヘッダー名でも検出（レイアウト判定に失敗してもメモ等を消さない）
-    const priorBirthCol  = existingHeader.findIndex(h => h === '生年月日');
-    const priorGenderCol = existingHeader.findIndex(h => h === '性別');
-    const priorNotesCol  = existingHeader.findIndex(h => h === 'メモ');
-    const priorFuriCol   = existingHeader.findIndex(h => h === 'ふりがな');
-    const priorLastCol   = existingHeader.findIndex(h => h === '最終架電日');
-    const priorIdCol     = existingHeader.findIndex(h => h === 'ID');
+    const priorBirthCol      = existingHeader.findIndex(h => h === '生年月日');
+    const priorGenderCol     = existingHeader.findIndex(h => h === '性別');
+    const priorNotesCol      = existingHeader.findIndex(h => h === 'メモ');
+    const priorFuriCol       = existingHeader.findIndex(h => h === 'ふりがな');
+    const priorLastCol       = existingHeader.findIndex(h => h === '最終架電日');
+    const priorWorkHistoryCol= existingHeader.findIndex(h => h === '職歴');
+    const priorIdCol         = existingHeader.findIndex(h => h === 'ID');
     const pcL  = layout ? layout.col : null;
     const idCl = pcL ? pcL.id : (priorIdCol >= 0 ? priorIdCol : 0);
     for (const row of existing.slice(1)) {
@@ -85,9 +100,10 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         status:     pcL && pcL.status   >= 0 ? row[pcL.status]    : undefined,
         notes:      priorNotesCol >= 0 ? row[priorNotesCol] : (pcL && pcL.notes    >= 0 ? row[pcL.notes]    : ''),
         furigana:   priorFuriCol  >= 0 ? row[priorFuriCol]  : (pcL && pcL.furigana >= 0 ? row[pcL.furigana] : ''),
-        birthDate:  priorBirthCol  >= 0 ? row[priorBirthCol]  : '',
-        gender:     priorGenderCol >= 0 ? row[priorGenderCol] : '',
-        lastCalled: priorLastCol   >= 0 ? row[priorLastCol]   : '',
+        birthDate:   priorBirthCol       >= 0 ? row[priorBirthCol]       : '',
+        gender:      priorGenderCol      >= 0 ? row[priorGenderCol]      : '',
+        lastCalled:  priorLastCol        >= 0 ? row[priorLastCol]        : '',
+        workHistory: priorWorkHistoryCol >= 0 ? row[priorWorkHistoryCol] : '',
       });
     }
 
@@ -194,6 +210,9 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
           if (p.gender && String(p.gender).trim() && !row[8]) row[8] = String(p.gender).trim();
           if (p.lastCalled && String(p.lastCalled).trim() && !String(row[SHEET_COL.lastCalled] || '').trim())
             row[SHEET_COL.lastCalled] = String(p.lastCalled).trim();
+          // 職歴: DBから自動抽出した値が空なら手入力値を保持
+          if (p.workHistory && String(p.workHistory).trim() && !String(row[SHEET_COL.workHistory] || '').trim())
+            row[SHEET_COL.workHistory] = String(p.workHistory).trim();
         }
         rows.push(row);
         count++;

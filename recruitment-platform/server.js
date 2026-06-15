@@ -42,7 +42,55 @@ const { privacyPolicyPage } = T;
 const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
-const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
+// playwright が import できる Python を自動検出して使う。
+// Windows で複数 Python（Microsoft Store 版など）が混在していても、
+// 実際に playwright が入っている実行ファイルを選ぶ。
+// PYTHON_PATH(.env) を指定すれば最優先で使用。
+const PYTHON_CMD = (function detectPython() {
+  const { spawnSync } = require('child_process');
+  // 実際にブラウザ操作まで使えるか（greenlet含む深いimport）で判定する。
+  const TEST = 'from playwright.sync_api import sync_playwright';
+  const candidates = [];
+  if ((process.env.PYTHON_PATH || '').trim()) candidates.push(process.env.PYTHON_PATH.trim());
+  if ((process.env.PYTHON_CMD  || '').trim()) candidates.push(process.env.PYTHON_CMD.trim());
+  // py ランチャー（Windows）で特定バージョンを試す
+  if (process.platform === 'win32') {
+    const la = process.env.LOCALAPPDATA || '';
+    const pf = process.env.ProgramFiles || 'C:\\Program Files';
+    // py -X.Y で playwright が動くか試し、動けば sys.executable（実パス）を返す
+    for (const v of ['3.12', '3.11', '3.13']) {
+      try {
+        const r = spawnSync('py', [`-${v}`, '-c', TEST], { timeout: 12000, windowsHide: true });
+        if (r.status === 0) {
+          // 実際の python.exe パスを取得して返す（以降の spawn でもそのまま使えるように）
+          const rr = spawnSync('py', [`-${v}`, '-c', 'import sys; print(sys.executable)'], { timeout: 5000, windowsHide: true });
+          const exePath = (rr.stdout || '').toString().trim();
+          const label = exePath || `py -${v}`;
+          console.log(`[python] playwright動作確認OK: ${label}`);
+          return exePath || 'py';
+        }
+      } catch (_) {}
+    }
+    // フルパスでも探す（py ランチャーなしの環境向け）
+    for (const v of ['312', '311', '313']) {
+      if (la) candidates.push(path.join(la, 'Programs', 'Python', `Python${v}`, 'python.exe'));
+      candidates.push(path.join(pf, `Python${v}`, 'python.exe'));
+    }
+    candidates.push('python');
+    if (la) candidates.push(path.join(la, 'Python', 'bin', 'python.exe'));
+  } else {
+    candidates.push('python3', 'python');
+  }
+  for (const c of candidates) {
+    try {
+      const r = spawnSync(c, ['-c', TEST], { timeout: 12000, windowsHide: true });
+      if (r.status === 0) { console.log(`[python] playwright動作確認OK: ${c}`); return c; }
+    } catch (_) {}
+  }
+  const fallback = (process.env.PYTHON_PATH || '').trim() || (process.platform === 'win32' ? 'python' : 'python3');
+  console.log(`[python] 動作するplaywright入りPythonが見つかりません。フォールバック: ${fallback}`);
+  return fallback;
+})();
 
 // アセットのバージョン（admin.js / styles.css の更新時刻から算出）。
 // HTML 内の <script>/<link> に ?v=... として付与し、デプロイ後に
@@ -242,12 +290,11 @@ function mapOpsCSVRow(row, company, media) {
     return '';
   };
 
-  // ── engage / Indeed形式: 氏名（姓）＋氏名（名）結合 ──
-  if (!base.name) {
-    const sei = col(['氏名（姓）','姓','sei']);
-    const mei = col(['氏名（名）','名','mei']);
-    const joined = `${sei} ${mei}`.trim();
-    if (joined) base.name = joined.replace(/[（(][^）)]*[）)]/g, '').trim();
+  // ── engage / Indeed形式: 氏名（姓）＋氏名（名）結合（姓・名列があれば常に上書き）──
+  const sei = col(['氏名（姓）','姓','sei']);
+  const mei = col(['氏名（名）','名','mei']);
+  if (sei || mei) {
+    base.name = `${sei} ${mei}`.trim().replace(/[（(][^）)]*[）)]/g, '').trim();
   }
   if (!base.name) base.name = col(['氏名','名前']).replace(/[（(][^）)]*[）)]/g, '').trim();
 
@@ -282,8 +329,13 @@ function mapOpsCSVRow(row, company, media) {
     if (parts.length) base.education = parts.join(' ');
   }
 
-  // ── 求人タイトル: engageは「応募求人-職種名」──
-  if (!base.jobTitle) base.jobTitle = col(['応募求人-職種名','応募求人名','求人タイトル','応募職種']);
+  // ── 求人タイトル: engageは「応募求人 - 職種名」（スペース付きハイフン形式）を優先 ──
+  const engageTitle = col(['応募求人 - 職種名','応募求人-職種名','応募求人名']);
+  if (media === 'engage' && engageTitle) {
+    base.jobTitle = engageTitle;
+  } else if (!base.jobTitle) {
+    base.jobTitle = engageTitle || col(['求人タイトル','応募職種','応募求人名']);
+  }
 
   // ── 求人ボックス形式: 生年月日 "1994年03月05日 (32歳)" から年齢を抽出 ──
   if (!base.age) {
@@ -356,13 +408,14 @@ function companyFullName(id) {
 // 新規応募者タブ統計
 async function opsNewStats() {
   const { db } = require('./db');
-  const today = new Date().toISOString().slice(0, 10);
-  const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
-  // 「本日の新規応募」は created_at（登録日時）基準でカウント。
-  // CSV取り込み分（is_imported=1）も含め、今日登録された全応募者を数える。
-  // これにより会社別×媒体別 新規応募数の合計と一致する。
-  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(today + 'T00:00:00Z').c;
-  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND created_at >= ?`).get(monday + 'T00:00:00Z').c;
+  // 日付はJST（UTC+9）基準。UTC基準だと日本の0:00〜8:59に前日扱いになる
+  const JST = 9 * 60 * 60 * 1000;
+  const today = new Date(Date.now() + JST).toISOString().slice(0, 10);
+  const monday = (() => { const d = new Date(Date.now() + JST); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
+  // 「本日の新規応募」は applied_at（応募日）基準でカウント。
+  // バックログ取込は applied_at が過去日付になるため自動的に除外される。
+  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(today).c;
+  const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(monday).c;
   const activeTotal = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND status IN ('新規','架電済(不通)','対応中')`).get().c;
   return { todayNew, weekNew, activeTotal };
 }
@@ -594,17 +647,21 @@ async function checkVPN() {
     const out = await vpncmdAccountList(vpncmdPath);
     // "Connected" はSoftEtherの英語ステータス文字列
     // "接続完了" は日本語表示時
-    const connected = isVpnConnectedFromOutput(out);
-    vpnCache = { connected, ts: Date.now() };
-    return connected;
+    if (isVpnConnectedFromOutput(out)) {
+      vpnCache = { connected: true, ts: Date.now() };
+      return true;
+    }
+    // vpncmdが未接続でも、SoftEther以外のVPNクライアントで接続している
+    // 可能性があるため、VPN_IP_RANGES設定時はIP範囲チェックにフォールバック
   }
 
-  // vpncmd未インストール → IP範囲チェックにフォールバック
   const vpnRanges = (process.env.VPN_IP_RANGES || '').split(',').map(s => s.trim()).filter(Boolean);
   if (!vpnRanges.length) {
-    // 設定なし = 開発環境（常にOK）
-    vpnCache = { connected: true, ts: Date.now() };
-    return true;
+    // IP範囲未設定: vpncmdで未接続判定済みならそれを尊重、
+    // vpncmd未インストールなら開発環境とみなし常にOK
+    const connected = !vpncmdPath;
+    vpnCache = { connected, ts: Date.now() };
+    return connected;
   }
   try {
     const externalIp = await new Promise((resolve, reject) => {
@@ -802,6 +859,18 @@ const server = http.createServer(async (req, res) => {
   catch { pathname = parsed.pathname || '/'; }  // 不正な%エンコードでも落とさない
 
   // ── Static files ──
+  if (pathname.startsWith('/images/') && method === 'GET') {
+    const fp = path.join(PUBLIC_DIR, path.normalize(pathname));
+    if (!fp.startsWith(path.join(PUBLIC_DIR, 'images'))) { send(res, 404, 'Not Found'); return; }
+    try {
+      const content = fs.readFileSync(fp);
+      const ext = path.extname(fp).toLowerCase();
+      const types = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
+      res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
+      res.end(content);
+    } catch { send(res, 404, 'Not Found'); }
+    return;
+  }
   if (pathname === '/styles.css' || pathname === '/admin.js') {
     const fp = path.join(PUBLIC_DIR, pathname);
     try {
@@ -854,12 +923,14 @@ const server = http.createServer(async (req, res) => {
     let jobs = await Jobs.findAll(true);
     if (search) {
       const s = search.toLowerCase();
-      jobs = jobs.filter(j =>
-        j.title.toLowerCase().includes(s) ||
-        j.location.toLowerCase().includes(s) ||
-        j.job_type.toLowerCase().includes(s) ||
-        (j.tags || '').toLowerCase().includes(s)
-      );
+      jobs = jobs.filter(j => {
+        const locs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
+        const allLocs = locs.length ? locs : [j.location || ''];
+        return j.title.toLowerCase().includes(s) ||
+          allLocs.some(l => l.toLowerCase().includes(s)) ||
+          j.job_type.toLowerCase().includes(s) ||
+          (j.tags || '').toLowerCase().includes(s);
+      });
     }
     send(res, 200, T.jobsListPage(jobs, search));
     return;
@@ -871,6 +942,49 @@ const server = http.createServer(async (req, res) => {
     const job = await Jobs.findById(jobDetailMatch[1]);
     if (!job || !job.is_published) { send(res, 404, '<h1>求人が見つかりません</h1>'); return; }
     send(res, 200, T.jobDetailPage(job));
+    return;
+  }
+
+  // ── Preview: 採用トップページ（イーストアジア風） ──
+  if (pathname === '/preview/top' && method === 'GET') {
+    const jobs = (await Jobs.findAll()).filter(j => j.is_published);
+    send(res, 200, T.topPageV2(jobs));
+    return;
+  }
+
+  // ── Preview: 新デザイン求人一覧（未公開求人も「未公開」バッジ付きで表示） ──
+  // 掲載先「自社サイト」の求人のみ表示（求人ボックス等の媒体用求人は出さない）
+  if (pathname === '/preview/jobs' && method === 'GET') {
+    let jobs = (await Jobs.findAll()).filter(j => (j.target_media || '').includes('自社サイト'));
+    // 職種タブからの絞り込み（?type=IT / 製造 / 送迎 / 配送）: job_type の先頭一致で判定
+    const type = (query.type || '').trim();
+    if (type) {
+      jobs = jobs.filter(j => (j.job_type || '').startsWith(type));
+    }
+    const search = (query.q || '').trim();
+    if (search) {
+      const s = search.toLowerCase();
+      jobs = jobs.filter(j => {
+        const locs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
+        const descLocMatch = !locs.length && (j.description || '').match(/【所在地】([^\n【]*)/);
+        const allLocs = locs.length ? locs : [descLocMatch ? descLocMatch[1].trim() : (j.location || '')];
+        return j.title.toLowerCase().includes(s) ||
+          allLocs.some(l => l.toLowerCase().includes(s)) ||
+          j.job_type.toLowerCase().includes(s) ||
+          (j.tags || '').toLowerCase().includes(s);
+      });
+    }
+    send(res, 200, T.jobsListPageV2(jobs, search || type));
+    return;
+  }
+
+  // ── Preview: 新デザイン求人詳細（承認後 /jobs/:id へ切り替え予定） ──
+  const previewJobMatch = pathname.match(/^\/preview\/jobs\/([^/]+)$/);
+  if (previewJobMatch && method === 'GET') {
+    const job = await Jobs.findById(previewJobMatch[1]);
+    // プレビューは未公開求人も表示可能（デザイン確認用）
+    if (!job) { send(res, 404, '<h1>求人が見つかりません</h1>'); return; }
+    send(res, 200, T.jobDetailPageV2(job));
     return;
   }
 
@@ -1292,7 +1406,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   if (pathname === '/api/ops/calls/smart-import' && method === 'POST') {
     const ct = req.headers['content-type'] || '';
     const buf = await readBody(req);
-    let fileBuf = null, defaultCompany = co, splitByCallCount = false, countAsNew = false;
+    let fileBuf = null, defaultCompany = co, splitByCallCount = false, countAsNew = false, fillMissing = false;
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=(.+)$/);
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
@@ -1300,6 +1414,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         if (/name="company"/.test(p.header)) defaultCompany = p.content.toString('utf8').trim();
         else if (/name="split"/.test(p.header)) splitByCallCount = p.content.toString('utf8').trim() === '1';
         else if (/name="countnew"/.test(p.header)) countAsNew = p.content.toString('utf8').trim() === '1';
+        else if (/name="fillmissing"/.test(p.header)) fillMissing = p.content.toString('utf8').trim() === '1';
         else if (/filename=/.test(p.header)) fileBuf = p.content;
       }
     } else {
@@ -1307,6 +1422,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       defaultCompany = query.company || co;
       splitByCallCount = query.split === '1';
       countAsNew = query.countnew === '1';
+      fillMissing = query.fillmissing === '1';
     }
     const isXlsx = fileBuf && fileBuf.length > 4 &&
       fileBuf[0] === 0x50 && fileBuf[1] === 0x4B && fileBuf[2] === 0x03 && fileBuf[3] === 0x04;
@@ -1322,6 +1438,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         defaultCompany,
         splitByCallCount,
         countAsNew,
+        fillMissing,
       });
       sendJSON(res, 200, { ok: true, ...r });
     } catch (e) {
@@ -1340,7 +1457,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
     const ct = req.headers['content-type'] || '';
     const buf = await readBody(req);
-    let fileBuf = null, importCompany = co, importMedia = 'indeed', importMode = 'insert';
+    let fileBuf = null, importCompany = co, importMedia = 'indeed', importMode = 'insert', importCountNew = false;
     if (ct.includes('multipart/form-data')) {
       const boundaryMatch = ct.match(/boundary=(.+)$/);
       const parts = parseMultipart(buf, boundaryMatch[1].trim());
@@ -1348,6 +1465,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         if (/name="company"/.test(p.header)) importCompany = p.content.toString('utf8').trim();
         else if (/name="media"/.test(p.header)) importMedia = p.content.toString('utf8').trim();
         else if (/name="mode"/.test(p.header)) importMode = p.content.toString('utf8').trim();
+        else if (/name="countnew"/.test(p.header)) importCountNew = p.content.toString('utf8').trim() === '1';
         else if (/filename=/.test(p.header)) fileBuf = p.content;
       }
     } else {
@@ -1355,6 +1473,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       importCompany = query.company || co;
       importMedia = query.media || 'indeed';
       importMode = query.mode || 'insert';
+      importCountNew = query.countnew === '1';
     }
 
     // Excel(.xlsx) は ZIP署名(PK\x03\x04)で判定。それ以外は CSV として解析。
@@ -1395,19 +1514,30 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
 
     // ── 新規取込モード（デフォルト）──
+    // importCountNew=true: 本日(JST)の新着として計上（applied_at=今日・架電リストへ）。
+    //   既存（重複）が見つかった場合は重複登録せず本日の新着へ昇格する。
     let imported = 0, duplicates = 0, skipped = 0;
     const skipReasons = [];
+    const todayJST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
     for (const row of rows) {
       const mapped = mapOpsCSVRow(row, importCompany, importMedia);
       if (!mapped.name || (!mapped.phone && !mapped.email)) { skipped++; skipReasons.push('名前/連絡先なし'); continue; }
       const nPhone = normalizePhone(mapped.phone);
       const nEmail = normalizeEmail(mapped.email);
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
-      if (dupId) duplicates++;
-      await Applicants.create({ ...mapped, isImported: 1 });
-      imported++;
+      if (dupId) {
+        // 重複は昇格せず、架電リストに「重複」バッジ付きで表示する（アーカイブしない）
+        await Applicants.create({ ...mapped, isImported: importCountNew ? 0 : 1, appliedAt: importCountNew ? todayJST : undefined, allowEmptyDate: !importCountNew, isArchived: 0, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        duplicates++;
+      } else if (importCountNew) {
+        await Applicants.create({ ...mapped, isImported: 0, appliedAt: todayJST, isArchived: 0 });
+        imported++;
+      } else {
+        await Applicants.create({ ...mapped, isImported: 1 });
+        imported++;
+      }
     }
-    await Logs.create('ops_csv_import', 'success', `${importCompany}/${importMedia}: ${imported}件取込・${duplicates}件重複`);
+    await Logs.create('ops_csv_import', 'success', `${importCompany}/${importMedia}: ${imported}件取込・${duplicates}件重複${importCountNew ? '（本日の新着として計上）' : ''}`);
     sendJSON(res, 200, { ok: true, imported, duplicates, skipped, skipReasons: skipReasons.slice(0, 5), rows: rows.length });
     return;
   }
@@ -1951,24 +2081,38 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       return sendJSON(res, 400, { error: '❌ VPN未接続です。処理を中止します。' });
     }
 
-    const startBody = await parseJSON(req);
-    const batchSize = Math.min(parseInt(startBody.limit || '25', 10), 25);
-    const kbCompany = startBody.company || null;
-    const allJobs   = await Jobs.findAll({ onlyPublished: true, company: kbCompany });
+    const startBody   = await parseJSON(req);
+    const batchSize   = Math.min(parseInt(startBody.limit || '25', 10), 25);
+    const kbCompany   = startBody.company || null;
+    const forceRepost = startBody.forceRepost === true || startBody.forceRepost === 'true';
+    const allJobs     = await Jobs.findAll({ onlyPublished: true, company: kbCompany });
     let kbJobs = allJobs.filter(j => {
       const m = JSON.parse(j.target_media || '[]');
       return m.includes('求人ボックス') || m.includes('kyujinbox');
     });
     if (kbJobs.length === 0) kbJobs = allJobs;
 
+    // Skip already-posted jobs unless forceRepost is set
+    const alreadyPosted = kbJobs.filter(j => j.kyujinbox_posted_at);
+    if (!forceRepost) {
+      kbJobs = kbJobs.filter(j => !j.kyujinbox_posted_at);
+    }
+
     if (kbJobs.length === 0) {
-      return sendJSON(res, 400, { error: '⚠️ 公開中の求人がありません' });
+      const msg = alreadyPosted.length > 0
+        ? `⚠️ 未投稿の求人がありません（${alreadyPosted.length}件は投稿済み）。再投稿するには「強制再投稿」ボタンを使ってください。`
+        : '⚠️ 公開中の求人がありません';
+      return sendJSON(res, 400, { error: msg, allPosted: alreadyPosted.length > 0 });
     }
 
     const { id, session } = createSession();
     const pushLog = (message, type = 'info') => {
       session.logs.push({ message: String(message ?? ''), type });
     };
+
+    if (alreadyPosted.length > 0 && !forceRepost) {
+      pushLog(`ℹ️ 投稿済みをスキップ: ${alreadyPosted.length}件（未投稿 ${kbJobs.length}件を投稿します）`, 'info');
+    }
 
     sendJSON(res, 200, { ok: true, sessionId: id });
 
@@ -1991,6 +2135,9 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       }
 
       pushLog(`📋 求人ボックス向け求人 ${Math.min(batchSize, kbJobs.length)}件を投稿します...`, 'info');
+      pushLog(`🐍 使用Python: ${PYTHON_CMD}`, 'info');
+      // Build a map of id→job for posted-at tracking
+      const jobIdMap = Object.fromEntries(kbJobs.map(j => [j.id, j]));
       const jobsJson = JSON.stringify(kbJobs.slice(0, batchSize));
       const proc = spawn(PYTHON_CMD, [scriptPath], {
         env: { ...process.env, KYUJINBOX_BATCH_SIZE: String(batchSize) }
@@ -2003,7 +2150,14 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         for (const line of lines) {
           try {
             const obj = JSON.parse(line);
-            pushLog(obj.message, obj.level || 'info');
+            // Track successfully posted jobs
+            if (obj.type === 'posted' && obj.jobId && jobIdMap[obj.jobId]) {
+              const ts = new Date().toISOString();
+              Jobs.update(obj.jobId, { kyujinbox_posted_at: ts });
+              pushLog(`📌 投稿済みとしてマーク: ${jobIdMap[obj.jobId].title}`, 'info');
+            } else {
+              pushLog(obj.message, obj.level || 'info');
+            }
           } catch {
             pushLog(line, 'info');
           }
@@ -2038,6 +2192,66 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
+  // ── API: Kyujinbox 既存下書きを一括公開（写真も後付け）──
+  if (pathname === '/api/post/kyujinbox/publish-drafts' && method === 'POST') {
+    const vpnOk = await checkVPN();
+    if (!vpnOk) {
+      await Logs.create('kyujinbox_post', 'error', 'VPN未接続');
+      return sendJSON(res, 400, { error: '❌ VPN未接続です。処理を中止します。' });
+    }
+
+    const { id, session } = createSession();
+    const pushLog = (message, type = 'info') => {
+      session.logs.push({ message: String(message ?? ''), type });
+    };
+    sendJSON(res, 200, { ok: true, sessionId: id });
+
+    (async () => {
+      const scriptPath = path.join(SCRIPTS_DIR, 'kyujinbox_poster.py');
+      if (!fs.existsSync(scriptPath)) {
+        pushLog('⚠️ 投稿スクリプトが見つかりません（scripts/kyujinbox_poster.py）', 'warn');
+        session.done = true; session.success = false;
+        return;
+      }
+      pushLog('📋 既存の下書きを巡回して公開します（写真も後付け）...', 'info');
+      pushLog(`🐍 使用Python: ${PYTHON_CMD}`, 'info');
+      const proc = spawn(PYTHON_CMD, [scriptPath], { env: { ...process.env } });
+      proc.stdin.write(JSON.stringify({ mode: 'publish_drafts' }));
+      proc.stdin.end();
+
+      proc.stdout.on('data', data => {
+        const lines = data.toString().split('\n').filter(l => l.trim());
+        for (const line of lines) {
+          try {
+            const obj = JSON.parse(line);
+            pushLog(obj.message, obj.level || 'info');
+          } catch {
+            pushLog(line, 'info');
+          }
+        }
+      });
+      proc.stderr.on('data', data => {
+        const txt = data.toString().trim();
+        if (txt) pushLog(`⚠️ ${txt}`, 'warn');
+      });
+      proc.on('error', err => {
+        pushLog(`❌ プロセス起動失敗: ${err.message}`, 'error');
+        session.done = true; session.success = false;
+      });
+      proc.on('close', async code => {
+        const ok = code === 0;
+        const msg = ok ? '✅ 下書きの公開処理が完了しました' : `❌ 下書き公開失敗(exit ${code})`;
+        await Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
+        pushLog(msg, ok ? 'success' : 'error');
+        session.done = true; session.success = ok;
+      });
+    })().catch(err => {
+      pushLog(`❌ 内部エラー: ${err.message}`, 'error');
+      session.done = true; session.success = false;
+    });
+    return;
+  }
+
   // ── API: Kyujinbox Post Poll ──
   if (pathname === '/api/post/kyujinbox/poll' && method === 'GET') {
     const sid = query.id;
@@ -2050,6 +2264,29 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       done: session.done,
       success: session.success,
     });
+  }
+
+  // ── API: Kyujinbox reset posted status ──
+  if (pathname === '/api/post/kyujinbox/reset' && method === 'POST') {
+    const body    = await parseJSON(req);
+    const company = body.company || null;
+    const allJobs = await Jobs.findAll({ company });
+    const posted  = allJobs.filter(j => j.kyujinbox_posted_at);
+    for (const j of posted) {
+      Jobs.update(j.id, { kyujinbox_posted_at: null });
+    }
+    return sendJSON(res, 200, { ok: true, reset: posted.length });
+  }
+
+  // Googleしごと検索 7日経過求人を手動除外
+  if (pathname === '/api/google/expire' && method === 'POST') {
+    const body = await parseJSON(req);
+    const days = parseInt(body.days, 10) || 7;
+    const count = Jobs.expireGoogleJobs(days);
+    if (count > 0) {
+      Logs.create('google_expire', 'success', `手動実行: Googleしごと検索から除外 ${count}件（掲載${days}日経過）`);
+    }
+    return sendJSON(res, 200, { ok: true, expired: count, days });
   }
 
   // ── スタンバイ投稿（ポーリング方式・ボタン1回で16件）──
@@ -2321,6 +2558,17 @@ server.listen(PORT, () => {
   console.log(`   管理画面: http://localhost:${PORT}/admin`);
   console.log(`   求人サイト: http://localhost:${PORT}/jobs\n`);
 
+  // 起動時データクリーンアップ（タイトル復元・駅フレーズ削除・タグ整理）
+  try {
+    const path = require('path');
+    const dbPath = process.env.DATA_DIR
+      ? path.join(process.env.DATA_DIR, 'recruitment.db')
+      : path.join(__dirname, 'data', 'recruitment.db');
+    const { runCleanup } = require('./startup-cleanup');
+    const c = runCleanup(dbPath);
+    if (c > 0) console.log(`[cleanup] ${c}件の求人データを整理しました`);
+  } catch (e) { console.error('[cleanup] startup error:', e.message); }
+
   // Auto-expire jobs on startup
   try {
     const n = Jobs.expireOld();
@@ -2329,6 +2577,15 @@ server.listen(PORT, () => {
       console.log(`[auto-expire] ${n}件の求人を非公開にしました`);
     }
   } catch (e) { console.error('[auto-expire] startup error:', e.message); }
+
+  // Google Jobs 7日経過除外（起動時）
+  try {
+    const ng = Jobs.expireGoogleJobs(7);
+    if (ng > 0) {
+      Logs.create('google_expire', 'success', `起動時にGoogleしごと検索から除外: ${ng}件（掲載7日経過）`);
+      console.log(`[google-expire] ${ng}件をGoogleしごと検索から除外しました`);
+    }
+  } catch (e) { console.error('[google-expire] startup error:', e.message); }
 
   // Hourly auto-expire
   setInterval(() => {
@@ -2339,6 +2596,15 @@ server.listen(PORT, () => {
         console.log(`[auto-expire] ${n}件の求人を非公開にしました`);
       }
     } catch (e) { console.error('[auto-expire] interval error:', e.message); }
+
+    // Google Jobs 7日経過除外（毎時）
+    try {
+      const ng = Jobs.expireGoogleJobs(7);
+      if (ng > 0) {
+        Logs.create('google_expire', 'success', `定期チェック: Googleしごと検索から除外 ${ng}件（掲載7日経過）`);
+        console.log(`[google-expire] ${ng}件をGoogleしごと検索から除外しました`);
+      }
+    } catch (e) { console.error('[google-expire] interval error:', e.message); }
   }, 60 * 60 * 1000);
 });
 
