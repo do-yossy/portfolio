@@ -2122,8 +2122,9 @@ def main():
 
     try:
         from playwright.sync_api import sync_playwright
-    except ImportError:
-        progress(f"❌ playwright がインストールされていません（実行Python: {sys.executable}）", "error")
+    except Exception as e:
+        progress(f"❌ playwright の読み込みに失敗（実行Python: {sys.executable}）", "error")
+        progress(f"   原因: {type(e).__name__}: {e}", "error")
         progress("   この Python に入れてください: " + f'"{sys.executable}" -m pip install playwright', "error")
         sys.exit(1)
 
