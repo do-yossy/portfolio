@@ -1509,6 +1509,11 @@ function jobDetailPageV2(job) {
   .ea-table td { border: 1px solid #e4dfd4; padding: 13px 16px; color: #333; line-height: 1.9; white-space: pre-wrap; }
   .ea-faq-q { font-weight: 700; color: #e0371f; margin: 10px 0 2px; }
   .ea-faq-a { margin-bottom: 8px; }
+  .ea-company p { margin: 0 0 14px; }
+  .ea-company .ea-biz-list { margin: 0 0 14px; padding-left: 0; list-style: none; }
+  .ea-company .ea-biz-list li { position: relative; padding: 7px 12px 7px 30px; margin-bottom: 6px; background: #faf8f3; border: 1px solid #e4dfd4; border-radius: 8px; line-height: 1.6; }
+  .ea-company .ea-biz-list li::before { content: "▶"; position: absolute; left: 11px; color: #e0371f; font-size: 10px; top: 11px; }
+  .ea-company .ea-biz-lead { margin-top: 16px; padding: 14px 16px; background: #fff7f5; border-left: 4px solid #e0371f; border-radius: 6px; font-weight: 600; color: #111; }
   .ea-applybtn-wrap { text-align: center; margin: 36px 0 0; }
   .ea-applybtn { background: #e0371f; color: #fff; font-size: 17px; font-weight: 700; border: none; border-radius: 999px; padding: 16px 90px; cursor: pointer; box-shadow: 0 2px 10px rgba(224,55,31,.3); transition: background .2s; }
   .ea-applybtn:hover { background: #c12c16; }
@@ -1544,6 +1549,20 @@ function jobDetailPageV2(job) {
     ${infoRows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}
   </tbody></table>
   ${faqHtml}
+  <div class="ea-secband">会社概要</div>
+  <div class="ea-secbody ea-company" style="white-space:normal">
+    <p>当社は、マーケティング事業を中心に、商品・サービスの価値を最大化するための総合支援を行っています。市場分析から戦略立案、実行・運用までを一貫して手がけ、クライアント企業の成長を支援しています。</p>
+    <p>マーケティング活動を実現するため、社内外の各部門と連携し、以下の事業を展開しています。</p>
+    <ul class="ea-biz-list">
+      <li>マーケティング戦略の企画・立案</li>
+      <li>販売促進・プロモーションの実施、運用</li>
+      <li>商品流通に関わる物流・配送体制の構築</li>
+      <li>工場・倉庫における商品管理・出荷業務の運営</li>
+      <li>法人向け営業活動および顧客フォロー</li>
+    </ul>
+    <p>また、当社の主力事業であるマーケティング支援を基盤に、近年は物流・配送事業や製造事業にも積極的に事業領域を拡大しています。市場ニーズに柔軟に対応しながら、企画から製造、物流、販売促進までを一貫して支援できる体制づくりを進めており、今後もさらなる事業成長とサービス拡充を目指しています。</p>
+    <p class="ea-biz-lead">マーケティングは「売る仕組み」をつくる仕事です。<br>当社では、企画・営業・物流・製造・現場スタッフが一体となり、成果につながるマーケティングを実現しています。</p>
+  </div>
   <div class="ea-secband">応募情報</div>
   <div class="ea-secbody" style="white-space:normal" id="apply-wrap">
     <p style="margin:0 0 16px">下記フォームより応募してください。担当者より3営業日以内にご連絡いたします。</p>
