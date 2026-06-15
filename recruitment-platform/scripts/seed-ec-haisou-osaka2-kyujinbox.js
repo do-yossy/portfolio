@@ -229,7 +229,7 @@ async function main() {
         description:    job.description,
         tags:           job.tags,
         catchcopy:      job.catchcopy,
-        imageUrl:       '',
+        imageUrl:       '/images/ec-haisou-driver.svg',
         faq:            job.faq,
         isPublished:    true,
         publishedAt:    NOW,

@@ -125,6 +125,54 @@ def get_base_url(url):
     parsed = urlparse(url)
     return f"{parsed.scheme}://{parsed.netloc}"
 
+def resolve_job_image(job):
+    """掲載画像のローカルパスを決定する。
+    優先順: 環境変数 KYUJINBOX_JOB_IMAGE > OneDrive共有フォルダ > リポジトリ同梱SVG。
+    OneDrive\\recruitment-config\\job-images\\ec-haisou.(jpg/png/...) に写真を置けば自動採用。"""
+    import pathlib
+    env_path = os.environ.get("KYUJINBOX_JOB_IMAGE", "").strip()
+    if env_path and os.path.exists(env_path):
+        return env_path
+    onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer") or ""
+    if onedrive:
+        base = pathlib.Path(onedrive) / "recruitment-config" / "job-images"
+        for name in ("ec-haisou.jpg", "ec-haisou.jpeg", "ec-haisou.png", "ec-haisou.webp", "ec-haisou.svg"):
+            p = base / name
+            if p.exists():
+                return str(p)
+    repo_svg = pathlib.Path(__file__).parent.parent / "public" / "images" / "ec-haisou-driver.svg"
+    if repo_svg.exists():
+        return str(repo_svg)
+    return ""
+
+def upload_job_image(page, job):
+    """掲載フォームの画像欄(input[type=file])へ画像をアップロードする。
+    画像欄が無い／画像が見つからない場合はスキップして処理を続行する（既存フローは壊さない）。"""
+    img_path = resolve_job_image(job)
+    if not img_path:
+        progress("  🖼️ 画像ファイルが見つからないためスキップ", "warn")
+        return False
+    try:
+        file_inputs = page.query_selector_all('input[type="file"]')
+        if not file_inputs:
+            progress("  🖼️ フォームに画像欄(input[type=file])が無いためスキップ", "warn")
+            return False
+        target = None
+        for fi in file_inputs:
+            accept = (fi.get_attribute('accept') or '').lower()
+            if 'image' in accept or accept == '':
+                target = fi
+                break
+        if target is None:
+            target = file_inputs[0]
+        target.set_input_files(img_path)
+        progress(f"  ✅ 画像アップロード: {os.path.basename(img_path)}", "info")
+        rand_delay(1.0, 1.8)  # アップロード反映待ち
+        return True
+    except Exception as e:
+        progress(f"  ⚠️ 画像アップロード失敗（スキップ）: {e}", "warn")
+        return False
+
 def human_type(page, selector, text, timeout=15000):
     """人間らしいランダム速度でテキストを入力"""
     el = page.wait_for_selector(selector, timeout=timeout)
@@ -1802,6 +1850,11 @@ def fill_kyujinbox_form(page, job, company_name):
     ).strip()
     progress(f"  📝 応募方法入力中", "info")
     fill_text(page, 'textarea[name="howToApply"]', how_to_apply, timeout=3000)
+    rand_delay(0.2, 0.4)
+
+    # ---- 画像アップロード（画像欄があれば添付・無ければスキップ）----
+    progress(f"  🖼️ 画像アップロード処理", "info")
+    upload_job_image(page, job)
     rand_delay(0.2, 0.4)
 
     # ---- 担当者情報 (relation) ----

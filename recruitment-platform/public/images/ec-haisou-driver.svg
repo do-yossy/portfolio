@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eaf4ff"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <linearGradient id="van" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e8eef4"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8c79a"/>
+      <stop offset="1" stop-color="#d4ad7a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- 雲 -->
+  <g fill="#ffffff" opacity="0.9">
+    <ellipse cx="250" cy="120" rx="70" ry="30"/>
+    <ellipse cx="310" cy="110" rx="55" ry="26"/>
+    <ellipse cx="980" cy="150" rx="80" ry="32"/>
+    <ellipse cx="1050" cy="140" rx="55" ry="26"/>
+  </g>
+
+  <!-- 街のビル群（背景） -->
+  <g opacity="0.5">
+    <rect x="120" y="250" width="90" height="170" rx="4" fill="#c5d6e8"/>
+    <rect x="225" y="210" width="70" height="210" rx="4" fill="#b7cbe0"/>
+    <rect x="980" y="230" width="80" height="190" rx="4" fill="#c5d6e8"/>
+    <rect x="1075" y="270" width="70" height="150" rx="4" fill="#b7cbe0"/>
+    <g fill="#eaf2fb">
+      <rect x="138" y="270" width="18" height="22"/><rect x="172" y="270" width="18" height="22"/>
+      <rect x="138" y="310" width="18" height="22"/><rect x="172" y="310" width="18" height="22"/>
+      <rect x="243" y="232" width="16" height="20"/><rect x="271" y="232" width="16" height="20"/>
+      <rect x="243" y="268" width="16" height="20"/><rect x="271" y="268" width="16" height="20"/>
+      <rect x="998" y="252" width="18" height="20"/><rect x="1028" y="252" width="18" height="20"/>
+      <rect x="998" y="290" width="18" height="20"/><rect x="1028" y="290" width="18" height="20"/>
+    </g>
+  </g>
+
+  <!-- 地面 -->
+  <rect x="0" y="470" width="1200" height="160" fill="#dfe7ee"/>
+  <rect x="0" y="470" width="1200" height="10" fill="#cbd6e0"/>
+
+  <!-- 積まれた段ボール箱（左） -->
+  <g>
+    <rect x="150" y="392" width="92" height="78" rx="4" fill="url(#box)" stroke="#c19a63" stroke-width="2"/>
+    <rect x="150" y="392" width="92" height="14" fill="#d9b683"/>
+    <line x1="196" y1="392" x2="196" y2="470" stroke="#b98f57" stroke-width="3"/>
+    <rect x="176" y="404" width="40" height="12" rx="2" fill="#f3e6d0"/>
+    <rect x="120" y="408" width="78" height="62" rx="4" fill="url(#box)" stroke="#c19a63" stroke-width="2"/>
+    <line x1="159" y1="408" x2="159" y2="470" stroke="#b98f57" stroke-width="3"/>
+    <rect x="142" y="418" width="34" height="11" rx="2" fill="#f3e6d0"/>
+  </g>
+
+  <!-- 配送バン（メイン・人物なし） -->
+  <g transform="translate(360,250)">
+    <!-- 影 -->
+    <ellipse cx="240" cy="232" rx="270" ry="22" fill="#9aa9b6" opacity="0.4"/>
+    <!-- 荷台 -->
+    <rect x="16" y="40" width="300" height="170" rx="14" fill="url(#van)" stroke="#c3ced9" stroke-width="3"/>
+    <!-- キャビン -->
+    <path d="M316 70 L392 70 Q424 70 444 98 L470 138 Q478 150 478 168 L478 196 Q478 210 464 210 L316 210 Z" fill="url(#van)" stroke="#c3ced9" stroke-width="3"/>
+    <!-- 窓 -->
+    <path d="M330 84 L392 84 Q414 84 428 104 L446 130 Q450 136 442 136 L330 136 Z" fill="#b9dcef" stroke="#93c2da" stroke-width="2"/>
+    <!-- アクセントライン -->
+    <rect x="16" y="150" width="462" height="20" fill="#2f7dd1"/>
+    <!-- 配送ロゴ風（箱＋矢印マーク） -->
+    <g transform="translate(120,95)">
+      <rect x="0" y="0" width="64" height="48" rx="6" fill="#2f7dd1"/>
+      <path d="M14 24 H46 M36 14 L48 24 L36 34" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <!-- ヘッドライト -->
+    <rect x="462" y="176" width="16" height="20" rx="4" fill="#ffe08a" stroke="#e6b94f" stroke-width="1.5"/>
+    <!-- バンパー -->
+    <rect x="16" y="200" width="462" height="14" rx="6" fill="#c3ced9"/>
+    <!-- タイヤ -->
+    <g>
+      <circle cx="110" cy="214" r="34" fill="#33414e"/>
+      <circle cx="110" cy="214" r="15" fill="#d6dde3"/>
+      <circle cx="400" cy="214" r="34" fill="#33414e"/>
+      <circle cx="400" cy="214" r="15" fill="#d6dde3"/>
+    </g>
+  </g>
+
+  <!-- 段ボール箱（右・手前） -->
+  <g>
+    <rect x="900" y="398" width="100" height="72" rx="4" fill="url(#box)" stroke="#c19a63" stroke-width="2"/>
+    <rect x="900" y="398" width="100" height="14" fill="#d9b683"/>
+    <line x1="950" y1="398" x2="950" y2="470" stroke="#b98f57" stroke-width="3"/>
+    <rect x="928" y="410" width="44" height="12" rx="2" fill="#f3e6d0"/>
+    <!-- 速達マーク -->
+    <circle cx="1018" cy="416" r="22" fill="#e0371f"/>
+    <path d="M1018 404 v12 h9" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- タイトル帯 -->
+  <g>
+    <rect x="0" y="538" width="1200" height="92" fill="#2f7dd1"/>
+    <text x="600" y="582" text-anchor="middle" fill="#ffffff" font-size="40" font-weight="700">EC配送ドライバー募集</text>
+    <text x="600" y="614" text-anchor="middle" fill="#dbe9fb" font-size="22" font-weight="500">正社員／月収38万円以上／未経験歓迎</text>
+  </g>
+</svg>
