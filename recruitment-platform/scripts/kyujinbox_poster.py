@@ -938,6 +938,19 @@ def _refill_empty_fields(page, job, full_payload=None):
         except Exception:
             pass
 
+    # jobType (職種区分) ← 公開するボタンが有効になる最重要フィールド
+    try:
+        v = page.evaluate(
+            "() => { const el = document.querySelector('select[name=\"jobType\"]'); return el ? el.value : null; }")
+        if not v or str(v) in ('0', '', 'null', 'None'):
+            jt_payload_val = str((full_payload or {}).get('jobType', '')) if full_payload else ''
+            if jt_payload_val and jt_payload_val not in ('None', 'null', '0', ''):
+                ok = select_option_safe(page, 'select[name="jobType"]', value=jt_payload_val, debug=False)
+                if ok:
+                    progress(f"  🔄 職種(jobType)再選択: value={jt_payload_val}", "info")
+    except Exception:
+        pass
+
     rand_delay(0.5, 1.0)
 
 
@@ -1028,6 +1041,51 @@ def publish_draft(page, draft_url, job=None, full_payload=None, upload_image=Fal
         except Exception:
             pass
 
+        # ── 「公開する」ボタンが有効になるまで待機（最大12秒）──
+        # 有効にならない場合は Vue reactive state を直接パッチして強制的に有効化する
+        progress("  ⏳ 「公開する」ボタンの有効化を待機中...", "info")
+        try:
+            page.wait_for_function("""() => {
+                const btns = Array.from(document.querySelectorAll('button'));
+                const pub = btns.find(b => (b.textContent||'').trim() === '公開する');
+                if (!pub) return false;
+                return !(pub.className||'').includes('is-disab') && !pub.disabled;
+            }""", timeout=12000)
+            progress("  ✅ 「公開する」ボタンが有効です", "info")
+        except Exception:
+            progress("  ⚠️ 「公開する」が有効にならない → Vue状態をパッチして再試行", "warn")
+            if job:
+                try:
+                    _pt, _pmn, _pmx = parse_salary(job.get('salary', ''))
+                    _ptv = {'時給': 1, '日給': 2, '月給': 3, '年収': 4, '固定報酬': 5}.get(_pt, 3)
+                    _loc = job.get('location', '')
+                    _pref = extract_prefecture(_loc)
+                    _pid = PREF_IDS.get(_pref) if _pref else None
+                    _jtv = (full_payload or {}).get('jobType')
+                    if not _jtv:
+                        try:
+                            _jtv = page.evaluate(
+                                "() => { const el = document.querySelector('select[name=\"jobType\"]'); return el ? el.value : null; }")
+                        except Exception:
+                            pass
+                    patch_vue_kyujin_state(
+                        page, job,
+                        job_type_val=_jtv,
+                        pay_type_val=_ptv,
+                        pay_min=_pmn,
+                        pay_max=_pmx,
+                        pref_id=_pid,
+                        char_values=['1', '19', '23', '24', '43', '52'],
+                        company_phone=os.environ.get("KYUJINBOX_PHONE", "").strip(),
+                    )
+                    rand_delay(1.5, 2.5)
+                    click_radio_by_label(page, ['基本情報'])
+                    rand_delay(0.5, 1.0)
+                except Exception as _e2:
+                    progress(f"  ⚠️ Vue状態パッチ失敗: {_e2}", "warn")
+
+        save_screenshot(page, 'before_publish_btn')
+
         # ── 「公開する」ボタンを最大3回試みる ──
         clicked_pub = False
         for attempt in range(3):
@@ -1084,7 +1142,7 @@ def publish_draft(page, draft_url, job=None, full_payload=None, upload_image=Fal
 
                 pub.scroll_into_view_if_needed()
                 rand_delay(0.3, 0.6)
-                pub.click()
+                pub.click(force=True)
                 progress(f"  ✅ 公開するをクリック（試行{attempt+1}）", "info")
                 clicked_pub = True
                 break
