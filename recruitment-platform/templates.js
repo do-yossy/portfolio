@@ -1590,15 +1590,10 @@ function jobDetailPageV2(job) {
     + '新しいことに踏み出し、ときに失敗しながら経験を糧にする。個人でもチームでも自走し、EC・物流プラットフォームや全国エリア拡大など新事業にも積極的に挑む文化をつくっています。\n\n'
     + '３：チームで勝ちにいく\n'
     + '現場スタッフ・ドライバー・エンジニア・プランナー、立場に関係なく意見が言える環境を大切にしています。責任感と当事者意識を持ち、仲間と一緒に結果を出すことが私たちの誇りです。';
-  const peopleContent =
-    '「はじめて正社員を目指す」「もっと稼ぎたい」「新しいことに挑戦したい」——理由はそれぞれで構いません。\n\n'
-    + `${shortName}には、物流・倉庫の現場スタッフ、配送ドライバー、製造ライン、営業、Web・AI開発まで、多様なバックグラウンドを持つメンバーが集まっています。未経験からスタートしたスタッフも多く、職種をまたいだキャリアアップも積極的にサポートしています。\n\n`
-    + 'あなたの「もっとこうしたい」という想いを、ぜひ一緒に実現しましょう。';
   const companyRows = [
     ['会社名',                companyName],
     ['MISSION / VISION / VALUE', mvvContent],
     ['私たちが大切にしているもの', valuesContent],
-    [`${shortName}で働く人々`,  peopleContent],
   ].filter(([, v]) => v && String(v).trim());
   const companyTable = `<table class="ea-table"><tbody>
     ${companyRows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}
