@@ -101,7 +101,7 @@ for (const job of jobs) {
     console.log(`✓ ドライバー: ${job.title}`);
     updated++;
   } else if (KANTO_TITLES.some(t => job.title.includes(t))) {
-    const cleanTitle = job.title.replace(/[\(（][^)）]*[都道府県市区町村][^)）]*[\)）]/g, '').trim();
+    const cleanTitle = job.title.replace(/[\(（][^)）]+[\)）]/g, '').trim();
     db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
       JSON.stringify(KANTO_LOCATIONS),
       '複数拠点（選択制）',
@@ -111,7 +111,7 @@ for (const job of jobs) {
     console.log(`✓ 関東: "${job.title}"${cleanTitle !== job.title ? ` → "${cleanTitle}"` : ''}`);
     updated++;
   } else if (TOKYO_TITLES.some(t => job.title.includes(t))) {
-    const cleanTitle = job.title.replace(/[\(（][^)）]*[都道府県市区町村][^)）]*[\)）]/g, '').trim();
+    const cleanTitle = job.title.replace(/[\(（][^)）]+[\)）]/g, '').trim();
     db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
       JSON.stringify(TOKYO_LOCATIONS),
       '複数拠点（選択制）',

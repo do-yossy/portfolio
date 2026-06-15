@@ -1392,7 +1392,7 @@ function jobsListPageV2(jobs, search = '') {
         const draftBadge = j.is_published ? '' : '<span class="hpl-draft">未公開</span>';
         const catchcopy = j.catchcopy || '';
         const jlocs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
-        const displayLoc = jlocs.length > 1 ? `${jlocs[0]} 他${jlocs.length - 1}拠点` : (jlocs[0] || j.location);
+        const displayLoc = jlocs.length > 1 ? `複数拠点（選択制・車通勤可）` : (jlocs[0] || '');
         return `<div class="hpl-item">
           <div class="hpl-item-head">
             <span class="hpl-emp">${esc(j.employment_type)}</span>
@@ -1472,8 +1472,8 @@ function jobDetailPageV2(job) {
   const faq = JSON.parse(job.faq || '[]');
   const jobLocs = (() => { try { return JSON.parse(job.locations || '[]'); } catch { return []; } })();
   const hasMultiLoc = jobLocs.length > 1;
-  const firstLoc = jobLocs[0] || job.location;
-  const locSummary = hasMultiLoc ? `${firstLoc} 他${jobLocs.length - 1}拠点（選択制・車通勤可）` : firstLoc;
+  const firstLoc = jobLocs[0] || '';
+  const locSummary = hasMultiLoc ? `複数拠点（選択制・車通勤可）` : firstLoc;
   const locDetail = hasMultiLoc ? `【選択制・車通勤可】\n` + jobLocs.join('\n') : firstLoc;
 
   const salaryParsed = parseSalary(job.salary);
