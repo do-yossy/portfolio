@@ -951,6 +951,78 @@ def _refill_empty_fields(page, job, full_payload=None):
     except Exception:
         pass
 
+    fp = full_payload or {}
+
+    # 住所（市区町村）input[name="address"] ← workLocations.location が null だと公開不可
+    try:
+        v = page.evaluate("() => (document.querySelector('input[name=\"address\"]') || {}).value || ''")
+        addr = str(fp.get('address') or fp.get('_location') or location or '').strip()
+        if not v.strip() and addr:
+            fill_text(page, 'input[name="address"]', addr, timeout=3000)
+            progress(f"  🔄 住所(市区町村)再入力: {addr}", "info")
+    except Exception:
+        pass
+
+    # 給与最大 payMax
+    try:
+        v = page.evaluate("() => (document.querySelector('input[name=\"payMax\"]') || {}).value || ''")
+        pm = str(fp.get('payMax') or pay_max or '').strip()
+        if not v.strip() and pm:
+            fill_text(page, 'input[name="payMax"]', pm, timeout=3000)
+            progress(f"  🔄 給与最大再入力: {pm}", "info")
+    except Exception:
+        pass
+
+    # 応募資格 qualifications（必須・空だと公開不可）
+    try:
+        v = page.evaluate("() => (document.querySelector('textarea[name=\"qualifications\"]') || {}).value || ''")
+        q = str(fp.get('qualifications') or '').strip()
+        if not q:
+            tags = job.get('tags', [])
+            if isinstance(tags, str):
+                try:
+                    tags = json.loads(tags)
+                except Exception:
+                    tags = []
+            if tags:
+                q = ' / '.join(str(t) for t in tags)[:130]
+        if not v.strip() and q:
+            fill_text(page, 'textarea[name="qualifications"]', q, timeout=3000)
+            progress("  🔄 応募資格再入力", "info")
+    except Exception:
+        pass
+
+    # 応募方法 howToApply（必須・空だと公開不可）
+    try:
+        v = page.evaluate("() => (document.querySelector('textarea[name=\"howToApply\"]') || {}).value || ''")
+        h = str(fp.get('howToApply')
+                or job.get('how_to_apply') or job.get('howToApply')
+                or "WEBの応募フォームよりご応募ください。応募後、担当者よりご連絡いたします。").strip()
+        if not v.strip() and h:
+            fill_text(page, 'textarea[name="howToApply"]', h, timeout=3000)
+            progress("  🔄 応募方法再入力", "info")
+    except Exception:
+        pass
+
+    # 特徴チェックボックス characteristics（1つも入っていなければ既定セットをON）
+    try:
+        char_values = fp.get('characteristics') or [1, 19, 23, 24, 43, 52]
+        char_values = [str(c) for c in char_values]
+        page.evaluate("""(targetValues) => {
+            const cbs = document.querySelectorAll('input[name="characteristics"]');
+            if (!cbs.length) return;
+            const anyChecked = Array.from(cbs).some(cb => cb.checked);
+            if (anyChecked) return;
+            for (const cb of cbs) {
+                if (targetValues.includes(String(cb.value)) && !cb.checked) {
+                    const lbl = cb.closest('label') || document.querySelector('label[for="' + cb.id + '"]');
+                    lbl ? lbl.click() : cb.click();
+                }
+            }
+        }""", char_values)
+    except Exception:
+        pass
+
     rand_delay(0.5, 1.0)
 
 
@@ -1410,7 +1482,7 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
 
     desc      = job.get('description', '')
     rewarding = (job.get('rewarding') or job.get('rewarding_text') or '').strip()
-    quals     = job.get('qualifications', '')
+    quals     = (job.get('qualifications') or '').strip()
     transport = (job.get('transportation') or job.get('access') or '').strip()
     worktime  = (job.get('worktimeHoliday') or job.get('worktime_holiday') or job.get('workTime') or '').strip()
     benefit   = job.get('salary', '')
@@ -1418,11 +1490,31 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
     location  = job.get('location', '')
     use_phone = bool(company_phone)
 
+    # 応募資格・応募方法は空だと公開バリデーションで弾かれるため既定値を用意
+    if not quals:
+        tags = job.get('tags', [])
+        if isinstance(tags, str):
+            try:
+                tags = json.loads(tags)
+            except Exception:
+                tags = []
+        quals = (' / '.join(str(t) for t in tags)[:130]) if tags else '学歴不問　未経験者歓迎'
+    how_to_apply = (job.get('how_to_apply') or job.get('howToApply')
+                    or "WEBの応募フォームよりご応募ください。応募後、担当者よりご連絡いたします。").strip()
+
+    # 勤務地の市区町村（workLocations[0].location が null だと公開不可）
+    pref_name = extract_prefecture(location) or ''
+    city_text = location
+    if pref_name and pref_name in city_text:
+        city_text = city_text.split(pref_name, 1)[1]
+    city_text = re.sub(r'[（(].*$', '', city_text).strip() or location
+
     patch_data = {
         'title': title,
         'description': desc,
         'rewarding': rewarding or desc[:100],
         'qualifications': quals,
+        'howToApply': how_to_apply,
         'transportation': transport,
         'worktimeHoliday': worktime,
         'benefit': benefit,
@@ -1434,7 +1526,7 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
         'payMax': pay_max or None,
         'isPhoneNumberRequired': use_phone,
         'applicationPhoneNumber': company_phone,
-        'workLocations': [{'prefectureId': pref_id, 'location': location}],
+        'workLocations': [{'prefectureId': pref_id, 'location': city_text or location}],
     }
 
     try:
