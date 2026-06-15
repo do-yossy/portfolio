@@ -1573,7 +1573,7 @@ function jobDetailPageV2(job) {
     ['応募資格', pick('応募資格', 'こんな方に向いています', 'こんな方におすすめ')],
     ['待遇・福利厚生', pick('福利厚生', '待遇・福利厚生', '待遇')],
     ['入社後の流れ', pick('入社後の流れ', '研修', '入社後の研修')],
-    ...secOrder.filter(h => !used.has(h)).map(h => [h, secMap[h]]),
+    ...secOrder.filter(h => !used.has(h) && !['勤務地','アクセス'].includes(h)).map(h => [h, secMap[h]]),
   ].filter(([, v]) => v);
 
   // 注目ポイント: タグ（✔リスト）＋導入文
