@@ -66,6 +66,29 @@ const KANTO_TITLES = [
   'コスメ製造',
 ];
 
+// DM制作ディレクター・グラフィックデザイナーの勤務地（東京広域）
+const TOKYO_LOCATIONS = [
+  '東京都昭島市田中町',
+  '東京都立川市柴崎町',
+  '東京都府中本町',
+  '東京都武蔵野市',
+  '東京都杉並区',
+  '東京都中野区中野',
+  '東京都世田谷区松原',
+  '東京都目黒区上目黒',
+  '東京都渋谷区',
+  '東京都新宿区',
+  '東京都豊島区南池袋',
+  '東京都千代田区飯田橋',
+  '東京都北区',
+  '東京都板橋区成増',
+];
+
+const TOKYO_TITLES = [
+  'DM制作ディレクター',
+  'グラフィックデザイナー',
+];
+
 const jobs = db.prepare('SELECT id, title FROM jobs').all();
 let updated = 0;
 for (const job of jobs) {
@@ -78,7 +101,6 @@ for (const job of jobs) {
     console.log(`✓ ドライバー: ${job.title}`);
     updated++;
   } else if (KANTO_TITLES.some(t => job.title.includes(t))) {
-    // タイトルから「（相模原）」などの地名括弧を除去
     const cleanTitle = job.title.replace(/[\(（][^)）]*[都道府県市区町村][^)）]*[\)）]/g, '').trim();
     db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
       JSON.stringify(KANTO_LOCATIONS),
@@ -87,6 +109,16 @@ for (const job of jobs) {
       job.id
     );
     console.log(`✓ 関東: "${job.title}"${cleanTitle !== job.title ? ` → "${cleanTitle}"` : ''}`);
+    updated++;
+  } else if (TOKYO_TITLES.some(t => job.title.includes(t))) {
+    const cleanTitle = job.title.replace(/[\(（][^)）]*[都道府県市区町村][^)）]*[\)）]/g, '').trim();
+    db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
+      JSON.stringify(TOKYO_LOCATIONS),
+      TOKYO_LOCATIONS[0],
+      cleanTitle,
+      job.id
+    );
+    console.log(`✓ 東京: "${job.title}"${cleanTitle !== job.title ? ` → "${cleanTitle}"` : ''}`);
     updated++;
   }
 }
