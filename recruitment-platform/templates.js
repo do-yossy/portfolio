@@ -1208,7 +1208,7 @@ function topPageV2(jobs) {
   <h2 class="et-h2">企業情報</h2>
   <div class="et-h2sub">About us</div>
   <div class="et-company-card">
-    <p class="et-company-lead">私たちは、<strong>Webサイト制作・システム / アプリ / AI開発を主力</strong>に、マーケティング支援から物流・配送、製造まで幅広く事業を展開する会社です。</p>
+    <p class="et-company-lead">${esc(companyName)}は、<strong>Webサイト制作・システム / アプリ / AI開発を主力</strong>に、マーケティング支援から物流・配送、製造まで幅広く事業を展開する会社です。</p>
     <p class="et-company-text">ひとつの専門にとどまらず、企画から開発・運用、現場での実行までを自社で一貫して手がけることで、お客様の「やりたい」を形にしています。事業領域を横断して連携できる体制こそが、私たちの強みです。</p>
 
     <div class="et-mvv">
@@ -1244,7 +1244,7 @@ function topPageV2(jobs) {
         <ul class="et-biz-list next">
           <li><b>自社プロダクト / SaaS開発</b><span>現場の課題から生まれた仕組みを製品化</span></li>
           <li><b>AI・DXソリューション</b><span>生成AIを活用した業務効率化・自動化支援</span></li>
-          <li><b>採用・人材プラットフォーム</b><span>求人媒体運用と採用DXをワンストップで</span></li>
+          <li><b>EC・物流プラットフォーム</b><span>自社配送網を活かした通販・物流サービスの展開</span></li>
           <li><b>全国エリアの事業拡大</b><span>物流・製造拠点を主要都市へ順次拡大</span></li>
         </ul>
       </div>
