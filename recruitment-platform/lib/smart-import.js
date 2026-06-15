@@ -106,13 +106,8 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
         const changes = Applicants.fillMissingFields(dupId, mapped);
         if (changes > 0) filled++;
         else skipped++;
-      } else if (dupId && countAsNew && Applicants.promoteToNew) {
-        // 新着モードで既存（先に取込済みのバックログ等）が見つかった場合は、
-        // 重複にせず「本日の新着」へ昇格して新規応募に計上する。
-        await Applicants.promoteToNew(dupId, today);
-        imported++; toCallList++; bump(currentCompany, media, 'imported');
       } else if (dupId) {
-        // 重複も架電リストに残し「重複」バッジで表示する（アーカイブしない）
+        // 重複は昇格せず、架電リストに「重複」バッジ付きで表示する（アーカイブしない）
         await Applicants.create({ ...mapped, isImported: countAsNew ? 0 : 1, appliedAt: countAsNew ? today : undefined, allowEmptyDate: !countAsNew, isArchived: 0, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
         duplicates++; toCallList++; bump(currentCompany, media, 'duplicates');
       } else {
