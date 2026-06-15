@@ -37,14 +37,14 @@ function detectKey(title, catchcopy, description) {
 }
 
 // 駅アクセス・リモート系の判定（タグ・行で使う）
-const STATION_RE = /鴫野|梅田駅|新宿駅|駅\s*(すぐ|徒歩|圏内)|徒歩\s*[\d〜～]*\s*分|徒歩圏内|リモートワーク制度あり/;
+const STATION_RE = /鴫野|梅田駅|新宿駅|駅\s*(すぐ|徒歩|圏内)|徒歩\s*[\d〜～]*\s*分|徒歩圏内|リモートワーク/;
 
 // インライン除去（タイトル・キャッチ用：行は消さない）
 function cleanInline(text) {
   if (!text) return text;
   let t = text;
   t = t.replace(/[・・]?[^\s　！!（(【「\n]*[駅]\s*(すぐ|徒歩\s*[\d〜～]*\s*分?(以内|圏内)?|徒歩圏内)[^\n★・・]*/g, '');
-  t = t.replace(/[・・]?リモートワーク制度あり[^。\n★・・]*/g, '');
+  t = t.replace(/[・・]?リモートワーク[^。\n★・・]*/g, '');
   t = t.replace(/[・・]+★/g, '★');
   t = t.replace(/[・・\s]+$/, '');
   return t.trim();
@@ -55,7 +55,7 @@ function cleanDescription(text) {
   if (!text) return text;
   let t = text;
   t = t.replace(/^[^\n]*[駅][^\n]*(すぐ|徒歩|圏内)[^\n]*$/gm, '');
-  t = t.replace(/^[^\n]*リモートワーク制度あり[^\n]*$/gm, '');
+  t = t.replace(/^[^\n]*リモートワーク[^\n]*$/gm, '');
   t = t.replace(/^◆[^\n]*[駅][^\n]*$/gm, '');
   t = t.replace(/^[・✔✓•※◇▶]\s*$/gm, '');
   t = t.replace(/\n{3,}/g, '\n\n').trim();
