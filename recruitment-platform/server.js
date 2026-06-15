@@ -42,10 +42,32 @@ const { privacyPolicyPage } = T;
 const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
-// PYTHON_PATH(.env) があればそれを優先。Windowsで複数Pythonがある場合に
-// playwright入りの正しいPythonを明示指定できる。未設定なら従来どおり 'python'。
-const PYTHON_CMD = (process.env.PYTHON_PATH || process.env.PYTHON_CMD || '').trim()
-  || (process.platform === 'win32' ? 'python' : 'python3');
+// playwright が import できる Python を自動検出して使う。
+// Windows で複数 Python（Microsoft Store 版など）が混在していても、
+// 実際に playwright が入っている実行ファイルを選ぶ。
+// PYTHON_PATH(.env) を指定すれば最優先で使用。
+const PYTHON_CMD = (function detectPython() {
+  const { spawnSync } = require('child_process');
+  const candidates = [];
+  if ((process.env.PYTHON_PATH || '').trim()) candidates.push(process.env.PYTHON_PATH.trim());
+  if ((process.env.PYTHON_CMD  || '').trim()) candidates.push(process.env.PYTHON_CMD.trim());
+  if (process.platform === 'win32') {
+    candidates.push('python', 'py');
+    const la = process.env.LOCALAPPDATA || '';
+    if (la) candidates.push(path.join(la, 'Python', 'bin', 'python.exe'));
+  } else {
+    candidates.push('python3', 'python');
+  }
+  for (const c of candidates) {
+    try {
+      const r = spawnSync(c, ['-c', 'import playwright'], { timeout: 10000, windowsHide: true });
+      if (r.status === 0) { console.log(`[python] playwright検出: ${c}`); return c; }
+    } catch (_) {}
+  }
+  const fallback = candidates[0] || (process.platform === 'win32' ? 'python' : 'python3');
+  console.log(`[python] playwright入りPythonが見つからず。フォールバック: ${fallback}`);
+  return fallback;
+})();
 
 // アセットのバージョン（admin.js / styles.css の更新時刻から算出）。
 // HTML 内の <script>/<link> に ?v=... として付与し、デプロイ後に
