@@ -868,9 +868,10 @@ def _refill_empty_fields(page, job, full_payload=None):
     rand_delay(0.5, 1.0)
 
 
-def publish_draft(page, draft_url, job=None, full_payload=None):
+def publish_draft(page, draft_url, job=None, full_payload=None, upload_image=False):
     """保存済み下書きを開き直し、必要項目ラジオを実クリックで選択して「公開する」を押す。
     job / full_payload を渡すと、空フィールドを自動補填してから公開を試みる。
+    upload_image=True のとき、公開前に画像を添付する（既存下書きへの後付け用）。
     戻り値: 公開成功なら True
     """
     try:
@@ -922,6 +923,23 @@ def publish_draft(page, draft_url, job=None, full_payload=None):
                     rand_delay(0.3, 0.6)
             except Exception:
                 pass
+
+        # ── 画像を後付け（既存下書きに写真が無い場合）──
+        if upload_image:
+            try:
+                has_photo = page.evaluate("""() => {
+                    // アップロード済みのプレビュー画像があるか（blob:/アップロード先URL）
+                    const imgs = Array.from(document.querySelectorAll('img'));
+                    return imgs.some(im => /blob:|cloudfront|kyujinbox|amazonaws|uploads?/i.test(im.src || ''));
+                }""")
+                if has_photo:
+                    progress("  🖼️ すでに写真があるため追加をスキップ", "info")
+                else:
+                    progress("  🖼️ 画像を後付けします", "info")
+                    upload_job_image(page, job or {})
+                    rand_delay(0.5, 1.0)
+            except Exception as e:
+                progress(f"  ⚠️ 画像後付け判定でエラー（スキップ）: {e}", "warn")
 
         # ── 必要項目「基本情報」ラジオを実クリック（完全一致・Vue更新）──
         try:
@@ -2193,12 +2211,168 @@ def fill_kyujinbox_form(page, job, company_name):
     return selected_job_type_val, company_phone, full_payload
 
 
+def collect_draft_urls(page, group_id, max_pages=70):
+    """求人一覧を巡回して、ステータスが「下書き」の求人の編集URLを集める。
+    ページ送り（次へ）で全ページを走査し、内容が変わらなくなったら終了する。"""
+    if not group_id:
+        progress("  ⚠️ KYUJINBOX_GROUP_ID 未設定のため下書き一覧を取得できません", "warn")
+        return []
+    list_url = f"https://saiyo.kyujinbox.com/company/groups/{group_id}/jobs"
+    try:
+        page.goto(list_url, timeout=30000)
+        page.wait_for_load_state('networkidle', timeout=15000)
+        rand_delay(1.5, 2.5)
+    except Exception as e:
+        progress(f"  ⚠️ 求人一覧の取得失敗: {e}", "warn")
+        return []
+
+    draft_urls = []
+    seen = set()
+    prev_sig = None
+    for pg in range(max_pages):
+        try:
+            result = page.evaluate("""() => {
+                const drafts = [];
+                const all = [];
+                const rows = document.querySelectorAll('tr, li, article, div');
+                for (const row of rows) {
+                    const a = row.querySelector && row.querySelector('a[href*="/jobs/edit/"]');
+                    if (!a || !a.href) continue;
+                    all.push(a.href);
+                    // 行テキストに「下書き」が含まれる かつ「公開中/審査中」を含まない
+                    const txt = (row.textContent || '');
+                    if (txt.includes('下書き')) drafts.push(a.href);
+                }
+                return {drafts: Array.from(new Set(drafts)), sig: Array.from(new Set(all)).slice(0,5).join('|')};
+            }""")
+        except Exception:
+            break
+        for u in result.get('drafts', []):
+            if u not in seen:
+                seen.add(u)
+                draft_urls.append(u)
+        sig = result.get('sig', '')
+        # 前ページと同じ内容ならページ送り終了
+        if sig and sig == prev_sig:
+            break
+        prev_sig = sig
+        # 次へボタン
+        moved = False
+        for kw in ['次へ', '次の', '＞', '>']:
+            try:
+                nxt = page.locator(f'a:has-text("{kw}"), button:has-text("{kw}")').first
+                if nxt.count() > 0 and nxt.is_visible():
+                    cls = nxt.get_attribute('class') or ''
+                    if 'disab' in cls.lower():
+                        break
+                    nxt.scroll_into_view_if_needed()
+                    nxt.click()
+                    page.wait_for_load_state('networkidle', timeout=10000)
+                    rand_delay(1.0, 2.0)
+                    moved = True
+                    break
+            except Exception:
+                pass
+        if not moved:
+            break
+    return draft_urls
+
+
+def run_publish_drafts():
+    """既存の下書き求人を巡回し、写真を後付けして公開する専用モード。"""
+    email    = os.environ.get("KYUJINBOX_EMAIL", "")
+    password = os.environ.get("KYUJINBOX_PASSWORD", "")
+    group_id = os.environ.get("KYUJINBOX_GROUP_ID", "").strip()
+    headless = os.environ.get("HEADLESS", "1").strip() not in ("0", "false", "no")
+
+    if not email or not password:
+        progress("⚠️ 環境変数 KYUJINBOX_EMAIL / KYUJINBOX_PASSWORD が未設定です", "warn")
+        sys.exit(1)
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        progress(f"❌ playwright の読み込みに失敗（実行Python: {sys.executable}）", "error")
+        progress(f"   原因: {type(e).__name__}: {e}", "error")
+        sys.exit(1)
+
+    keepalive_stop = start_keepalive(12)
+    with sync_playwright() as p:
+        progress("🌐 ブラウザを起動しています...", "info")
+        browser = p.chromium.launch(
+            headless=headless,
+            args=['--disable-blink-features=AutomationControlled', '--no-sandbox',
+                  '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        )
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            viewport={"width": 1440, "height": 900}, locale="ja-JP", timezone_id="Asia/Tokyo",
+        )
+        ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
+        page = ctx.new_page()
+        try:
+            progress("🔑 求人ボックスにログイン中...", "info")
+            page.goto("https://secure.kyujinbox.com/login", timeout=30000)
+            page.wait_for_load_state('networkidle', timeout=15000)
+            rand_delay(1.0, 2.0)
+            email_sel = find_input(page, 'input[name="login[email]"]', 'input[type="email"]', 'input[name="email"]')
+            human_type(page, email_sel, email)
+            rand_delay(0.6, 1.2)
+            pass_sel = find_input(page, 'input[name="login[password]"]', 'input[type="password"]', 'input[name="password"]')
+            human_type(page, pass_sel, password)
+            rand_delay(0.3, 0.8)
+            page.click('button[type="submit"], input[type="submit"], form button')
+            page.wait_for_load_state('networkidle', timeout=15000)
+            if 'login' in page.url.lower():
+                progress("❌ ログイン失敗", "error")
+                browser.close(); sys.exit(1)
+            progress("✅ ログイン成功", "success")
+
+            progress("🔎 下書きの求人を検索中...", "info")
+            draft_urls = collect_draft_urls(page, group_id)
+            progress(f"📋 下書き {len(draft_urls)}件 を公開します", "info")
+            if not draft_urls:
+                progress("✅ 公開対象の下書きはありませんでした", "success")
+                browser.close(); keepalive_stop.set(); return
+
+            published = 0
+            for idx, url in enumerate(draft_urls):
+                progress(f"📝 [{idx+1}/{len(draft_urls)}] 下書きを公開中...", "info")
+                try:
+                    ok = publish_draft(page, url, job=None, full_payload=None, upload_image=True)
+                    if ok:
+                        published += 1
+                        progress(f"🎉 公開しました（{idx+1}/{len(draft_urls)}）", "success")
+                    else:
+                        progress(f"📝 公開できませんでした（下書きのまま）: {url[-40:]}", "warn")
+                except Exception as e:
+                    progress(f"⚠️ 公開処理エラー: {e}", "warn")
+                if idx < len(draft_urls) - 1:
+                    wait = random.uniform(5.0, 12.0)
+                    progress(f"⏳ 次まで {wait:.0f}秒 待機（BAN回避）...", "info")
+                    time.sleep(wait)
+
+            progress(f"✅ {published}/{len(draft_urls)}件 を公開しました", "success")
+        except Exception as e:
+            progress(f"❌ エラー: {e}", "error")
+            browser.close(); keepalive_stop.set(); sys.exit(1)
+        browser.close()
+        keepalive_stop.set()
+
+
 def main():
     try:
         jobs_json = sys.stdin.read().strip()
-        jobs = json.loads(jobs_json) if jobs_json else []
+        parsed = json.loads(jobs_json) if jobs_json else []
     except Exception:
-        jobs = []
+        parsed = []
+
+    # 既存下書きの公開モード: stdin が {"mode": "publish_drafts"} の場合
+    if isinstance(parsed, dict) and parsed.get('mode') == 'publish_drafts':
+        run_publish_drafts()
+        return
+
+    jobs = parsed if isinstance(parsed, list) else []
 
     if not jobs:
         progress("⚠️ 投稿する求人データがありません", "warn")

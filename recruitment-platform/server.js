@@ -2187,6 +2187,66 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
+  // ── API: Kyujinbox 既存下書きを一括公開（写真も後付け）──
+  if (pathname === '/api/post/kyujinbox/publish-drafts' && method === 'POST') {
+    const vpnOk = await checkVPN();
+    if (!vpnOk) {
+      await Logs.create('kyujinbox_post', 'error', 'VPN未接続');
+      return sendJSON(res, 400, { error: '❌ VPN未接続です。処理を中止します。' });
+    }
+
+    const { id, session } = createSession();
+    const pushLog = (message, type = 'info') => {
+      session.logs.push({ message: String(message ?? ''), type });
+    };
+    sendJSON(res, 200, { ok: true, sessionId: id });
+
+    (async () => {
+      const scriptPath = path.join(SCRIPTS_DIR, 'kyujinbox_poster.py');
+      if (!fs.existsSync(scriptPath)) {
+        pushLog('⚠️ 投稿スクリプトが見つかりません（scripts/kyujinbox_poster.py）', 'warn');
+        session.done = true; session.success = false;
+        return;
+      }
+      pushLog('📋 既存の下書きを巡回して公開します（写真も後付け）...', 'info');
+      pushLog(`🐍 使用Python: ${PYTHON_CMD}`, 'info');
+      const proc = spawn(PYTHON_CMD, [scriptPath], { env: { ...process.env } });
+      proc.stdin.write(JSON.stringify({ mode: 'publish_drafts' }));
+      proc.stdin.end();
+
+      proc.stdout.on('data', data => {
+        const lines = data.toString().split('\n').filter(l => l.trim());
+        for (const line of lines) {
+          try {
+            const obj = JSON.parse(line);
+            pushLog(obj.message, obj.level || 'info');
+          } catch {
+            pushLog(line, 'info');
+          }
+        }
+      });
+      proc.stderr.on('data', data => {
+        const txt = data.toString().trim();
+        if (txt) pushLog(`⚠️ ${txt}`, 'warn');
+      });
+      proc.on('error', err => {
+        pushLog(`❌ プロセス起動失敗: ${err.message}`, 'error');
+        session.done = true; session.success = false;
+      });
+      proc.on('close', async code => {
+        const ok = code === 0;
+        const msg = ok ? '✅ 下書きの公開処理が完了しました' : `❌ 下書き公開失敗(exit ${code})`;
+        await Logs.create('kyujinbox_post', ok ? 'success' : 'error', msg);
+        pushLog(msg, ok ? 'success' : 'error');
+        session.done = true; session.success = ok;
+      });
+    })().catch(err => {
+      pushLog(`❌ 内部エラー: ${err.message}`, 'error');
+      session.done = true; session.success = false;
+    });
+    return;
+  }
+
   // ── API: Kyujinbox Post Poll ──
   if (pathname === '/api/post/kyujinbox/poll' && method === 'GET') {
     const sid = query.id;

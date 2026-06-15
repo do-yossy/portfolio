@@ -2157,8 +2157,9 @@ function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
           <button id="btn-post-kyujinbox" class="btn btn-warning" onclick="startPostKyujinbox('${co}')">🚀 求人ボックスに投稿する（未投稿のみ）</button>
           <button id="btn-post-kyujinbox-force" class="btn btn-ghost btn-sm" onclick="startPostKyujinboxForce('${co}')" title="投稿済み求人も含めて全件投稿">🔄 強制再投稿</button>
           <button class="btn btn-ghost btn-sm" onclick="resetKyujinboxPosted('${co}')" title="投稿済みフラグをリセット">♻️ フラグリセット</button>
+          <button id="btn-publish-kyujinbox-drafts" class="btn btn-ghost btn-sm" onclick="startPublishKyujinboxDrafts()" title="求人ボックス側に残っている下書きを巡回して公開（写真も後付け）">📤 下書きを公開＋写真添付</button>
         </div>
-        <div class="text-sm text-muted" style="margin-top:4px">1度投稿した求人は次回スキップ（スキップしたくない場合は強制再投稿 or フラグリセット）</div>
+        <div class="text-sm text-muted" style="margin-top:4px">1度投稿した求人は次回スキップ（スキップしたくない場合は強制再投稿 or フラグリセット）。<br>「下書きを公開＋写真添付」は、求人ボックスに下書きのまま残った求人を巡回して公開し、写真も後付けします。</div>
         <div id="progress-kyujinbox-wrap" class="progress-wrap hidden"><div id="progress-kyujinbox" class="progress-box"></div></div>
       </div>
 

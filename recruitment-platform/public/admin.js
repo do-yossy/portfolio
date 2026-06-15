@@ -335,6 +335,56 @@ function startPostKyujinboxForce(co) {
   });
 }
 
+// ── 求人ボックスに残った下書きを巡回して公開（写真も後付け）──
+function startPublishKyujinboxDrafts() {
+  confirmAction(
+    '求人ボックスに「下書き」のまま残っている求人を巡回して公開します。\n写真が無いものには写真も後付けします。\nVPN接続を確認してから実行してください。\n実行しますか？',
+    async () => {
+      const vpnOk = await refreshVpn();
+      if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
+
+      const box = openProgress('progress-kyujinbox');
+      const btn = document.getElementById('btn-publish-kyujinbox-drafts');
+      if (btn) { btn.disabled = true; btn.dataset.origText = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> 実行中...'; }
+      appendLog(box, '処理を開始しています...', 'info');
+
+      let sessionId = null;
+      try {
+        const r = await fetch('/api/post/kyujinbox/publish-drafts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          appendLog(box, d.error || 'サーバーエラーが発生しました', 'error');
+          if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+          return;
+        }
+        sessionId = d.sessionId;
+      } catch (e) {
+        appendLog(box, 'サーバーへの接続に失敗しました: ' + e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+        return;
+      }
+
+      let fromIdx = 0;
+      const timer = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/post/kyujinbox/poll?id=${sessionId}&from=${fromIdx}`);
+          if (!r.ok) return;
+          const d = await r.json();
+          for (const entry of d.logs) appendLog(box, entry.message, entry.type || 'info');
+          fromIdx = d.total;
+          if (d.done) {
+            clearInterval(timer);
+            if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+            toast(d.success ? '下書きの公開処理が完了しました' : '公開処理が失敗しました', d.success ? 'success' : 'error');
+          }
+        } catch { /* ignore transient network errors */ }
+      }, 2000);
+    }
+  );
+}
+
 async function resetKyujinboxPosted(co) {
   if (!confirm('求人ボックス「投稿済み」フラグをすべてリセットします。\n次回投稿時に全求人が再投稿対象になります。\nよろしいですか？')) return;
   try {
