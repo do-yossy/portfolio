@@ -1,5 +1,5 @@
 'use strict';
-// タイトルが空になった求人を job_type から復元する
+// タイトルが消えた求人を復元する
 
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
@@ -10,30 +10,35 @@ const DB_PATH = process.env.DATA_DIR
 
 const db = new DatabaseSync(DB_PATH);
 
-const jobs = db.prepare('SELECT id, title, job_type, catchcopy, description FROM jobs').all();
+// job_type → 正式タイトルのマッピング（場所情報なし）
+const TITLE_MAP = {
+  'グラフィックデザイナー':  'グラフィックデザイナー',
+  'DM制作ディレクター':      'DM制作ディレクター',
+  'ITエンジニア':            'ITエンジニア',
+  'エンジニア':              'ITエンジニア',
+  '機械オペレーター':        '機械オペレーター',
+  'コスメ製造':              'コスメ製造スタッフ',
+  'ロケ同行ドライバー':      'ロケ同行ドライバー',
+  'EC倉庫配送ドライバー':    'EC倉庫配送ドライバー',
+  '夜勤配送ドライバー':      '夜勤配送ドライバー（倉庫業務あり）',
+  '宅配便配送ドライバー':    '宅配便配送ドライバー',
+  '製造・物流':              '製造・物流スタッフ',
+};
 
-console.log('=== タイトルが空の求人 ===');
-let restored = 0;
+const jobs = db.prepare('SELECT id, title, job_type FROM jobs').all();
+let fixed = 0;
+
 for (const job of jobs) {
-  if (job.title && job.title.trim() !== '') continue;
+  const titleOk = job.title && job.title.trim().length >= 4;
+  if (titleOk) continue; // 問題なし
 
-  // 説明文の先頭からヒントを取得
-  const descHint = (job.description || '').trim().split('\n')[0].slice(0, 40);
-  console.log(`\n職種: ${job.job_type}`);
-  console.log(`キャッチ: ${job.catchcopy || '(なし)'}`);
-  console.log(`説明冒頭: ${descHint}`);
-
-  // job_type をタイトルとして復元
-  const newTitle = job.job_type || '(要設定)';
+  const newTitle = TITLE_MAP[job.job_type] || job.job_type || '要設定';
   db.prepare('UPDATE jobs SET title=?, updated_at=? WHERE id=?').run(
     newTitle, new Date().toISOString(), job.id
   );
-  console.log(`→ タイトルを "${newTitle}" に復元しました`);
-  restored++;
+  console.log(`✓ 復元: [${job.job_type}] → "${newTitle}"`);
+  fixed++;
 }
 
-if (restored === 0) {
-  console.log('タイトルが空の求人はありませんでした。');
-}
-console.log(`\n完了: ${restored}件復元`);
-console.log('\n※ 管理画面(/admin/jobs)から正式なタイトルに編集してください。');
+if (fixed === 0) console.log('空タイトルの求人はありませんでした。');
+console.log(`\n完了: ${fixed}件復元`);
