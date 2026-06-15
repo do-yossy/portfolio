@@ -1146,10 +1146,10 @@ function topPageV2(jobs) {
   <div class="et-hero-in">
     <div class="et-hero-text">
       <div class="et-hero-label">RECRUIT INFORMATION — ${esc(companyName)}</div>
-      <h1>稼げる仕事が、<br><span class="red">// ここにある。</span></h1>
-      <p class="et-hero-lead">配送・製造・IT・工場内作業など、全国の正社員求人を多数掲載。未経験スタートOK、頑張りがきちんと給与に反映される環境です。</p>
+      <h1><span class="red">あなたらしく</span>、<br>働ける場所。</h1>
+      <p class="et-hero-lead">配送・製造・倉庫内作業など、全国の正社員求人を多数掲載。未経験からでも安心して始められる環境と、頑張りがきちんと評価される待遇をご用意しています。</p>
       <a class="et-btn black" href="/preview/jobs">お仕事一覧を見る →</a>
-      <a class="et-btn line" href="#flow" style="margin-left:10px">採用の流れ</a>
+      <a class="et-btn line" href="#flow" style="margin-left:10px">応募の流れ</a>
     </div>
     <div class="et-hero-imgs">
       <div class="et-hi et-hi-1">
