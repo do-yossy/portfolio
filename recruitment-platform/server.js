@@ -53,15 +53,30 @@ const PYTHON_CMD = (function detectPython() {
   const candidates = [];
   if ((process.env.PYTHON_PATH || '').trim()) candidates.push(process.env.PYTHON_PATH.trim());
   if ((process.env.PYTHON_CMD  || '').trim()) candidates.push(process.env.PYTHON_CMD.trim());
+  // py ランチャー（Windows）で特定バージョンを試す
   if (process.platform === 'win32') {
     const la = process.env.LOCALAPPDATA || '';
     const pf = process.env.ProgramFiles || 'C:\\Program Files';
-    // 安定版（3.13/3.12）を優先。Python 3.14 は playwright/greenlet 未対応のことが多い。
-    for (const v of ['313', '312', '311']) {
+    // py -X.Y で playwright が動くか試し、動けば sys.executable（実パス）を返す
+    for (const v of ['3.12', '3.11', '3.13']) {
+      try {
+        const r = spawnSync('py', [`-${v}`, '-c', TEST], { timeout: 12000, windowsHide: true });
+        if (r.status === 0) {
+          // 実際の python.exe パスを取得して返す（以降の spawn でもそのまま使えるように）
+          const rr = spawnSync('py', [`-${v}`, '-c', 'import sys; print(sys.executable)'], { timeout: 5000, windowsHide: true });
+          const exePath = (rr.stdout || '').toString().trim();
+          const label = exePath || `py -${v}`;
+          console.log(`[python] playwright動作確認OK: ${label}`);
+          return exePath || 'py';
+        }
+      } catch (_) {}
+    }
+    // フルパスでも探す（py ランチャーなしの環境向け）
+    for (const v of ['312', '311', '313']) {
       if (la) candidates.push(path.join(la, 'Programs', 'Python', `Python${v}`, 'python.exe'));
       candidates.push(path.join(pf, `Python${v}`, 'python.exe'));
     }
-    candidates.push('python', 'py');
+    candidates.push('python');
     if (la) candidates.push(path.join(la, 'Python', 'bin', 'python.exe'));
   } else {
     candidates.push('python3', 'python');
