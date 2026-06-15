@@ -1243,15 +1243,15 @@ function topPageV2(jobs) {
         <ul class="et-biz-list">
           <li><b>Web制作・システム / アプリ / AI開発</b><span>企画・設計から開発・運用まで自社一貫</span></li>
           <li><b>マーケティング・販促支援</b><span>集客から採用広報まで成果ベースで支援</span></li>
-          <li><b>物流・配送</b><span>EC配送・ルート配送を全国エリアで展開</span></li>
-          <li><b>製造・倉庫管理</b><span>工場内作業・軽作業・倉庫運営を受託</span></li>
+          <li><b>自社プロダクト / SaaS開発</b><span>現場の課題から生まれた仕組みを製品化</span></li>
+          <li><b>AI・DXソリューション</b><span>生成AIを活用した業務効率化・自動化支援</span></li>
         </ul>
       </div>
       <div class="et-biz-col">
         <div class="et-biz-head"><span class="et-biz-badge next">NEXT</span>これから展開していく事業</div>
         <ul class="et-biz-list next">
-          <li><b>自社プロダクト / SaaS開発</b><span>現場の課題から生まれた仕組みを製品化</span></li>
-          <li><b>AI・DXソリューション</b><span>生成AIを活用した業務効率化・自動化支援</span></li>
+          <li><b>物流・配送</b><span>EC配送・ルート配送を全国エリアで展開</span></li>
+          <li><b>製造・倉庫管理</b><span>工場内作業・軽作業・倉庫運営を受託</span></li>
           <li><b>EC・物流プラットフォーム</b><span>自社配送網を活かした通販・物流サービスの展開</span></li>
           <li><b>全国エリアの事業拡大</b><span>物流・製造拠点を主要都市へ順次拡大</span></li>
         </ul>
