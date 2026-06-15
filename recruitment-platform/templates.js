@@ -1153,7 +1153,7 @@ function topPageV2(jobs) {
     </div>
     <div class="et-hero-imgs">
       <div class="et-hi et-hi-1">
-        <img src="https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=460&h=345&q=80" alt="IT職種" loading="lazy">
+        <img src="/images/it-office.jpg" alt="IT職種" loading="lazy">
       </div>
       <div class="et-hi et-hi-2">
         <img src="/images/haisou-fleet.jpg" alt="配送ドライバー職種" loading="lazy">
