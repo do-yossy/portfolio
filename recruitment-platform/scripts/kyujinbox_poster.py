@@ -152,12 +152,33 @@ def resolve_job_image(job):
 
 def upload_job_image(page, job):
     """掲載フォームの画像欄(input[type=file])へ画像をアップロードする。
-    画像欄が無い／画像が見つからない場合はスキップして処理を続行する（既存フローは壊さない）。"""
+    求人ボックスの写真欄は「写真を追加する」ボタンで input[type=file] を出現させる構造のため、
+    まずボタンを押してからファイルをセットする。画像欄が無い／画像が見つからない場合は
+    スキップして処理を続行する（既存フローは壊さない）。"""
     img_path = resolve_job_image(job)
     if not img_path:
         progress("  🖼️ 画像ファイルが見つからないためスキップ", "warn")
         return False
+    # 求人ボックスはSVG不可。SVGしか無い場合は添付しない。
+    if img_path.lower().endswith('.svg'):
+        progress("  🖼️ SVGは求人ボックス非対応のためスキップ（JPG/PNGを配置してください）", "warn")
+        return False
     try:
+        # ① まず「写真を追加する」ボタンを押して隠れた file input を出現させる
+        for label in ['写真を追加', '写真を登録', '画像を追加', '画像をアップロード', '写真']:
+            try:
+                btn = page.locator(f'button:has-text("{label}"), a:has-text("{label}")').first
+                if btn.count() > 0 and btn.is_visible():
+                    btn.scroll_into_view_if_needed()
+                    rand_delay(0.2, 0.4)
+                    btn.click()
+                    progress(f"  🖼️ 「{label}」ボタンをクリック", "info")
+                    rand_delay(0.6, 1.0)
+                    break
+            except Exception:
+                pass
+
+        # ② file input を探す（隠れていても set_input_files は可能）
         file_inputs = page.query_selector_all('input[type="file"]')
         if not file_inputs:
             progress("  🖼️ フォームに画像欄(input[type=file])が無いためスキップ", "warn")
@@ -172,7 +193,19 @@ def upload_job_image(page, job):
             target = file_inputs[0]
         target.set_input_files(img_path)
         progress(f"  ✅ 画像アップロード: {os.path.basename(img_path)}", "info")
-        rand_delay(1.0, 1.8)  # アップロード反映待ち
+        rand_delay(1.5, 2.5)  # アップロード反映待ち
+
+        # ③ アップロード後にトリミング/確定ダイアログがあれば「設定」「保存」「OK」を押す
+        for label in ['設定する', '設定', '保存する', '保存', '確定', 'アップロード', 'OK', '完了']:
+            try:
+                btn = page.locator(f'button:has-text("{label}")').last
+                if btn.count() > 0 and btn.is_visible():
+                    btn.click()
+                    progress(f"  🖼️ 画像確定ボタン「{label}」をクリック", "info")
+                    rand_delay(1.0, 1.8)
+                    break
+            except Exception:
+                pass
         return True
     except Exception as e:
         progress(f"  ⚠️ 画像アップロード失敗（スキップ）: {e}", "warn")
@@ -871,6 +904,25 @@ def publish_draft(page, draft_url, job=None, full_payload=None):
             _refill_empty_fields(page, job, full_payload)
             rand_delay(0.5, 1.0)
 
+        # ── 電話番号未設定なら「電話番号を入力必須にする」を外す ──
+        # （チェック有りで電話番号が空だと公開時のバリデーションで弾かれる）
+        company_phone = os.environ.get("KYUJINBOX_PHONE", "").strip()
+        if not company_phone:
+            try:
+                res = page.evaluate("""() => {
+                    const cb = document.querySelector('input[name="isPhoneNumberRequired"]');
+                    if (!cb) return 'no checkbox';
+                    if (!cb.checked) return 'already off';
+                    const lbl = cb.closest('label') || document.querySelector('label[for="' + cb.id + '"]');
+                    (lbl || cb).click();
+                    return 'unchecked';
+                }""")
+                if res == 'unchecked':
+                    progress("  📞 電話番号必須チェックを解除（番号未設定のため）", "info")
+                    rand_delay(0.3, 0.6)
+            except Exception:
+                pass
+
         # ── 必要項目「基本情報」ラジオを実クリック（完全一致・Vue更新）──
         try:
             result = click_radio_by_label(page, ['基本情報'])
@@ -950,32 +1002,75 @@ def publish_draft(page, draft_url, job=None, full_payload=None):
 
         rand_delay(2.0, 3.0)
 
-        # ── 確認ダイアログ「求人を公開します。」→ OK をクリック ──
+        # ── 確認ダイアログ「求人を公開します。」→ 利用規約同意にチェック → OK をクリック ──
         ok_clicked = False
         for _attempt in range(12):
             try:
+                # ダイアログ内の「利用規約および掲載ガイドラインに同意する」チェックボックスをON
+                # （未チェックだとOKが無効になり下書きのまま止まる）。「無料オプション」側は触らない。
+                try:
+                    agree = page.evaluate("""() => {
+                        const cbs = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+                        for (const cb of cbs) {
+                            const r = cb.getBoundingClientRect();
+                            if (r.width === 0 && r.height === 0) continue;
+                            const lbl = cb.closest('label') || cb.parentElement;
+                            const txt = lbl ? (lbl.textContent || '') : '';
+                            if (txt.includes('利用規約') || txt.includes('ガイドライン') || txt.includes('同意')) {
+                                if (!cb.checked) {
+                                    (cb.closest('label') ? cb.closest('label') : cb).click();
+                                    return 'checked';
+                                }
+                                return 'already';
+                            }
+                        }
+                        return 'not found';
+                    }""")
+                    if agree == 'checked':
+                        progress("  ☑ 利用規約同意にチェック", "info")
+                        rand_delay(0.3, 0.6)
+                except Exception:
+                    pass
+
+                if _attempt == 0:
+                    save_screenshot(page, 'before_ok_click')
+
+                # OKボタンを element.click(force) で押す（座標クリックより確実）
+                ok_loc = page.locator('button:has-text("OK"), button:has-text("ＯＫ")')
+                clicked_this = False
+                if ok_loc.count() > 0:
+                    for idx in range(ok_loc.count()):
+                        b = ok_loc.nth(idx)
+                        try:
+                            if b.is_visible():
+                                b.scroll_into_view_if_needed()
+                                b.click(force=True, timeout=3000)
+                                progress(f"  ✅ 確認ダイアログ「OK」クリック成功（試行{_attempt+1}）", "success")
+                                ok_clicked = True
+                                clicked_this = True
+                                break
+                        except Exception:
+                            pass
+                if clicked_this:
+                    break
+
+                # フォールバック: 座標クリック
                 pos = page.evaluate("""() => {
                     const btns = Array.from(document.querySelectorAll('button'));
-                    const okBtns = btns.filter(b => (b.textContent || '').trim() === 'OK');
+                    const okBtns = btns.filter(b => ['OK','ＯＫ'].includes((b.textContent || '').trim()));
                     for (const b of okBtns) {
                         const r = b.getBoundingClientRect();
                         const s = window.getComputedStyle(b);
-                        if (r.width > 0 && r.height > 0
-                                && s.display !== 'none'
-                                && s.visibility !== 'hidden'
-                                && s.opacity !== '0') {
-                            return {x: r.left + r.width / 2, y: r.top + r.height / 2,
-                                    w: r.width, h: r.height, cls: b.className};
+                        if (r.width > 0 && r.height > 0 && s.display !== 'none'
+                                && s.visibility !== 'hidden' && s.opacity !== '0') {
+                            return {x: r.left + r.width / 2, y: r.top + r.height / 2, cls: b.className};
                         }
                     }
                     return null;
                 }""")
                 if pos:
-                    if _attempt == 0:
-                        save_screenshot(page, 'before_ok_click')
-                    progress(f"  🖱️ OKボタン座標: ({pos['x']:.0f}, {pos['y']:.0f}) cls={pos['cls']}", "info")
+                    progress(f"  🖱️ OK座標クリック: ({pos['x']:.0f}, {pos['y']:.0f})", "info")
                     page.mouse.click(pos['x'], pos['y'])
-                    progress(f"  ✅ 確認ダイアログ「OK」mouse.click成功（試行{_attempt+1}）", "success")
                     ok_clicked = True
                     break
                 else:
