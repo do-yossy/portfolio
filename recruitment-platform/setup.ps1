@@ -66,6 +66,21 @@ Write-Host "[4/5] Installing packages..." -ForegroundColor Yellow
 npm install --silent *> $null
 Write-Host "      OK: installed" -ForegroundColor Green
 
+# -- 4b. Python / Playwright (for kyujinbox & indeed automation) ----
+Write-Host "      Checking Python / Playwright (for job-board automation)..." -ForegroundColor Yellow
+$py = $null
+foreach ($cand in @("python", "python3", "py")) {
+    try { & $cand --version *> $null; if ($LASTEXITCODE -eq 0) { $py = $cand; break } } catch {}
+}
+if ($py) {
+    & $py -m pip install --quiet --upgrade playwright *> $null
+    & $py -m playwright install chromium *> $null
+    Write-Host "      OK: Playwright ready ($py)" -ForegroundColor Green
+} else {
+    Write-Host "      SKIP: Python not found. Install from https://www.python.org to enable" -ForegroundColor Gray
+    Write-Host "            kyujinbox/indeed auto-posting, then run: python -m pip install playwright; python -m playwright install chromium" -ForegroundColor Gray
+}
+
 # -- 5. .env check --------------------------------------------------
 Write-Host "[5/5] Checking .env file..." -ForegroundColor Yellow
 
