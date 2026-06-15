@@ -263,7 +263,7 @@ function startScrapeIndeed() {
 
 // ── 媒体投稿（ポーリング方式: Cloudflare のSSEタイムアウト回避）──
 // ボタン1回で1日分（求人ボックス25件 / スタンバイ16件）を一括投稿する共通処理
-function startMediaPost({ endpoint, limit, company, mediaLabel, progressId, btnId }) {
+function startMediaPost({ endpoint, limit, company, mediaLabel, progressId, btnId, forceRepost = false }) {
   confirmAction(
     `${mediaLabel}に${limit}件を投稿します。\nVPN接続を確認してから実行してください。\n実行しますか？`,
     async () => {
@@ -280,11 +280,16 @@ function startMediaPost({ endpoint, limit, company, mediaLabel, progressId, btnI
         const r = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ limit, company })
+          body: JSON.stringify({ limit, company, forceRepost })
         });
         const d = await r.json();
         if (!r.ok || !d.ok) {
-          appendLog(box, d.error || 'サーバーエラーが発生しました', 'error');
+          if (d.allPosted) {
+            appendLog(box, d.error || '全件投稿済みです', 'warn');
+            toast(d.error || '全件投稿済みです', 'warn');
+          } else {
+            appendLog(box, d.error || 'サーバーエラーが発生しました', 'error');
+          }
           if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
           return;
         }
@@ -320,6 +325,96 @@ function startPostKyujinbox(co) {
     endpoint: '/api/post/kyujinbox', limit: 25, company: co,
     mediaLabel: '求人ボックス', progressId: 'progress-kyujinbox', btnId: 'btn-post-kyujinbox',
   });
+}
+
+function startPostKyujinboxForce(co) {
+  startMediaPost({
+    endpoint: '/api/post/kyujinbox', limit: 25, company: co,
+    mediaLabel: '求人ボックス（強制再投稿）', progressId: 'progress-kyujinbox', btnId: 'btn-post-kyujinbox-force',
+    forceRepost: true,
+  });
+}
+
+// ── 求人ボックスに残った下書きを巡回して公開（写真も後付け）──
+function startPublishKyujinboxDrafts() {
+  confirmAction(
+    '求人ボックスに「下書き」のまま残っている求人を巡回して公開します。\n写真が無いものには写真も後付けします。\nVPN接続を確認してから実行してください。\n実行しますか？',
+    async () => {
+      const vpnOk = await refreshVpn();
+      if (!vpnOk) { toast('VPNに接続してから実行してください', 'error'); return; }
+
+      const box = openProgress('progress-kyujinbox');
+      const btn = document.getElementById('btn-publish-kyujinbox-drafts');
+      if (btn) { btn.disabled = true; btn.dataset.origText = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> 実行中...'; }
+      appendLog(box, '処理を開始しています...', 'info');
+
+      let sessionId = null;
+      try {
+        const r = await fetch('/api/post/kyujinbox/publish-drafts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          appendLog(box, d.error || 'サーバーエラーが発生しました', 'error');
+          if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+          return;
+        }
+        sessionId = d.sessionId;
+      } catch (e) {
+        appendLog(box, 'サーバーへの接続に失敗しました: ' + e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+        return;
+      }
+
+      let fromIdx = 0;
+      const timer = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/post/kyujinbox/poll?id=${sessionId}&from=${fromIdx}`);
+          if (!r.ok) return;
+          const d = await r.json();
+          for (const entry of d.logs) appendLog(box, entry.message, entry.type || 'info');
+          fromIdx = d.total;
+          if (d.done) {
+            clearInterval(timer);
+            if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+            toast(d.success ? '下書きの公開処理が完了しました' : '公開処理が失敗しました', d.success ? 'success' : 'error');
+          }
+        } catch { /* ignore transient network errors */ }
+      }, 2000);
+    }
+  );
+}
+
+async function resetKyujinboxPosted(co) {
+  if (!confirm('求人ボックス「投稿済み」フラグをすべてリセットします。\n次回投稿時に全求人が再投稿対象になります。\nよろしいですか？')) return;
+  try {
+    const r = await fetch('/api/post/kyujinbox/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: co })
+    });
+    const d = await r.json();
+    if (d.ok) toast(`投稿済みフラグをリセットしました（${d.reset}件）`, 'success');
+    else toast('リセットに失敗しました', 'error');
+  } catch {
+    toast('通信エラー', 'error');
+  }
+}
+
+async function expireGoogleJobs() {
+  if (!confirm('掲載から7日以上経過した求人をGoogleしごと検索から除外します。\n（求人はサイトに残り、Googleのみ除外されます）\nよろしいですか？')) return;
+  try {
+    const r = await fetch('/api/google/expire', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days: 7 })
+    });
+    const d = await r.json();
+    if (d.ok) toast(d.expired > 0 ? `${d.expired}件をGoogleしごと検索から除外しました` : '除外対象の求人はありませんでした', 'success');
+    else toast('除外処理に失敗しました', 'error');
+  } catch {
+    toast('通信エラー', 'error');
+  }
 }
 
 // ── Stanby Post（ボタン1回で16件）──
@@ -390,6 +485,32 @@ async function changeStatus(id, newStatus) {
   }
 }
 
+// ── Multi-location chip helpers ──
+function renderJobLocations(locs) {
+  const chips = document.getElementById('jf-locations-chips');
+  const hidden = document.getElementById('jf-location');
+  if (!chips) return;
+  chips.innerHTML = locs.map(l =>
+    `<span data-loc="${l.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" style="display:inline-flex;align-items:center;gap:4px;background:#f0ede4;border:1px solid #d1ccc0;border-radius:999px;padding:3px 10px;font-size:12px">${l} <button type="button" onclick="removeJobLocation(this)" style="background:none;border:none;cursor:pointer;color:#888;padding:0;font-size:14px;line-height:1">×</button></span>`
+  ).join('');
+  if (hidden) hidden.value = locs[0] || '';
+}
+function addJobLocation() {
+  const input = document.getElementById('jf-location-input');
+  if (!input || !input.value.trim()) return;
+  const chips = document.getElementById('jf-locations-chips');
+  const existing = Array.from(chips.querySelectorAll('[data-loc]')).map(el => el.dataset.loc);
+  if (!existing.includes(input.value.trim())) renderJobLocations([...existing, input.value.trim()]);
+  input.value = '';
+  input.focus();
+}
+function removeJobLocation(btn) {
+  const chip = btn.closest('[data-loc]');
+  const chips = document.getElementById('jf-locations-chips');
+  const existing = Array.from(chips.querySelectorAll('[data-loc]')).map(el => el.dataset.loc);
+  renderJobLocations(existing.filter(l => l !== chip.dataset.loc));
+}
+
 // ── Job Modal ──
 function showJobModal(job) {
   const m = document.getElementById('job-modal');
@@ -397,7 +518,8 @@ function showJobModal(job) {
   document.getElementById('modal-title').textContent = job ? '求人を編集' : '求人を登録';
   document.getElementById('jf-id').value          = job ? job.id : '';
   document.getElementById('jf-title').value       = job ? job.title : '';
-  document.getElementById('jf-location').value    = job ? job.location : '';
+  const _locs = job ? (() => { try { return JSON.parse(job.locations || '[]'); } catch { return []; } })() : [];
+  renderJobLocations(_locs);
   document.getElementById('jf-salary').value      = job ? job.salary : '';
   document.getElementById('jf-type').value        = job ? job.job_type : '';
   document.getElementById('jf-employment').value  = job ? job.employment_type : '';
@@ -423,9 +545,12 @@ async function saveJob() {
   const id = document.getElementById('jf-id').value;
   const tagsRaw = document.getElementById('jf-tags').value;
   const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const _locChips = document.getElementById('jf-locations-chips');
+  const _locsArr = _locChips ? Array.from(_locChips.querySelectorAll('[data-loc]')).map(el => el.dataset.loc) : [];
   const body = {
     title:          document.getElementById('jf-title').value,
-    location:       document.getElementById('jf-location').value,
+    location:       _locsArr[0] || document.getElementById('jf-location').value,
+    locations:      _locsArr,
     salary:         document.getElementById('jf-salary').value,
     jobType:        document.getElementById('jf-type').value,
     employmentType: document.getElementById('jf-employment').value,
@@ -861,6 +986,8 @@ function callImportModeHint() {
   hint.textContent = mode === 'update'
     ? '架電後のCSV/Excel(.xlsx)/スプレッドシートを取り込み、電話番号・メールが一致する既存応募者の「対応状況・架電回数・メモ」を更新します（新規追加はしません）。'
     : '新規の応募者を取り込みます。CSV・Excel(.xlsx)・スプレッドシートに対応。電話番号・メールが既存と一致する場合は重複として記録します。';
+  const cnRow = document.getElementById('ci-countnew-row');
+  if (cnRow) cnRow.style.display = mode === 'update' ? 'none' : '';
 }
 async function callDoImport() {
   const mode    = document.getElementById('ci-mode')?.value || 'insert';
@@ -872,6 +999,7 @@ async function callDoImport() {
   fd.append('mode', mode);
   fd.append('company', company);
   fd.append('media', media);
+  fd.append('countnew', document.getElementById('ci-countnew')?.checked ? '1' : '0');
   fd.append('file', file);
   const resultEl = document.getElementById('ci-result');
   resultEl.innerHTML = mode === 'update' ? '<p>架電結果を反映中...</p>' : '<p>取込中...</p>';
@@ -913,15 +1041,17 @@ function callCloseSmartImport() {
   if (r) r.innerHTML = '';
 }
 async function callDoSmartImport() {
-  const company  = document.getElementById('si-company').value;
-  const split    = document.getElementById('si-split')?.checked ? '1' : '0';
-  const countnew = document.getElementById('si-countnew')?.checked ? '1' : '0';
-  const file     = document.getElementById('si-file').files[0];
+  const company     = document.getElementById('si-company').value;
+  const split       = document.getElementById('si-split')?.checked ? '1' : '0';
+  const countnew    = document.getElementById('si-countnew')?.checked ? '1' : '0';
+  const fillmissing = document.getElementById('si-fillmissing')?.checked ? '1' : '0';
+  const file        = document.getElementById('si-file').files[0];
   if (!file) return toast('Excelファイルを選択してください', 'warn');
   const fd = new FormData();
   fd.append('company', company);
   fd.append('split', split);
   fd.append('countnew', countnew);
+  fd.append('fillmissing', fillmissing);
   fd.append('file', file);
   const resultEl = document.getElementById('si-result');
   resultEl.innerHTML = '<p>自動振り分けで取込中...</p>';
@@ -934,7 +1064,7 @@ async function callDoSmartImport() {
         `<tr><td style="padding:2px 10px">${k}</td><td style="padding:2px 10px;text-align:right">${v.imported}件</td><td style="padding:2px 10px;text-align:right;color:#b45309">${v.duplicates || 0}件重複</td></tr>`
       ).join('');
       resultEl.innerHTML =
-        `<p style="color:#16a34a">✅ 合計 ${d.imported}件取込・${d.duplicates}件重複</p>` +
+        `<p style="color:#16a34a">✅ 合計 ${d.imported}件取込・${d.duplicates}件重複${d.filled ? `・${d.filled}件空欄補完` : ''}</p>` +
         ((d.toCallList || d.toPast) ? `<p style="font-size:13px">📞 架電リスト: <strong>${d.toCallList}件</strong> ／ 📚 過去リスト: <strong>${d.toPast}件</strong></p>` : '') +
         (rows ? `<table style="font-size:12px;border-collapse:collapse;margin-top:6px"><thead><tr><th style="padding:2px 10px;text-align:left">会社/媒体</th><th style="padding:2px 10px">取込</th><th style="padding:2px 10px">重複</th></tr></thead><tbody>${rows}</tbody></table>` : '') +
         (d.skippedSheets?.length ? `<p style="color:#b45309;font-size:12px;margin-top:6px">媒体不明でスキップしたシート: ${d.skippedSheets.join('、')}</p>` : '');

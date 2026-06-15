@@ -1,7 +1,7 @@
 {
   "name": "recruitment-platform",
   "version": "1.0.0",
-  "description": "SEO採用プラットフォーム + ATS + 媒体運用自動化システム",
+  "description": "ATS採用プラットフォーム + 媒体運用自動化システム",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

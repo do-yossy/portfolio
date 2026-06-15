@@ -49,11 +49,11 @@ function hasContact(row) {
 
 // メイン: parseXlsxSheets の結果を受け取り、会社・媒体を割り当てて取り込む。
 //   deps: { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Logs }
-async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCount = false, countAsNew = false }) {
+async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCount = false, countAsNew = false, fillMissing = false }) {
   const { mapOpsCSVRow, normalizePhone, normalizeEmail, Applicants, Ops, Logs } = deps;
   const summary = {};   // "会社/媒体" → { imported, duplicates }
   const skippedSheets = [];
-  let imported = 0, duplicates = 0, skipped = 0, headerRows = 0;
+  let imported = 0, duplicates = 0, skipped = 0, headerRows = 0, filled = 0;
   let toCallList = 0, toPast = 0;   // 振り分け結果（架電リスト / 過去リスト）
   const today = new Date().toISOString().slice(0, 10);   // 新着計上時の応募日
 
@@ -88,7 +88,10 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
       //  - 本日の新着として計上(countAsNew): 全件 架電リスト
       //  - それ以外(過去バックログ): 全件 過去リスト（アーカイブ）
       const callCount = parseInt(mapped.callCount || 0) || 0;
-      const archived = splitByCallCount ? (callCount >= 1 ? 1 : 0) : (countAsNew ? 0 : 1);
+      // 終了・対応中・不通ステータスは取込モードに関わらず過去リストへ
+      const PAST_STATUSES = ['終了', '対応中', '架電済(不通)', '不通'];
+      const forcePast = PAST_STATUSES.includes(mapped.status || '');
+      const archived = forcePast ? 1 : (splitByCallCount ? (callCount >= 1 ? 1 : 0) : (countAsNew ? 0 : 1));
       // 新着計上時は新規応募にカウント(is_imported=0)し、応募日を本日に設定して
       // 「本日の新規応募」に確実に反映させる。過去バックログ時はカウントせず(is_imported=1)、
       // 応募日が空ならそのまま空に保持する。
@@ -98,15 +101,15 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
         : { isImported: 1, allowEmptyDate: true };
 
       const dupId = await Applicants.findDuplicate(nPhone, nEmail);
-      if (dupId && countAsNew && Applicants.promoteToNew) {
-        // 新着モードで既存（先に取込済みのバックログ等）が見つかった場合は、
-        // 重複にせず「本日の新着」へ昇格して新規応募に計上する。
-        await Applicants.promoteToNew(dupId, today);
-        imported++; toCallList++; bump(currentCompany, media, 'imported');
+      if (dupId && fillMissing) {
+        // 空欄補完モード: 既存レコードの空フィールドのみ更新（重複レコードは作らない）
+        const changes = Applicants.fillMissingFields(dupId, mapped);
+        if (changes > 0) filled++;
+        else skipped++;
       } else if (dupId) {
-        // 重複は架電リストに出さず必ずアーカイブ＋重複フラグで記録（新着でも計上しない）
-        await Applicants.create({ ...mapped, isImported: 1, allowEmptyDate: true, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
-        duplicates++; bump(currentCompany, media, 'duplicates');
+        // 重複は昇格せず、架電リストに「重複」バッジ付きで表示する（アーカイブしない）
+        await Applicants.create({ ...mapped, isImported: countAsNew ? 0 : 1, appliedAt: countAsNew ? today : undefined, allowEmptyDate: !countAsNew, isArchived: 0, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        duplicates++; toCallList++; bump(currentCompany, media, 'duplicates');
       } else {
         await Applicants.create({ ...mapped, ...newFields, isArchived: archived });
         imported++; bump(currentCompany, media, 'imported');
@@ -122,7 +125,7 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
       (skippedSheets.length ? ` ※媒体不明でスキップ:${skippedSheets.join(',')}` : ''));
   }
 
-  return { imported, duplicates, skipped, headerRows, summary, skippedSheets, toCallList, toPast };
+  return { imported, duplicates, skipped, filled, headerRows, summary, skippedSheets, toCallList, toPast };
 }
 
 module.exports = { smartImport, mediaFromSheetName, companyFromHeaderText };
