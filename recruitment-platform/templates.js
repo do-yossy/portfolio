@@ -1137,6 +1137,7 @@ function topPageV2(jobs) {
       <a href="#area">エリアから探す</a>
       <a href="#voice">スタッフの一言</a>
       <a href="#about">会社の特徴</a>
+      <a href="#company">企業情報</a>
       <a href="#faq">よくある質問</a>
       <a class="et-pill" href="/preview/jobs">応募はこちら</a>
     </nav>
@@ -1216,6 +1217,21 @@ function topPageV2(jobs) {
   <div class="et-h2sub">About company</div>
   <div class="et-features">${features}</div>
 </section>
+<section class="et-sec" id="company">
+  <h2 class="et-h2">企業情報</h2>
+  <div class="et-h2sub">About us</div>
+  <div class="et-company-card">
+    <p class="et-company-lead">私たちは、<strong>Webサイト制作・システム/アプリ/AI開発を主力</strong>に、マーケティング支援から物流・配送、製造まで幅広く事業を展開する会社です。</p>
+    <p class="et-company-text">ひとつの専門にとどまらず、企画から開発・運用、現場での実行までを自社で一貫して手がけることで、お客様の「やりたい」を形にしています。事業領域を横断して連携できる体制が、私たちの強みです。</p>
+    <div class="et-company-areas">
+      <div class="et-area et-area-main"><span class="et-area-tag">主力</span>Web制作・システム/アプリ/AI開発</div>
+      <div class="et-area">マーケティング・販促支援</div>
+      <div class="et-area">物流・配送</div>
+      <div class="et-area">製造・倉庫管理</div>
+      <div class="et-area">法人営業・顧客サポート</div>
+    </div>
+  </div>
+</section>
 <div class="et-flowband" id="flow">
   <div class="et-flow-in">
     <h2 class="et-h2">応募から採用までの流れ</h2>
@@ -1256,6 +1272,19 @@ function topPageV2(jobs) {
   html { scroll-behavior: smooth; }
   .et-typecard, .et-feature, .et-step { transition: transform .25s ease, box-shadow .25s ease; }
   .et-typecard:hover, .et-feature:hover { transform: translateY(-4px); }
+  /* 企業情報 */
+  .et-company-card { max-width: 860px; margin: 0 auto; background: #fff; border: 1px solid #e6e1d6; border-radius: 16px; padding: 32px 30px; box-shadow: 0 4px 20px rgba(0,0,0,.04); }
+  .et-company-lead { font-size: 17px; font-weight: 700; line-height: 1.9; color: #1a1a1a; margin: 0 0 14px; }
+  .et-company-lead strong { color: #e0371f; }
+  .et-company-text { font-size: 14.5px; line-height: 2; color: #555; margin: 0 0 22px; }
+  .et-company-areas { display: flex; flex-wrap: wrap; gap: 10px; }
+  .et-area { background: #f5f2ec; border: 1px solid #e6e1d6; border-radius: 999px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; color: #333; }
+  .et-area-main { background: #fff3f0; border-color: #f3c7bd; color: #c12c16; display: inline-flex; align-items: center; gap: 8px; }
+  .et-area-tag { background: #e0371f; color: #fff; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  @media (max-width: 640px) {
+    .et-company-card { padding: 24px 18px; }
+    .et-company-lead { font-size: 15.5px; }
+  }
 </style>
 <script>
 (function(){
