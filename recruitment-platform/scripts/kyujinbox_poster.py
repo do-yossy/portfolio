@@ -2123,7 +2123,8 @@ def main():
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        progress("❌ playwright がインストールされていません: pip install playwright && playwright install chromium", "error")
+        progress(f"❌ playwright がインストールされていません（実行Python: {sys.executable}）", "error")
+        progress("   この Python に入れてください: " + f'"{sys.executable}" -m pip install playwright', "error")
         sys.exit(1)
 
     viewports = [

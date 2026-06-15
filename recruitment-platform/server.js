@@ -2107,6 +2107,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       }
 
       pushLog(`📋 求人ボックス向け求人 ${Math.min(batchSize, kbJobs.length)}件を投稿します...`, 'info');
+      pushLog(`🐍 使用Python: ${PYTHON_CMD}`, 'info');
       // Build a map of id→job for posted-at tracking
       const jobIdMap = Object.fromEntries(kbJobs.map(j => [j.id, j]));
       const jobsJson = JSON.stringify(kbJobs.slice(0, batchSize));
