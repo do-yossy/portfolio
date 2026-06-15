@@ -1022,8 +1022,9 @@ function topPageV2(jobs) {
 
   const content = `
 <style>
-  /* Social Quality HP準拠: クリーム背景・黒・赤アクセント */
-  body.pub-body { background: #f4f1ea; }
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap');
+  /* Social Quality HP準拠: クリーム背景・黒・赤アクセント・書体=Noto Sans JP */
+  body.pub-body { background: #f4f1ea; font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; }
   .et-head { background: rgba(244,241,234,.95); backdrop-filter: blur(6px); border-bottom: 1px solid #e4dfd4; position: sticky; top: 0; z-index: 50; }
   .et-head-in { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 20px; flex-wrap: wrap; }
   .et-logo { font-size: 17px; font-weight: 800; color: #111; letter-spacing: .02em; padding: 14px 0; margin-right: auto; white-space: nowrap; }
@@ -1044,8 +1045,9 @@ function topPageV2(jobs) {
   .et-hi-2 { width: 215px; height: 161px; top: 110px; left: 170px; z-index: 2; }
   .et-hi-3 { width: 222px; height: 167px; top: 210px; left: 30px; z-index: 1; }
   @media (max-width: 760px) { .et-hero-imgs { display: none; } .et-hero-text { flex: 1; } }
-  .et-hero-label { color: #e0371f; font-size: 12px; font-weight: 700; letter-spacing: .24em; margin-bottom: 24px; }
-  .et-hero h1 { font-size: 52px; font-weight: 800; color: #111; line-height: 1.35; letter-spacing: .03em; margin: 0 0 22px; }
+  .et-hero-label { color: #e0371f; font-size: 12px; font-weight: 700; letter-spacing: .22em; margin-bottom: 24px; display: flex; align-items: center; gap: 14px; }
+  .et-hero-label::before { content: ''; width: 34px; height: 2px; background: #e0371f; display: block; flex-shrink: 0; }
+  .et-hero h1 { font-size: 58px; font-weight: 900; color: #111; line-height: 1.28; letter-spacing: -.01em; margin: 0 0 22px; }
   .et-hero h1 .red { color: #e0371f; }
   .et-hero-lead { font-size: 14px; color: #4a4a4a; line-height: 2.1; margin: 0 0 32px; max-width: 560px; }
   .et-btn { display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; font-size: 14px; font-weight: 700; padding: 14px 34px; text-decoration: none; transition: all .2s; }
@@ -1123,7 +1125,7 @@ function topPageV2(jobs) {
   .et-footer { background: #111; color: #999; font-size: 12px; text-align: center; padding: 30px 16px; margin-top: 30px; }
   .et-footer a { color: #ccc; text-decoration: none; margin: 0 12px; }
   @media (max-width: 640px) {
-    .et-hero h1 { font-size: 30px; }
+    .et-hero h1 { font-size: 34px; line-height: 1.3; }
     .et-h2 { font-size: 22px; }
     .et-h2sub { margin-left: 34px; }
     .et-marquee span { font-size: 15px; }
