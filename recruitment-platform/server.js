@@ -42,7 +42,10 @@ const { privacyPolicyPage } = T;
 const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
-const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
+// PYTHON_PATH(.env) があればそれを優先。Windowsで複数Pythonがある場合に
+// playwright入りの正しいPythonを明示指定できる。未設定なら従来どおり 'python'。
+const PYTHON_CMD = (process.env.PYTHON_PATH || process.env.PYTHON_CMD || '').trim()
+  || (process.platform === 'win32' ? 'python' : 'python3');
 
 // アセットのバージョン（admin.js / styles.css の更新時刻から算出）。
 // HTML 内の <script>/<link> に ?v=... として付与し、デプロイ後に
