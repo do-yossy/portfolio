@@ -1232,8 +1232,8 @@ function topPageV2(jobs) {
       </div>
       <div class="et-mvv-item">
         <div class="et-mvv-label">VISION<span>目指す姿</span></div>
-        <div class="et-mvv-title">デジタルの力で、誰もが自分らしく活躍できる社会へ。</div>
-        <div class="et-mvv-text">職種や地域、経験を問わず、誰もが活躍できる場をつくる。複数の事業を束ね、社会に必要とされ続ける企業を目指します。</div>
+        <div class="et-mvv-title">確かな価値を提供できる企業へ。</div>
+        <div class="et-mvv-text">デジタルの力で誰もが自分らしく活躍できる場をつくり、お客様・働く仲間・社会に、確かな価値を届け続ける企業を目指します。</div>
       </div>
       <div class="et-mvv-item">
         <div class="et-mvv-label">VALUE<span>価値観</span></div>
@@ -1582,7 +1582,7 @@ function jobDetailPageV2(job) {
     + '・全国エリアの事業拡大';
   const mvvContent =
     'MISSION（使命）\nテクノロジーで、「働く」と「ビジネス」をアップデートする。\n\n'
-    + 'VISION（目指す姿）\nデジタルの力で、誰もが自分らしく活躍できる社会へ。\n\n'
+    + 'VISION（目指す姿）\n確かな価値を提供できる企業へ。\n\n'
     + 'VALUE（価値観）\nユーザーファースト / スピード&改善 / 学び続ける。';
   const companyRows = [
     ['会社名',      companyName],
