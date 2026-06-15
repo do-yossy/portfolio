@@ -1227,18 +1227,18 @@ function topPageV2(jobs) {
     <div class="et-mvv">
       <div class="et-mvv-item">
         <div class="et-mvv-label">MISSION<span>使命</span></div>
-        <div class="et-mvv-title">「働く」の可能性を、もっと広げる。</div>
-        <div class="et-mvv-text">テクノロジーと現場力を掛け合わせ、人と企業の「やりたい」を形にする。挑戦する人が正しく報われる仕組みをつくります。</div>
+        <div class="et-mvv-title">テクノロジーで、「働く」と「ビジネス」をアップデートする。</div>
+        <div class="et-mvv-text">Web・アプリ・AIの開発力を軸に、人と企業の「できる」を増やす。デジタルの力で、現場の課題を一つずつ解決していきます。</div>
       </div>
       <div class="et-mvv-item">
         <div class="et-mvv-label">VISION<span>目指す姿</span></div>
-        <div class="et-mvv-title">一人ひとりが自分らしく働ける社会へ。</div>
+        <div class="et-mvv-title">デジタルの力で、誰もが自分らしく活躍できる社会へ。</div>
         <div class="et-mvv-text">職種や地域、経験を問わず、誰もが活躍できる場をつくる。複数の事業を束ね、社会に必要とされ続ける企業を目指します。</div>
       </div>
       <div class="et-mvv-item">
         <div class="et-mvv-label">VALUE<span>価値観</span></div>
-        <div class="et-mvv-title">挑戦・誠実・共創。</div>
-        <div class="et-mvv-text">前例がなくてもまず挑む。お客様にも仲間にも誠実に向き合う。立場を越えて協力し合い、より大きな価値を共に創ります。</div>
+        <div class="et-mvv-title">ユーザーファースト・スピード&amp;改善・学び続ける。</div>
+        <div class="et-mvv-text">まず使う人の価値を第一に。小さく速くつくって改善を回す。新しい技術を学び続け、チームで成果につなげていきます。</div>
       </div>
     </div>
 
@@ -1566,6 +1566,39 @@ function jobDetailPageV2(job) {
     ? `<div class="ea-image"><img src="${esc(job.image_url)}" alt="${esc(job.title)}"></div>`
     : '';
 
+  // 会社情報テーブル（GIG INC.風）。事実情報(設立・資本金等)は .env から取得し、
+  // 未設定の行は自動で非表示にする（事実を捏造しないため）。事業内容・MVVは常に表示。
+  const companyName = process.env.COMPANY_NAME || '株式会社Social Quality';
+  const bizContent =
+    '【メイン事業】\n'
+    + '・Web制作・システム / アプリ / AI開発\n'
+    + '・マーケティング・販促支援\n'
+    + '・物流・配送\n'
+    + '・製造・倉庫管理\n\n'
+    + '【これから展開していく事業】\n'
+    + '・自社プロダクト / SaaS開発\n'
+    + '・AI・DXソリューション\n'
+    + '・採用・人材プラットフォーム\n'
+    + '・全国エリアの事業拡大';
+  const mvvContent =
+    'MISSION（使命）\nテクノロジーで、「働く」と「ビジネス」をアップデートする。\n\n'
+    + 'VISION（目指す姿）\nデジタルの力で、誰もが自分らしく活躍できる社会へ。\n\n'
+    + 'VALUE（価値観）\nユーザーファースト / スピード&改善 / 学び続ける。';
+  const companyRows = [
+    ['会社名',      companyName],
+    ['設立',        process.env.COMPANY_FOUNDED   || ''],
+    ['代表者',      process.env.COMPANY_CEO       || ''],
+    ['資本金',      process.env.COMPANY_CAPITAL   || ''],
+    ['従業員数',    process.env.COMPANY_EMPLOYEES || ''],
+    ['事業内容',    bizContent],
+    ['所在地',      process.env.COMPANY_ADDRESS   || ''],
+    ['私たちが大切にしていること', mvvContent],
+    ['主要取引先',  process.env.COMPANY_CLIENTS   || ''],
+  ].filter(([, v]) => v && String(v).trim());
+  const companyTable = `<table class="ea-table"><tbody>
+    ${companyRows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}
+  </tbody></table>`;
+
   const content = `
 <style>
   body.pub-body { background: #f4f1ea; }
@@ -1631,20 +1664,8 @@ function jobDetailPageV2(job) {
     ${infoRows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}
   </tbody></table>
   ${faqHtml}
-  <div class="ea-secband">会社概要</div>
-  <div class="ea-secbody ea-company" style="white-space:normal">
-    <p>当社は、マーケティング事業を中心に、商品・サービスの価値を最大化するための総合支援を行っています。市場分析から戦略立案、実行・運用までを一貫して手がけ、クライアント企業の成長を支援しています。</p>
-    <p>マーケティング活動を実現するため、社内外の各部門と連携し、以下の事業を展開しています。</p>
-    <ul class="ea-biz-list">
-      <li>マーケティング戦略の企画・立案</li>
-      <li>販売促進・プロモーションの実施、運用</li>
-      <li>商品流通に関わる物流・配送体制の構築</li>
-      <li>工場・倉庫における商品管理・出荷業務の運営</li>
-      <li>法人向け営業活動および顧客フォロー</li>
-    </ul>
-    <p>また、当社の主力事業であるマーケティング支援を基盤に、近年は物流・配送事業や製造事業にも積極的に事業領域を拡大しています。市場ニーズに柔軟に対応しながら、企画から製造、物流、販売促進までを一貫して支援できる体制づくりを進めており、今後もさらなる事業成長とサービス拡充を目指しています。</p>
-    <p class="ea-biz-lead">マーケティングは「売る仕組み」をつくる仕事です。<br>当社では、企画・営業・物流・製造・現場スタッフが一体となり、成果につながるマーケティングを実現しています。</p>
-  </div>
+  <div class="ea-secband">会社情報</div>
+  ${companyTable}
   <div class="ea-secband">応募情報</div>
   <div class="ea-secbody" style="white-space:normal" id="apply-wrap">
     <p style="margin:0 0 16px">下記フォームより応募してください。担当者より3営業日以内にご連絡いたします。</p>
