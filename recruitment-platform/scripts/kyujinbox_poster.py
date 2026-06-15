@@ -174,6 +174,51 @@ def resolve_job_image(job):
             return str(p)
     return ""
 
+def confirm_crop_if_open(page, max_attempts=8):
+    """「選択した写真をトリミングします。」等のモーダルが開いていれば「設定」を押して閉じる。
+    開いていなければ何もしない。タイミングに左右されず、送信前・公開前の保険として呼べる。
+    戻り値: 確定して閉じたら True / 開いていなければ False"""
+    closed = False
+    for _ in range(max_attempts):
+        try:
+            present = page.evaluate("""() => {
+                const txt = document.body.innerText || '';
+                const hasCrop = txt.includes('トリミング') || txt.includes('切り抜き') || txt.includes('画像を設定');
+                const btns = Array.from(document.querySelectorAll('button'));
+                const hasSet = btns.some(b => {
+                    const t = (b.textContent || '').trim();
+                    const r = b.getBoundingClientRect();
+                    return ['設定','設定する','決定','確定','完了'].includes(t)
+                           && r.width > 0 && r.height > 0;
+                });
+                return hasCrop && hasSet;
+            }""")
+        except Exception:
+            present = False
+        if not present:
+            break
+        clicked = False
+        for label in ['設定', '設定する', '確定', '決定', '完了', '保存', 'OK']:
+            try:
+                loc = page.get_by_role('button', name=label, exact=True)
+                if loc.count() == 0:
+                    continue
+                btn = loc.last
+                if btn.is_visible():
+                    btn.scroll_into_view_if_needed()
+                    btn.click(force=True, timeout=3000)
+                    progress(f"  🖼️ トリミング確定「{label}」をクリック", "info")
+                    clicked = True
+                    closed = True
+                    break
+            except Exception:
+                pass
+        if not clicked:
+            break
+        rand_delay(1.0, 1.6)
+    return closed
+
+
 def upload_job_image(page, job):
     """掲載フォームの画像欄(input[type=file])へ画像をアップロードする。
     求人ボックスの写真欄は「写真を追加する」ボタンで input[type=file] を出現させる構造のため、
@@ -217,67 +262,18 @@ def upload_job_image(page, job):
             target = file_inputs[0]
         target.set_input_files(img_path)
         progress(f"  ✅ 画像アップロード: {os.path.basename(img_path)}", "info")
-        rand_delay(1.5, 2.5)  # アップロード反映待ち
+        rand_delay(2.0, 3.0)  # アップロード＆トリミングダイアログ表示待ち
 
-        # ③ アップロード後の「選択した写真をトリミングします。」ダイアログで「設定」を確実に押す。
-        #    ダイアログ表示には時間差があるため、最大約14秒・複数回トライして確定する。
-        #    確定しないとモーダルが残り、後続の「公開する」がブロックされる。
-        confirmed = False
-        for attempt in range(14):
-            # トリミングダイアログ or 確定ボタンが出ているか
-            try:
-                dlg_present = page.evaluate("""() => {
-                    const txt = document.body.innerText || '';
-                    const hasCrop = txt.includes('トリミング') || txt.includes('切り抜き') || txt.includes('画像を設定');
-                    const btns = Array.from(document.querySelectorAll('button'));
-                    const hasSet = btns.some(b => {
-                        const t = (b.textContent || '').trim();
-                        const r = b.getBoundingClientRect();
-                        return (t === '設定' || t === '設定する' || t === '保存' || t === '保存する'
-                                || t === '確定' || t === '決定' || t === '完了')
-                               && r.width > 0 && r.height > 0;
-                    });
-                    return hasCrop || hasSet;
-                }""")
-            except Exception:
-                dlg_present = False
-
-            if dlg_present:
-                # 設定/保存/確定/完了 を順に試す（完全一致で。部分一致だと
-                # フォーム内の「特徴を設定する」等を誤クリックするため exact=True）
-                for label in ['設定', '設定する', '保存', '保存する', '確定', '決定', '完了', 'OK']:
-                    try:
-                        loc = page.get_by_role('button', name=label, exact=True)
-                        if loc.count() == 0:
-                            continue
-                        btn = loc.last
-                        if btn.is_visible():
-                            btn.scroll_into_view_if_needed()
-                            btn.click(force=True, timeout=3000)
-                            progress(f"  🖼️ トリミング確定「{label}」をクリック", "info")
-                            confirmed = True
-                            break
-                    except Exception:
-                        pass
-                if confirmed:
-                    rand_delay(1.2, 2.0)
-                    # ダイアログが閉じたか確認。残っていれば次ループで再試行。
-                    try:
-                        still = page.evaluate("""() => {
-                            const txt = document.body.innerText || '';
-                            return txt.includes('トリミング') || txt.includes('切り抜き');
-                        }""")
-                    except Exception:
-                        still = False
-                    if not still:
-                        break
-                    confirmed = False  # まだ残っている→再試行
-            rand_delay(0.6, 1.0)
-
-        if confirmed:
+        # ③ 「選択した写真をトリミングします。」ダイアログが出たら「設定」で確定する。
+        #    確定しないとモーダルが残り、後続の保存／公開がブロックされる。
+        if confirm_crop_if_open(page, max_attempts=10):
             progress("  ✅ 画像のトリミング確定が完了しました", "info")
         else:
-            progress("  ℹ️ トリミングダイアログは検出されませんでした（確定不要のUIの可能性）", "info")
+            progress("  ℹ️ トリミングダイアログは検出されませんでした", "info")
+        try:
+            save_screenshot(page, 'after_image_upload')
+        except Exception:
+            pass
         return True
     except Exception as e:
         progress(f"  ⚠️ 画像アップロード失敗（スキップ）: {e}", "warn")
@@ -383,6 +379,11 @@ def select_option_safe(page, selector, label=None, value=None, timeout=5000, deb
 
 def click_submit_button(page):
     """フォームの送信ボタンをクリック（複数の方法を試す）"""
+    # 保険: トリミング等のモーダルが残っていると送信がブロックされるため先に閉じる
+    try:
+        confirm_crop_if_open(page, max_attempts=4)
+    except Exception:
+        pass
     page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
     rand_delay(0.5, 1.0)
 
@@ -1020,6 +1021,12 @@ def publish_draft(page, draft_url, job=None, full_payload=None, upload_image=Fal
         except Exception as e:
             progress(f"  ⚠️ 必要項目クリック失敗: {e}", "warn")
         rand_delay(1.0, 1.5)
+
+        # 保険: 画像トリミング等のモーダルが残っていれば閉じる（公開ブロック防止）
+        try:
+            confirm_crop_if_open(page, max_attempts=4)
+        except Exception:
+            pass
 
         # ── 「公開する」ボタンを最大3回試みる ──
         clicked_pub = False
