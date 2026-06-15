@@ -947,7 +947,9 @@ function topPageV2(jobs) {
   for (const j of jobs) {
     typeCounts[j.job_type] = (typeCounts[j.job_type] || 0) + 1;
     const locs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
-    const allLocs = locs.length ? locs : [j.location || ''];
+    const descLocMatch = !locs.length && (j.description || '').match(/【所在地】([^\n【]*)/);
+    const descLoc = descLocMatch ? descLocMatch[1].trim() : '';
+    const allLocs = locs.length ? locs : [descLoc || j.location || ''];
     const seenPrefs = new Set();
     for (const loc of allLocs) {
       const p = PREFS.find(pf => (loc || '').includes(pf));

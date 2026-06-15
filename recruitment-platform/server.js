@@ -966,7 +966,8 @@ const server = http.createServer(async (req, res) => {
       const s = search.toLowerCase();
       jobs = jobs.filter(j => {
         const locs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
-        const allLocs = locs.length ? locs : [j.location || ''];
+        const descLocMatch = !locs.length && (j.description || '').match(/【所在地】([^\n【]*)/);
+        const allLocs = locs.length ? locs : [descLocMatch ? descLocMatch[1].trim() : (j.location || '')];
         return j.title.toLowerCase().includes(s) ||
           allLocs.some(l => l.toLowerCase().includes(s)) ||
           j.job_type.toLowerCase().includes(s) ||

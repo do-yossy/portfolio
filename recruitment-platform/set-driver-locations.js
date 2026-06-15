@@ -89,6 +89,30 @@ const TOKYO_TITLES = [
   'グラフィックデザイナー',
 ];
 
+// ITエンジニアの勤務地（東京・大阪の主要駅）
+const IT_LOCATIONS = [
+  '東京都千代田区丸の内',
+  '東京都新宿区新宿',
+  '東京都渋谷区渋谷',
+  '東京都港区品川',
+  '東京都豊島区南池袋',
+  '東京都千代田区秋葉原',
+  '東京都中央区日本橋',
+  '東京都文京区後楽園',
+  '東京都江東区豊洲',
+  '東京都品川区大崎',
+  '大阪府大阪市北区梅田',
+  '大阪府大阪市中央区難波',
+  '大阪府大阪市北区天満橋',
+  '大阪府大阪市住之江区南港北',
+  '大阪府大阪市福島区福島',
+];
+
+const IT_TITLES = [
+  'ITエンジニア',
+  'エンジニア',
+];
+
 const jobs = db.prepare('SELECT id, title FROM jobs').all();
 let updated = 0;
 for (const job of jobs) {
@@ -119,6 +143,16 @@ for (const job of jobs) {
       job.id
     );
     console.log(`✓ 東京: "${job.title}"${cleanTitle !== job.title ? ` → "${cleanTitle}"` : ''}`);
+    updated++;
+  } else if (IT_TITLES.some(t => job.title.includes(t))) {
+    const cleanTitle = job.title.replace(/[\(（][^)）]+[\)）]/g, '').trim();
+    db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
+      JSON.stringify(IT_LOCATIONS),
+      '複数拠点（選択制）',
+      cleanTitle,
+      job.id
+    );
+    console.log(`✓ IT: "${job.title}"${cleanTitle !== job.title ? ` → "${cleanTitle}"` : ''}`);
     updated++;
   }
 }
