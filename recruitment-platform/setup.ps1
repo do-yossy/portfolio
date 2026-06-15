@@ -160,7 +160,8 @@ $seeds = @(
     "seed-factory-hachioji-job.js",
     "seed-factory-hino-job.js",
     "seed-factory-fuchu-job.js",
-    "seed-welfare-driver-nakamozu-job.js"
+    "seed-welfare-driver-nakamozu-job.js",
+    "seed-kikai-op-kombinat-kyujinbox.js"
 )
 foreach ($seed in $seeds) {
     node --experimental-sqlite "scripts\$seed" *> $null

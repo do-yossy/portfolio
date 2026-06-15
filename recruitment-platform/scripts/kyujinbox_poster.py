@@ -127,24 +127,48 @@ def get_base_url(url):
 
 def resolve_job_image(job):
     """掲載画像のローカルパスを決定する。
-    優先順: 環境変数 KYUJINBOX_JOB_IMAGE > OneDrive共有フォルダ > リポジトリ同梱画像。
-    OneDrive\\recruitment-config\\job-images\\ec-haisou.(jpg/png/...) に写真を置けば自動採用。
-    求人ボックスはSVGを受け付けないため、JPG/PNG/JPEG/WEBP を最優先で探し、SVGは最後の手段。"""
+    優先順:
+      1) 環境変数 KYUJINBOX_JOB_IMAGE（明示指定）
+      2) 求人の imageUrl（/images/xxx.jpg → public/images/xxx.jpg）※求人ごとに別画像
+      3) OneDrive共有フォルダ（ec-haisou.*）
+      4) リポジトリ同梱画像（ec-haisou-driver.*）
+    求人ボックスはSVGを受け付けないため、JPG/PNG/JPEG/WEBP を優先し、SVGは添付しない。"""
     import pathlib
+    job = job or {}
+    raster_exts = ("jpg", "jpeg", "png", "webp")
+    repo_dir = pathlib.Path(__file__).parent.parent / "public" / "images"
+
+    # 1) 明示指定
     env_path = os.environ.get("KYUJINBOX_JOB_IMAGE", "").strip()
     if env_path and os.path.exists(env_path):
         return env_path
-    # ラスター画像を優先（kyujinboxはSVG不可）。svgは最後に回す。
-    raster_exts = ("jpg", "jpeg", "png", "webp")
+
+    # 2) 求人ごとの imageUrl（/images/xxx.jpg などローカルパスを解決）
+    img_url = (job.get("imageUrl") or job.get("image_url") or "").strip()
+    if img_url and not img_url.lower().startswith(("http://", "https://")):
+        rel = img_url.lstrip("/")
+        # "images/xxx.jpg" 形式 → public/ 配下
+        cand = pathlib.Path(__file__).parent.parent / "public" / rel
+        if cand.exists() and not cand.suffix.lower() == ".svg":
+            return str(cand)
+        # 拡張子違い（svg指定だがjpgがある等）を救済: 同じ basename で raster を探す
+        stem = pathlib.Path(rel).stem
+        for ext in raster_exts:
+            p = repo_dir / f"{stem}.{ext}"
+            if p.exists():
+                return str(p)
+
+    # 3) OneDrive 共有（汎用フォールバック）
     onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer") or ""
     if onedrive:
         base = pathlib.Path(onedrive) / "recruitment-config" / "job-images"
-        for ext in raster_exts + ("svg",):
+        for ext in raster_exts:
             p = base / f"ec-haisou.{ext}"
             if p.exists():
                 return str(p)
-    repo_dir = pathlib.Path(__file__).parent.parent / "public" / "images"
-    for ext in raster_exts + ("svg",):
+
+    # 4) リポジトリ同梱（最終フォールバック）
+    for ext in raster_exts:
         p = repo_dir / f"ec-haisou-driver.{ext}"
         if p.exists():
             return str(p)
