@@ -13,29 +13,30 @@ const DB_PATH = process.env.DATA_DIR
 
 const db = new DatabaseSync(DB_PATH);
 
-// 掲載写真（EC配送ドライバー）
-const EC_IMAGE = '/images/ec-haisou-driver.svg';
+// 掲載写真（EC配送ドライバー）— ユーザーが public/images/ に配置済み
+const EC_IMAGE = '/images/ec-haisou-driver.jpg';
 // 写真に合わせた給与（月給42万円〜62万円）
 const SALARY_INCOME = '月給42万円〜62万円';
 const SALARY_DETAIL = '月給420,000円〜620,000円（歩合・各種手当込み）';
 
-// 大阪府内の15エリア（重複なし）
+// 大阪市内の15エリア（区＋地区名で細分化・既存求人とも重複なし）
+// 既存求人は区レベルまでしか使っていないため、地区名で一意にする
 const AREAS = [
-  { area: '大阪市中央区',   service: 'Amazon・EC通販大手' },
-  { area: '大阪市淀川区',   service: '楽天市場・Amazon倉庫直発' },
-  { area: '大阪市住之江区', service: '大型EC倉庫発・通販各社' },
-  { area: '大阪市港区',     service: 'Yahoo!ショッピング・EC各社' },
-  { area: '大阪市此花区',   service: 'Amazon配送パートナー便' },
-  { area: '堺市堺区',       service: 'Amazon・楽天EC大手' },
-  { area: '堺市西区',       service: 'EC通販各社・大型倉庫発' },
-  { area: '東大阪市',       service: '食品・日用品EC通販' },
-  { area: '吹田市',         service: '楽天・AmazonのEC配送' },
-  { area: '豊中市',         service: '生活雑貨・日用品EC' },
-  { area: '高槻市',         service: 'Amazon・EC通販各社' },
-  { area: '茨木市',         service: '大手EC倉庫発の配送' },
-  { area: '枚方市',         service: 'アパレル・雑貨EC各社' },
-  { area: '八尾市',         service: 'スポーツ・家電EC配送' },
-  { area: '岸和田市',       service: 'EC通販各社・泉州エリア' },
+  { ward: '大阪市北区',     district: '中之島',   service: 'Amazon・EC通販大手' },
+  { ward: '大阪市福島区',   district: '野田',     service: '楽天市場・Amazon倉庫直発' },
+  { ward: '大阪市西区',     district: '新町',     service: '大型EC倉庫発・通販各社' },
+  { ward: '大阪市中央区',   district: '本町',     service: 'Yahoo!ショッピング・EC各社' },
+  { ward: '大阪市天王寺区', district: '上本町',   service: 'Amazon配送パートナー便' },
+  { ward: '大阪市浪速区',   district: '難波中',   service: 'Amazon・楽天EC大手' },
+  { ward: '大阪市淀川区',   district: '西中島',   service: 'EC通販各社・大型倉庫発' },
+  { ward: '大阪市東淀川区', district: '淡路',     service: '食品・日用品EC通販' },
+  { ward: '大阪市城東区',   district: '関目',     service: '楽天・AmazonのEC配送' },
+  { ward: '大阪市阿倍野区', district: '文の里',   service: '生活雑貨・日用品EC' },
+  { ward: '大阪市住吉区',   district: '長居',     service: 'Amazon・EC通販各社' },
+  { ward: '大阪市東住吉区', district: '駒川',     service: '大手EC倉庫発の配送' },
+  { ward: '大阪市平野区',   district: '喜連',     service: 'アパレル・雑貨EC各社' },
+  { ward: '大阪市生野区',   district: '鶴橋',     service: 'スポーツ・家電EC配送' },
+  { ward: '大阪市都島区',   district: '京橋',     service: 'EC通販各社・城東エリア' },
 ];
 
 const now = new Date().toISOString();
@@ -53,8 +54,9 @@ const stmt = db.prepare(`
 let created = 0;
 for (let i = 0; i < AREAS.length; i++) {
   const j = AREAS[i];
+  const areaLabel = `${j.ward}・${j.district}`;
   const id = crypto.randomBytes(10).toString('hex');
-  const title = `【${j.area}】EC配送ドライバー正社員募集｜${SALARY_INCOME}・車両費用完全会社負担`;
+  const title = `【${areaLabel}】EC配送ドライバー正社員募集｜${SALARY_INCOME}・車両費用完全会社負担`;
   const catchcopy = `${SALARY_INCOME}／高時給エリア配送！${j.service}の荷物をお届け。未経験から始められる高収入のお仕事です。`;
   const description = `■お仕事内容
 都心エリアで効率配送！高収入を実現する高時給エリア配送ドライバーです。
@@ -143,11 +145,11 @@ ${SALARY_DETAIL}
   ]);
   const rewarding = `コンパクトエリアで効率配送できる高時給エリア配送の仕事。${SALARY_INCOME}の高収入で、定期顧客を構築すればさらに収入アップも可能です。未経験からスタートして活躍しているスタッフが多数います。`;
   const worktime = '稼働時間 11:00〜20:00を想定（調整可能）　夜間帯配送（17時〜21時）が中心　実働8時間・シフト制　週休2日　年間休日120日以上';
-  const transport = `大阪府${j.area}エリア。車通勤OK・無料駐車場完備。社用車（軽自動車）を貸与するため、マイカー不要です。`;
+  const transport = `大阪府${j.ward}（${j.district}）エリア。車通勤OK・無料駐車場完備。社用車（軽自動車）を貸与するため、マイカー不要です。`;
   const howToApply = 'このページよりWebでご応募ください。書類選考後、担当者よりご連絡いたします。面接は1回のみ・WEB面接も対応しております。';
 
   stmt.run(
-    id, title, `大阪府${j.area}`, SALARY_DETAIL, 'EC配送ドライバー', '正社員',
+    id, title, `大阪府${j.ward}${j.district}`, SALARY_DETAIL, 'EC配送ドライバー', '正社員',
     description, tags, catchcopy, EC_IMAGE,
     JSON.stringify(['求人ボックス']),
     now, expires, now, now,
