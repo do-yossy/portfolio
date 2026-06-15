@@ -485,6 +485,32 @@ async function changeStatus(id, newStatus) {
   }
 }
 
+// ── Multi-location chip helpers ──
+function renderJobLocations(locs) {
+  const chips = document.getElementById('jf-locations-chips');
+  const hidden = document.getElementById('jf-location');
+  if (!chips) return;
+  chips.innerHTML = locs.map(l =>
+    `<span data-loc="${l.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" style="display:inline-flex;align-items:center;gap:4px;background:#f0ede4;border:1px solid #d1ccc0;border-radius:999px;padding:3px 10px;font-size:12px">${l} <button type="button" onclick="removeJobLocation(this)" style="background:none;border:none;cursor:pointer;color:#888;padding:0;font-size:14px;line-height:1">×</button></span>`
+  ).join('');
+  if (hidden) hidden.value = locs[0] || '';
+}
+function addJobLocation() {
+  const input = document.getElementById('jf-location-input');
+  if (!input || !input.value.trim()) return;
+  const chips = document.getElementById('jf-locations-chips');
+  const existing = Array.from(chips.querySelectorAll('[data-loc]')).map(el => el.dataset.loc);
+  if (!existing.includes(input.value.trim())) renderJobLocations([...existing, input.value.trim()]);
+  input.value = '';
+  input.focus();
+}
+function removeJobLocation(btn) {
+  const chip = btn.closest('[data-loc]');
+  const chips = document.getElementById('jf-locations-chips');
+  const existing = Array.from(chips.querySelectorAll('[data-loc]')).map(el => el.dataset.loc);
+  renderJobLocations(existing.filter(l => l !== chip.dataset.loc));
+}
+
 // ── Job Modal ──
 function showJobModal(job) {
   const m = document.getElementById('job-modal');
@@ -492,7 +518,8 @@ function showJobModal(job) {
   document.getElementById('modal-title').textContent = job ? '求人を編集' : '求人を登録';
   document.getElementById('jf-id').value          = job ? job.id : '';
   document.getElementById('jf-title').value       = job ? job.title : '';
-  document.getElementById('jf-location').value    = job ? job.location : '';
+  const _locs = job ? (() => { try { const a = JSON.parse(job.locations || '[]'); return a.length ? a : (job.location ? [job.location] : []); } catch { return job.location ? [job.location] : []; } })() : [];
+  renderJobLocations(_locs);
   document.getElementById('jf-salary').value      = job ? job.salary : '';
   document.getElementById('jf-type').value        = job ? job.job_type : '';
   document.getElementById('jf-employment').value  = job ? job.employment_type : '';
@@ -518,9 +545,12 @@ async function saveJob() {
   const id = document.getElementById('jf-id').value;
   const tagsRaw = document.getElementById('jf-tags').value;
   const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const _locChips = document.getElementById('jf-locations-chips');
+  const _locsArr = _locChips ? Array.from(_locChips.querySelectorAll('[data-loc]')).map(el => el.dataset.loc) : [];
   const body = {
     title:          document.getElementById('jf-title').value,
-    location:       document.getElementById('jf-location').value,
+    location:       _locsArr[0] || document.getElementById('jf-location').value,
+    locations:      _locsArr,
     salary:         document.getElementById('jf-salary').value,
     jobType:        document.getElementById('jf-type').value,
     employmentType: document.getElementById('jf-employment').value,

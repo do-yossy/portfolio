@@ -449,9 +449,14 @@ function jobModalHTML() {
         <label>タイトル<span class="req">*</span></label>
         <input type="text" id="jf-title" placeholder="例: 介護職員（東京）">
       </div>
-      <div class="form-group">
-        <label>勤務地<span class="req">*</span></label>
-        <input type="text" id="jf-location" placeholder="例: 東京都新宿区">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>勤務地（複数可・選択制・車通勤可）<span class="req">*</span></label>
+        <div id="jf-locations-chips" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;min-height:36px;border:1px solid #d1ccc0;border-radius:8px;background:#faf8f3;margin-bottom:6px;"></div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="jf-location-input" placeholder="例: 大阪府大阪市北区芝田" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addJobLocation();}">
+          <button type="button" onclick="addJobLocation()" style="padding:8px 14px;background:#333;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap">追加</button>
+        </div>
+        <input type="hidden" id="jf-location">
       </div>
     </div>
     <div class="form-row">
@@ -941,8 +946,13 @@ function topPageV2(jobs) {
   const prefCounts = {};
   for (const j of jobs) {
     typeCounts[j.job_type] = (typeCounts[j.job_type] || 0) + 1;
-    const p = PREFS.find(pf => (j.location || '').includes(pf));
-    if (p) prefCounts[p] = (prefCounts[p] || 0) + 1;
+    const locs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
+    const allLocs = locs.length ? locs : [j.location || ''];
+    const seenPrefs = new Set();
+    for (const loc of allLocs) {
+      const p = PREFS.find(pf => (loc || '').includes(pf));
+      if (p && !seenPrefs.has(p)) { seenPrefs.add(p); prefCounts[p] = (prefCounts[p] || 0) + 1; }
+    }
   }
   const typeIcon = t => {
     if (/配送|ドライバー/.test(t)) return '🚚';
@@ -1381,6 +1391,8 @@ function jobsListPageV2(jobs, search = '') {
     : jobs.map(j => {
         const draftBadge = j.is_published ? '' : '<span class="hpl-draft">未公開</span>';
         const catchcopy = j.catchcopy || '';
+        const jlocs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
+        const displayLoc = jlocs.length > 1 ? `${jlocs[0]} 他${jlocs.length - 1}拠点` : (jlocs[0] || j.location);
         return `<div class="hpl-item">
           <div class="hpl-item-head">
             <span class="hpl-emp">${esc(j.employment_type)}</span>
@@ -1390,7 +1402,7 @@ function jobsListPageV2(jobs, search = '') {
           ${catchcopy ? `<div class="hpl-catch">${esc(catchcopy)}</div>` : ''}
           <h3 class="hpl-title"><a href="/preview/jobs/${j.id}">${esc(j.title)}</a></h3>
           <table class="hpl-table"><tbody>
-            <tr><th>勤務地</th><td>${esc(j.location)}</td></tr>
+            <tr><th>勤務地</th><td>${esc(displayLoc)}</td></tr>
             <tr><th>給与</th><td>${esc(j.salary)}</td></tr>
           </tbody></table>
           <div class="hpl-more"><a href="/preview/jobs/${j.id}" class="hpl-btn">詳細を見る</a></div>
@@ -1458,6 +1470,11 @@ function jobsListPageV2(jobs, search = '') {
 function jobDetailPageV2(job) {
   const tags = JSON.parse(job.tags || '[]');
   const faq = JSON.parse(job.faq || '[]');
+  const jobLocs = (() => { try { return JSON.parse(job.locations || '[]'); } catch { return []; } })();
+  const hasMultiLoc = jobLocs.length > 1;
+  const firstLoc = jobLocs[0] || job.location;
+  const locSummary = hasMultiLoc ? `${firstLoc} 他${jobLocs.length - 1}拠点（選択制・車通勤可）` : firstLoc;
+  const locDetail = hasMultiLoc ? `【選択制・車通勤可】\n` + jobLocs.join('\n') : firstLoc;
 
   const salaryParsed = parseSalary(job.salary);
   const salarySchema = salaryParsed ? {
@@ -1475,7 +1492,7 @@ function jobDetailPageV2(job) {
   const jobUrl  = `${siteUrl}/jobs/${job.id}`;
 
   const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
-  const addressRegion = PREFS.find(p => job.location.includes(p)) || '';
+  const addressRegion = PREFS.find(p => firstLoc.includes(p)) || '';
 
   const datePosted = (job.published_at || job.created_at || '').slice(0, 10);
   const validThrough = job.expires_at
@@ -1549,7 +1566,7 @@ function jobDetailPageV2(job) {
   const infoRows = [
     ['お仕事内容', mainDesc],
     ['給与', salaryCell],
-    ['所在地', job.location],
+    ['所在地', locDetail],
     ['雇用形態', job.employment_type],
     ['シフト・勤務時間', shiftText],
     ['休日・休暇', pick('休日・休暇', '休日')],
@@ -1648,12 +1665,12 @@ function jobDetailPageV2(job) {
 </div>
 <div class="ea-wrap">
   <div class="ea-breadcrumb">
-    <a href="/preview/top">求人情報トップ</a> ＞ <a href="/preview/jobs">お仕事一覧</a> ＞ ${esc(job.location)} ＞ ${esc(job.title)}
+    <a href="/preview/top">求人情報トップ</a> ＞ <a href="/preview/jobs">お仕事一覧</a> ＞ ${esc(firstLoc)} ＞ ${esc(job.title)}
   </div>
   ${catchcopy ? `<div class="ea-headline">${esc(catchcopy)}</div>` : ''}
   <table class="ea-summary"><tbody>
     <tr><th>給与</th><td>${esc(job.salary)}</td><th>シフト</th><td>${esc((shiftText.split('\n')[0] || 'シフト制'))}</td></tr>
-    <tr><th>勤務地</th><td>${esc(job.location)}</td><th>雇用形態</th><td>${esc(job.employment_type)}</td></tr>
+    <tr><th>勤務地</th><td>${esc(locSummary)}</td><th>雇用形態</th><td>${esc(job.employment_type)}</td></tr>
   </tbody></table>
   ${imageHtml}
   ${pointsText ? `

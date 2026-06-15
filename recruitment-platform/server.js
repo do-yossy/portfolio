@@ -923,12 +923,14 @@ const server = http.createServer(async (req, res) => {
     let jobs = await Jobs.findAll(true);
     if (search) {
       const s = search.toLowerCase();
-      jobs = jobs.filter(j =>
-        j.title.toLowerCase().includes(s) ||
-        j.location.toLowerCase().includes(s) ||
-        j.job_type.toLowerCase().includes(s) ||
-        (j.tags || '').toLowerCase().includes(s)
-      );
+      jobs = jobs.filter(j => {
+        const locs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
+        const allLocs = locs.length ? locs : [j.location || ''];
+        return j.title.toLowerCase().includes(s) ||
+          allLocs.some(l => l.toLowerCase().includes(s)) ||
+          j.job_type.toLowerCase().includes(s) ||
+          (j.tags || '').toLowerCase().includes(s);
+      });
     }
     send(res, 200, T.jobsListPage(jobs, search));
     return;
@@ -962,12 +964,14 @@ const server = http.createServer(async (req, res) => {
     const search = (query.q || '').trim();
     if (search) {
       const s = search.toLowerCase();
-      jobs = jobs.filter(j =>
-        j.title.toLowerCase().includes(s) ||
-        j.location.toLowerCase().includes(s) ||
-        j.job_type.toLowerCase().includes(s) ||
-        (j.tags || '').toLowerCase().includes(s)
-      );
+      jobs = jobs.filter(j => {
+        const locs = (() => { try { return JSON.parse(j.locations || '[]'); } catch { return []; } })();
+        const allLocs = locs.length ? locs : [j.location || ''];
+        return j.title.toLowerCase().includes(s) ||
+          allLocs.some(l => l.toLowerCase().includes(s)) ||
+          j.job_type.toLowerCase().includes(s) ||
+          (j.tags || '').toLowerCase().includes(s);
+      });
     }
     send(res, 200, T.jobsListPageV2(jobs, search || type));
     return;

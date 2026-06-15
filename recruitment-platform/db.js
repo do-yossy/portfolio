@@ -149,6 +149,9 @@ try {
 // Migration v7: kyujinbox posted tracking
 try { db.exec("ALTER TABLE jobs ADD COLUMN kyujinbox_posted_at TEXT DEFAULT NULL"); } catch {}
 
+// Migration v8: multiple locations per job (JSON array)
+try { db.exec("ALTER TABLE jobs ADD COLUMN locations TEXT DEFAULT '[]'"); } catch {}
+
 // Migration v2: 媒体掲載日報テーブル
 db.exec(`
   CREATE TABLE IF NOT EXISTS media_posts (
@@ -191,8 +194,8 @@ const Jobs = {
     const id = generateId();
     const ts = now();
     db.prepare(`
-      INSERT INTO jobs (id, title, location, salary, job_type, employment_type, description, tags, catchcopy, image_url, faq, is_published, target_media, published_at, expires_at, company, rewarding, worktime_holiday, transportation, how_to_apply, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO jobs (id, title, location, salary, job_type, employment_type, description, tags, catchcopy, image_url, faq, is_published, target_media, published_at, expires_at, company, rewarding, worktime_holiday, transportation, how_to_apply, locations, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       data.title, data.location, data.salary,
@@ -212,6 +215,7 @@ const Jobs = {
       data.worktimeHoliday || data.worktime_holiday || '',
       data.transportation || '',
       data.howToApply || data.how_to_apply || '',
+      JSON.stringify(data.locations || []),
       ts, ts
     );
     return Jobs.findById(id);
@@ -247,6 +251,7 @@ const Jobs = {
       transportation: 'transportation',
       howToApply: 'how_to_apply', how_to_apply: 'how_to_apply',
       kyujinbox_posted_at: 'kyujinbox_posted_at',
+      locations: 'locations',
     };
     for (const [key, col] of Object.entries(map)) {
       if (data[key] !== undefined) {
