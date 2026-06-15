@@ -95,7 +95,7 @@ for (const job of jobs) {
   if (DRIVER_TITLES.some(t => job.title.includes(t))) {
     db.prepare('UPDATE jobs SET locations=?, location=? WHERE id=?').run(
       JSON.stringify(DRIVER_LOCATIONS),
-      DRIVER_LOCATIONS[0],
+      '複数拠点（選択制）',
       job.id
     );
     console.log(`✓ ドライバー: ${job.title}`);
@@ -104,7 +104,7 @@ for (const job of jobs) {
     const cleanTitle = job.title.replace(/[\(（][^)）]*[都道府県市区町村][^)）]*[\)）]/g, '').trim();
     db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
       JSON.stringify(KANTO_LOCATIONS),
-      KANTO_LOCATIONS[0],
+      '複数拠点（選択制）',
       cleanTitle,
       job.id
     );
@@ -114,7 +114,7 @@ for (const job of jobs) {
     const cleanTitle = job.title.replace(/[\(（][^)）]*[都道府県市区町村][^)）]*[\)）]/g, '').trim();
     db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
       JSON.stringify(TOKYO_LOCATIONS),
-      TOKYO_LOCATIONS[0],
+      '複数拠点（選択制）',
       cleanTitle,
       job.id
     );

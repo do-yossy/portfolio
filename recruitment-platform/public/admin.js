@@ -518,7 +518,7 @@ function showJobModal(job) {
   document.getElementById('modal-title').textContent = job ? '求人を編集' : '求人を登録';
   document.getElementById('jf-id').value          = job ? job.id : '';
   document.getElementById('jf-title').value       = job ? job.title : '';
-  const _locs = job ? (() => { try { const a = JSON.parse(job.locations || '[]'); return a.length ? a : (job.location ? [job.location] : []); } catch { return job.location ? [job.location] : []; } })() : [];
+  const _locs = job ? (() => { try { return JSON.parse(job.locations || '[]'); } catch { return []; } })() : [];
   renderJobLocations(_locs);
   document.getElementById('jf-salary').value      = job ? job.salary : '';
   document.getElementById('jf-type').value        = job ? job.job_type : '';
