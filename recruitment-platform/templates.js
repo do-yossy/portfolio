@@ -1566,34 +1566,29 @@ function jobDetailPageV2(job) {
     ? `<div class="ea-image"><img src="${esc(job.image_url)}" alt="${esc(job.title)}"></div>`
     : '';
 
-  // 会社情報テーブル（GIG INC.風）。事実情報(設立・資本金等)は .env から取得し、
-  // 未設定の行は自動で非表示にする（事実を捏造しないため）。事業内容・MVVは常に表示。
+  // 会社情報テーブル（GIG INC.風）。会社名・MVV・大切にしているもの・働く人々で構成。
   const companyName = process.env.COMPANY_NAME || '株式会社Social Quality';
-  const bizContent =
-    '【メイン事業】\n'
-    + '・Web制作・システム / アプリ / AI開発\n'
-    + '・マーケティング・販促支援\n'
-    + '・物流・配送\n'
-    + '・製造・倉庫管理\n\n'
-    + '【これから展開していく事業】\n'
-    + '・自社プロダクト / SaaS開発\n'
-    + '・AI・DXソリューション\n'
-    + '・採用・人材プラットフォーム\n'
-    + '・全国エリアの事業拡大';
+  const shortName = companyName.replace(/^(株式会社|有限会社|合同会社)\s*/, '');
   const mvvContent =
     'MISSION（使命）\nテクノロジーで、「働く」と「ビジネス」をアップデートする。\n\n'
     + 'VISION（目指す姿）\n確かな価値を提供できる企業へ。\n\n'
     + 'VALUE（価値観）\nユーザーファースト / スピード&改善 / 学び続ける。';
+  const valuesContent =
+    '１：Good is good\n'
+    + '‣ 付加価値のあるものを創り、広く届ける。クライアントやユーザーに価値を生み出し続けることを大切にしています。情熱と想いを強く持ち、自分たちが生み出したモノ・関わったコトで、プロジェクトや世の中を前進させます。\n\n'
+    + '２：JUST HACK IT\n'
+    + '‣ 挑戦に失敗は付き物です。より良いモノをつくろう・改善しようと、個人でもチームでも自走して前に進める組織を目指しています。意味のある失敗を早く経験し、共有・仕組み化することを大切にしています。\n\n'
+    + '３：Making a great team\n'
+    + '‣ 責任感と当事者意識が、チームをつくると考えています。優秀な仲間とともに挑戦を楽しめる文化づくり・制度づくり・採用活動をおこなっています。';
+  const peopleContent =
+    '「何をやるかより、誰とやるか」\n\n'
+    + `${shortName}に集まっているのは、様々なバックグラウンドを持つメンバーです。Web・アプリ・AI開発のエンジニアから、デザイナー・マーケター・プランナー・ディレクター、現場をリードするスタッフまで、「つくる人」が中心の組織づくりを進めています。\n\n`
+    + '価値あるプロダクトを仲間とともにつくり、多くの人にきっかけを届けたい——そんな想いを持つメンバーが集まっています。';
   const companyRows = [
-    ['会社名',      companyName],
-    ['設立',        process.env.COMPANY_FOUNDED   || ''],
-    ['代表者',      process.env.COMPANY_CEO       || ''],
-    ['資本金',      process.env.COMPANY_CAPITAL   || ''],
-    ['従業員数',    process.env.COMPANY_EMPLOYEES || ''],
-    ['事業内容',    bizContent],
-    ['所在地',      process.env.COMPANY_ADDRESS   || ''],
-    ['私たちが大切にしていること', mvvContent],
-    ['主要取引先',  process.env.COMPANY_CLIENTS   || ''],
+    ['会社名',                companyName],
+    ['MISSION / VISION / VALUE', mvvContent],
+    ['私たちが大切にしているもの', valuesContent],
+    [`${shortName}で働く人々`,  peopleContent],
   ].filter(([, v]) => v && String(v).trim());
   const companyTable = `<table class="ea-table"><tbody>
     ${companyRows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}
