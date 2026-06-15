@@ -39,15 +39,19 @@ function detectKey(title, catchcopy, description) {
 // 駅アクセス・リモート系の判定（タグ・行で使う）
 const STATION_RE = /鴫野|梅田駅|新宿駅|駅\s*(すぐ|徒歩|圏内)|徒歩\s*[\d〜～]*\s*分|徒歩圏内|リモートワーク/;
 
-// インライン除去（タイトル・キャッチ用：行は消さない）
+// インライン除去（タイトル・キャッチ用）
+// 駅・リモート系フレーズを行内から除去し、結果として空になった行は削除する。
 function cleanInline(text) {
   if (!text) return text;
   let t = text;
   t = t.replace(/[・・]?[^\s　！!（(【「\n]*[駅]\s*(すぐ|徒歩\s*[\d〜～]*\s*分?(以内|圏内)?|徒歩圏内)[^\n★・・]*/g, '');
   t = t.replace(/[・・]?リモートワーク[^。\n★・・]*/g, '');
   t = t.replace(/[・・]+★/g, '★');
-  t = t.replace(/[・・\s]+$/, '');
-  return t.trim();
+  // 行ごとに整形：先頭の残骸記号を整え、空行（記号だけ含む行）を除去
+  const lines = t.split('\n')
+    .map(l => l.replace(/[・・\s]+$/, '').trimEnd())
+    .filter(l => l.trim() !== '' && !/^[・✔✓•※◇▶\s]+$/.test(l));
+  return lines.join('\n').trim();
 }
 
 // 説明文の駅アクセス行を削除
