@@ -37,27 +37,56 @@ const DRIVER_LOCATIONS = [
   '東京都荒川区南千住',
 ];
 
-const TARGET_TITLES = [
+// ドライバー系の求人タイトル
+const DRIVER_TITLES = [
   'ロケ同行ドライバー',
   'EC倉庫配送ドライバー',
   '夜勤配送ドライバー',
   '宅配便配送ドライバー',
+];
+
+// 機械オペレーター・コスメ製造の勤務地（相模原・多摩エリア）
+const KANTO_LOCATIONS = [
+  '神奈川県相模原市中央区南橋本',
+  '東京都町田市原町田',
+  '東京都八王子市明神町',
+  '東京都日野市大坂上',
+  '東京都昭島市田中町',
+  '東京都福生市福生',
+  '東京都立川市柴崎町',
+  '東京都府中本町',
+  '東京都武蔵野市',
+  '東京都杉並区',
+  '東京都中野区中野',
+  '東京都世田谷区松原',
+];
+
+const KANTO_TITLES = [
   '機械オペレーター',
+  'コスメ製造',
 ];
 
 const jobs = db.prepare('SELECT id, title FROM jobs').all();
 let updated = 0;
 for (const job of jobs) {
-  if (TARGET_TITLES.some(t => job.title.includes(t))) {
-    // 機械オペレーターのタイトルから「（相模原）」などの地名括弧を除去
-    const cleanTitle = job.title.replace(/[\(（][^)）]*[都道府県市区町村][^)）]*[\)）]/g, '').trim();
-    db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
+  if (DRIVER_TITLES.some(t => job.title.includes(t))) {
+    db.prepare('UPDATE jobs SET locations=?, location=? WHERE id=?').run(
       JSON.stringify(DRIVER_LOCATIONS),
       DRIVER_LOCATIONS[0],
+      job.id
+    );
+    console.log(`✓ ドライバー: ${job.title}`);
+    updated++;
+  } else if (KANTO_TITLES.some(t => job.title.includes(t))) {
+    // タイトルから「（相模原）」などの地名括弧を除去
+    const cleanTitle = job.title.replace(/[\(（][^)）]*[都道府県市区町村][^)）]*[\)）]/g, '').trim();
+    db.prepare('UPDATE jobs SET locations=?, location=?, title=? WHERE id=?').run(
+      JSON.stringify(KANTO_LOCATIONS),
+      KANTO_LOCATIONS[0],
       cleanTitle,
       job.id
     );
-    console.log(`✓ Updated: "${job.title}"${cleanTitle !== job.title ? ` → title: "${cleanTitle}"` : ''}`);
+    console.log(`✓ 関東: "${job.title}"${cleanTitle !== job.title ? ` → "${cleanTitle}"` : ''}`);
     updated++;
   }
 }
