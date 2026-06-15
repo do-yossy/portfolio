@@ -928,7 +928,14 @@ function jobDetailPage(job) {
 // /preview/top で表示。
 function topPageV2(jobs) {
   const companyName = process.env.COMPANY_NAME || '株式会社Social Quality';
-  const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+  // ヘッダーロゴ: 本体サイト(social-quality.com)のワードマーク「Social.Quality」に合わせる。
+  // 株式会社などの法人格を外し、語間をドットで連結（例: Social Quality → Social.Quality）。
+  const brandNoPrefix = companyName.replace(/^(株式会社|有限会社|合同会社)\s*/, '');
+  const brandParts = brandNoPrefix.split(/\s+/).filter(Boolean);
+  const logoHtml = brandParts.length >= 2
+    ? `${esc(brandParts[0])}<span class="et-logo-dot">.</span>${esc(brandParts.slice(1).join(''))}`
+    : esc(brandNoPrefix);
+  const PREFS =['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
 
   const typeCounts = {};
   const prefCounts = {};
@@ -1027,7 +1034,8 @@ function topPageV2(jobs) {
   body.pub-body { background: #f4f1ea; font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; }
   .et-head { background: rgba(244,241,234,.95); backdrop-filter: blur(6px); border-bottom: 1px solid #e4dfd4; position: sticky; top: 0; z-index: 50; }
   .et-head-in { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 20px; flex-wrap: wrap; }
-  .et-logo { font-size: 17px; font-weight: 800; color: #111; letter-spacing: .02em; padding: 14px 0; margin-right: auto; white-space: nowrap; }
+  .et-logo { font-size: 22px; font-weight: 900; color: #111; letter-spacing: -.01em; padding: 14px 0; margin-right: auto; white-space: nowrap; }
+  .et-logo-dot { color: #e0371f; }
   .et-nav { display: flex; flex-wrap: wrap; align-items: center; }
   .et-nav a { font-size: 13px; font-weight: 600; color: #111; text-decoration: none; padding: 14px 12px; }
   .et-nav a:hover { color: #e0371f; }
@@ -1133,7 +1141,7 @@ function topPageV2(jobs) {
 </style>
 <header class="et-head">
   <div class="et-head-in">
-    <div class="et-logo">${esc(companyName)}</div>
+    <div class="et-logo">${logoHtml}</div>
     <nav class="et-nav">
       <a href="#type">職種から探す</a>
       <a href="#voice">スタッフの一言</a>
