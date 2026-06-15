@@ -2558,6 +2558,17 @@ server.listen(PORT, () => {
   console.log(`   管理画面: http://localhost:${PORT}/admin`);
   console.log(`   求人サイト: http://localhost:${PORT}/jobs\n`);
 
+  // 起動時データクリーンアップ（タイトル復元・駅フレーズ削除・タグ整理）
+  try {
+    const path = require('path');
+    const dbPath = process.env.DATA_DIR
+      ? path.join(process.env.DATA_DIR, 'recruitment.db')
+      : path.join(__dirname, 'data', 'recruitment.db');
+    const { runCleanup } = require('./startup-cleanup');
+    const c = runCleanup(dbPath);
+    if (c > 0) console.log(`[cleanup] ${c}件の求人データを整理しました`);
+  } catch (e) { console.error('[cleanup] startup error:', e.message); }
+
   // Auto-expire jobs on startup
   try {
     const n = Jobs.expireOld();
