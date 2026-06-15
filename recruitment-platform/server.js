@@ -1476,8 +1476,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         await Applicants.promoteToNew(dupId, todayJST);
         imported++;
       } else if (dupId) {
-        // 重複は架電リストに出さずアーカイブ＋重複フラグで記録
-        await Applicants.create({ ...mapped, isImported: 1, allowEmptyDate: true, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        // 重複も架電リストに残し「重複」バッジで表示する（アーカイブしない）
+        await Applicants.create({ ...mapped, isImported: importCountNew ? 0 : 1, appliedAt: importCountNew ? todayJST : undefined, allowEmptyDate: !importCountNew, isArchived: 0, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
         duplicates++;
       } else if (importCountNew) {
         await Applicants.create({ ...mapped, isImported: 0, appliedAt: todayJST, isArchived: 0 });

@@ -112,9 +112,9 @@ async function smartImport({ sheets, deps, defaultCompany = 'sq', splitByCallCou
         await Applicants.promoteToNew(dupId, today);
         imported++; toCallList++; bump(currentCompany, media, 'imported');
       } else if (dupId) {
-        // 重複は架電リストに出さず必ずアーカイブ＋重複フラグで記録（新着でも計上しない）
-        await Applicants.create({ ...mapped, isImported: 1, allowEmptyDate: true, isArchived: 1, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
-        duplicates++; bump(currentCompany, media, 'duplicates');
+        // 重複も架電リストに残し「重複」バッジで表示する（アーカイブしない）
+        await Applicants.create({ ...mapped, isImported: countAsNew ? 0 : 1, appliedAt: countAsNew ? today : undefined, allowEmptyDate: !countAsNew, isArchived: 0, isDuplicate: 1, duplicateOfId: dupId, status: '重複' });
+        duplicates++; toCallList++; bump(currentCompany, media, 'duplicates');
       } else {
         await Applicants.create({ ...mapped, ...newFields, isArchived: archived });
         imported++; bump(currentCompany, media, 'imported');
