@@ -1147,10 +1147,10 @@ function topPageV2(jobs) {
   <div class="et-hero-in">
     <div class="et-hero-text">
       <div class="et-hero-label">RECRUIT INFORMATION — ${esc(companyName)}</div>
-      <h1><span class="red">あなたらしく</span>、<br>働ける場所。</h1>
-      <p class="et-hero-lead">配送・製造・倉庫内作業など、全国の正社員求人を多数掲載。未経験からでも安心して始められる環境と、頑張りがきちんと評価される待遇をご用意しています。</p>
+      <h1>稼げる仕事が、<br><span class="red">// ここにある。</span></h1>
+      <p class="et-hero-lead">配送・製造・IT・工場内作業など、全国の正社員求人を多数掲載。未経験スタートOK、頑張りがきちんと給与に反映される環境です。</p>
       <a class="et-btn black" href="/preview/jobs">お仕事一覧を見る →</a>
-      <a class="et-btn line" href="#flow" style="margin-left:10px">応募の流れ</a>
+      <a class="et-btn line" href="#flow" style="margin-left:10px">採用の流れ</a>
     </div>
     <div class="et-hero-imgs">
       <div class="et-hi et-hi-1">
@@ -1167,8 +1167,8 @@ function topPageV2(jobs) {
 </div>
 <div class="et-marquee">
   <div class="et-marquee-track">
-    <span>IT</span><span class="sl">/</span><span>製造・工場</span><span class="sl">/</span><span>送迎ドライバー</span><span class="sl">/</span><span>配送ドライバー</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
-    <span>IT</span><span class="sl">/</span><span>製造・工場</span><span class="sl">/</span><span>送迎ドライバー</span><span class="sl">/</span><span>配送ドライバー</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
+    <span>IT・エンジニア</span><span class="sl">/</span><span>製造・工場</span><span class="sl">/</span><span>送迎ドライバー</span><span class="sl">/</span><span>配送ドライバー</span><span class="sl">/</span><span>FULL-TIME JOBS</span><span class="sl">/</span><span>未経験歓迎</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
+    <span>IT・エンジニア</span><span class="sl">/</span><span>製造・工場</span><span class="sl">/</span><span>送迎ドライバー</span><span class="sl">/</span><span>配送ドライバー</span><span class="sl">/</span><span>FULL-TIME JOBS</span><span class="sl">/</span><span>未経験歓迎</span><span class="sl">/</span><span>NATIONWIDE RECRUIT</span><span class="sl">/</span>
   </div>
 </div>
 <section class="et-sec" id="type">
@@ -1208,13 +1208,13 @@ function topPageV2(jobs) {
   </div>
 </section>
 <section class="et-sec" id="voice">
-  <h2 class="et-h2">スタッフからの一言</h2>
-  <div class="et-h2sub">Staff Message</div>
+  <h2 class="et-h2">働く人の声</h2>
+  <div class="et-h2sub">Staff Voice</div>
   <div class="et-voices">${voices}</div>
 </section>
 <section class="et-sec" id="about">
-  <h2 class="et-h2">会社の特徴</h2>
-  <div class="et-h2sub">About company</div>
+  <h2 class="et-h2">選ばれる理由</h2>
+  <div class="et-h2sub">Why choose us</div>
   <div class="et-features">${features}</div>
 </section>
 <section class="et-sec" id="company">
@@ -1245,9 +1245,11 @@ function topPageV2(jobs) {
   ${faqs}
 </section>
 <div class="et-ctaband">
+  <h2 style="color:#fff;font-size:26px;font-weight:800;text-align:center;margin:0 0 8px;letter-spacing:.04em">あなたの次の仕事、ここにある。</h2>
+  <p style="color:#aaa;font-size:13px;text-align:center;margin:0 0 24px">まずはお気軽に求人一覧をご覧ください</p>
   <div class="et-ctaband-in">
     <a class="et-ctabtn" href="/preview/jobs">お仕事一覧へ</a>
-    <a class="et-ctabtn orange" href="/preview/jobs">応募はこちら</a>
+    <a class="et-ctabtn orange" href="/preview/jobs">今すぐ応募する</a>
   </div>
 </div>
 <div class="et-footer">
