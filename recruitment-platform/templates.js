@@ -1221,14 +1221,46 @@ function topPageV2(jobs) {
   <h2 class="et-h2">企業情報</h2>
   <div class="et-h2sub">About us</div>
   <div class="et-company-card">
-    <p class="et-company-lead">私たちは、<strong>Webサイト制作・システム/アプリ/AI開発を主力</strong>に、マーケティング支援から物流・配送、製造まで幅広く事業を展開する会社です。</p>
-    <p class="et-company-text">ひとつの専門にとどまらず、企画から開発・運用、現場での実行までを自社で一貫して手がけることで、お客様の「やりたい」を形にしています。事業領域を横断して連携できる体制が、私たちの強みです。</p>
-    <div class="et-company-areas">
-      <div class="et-area et-area-main"><span class="et-area-tag">主力</span>Web制作・システム/アプリ/AI開発</div>
-      <div class="et-area">マーケティング・販促支援</div>
-      <div class="et-area">物流・配送</div>
-      <div class="et-area">製造・倉庫管理</div>
-      <div class="et-area">法人営業・顧客サポート</div>
+    <p class="et-company-lead">私たちは、<strong>Webサイト制作・システム / アプリ / AI開発を主力</strong>に、マーケティング支援から物流・配送、製造まで幅広く事業を展開する会社です。</p>
+    <p class="et-company-text">ひとつの専門にとどまらず、企画から開発・運用、現場での実行までを自社で一貫して手がけることで、お客様の「やりたい」を形にしています。事業領域を横断して連携できる体制こそが、私たちの強みです。</p>
+
+    <div class="et-mvv">
+      <div class="et-mvv-item">
+        <div class="et-mvv-label">MISSION<span>使命</span></div>
+        <div class="et-mvv-title">「働く」の可能性を、もっと広げる。</div>
+        <div class="et-mvv-text">テクノロジーと現場力を掛け合わせ、人と企業の「やりたい」を形にする。挑戦する人が正しく報われる仕組みをつくります。</div>
+      </div>
+      <div class="et-mvv-item">
+        <div class="et-mvv-label">VISION<span>目指す姿</span></div>
+        <div class="et-mvv-title">一人ひとりが自分らしく働ける社会へ。</div>
+        <div class="et-mvv-text">職種や地域、経験を問わず、誰もが活躍できる場をつくる。複数の事業を束ね、社会に必要とされ続ける企業を目指します。</div>
+      </div>
+      <div class="et-mvv-item">
+        <div class="et-mvv-label">VALUE<span>価値観</span></div>
+        <div class="et-mvv-title">挑戦・誠実・共創。</div>
+        <div class="et-mvv-text">前例がなくてもまず挑む。お客様にも仲間にも誠実に向き合う。立場を越えて協力し合い、より大きな価値を共に創ります。</div>
+      </div>
+    </div>
+
+    <div class="et-biz">
+      <div class="et-biz-col">
+        <div class="et-biz-head"><span class="et-biz-badge main">MAIN</span>メイン事業</div>
+        <ul class="et-biz-list">
+          <li><b>Web制作・システム / アプリ / AI開発</b><span>企画・設計から開発・運用まで自社一貫</span></li>
+          <li><b>マーケティング・販促支援</b><span>集客から採用広報まで成果ベースで支援</span></li>
+          <li><b>物流・配送</b><span>EC配送・ルート配送を全国エリアで展開</span></li>
+          <li><b>製造・倉庫管理</b><span>工場内作業・軽作業・倉庫運営を受託</span></li>
+        </ul>
+      </div>
+      <div class="et-biz-col">
+        <div class="et-biz-head"><span class="et-biz-badge next">NEXT</span>これから展開していく事業</div>
+        <ul class="et-biz-list next">
+          <li><b>自社プロダクト / SaaS開発</b><span>現場の課題から生まれた仕組みを製品化</span></li>
+          <li><b>AI・DXソリューション</b><span>生成AIを活用した業務効率化・自動化支援</span></li>
+          <li><b>採用・人材プラットフォーム</b><span>求人媒体運用と採用DXをワンストップで</span></li>
+          <li><b>全国エリアの事業拡大</b><span>物流・製造拠点を主要都市へ順次拡大</span></li>
+        </ul>
+      </div>
     </div>
   </div>
 </section>
@@ -1275,14 +1307,33 @@ function topPageV2(jobs) {
   .et-typecard, .et-feature, .et-step { transition: transform .25s ease, box-shadow .25s ease; }
   .et-typecard:hover, .et-feature:hover { transform: translateY(-4px); }
   /* 企業情報 */
-  .et-company-card { max-width: 860px; margin: 0 auto; background: #fff; border: 1px solid #e6e1d6; border-radius: 16px; padding: 32px 30px; box-shadow: 0 4px 20px rgba(0,0,0,.04); }
+  .et-company-card { max-width: 920px; margin: 0 auto; background: #fff; border: 1px solid #e6e1d6; border-radius: 16px; padding: 36px 34px; box-shadow: 0 4px 20px rgba(0,0,0,.04); }
   .et-company-lead { font-size: 17px; font-weight: 700; line-height: 1.9; color: #1a1a1a; margin: 0 0 14px; }
   .et-company-lead strong { color: #e0371f; }
-  .et-company-text { font-size: 14.5px; line-height: 2; color: #555; margin: 0 0 22px; }
-  .et-company-areas { display: flex; flex-wrap: wrap; gap: 10px; }
-  .et-area { background: #f5f2ec; border: 1px solid #e6e1d6; border-radius: 999px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; color: #333; }
-  .et-area-main { background: #fff3f0; border-color: #f3c7bd; color: #c12c16; display: inline-flex; align-items: center; gap: 8px; }
-  .et-area-tag { background: #e0371f; color: #fff; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .et-company-text { font-size: 14.5px; line-height: 2; color: #555; margin: 0 0 30px; }
+  /* MVV */
+  .et-mvv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 34px; }
+  .et-mvv-item { background: #faf8f3; border: 1px solid #ece7dc; border-left: 3px solid #e0371f; border-radius: 12px; padding: 22px 20px; }
+  .et-mvv-label { font-family: Georgia, serif; font-style: italic; font-size: 17px; font-weight: 700; color: #e0371f; letter-spacing: .04em; margin-bottom: 12px; display: flex; align-items: baseline; gap: 8px; }
+  .et-mvv-label span { font-family: inherit; font-style: normal; font-size: 11px; font-weight: 700; color: #999; letter-spacing: .12em; }
+  .et-mvv-title { font-size: 15px; font-weight: 800; color: #111; line-height: 1.6; margin-bottom: 10px; }
+  .et-mvv-text { font-size: 12.5px; color: #666; line-height: 1.95; }
+  @media (max-width: 760px) { .et-mvv { grid-template-columns: 1fr; } }
+  /* 事業（メイン / これから） */
+  .et-biz { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .et-biz-col { background: #faf8f3; border: 1px solid #ece7dc; border-radius: 12px; padding: 22px 22px 8px; }
+  .et-biz-head { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; color: #111; margin-bottom: 16px; }
+  .et-biz-badge { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; padding: 3px 10px; border-radius: 999px; }
+  .et-biz-badge.main { background: #e0371f; color: #fff; }
+  .et-biz-badge.next { background: #111; color: #fff; }
+  .et-biz-list { list-style: none; margin: 0; padding: 0; }
+  .et-biz-list li { padding: 12px 0 12px 22px; border-top: 1px solid #ece7dc; position: relative; }
+  .et-biz-list li:first-child { border-top: none; }
+  .et-biz-list li::before { content: ''; position: absolute; left: 2px; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: #e0371f; }
+  .et-biz-list.next li::before { background: #111; }
+  .et-biz-list li b { display: block; font-size: 13.5px; font-weight: 800; color: #111; line-height: 1.5; }
+  .et-biz-list li span { display: block; font-size: 12px; color: #777; line-height: 1.7; margin-top: 3px; }
+  @media (max-width: 760px) { .et-biz { grid-template-columns: 1fr; } }
   @media (max-width: 640px) {
     .et-company-card { padding: 24px 18px; }
     .et-company-lead { font-size: 15.5px; }
