@@ -230,7 +230,7 @@ async function main() {
       catchcopy:      JOB.catchcopy,
       imageUrl:       '',
       faq:            JOB.faq,
-      isPublished:    false,
+      isPublished:    true,
       targetMedia:    ['自社サイト'],
       company:        'sq',
     });

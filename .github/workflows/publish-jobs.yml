@@ -1,0 +1,21 @@
+name: Publish self-site jobs
+
+# 本番(sq-saiyou)の「自社サイト掲載」求人をすべて公開(is_published=1)にする。
+# 手動実行(workflow_dispatch)。冪等なので再実行も安全。
+# ※ scripts/publish-self-site-jobs.js を含むデプロイが本番に反映済みであること。
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    name: Publish self-site jobs on sq-saiyou
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Publish all self-site jobs on production
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl ssh console -a sq-saiyou -C "node /app/scripts/publish-self-site-jobs.js"

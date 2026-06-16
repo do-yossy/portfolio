@@ -207,7 +207,7 @@ async function main() {
       catchcopy:      JOB.catchcopy,
       imageUrl:       '',
       faq:            JOB.faq,
-      isPublished:    false,                 // 未公開（プレビュー確認後に公開）
+      isPublished:    true,                 // 未公開（プレビュー確認後に公開）
       targetMedia:    ['自社サイト'],
       company:        'sq',
     });
