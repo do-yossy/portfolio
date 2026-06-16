@@ -849,10 +849,12 @@ function jobDetailPage(job) {
     "validThrough": validThrough,
     "directApply": true,
     "employmentType": mapEmploymentType(job.employment_type),
+    ...(job.job_type ? { "occupationalCategory": job.job_type } : {}),
     "hiringOrganization": {
       "@type": "Organization",
       "name": process.env.COMPANY_NAME || "採用企業",
-      ...(process.env.SITE_URL ? { "sameAs": process.env.SITE_URL } : {})
+      "url": process.env.CORPORATE_URL || "https://www.social-quality.com/",
+      "sameAs": process.env.CORPORATE_URL || "https://www.social-quality.com/"
     },
     "jobLocation": {
       "@type": "Place",
@@ -1540,10 +1542,12 @@ function jobDetailPageV2(job) {
     "validThrough": validThrough,
     "directApply": true,
     "employmentType": mapEmploymentType(job.employment_type),
+    ...(job.job_type ? { "occupationalCategory": job.job_type } : {}),
     "hiringOrganization": {
       "@type": "Organization",
       "name": process.env.COMPANY_NAME || "採用企業",
-      ...(process.env.SITE_URL ? { "sameAs": process.env.SITE_URL } : {})
+      "url": process.env.CORPORATE_URL || "https://www.social-quality.com/",
+      "sameAs": process.env.CORPORATE_URL || "https://www.social-quality.com/"
     },
     "jobLocation": {
       "@type": "Place",
