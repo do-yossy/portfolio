@@ -35,6 +35,7 @@ const TITLE_PREFIX = '製造スタッフ（八王子）';
 const JOB = {
   title: '製造スタッフ（八王子）／＜月給25万円〜32万円＞新事業オープニングメンバー募集・未経験歓迎・完全週休2日制（土日休み）★',
   location: '東京都八王子市（八王子駅徒歩圏内）',
+  locations: ["東京都八王子市","東京都日野市","東京都府中市","東京都昭島市","東京都立川市","東京都青梅市","神奈川県相模原市","神奈川県厚木市","埼玉県入間市"],
   salary: '月給250,000円〜320,000円',
   jobType: '製造・工場',
   employmentType: '正社員',
@@ -206,6 +207,7 @@ async function main() {
     job = await Jobs.update(existing.id, {
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,
@@ -219,6 +221,7 @@ async function main() {
     job = await Jobs.create({
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,

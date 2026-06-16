@@ -35,6 +35,7 @@ const TITLE_PREFIX = 'ITエンジニア（システム開発）';
 const JOB = {
   title: 'ITエンジニア（システム開発）／＜月給30万円〜50万円＞未経験・第二新卒歓迎・完全週休2日制（土日）・梅田駅すぐ★',
   location: '大阪府大阪市北区（梅田駅徒歩5分以内）',
+  locations: ["大阪府大阪市北区梅田","大阪府大阪市中央区本町","大阪府大阪市淀川区西中島","大阪府大阪市中央区難波","東京都千代田区丸の内","東京都渋谷区渋谷","東京都新宿区西新宿","東京都港区六本木"],
   salary: '月給300,000円〜500,000円',
   jobType: 'IT',
   employmentType: '正社員',
@@ -195,6 +196,7 @@ async function main() {
     job = await Jobs.update(existing.id, {
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,
@@ -208,6 +210,7 @@ async function main() {
     job = await Jobs.create({
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,
