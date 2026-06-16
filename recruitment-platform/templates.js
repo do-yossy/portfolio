@@ -111,7 +111,7 @@ ${bare ? '' : `<header class="pub-header">
     <a href="/jobs" class="pub-header-logo">採用情報</a>
     <nav class="pub-header-nav">
       <a href="/preview/jobs">求人一覧</a>
-      <a href="https://www.social-quality.com/">← コーポレートサイト</a>
+      <a href="https://www.social-quality.com/">コーポレートサイト</a>
     </nav>
   </div>
 </header>`}
@@ -1156,7 +1156,7 @@ function topPageV2(jobs) {
   <div class="et-head-in">
     <div class="et-logo">${logoHtml}</div>
     <nav class="et-nav">
-      <a href="https://www.social-quality.com/">← コーポレートサイト</a>
+      <a href="https://www.social-quality.com/">コーポレートサイト</a>
       <a href="#type">職種から探す</a>
       <a href="#area">エリアから探す</a>
       <a href="#voice">スタッフの一言</a>
