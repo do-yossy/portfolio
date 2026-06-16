@@ -1097,7 +1097,13 @@ function topPageV2(jobs) {
   .et-hi-1 { width: 230px; height: 172px; top: 0; left: 0; z-index: 3; }
   .et-hi-2 { width: 215px; height: 161px; top: 110px; left: 170px; z-index: 2; }
   .et-hi-3 { width: 222px; height: 167px; top: 210px; left: 30px; z-index: 1; }
-  @media (max-width: 760px) { .et-hero-imgs { display: none; } .et-hero-text { flex: 1; } }
+  @media (max-width: 760px) {
+    .et-hero-in { flex-direction: column; gap: 8px; }
+    .et-hero-text { flex: 1; }
+    .et-hero-imgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; height: auto; position: static; margin-top: 10px; }
+    .et-hi, .et-hi-1, .et-hi-2, .et-hi-3 { position: static; width: auto; height: auto; top: auto; left: auto; box-shadow: 0 8px 22px rgba(0,0,0,.14); }
+    .et-hi img { height: 100px; }
+  }
   .et-hero-label { color: #e0371f; font-size: 12px; font-weight: 700; letter-spacing: .22em; margin-bottom: 24px; display: flex; align-items: center; gap: 14px; }
   .et-hero-label::before { content: ''; width: 34px; height: 2px; background: #e0371f; display: block; flex-shrink: 0; }
   .et-hero h1 { font-size: 58px; font-weight: 900; color: #111; line-height: 1.28; letter-spacing: -.01em; margin: 0 0 22px; }

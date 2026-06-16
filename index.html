@@ -70,14 +70,29 @@ header.sc{background:rgba(244,242,236,.82);backdrop-filter:blur(16px);border-bot
 .menu{display:flex;gap:26px;font-size:.78rem;font-weight:600}
 .menu a{position:relative}.menu a::after{content:"";position:absolute;left:0;bottom:-3px;width:0;height:1.5px;background:var(--accent);transition:width .35s var(--ease)}.menu a:hover::after{width:100%}
 .nav .btn{padding:9px 18px;font-size:.78rem}
-@media(max-width:880px){.menu{display:none}}
+.navtoggle{display:none;background:none;border:0;width:42px;height:42px;flex-direction:column;justify-content:center;align-items:center;gap:6px;cursor:pointer;padding:0;z-index:210}
+.navtoggle span{display:block;width:24px;height:2px;background:var(--ink);border-radius:2px;transition:transform .35s var(--ease),opacity .25s}
+.navtoggle.open span:nth-child(1){transform:translateY(8px) rotate(45deg)}
+.navtoggle.open span:nth-child(2){opacity:0}
+.navtoggle.open span:nth-child(3){transform:translateY(-8px) rotate(-45deg)}
+.navpanel{display:contents}
+@media(max-width:880px){
+  .navtoggle{display:flex}
+  header.nav-open::before{content:"";position:fixed;inset:0;background:rgba(21,18,13,.42);backdrop-filter:blur(2px);z-index:204}
+  .nav .navpanel{position:fixed;top:0;right:0;z-index:205;display:flex;flex-direction:column;align-items:stretch;gap:0;width:min(82%,300px);height:100vh;height:100dvh;background:var(--paper);box-shadow:-14px 0 50px rgba(21,18,13,.2);padding:84px 26px 30px;transform:translateX(100%);transition:transform .42s var(--ease)}
+  header.nav-open .nav .navpanel{transform:translateX(0)}
+  .nav .navpanel .menu{display:flex;flex-direction:column;gap:0}
+  .nav .navpanel .menu a{font-size:1.06rem;font-weight:600;padding:16px 2px;border-bottom:1px solid var(--line)}
+  .nav .navpanel .menu a::after{display:none}
+  .nav .navpanel .btn{display:inline-flex;margin-top:24px;justify-content:center;padding:14px 22px;font-size:.92rem}
+}
 /* hero */
 .hero{position:relative;padding:104px 0 46px;overflow:hidden}
 .hero .orb{position:absolute;border-radius:50%;filter:blur(80px);z-index:0}
 .hero .o1{width:380px;height:380px;background:rgba(255,59,31,.16);top:120px;right:4%}
 .hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.35fr .65fr;gap:48px;align-items:center}
 @media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:40px}}
-@media(max-width:600px){.hero{padding:104px 0 52px}.hero .ey{margin-bottom:20px}.hero h1{margin-bottom:20px;font-size:34px}.nav .btn{display:none}.nav{padding:15px 0}.brand{font-size:1.05rem}}
+@media(max-width:600px){.hero{padding:104px 0 52px}.hero .ey{margin-bottom:20px}.hero h1{margin-bottom:20px;font-size:34px}.nav{padding:15px 0}.brand{font-size:1.05rem}}
 .hero .ey{margin-bottom:30px}
 .hero h1{font-size:58px;margin-bottom:28px;font-weight:900;letter-spacing:-.01em;line-height:1.28}
 .hero p.lead{color:var(--muted);font-size:clamp(.92rem,1.1vw,1rem);max-width:450px;margin-bottom:26px;line-height:1.7}
@@ -186,8 +201,11 @@ footer{padding:54px 0 46px;border-top:1px solid var(--line)}
 
 <header id="hd"><div class="nav">
   <div class="brand">Social<i>.</i>Quality</div>
-  <nav class="menu"><a href="#services">事業内容</a><a href="#company">会社概要</a><a href="https://saiyou.social-quality.com/preview/top">求人情報</a></nav>
-  <a href="#contact" class="btn" data-mag><span>お問い合わせ</span></a>
+  <button class="navtoggle" id="navtoggle" aria-label="メニュー" aria-expanded="false" aria-controls="navpanel"><span></span><span></span><span></span></button>
+  <div class="navpanel" id="navpanel">
+    <nav class="menu"><a href="#services">事業内容</a><a href="#company">会社概要</a><a href="https://saiyou.social-quality.com/preview/top">求人情報</a></nav>
+    <a href="#contact" class="btn" data-mag><span>お問い合わせ</span></a>
+  </div>
 </div></header>
 
 <section class="hero" id="top">
@@ -368,6 +386,15 @@ const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
 addEventListener('load',()=>D.querySelector('.hero').classList.add('lded'));
 // header + progress
 const hd=D.getElementById('hd'),prog=D.getElementById('prog');
+// mobile hamburger menu
+const navtoggle=D.getElementById('navtoggle');
+if(navtoggle){
+  const closeNav=()=>{hd.classList.remove('nav-open');navtoggle.classList.remove('open');navtoggle.setAttribute('aria-expanded','false');D.body.style.overflow='';};
+  navtoggle.addEventListener('click',e=>{e.stopPropagation();const open=hd.classList.toggle('nav-open');navtoggle.classList.toggle('open',open);navtoggle.setAttribute('aria-expanded',open);D.body.style.overflow=open?'hidden':'';});
+  D.querySelectorAll('#navpanel a').forEach(a=>a.addEventListener('click',closeNav));
+  D.addEventListener('click',e=>{if(hd.classList.contains('nav-open')&&!e.target.closest('#navpanel')&&!e.target.closest('#navtoggle'))closeNav();});
+  addEventListener('resize',()=>{if(innerWidth>880)closeNav();});
+}
 function onScroll(){const y=scrollY;hd.classList.toggle('sc',y>20);const h=D.documentElement.scrollHeight-innerHeight;prog.style.width=(h>0?y/h*100:0)+'%';}
 addEventListener('scroll',onScroll,{passive:true});onScroll();
 // reveal
