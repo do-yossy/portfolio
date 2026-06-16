@@ -34,7 +34,7 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     jobs:      (c) => `/admin/jobs?co=${c}`,
     analytics: (c) => `/admin/analytics?co=${c}`,
     logs:      (c) => `/admin/logs?co=${c}`,
-    site:      ()  => '/jobs',
+    site:      ()  => 'https://sq-saiyou.fly.dev/preview/top',
   };
   const getHref = (key, c) => pageHref[key] ? pageHref[key](c) : `/admin/ops?tab=posts&co=${c}`;
 
@@ -47,7 +47,7 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     { key: 'analytics', icon: '📈', label: '分析・レポート' },
     { key: 'logs',      icon: '📋', label: '投稿ログ' },
     { key: 'site',      icon: '🌐', label: '求人サイトを見る' },
-  ].map(n => `<a href="${getHref(n.key, co)}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
+  ].map(n => `<a href="${getHref(n.key, co)}" ${n.key === 'site' ? 'target="_blank" rel="noopener noreferrer"' : ''} class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
 
   return `<!DOCTYPE html>
 <html lang="ja">
