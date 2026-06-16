@@ -35,6 +35,7 @@ const TITLE_PREFIX = 'EC倉庫配送ドライバー';
 const JOB = {
   title: 'EC倉庫配送ドライバー／＜月収41万円以上＞未経験歓迎・車両費用完全会社負担・完全週休2日制・鴫野駅すぐ★',
   location: '大阪府大阪市城東区（鴫野駅徒歩圏内）',
+  locations: ["兵庫県尼崎市潮江","兵庫県神戸市東灘区深江北町","京都府京都市伏見区桃山筒井伊賀西町","大阪府大阪市淀川区十三東","大阪府池田市石橋","大阪府茨木市永代町","大阪府高槻市城北町","大阪府守口市大日町","大阪府大阪市城東区古市","大阪府大阪市城東区鴫野西","大阪府東大阪市川俣","大阪府八尾市龍華町","大阪府大阪市東淀川区東淡路","大阪府大阪市北区芝田","大阪府大阪市中央区難波","大阪府堺市北区中百舌鳥町","大阪府堺市堺区戎島町","大阪府堺市西区津久野町","東京都豊島区南池袋","東京都新宿区新宿","東京都千代田区有楽町","東京都墨田区横綱","東京都荒川区南千住"],
   salary: '月収410,000円以上',
   jobType: '配送ドライバー',
   employmentType: '正社員',
@@ -196,6 +197,7 @@ async function main() {
     job = await Jobs.update(existing.id, {
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,
@@ -209,6 +211,7 @@ async function main() {
     job = await Jobs.create({
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,

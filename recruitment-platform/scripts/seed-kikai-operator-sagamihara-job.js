@@ -35,6 +35,7 @@ const TITLE_PREFIX = '機械オペレーター（相模原）';
 const JOB = {
   title: '機械オペレーター（相模原）／＜月給25万円〜32万円＞新事業オープニングメンバー募集・未経験歓迎・完全週休2日制（土日休み）★',
   location: '神奈川県相模原市',
+  locations: ["神奈川県相模原市中央区南橋本","東京都町田市原町田","東京都八王子市明神町","東京都日野市大坂上","東京都昭島市田中町","東京都福生市福生","東京都立川市柴崎町","東京都府中本町","東京都武蔵野市","東京都杉並区","東京都中野区中野","東京都世田谷区松原"],
   salary: '月給250,000円〜320,000円',
   jobType: '製造・工場',
   employmentType: '正社員',
@@ -207,6 +208,7 @@ async function main() {
     job = await Jobs.update(existing.id, {
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,
@@ -220,6 +222,7 @@ async function main() {
     job = await Jobs.create({
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,
