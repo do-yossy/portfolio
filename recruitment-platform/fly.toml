@@ -11,7 +11,7 @@ primary_region = "nrt"   # Tokyo
 [env]
   PORT       = "3000"
   NODE_OPTIONS = "--experimental-sqlite"
-  SITE_URL   = "https://sq-saiyou.fly.dev"
+  SITE_URL   = "https://saiyou.social-quality.com"
   COMPANY_NAME = "株式会社Social Quality"
   SITE_NAME  = "採用サイト"
 
