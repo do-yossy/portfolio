@@ -23,3 +23,9 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
+
+      # 自社サイト掲載の求人をすべて公開状態に保つ（冪等。未公開のものだけ公開化）
+      - name: Publish self-site jobs
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl ssh console -a sq-saiyou -C "node /app/scripts/publish-self-site-jobs.js"
