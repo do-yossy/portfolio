@@ -168,6 +168,16 @@ section{padding:clamp(80px,10vw,140px) 0;position:relative}
 footer{padding:54px 0 46px;border-top:1px solid var(--line)}
 .foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;align-items:center;color:var(--muted);font-size:.83rem}
 .foot .brand{color:var(--ink)}
+/* business tags */
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.tags span{font-size:.72rem;font-weight:600;color:var(--ink);background:#efece4;padding:5px 12px;border-radius:20px}
+/* mvv */
+.mvv{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:46px}
+@media(max-width:760px){.mvv{grid-template-columns:1fr}}
+.mvv .m{background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:14px;padding:26px 24px}
+.mvv .k{font-family:'Syne';font-weight:800;color:var(--accent);font-size:.86rem;letter-spacing:.12em}
+.mvv .t{font-size:1.05rem;font-weight:700;margin:10px 0 9px;line-height:1.5}
+.mvv .d{font-size:.82rem;color:var(--muted);line-height:1.9}
 </style>
 </head>
 <body>
@@ -240,12 +250,12 @@ footer{padding:54px 0 46px;border-top:1px solid var(--line)}
 </div></div></section>
 
 <section id="services"><div class="wrap">
-  <div class="shead"><div class="ey" data-rv>Services</div><h2 class="disp" data-rv>提供サービス</h2></div>
+  <div class="shead"><div class="ey" data-rv>Business</div><h2 class="disp" data-rv>事業内容</h2><p data-rv>Web制作を起点に、システム・アプリ・AI開発、マーケティング、そして物流・製造まで。各事業の中に、具体的な提供サービスがあります。</p></div>
   <div class="svc">
-    <div class="sc" data-rv><div class="no">01</div><h3>Webサイト／LP制作</h3><p>構成・コピー・コーディングまで一括。問い合わせにつながる成果重視のサイト。</p><div class="pr">¥50,000<small>〜</small></div></div>
-    <div class="sc" data-rv><div class="no">02</div><h3>業務システム・Webツール開発</h3><p>予約・在庫・管理画面など、業務を効率化するWebシステムを開発します。</p><div class="pr">¥100,000<small>〜</small></div></div>
-    <div class="sc" data-rv><div class="no">03</div><h3>コンテンツ運用（月額）</h3><p>SEO記事・SNS投稿を毎月代行。集客基盤を継続的に育てます。</p><div class="pr">¥30,000<small>〜／月</small></div></div>
-    <div class="sc" data-rv><div class="no">04</div><h3>スマホアプリ開発</h3><p>iOS・Android対応のアプリを、企画から開発・公開まで対応します。</p><div class="pr">¥150,000<small>〜</small></div></div>
+    <div class="sc" data-rv><div class="no">01</div><h3>Web・デジタル制作</h3><p>問い合わせ・売上につながる成果重視のサイトを、企画・コピー・デザイン・コーディングまで一括で制作します。</p><div class="tags"><span>LP制作</span><span>コーポレートサイト</span><span>ECサイト</span><span>Webデザイン</span></div></div>
+    <div class="sc" data-rv><div class="no">02</div><h3>システム・アプリ・AI開発</h3><p>予約・在庫・管理画面などの業務システムから、Web／スマホアプリ、生成AIを使った業務効率化まで開発します。</p><div class="tags"><span>業務システム</span><span>Webアプリ</span><span>スマホアプリ</span><span>AI・DX</span></div></div>
+    <div class="sc" data-rv><div class="no">03</div><h3>マーケティング・運用支援</h3><p>SEO記事・SNS運用・採用広報まで。集客の基盤を継続的に育て、成果につなげます。</p><div class="tags"><span>SEO・コンテンツ運用</span><span>SNS運用</span><span>採用広報</span><span>集客支援</span></div></div>
+    <div class="sc" data-rv><div class="no">04</div><h3>物流・配送・製造 <span style="font-size:.6rem;color:var(--accent);font-weight:700;vertical-align:middle;letter-spacing:.08em">拡大領域</span></h3><p>自社の実行力で、ものづくりと物流まで。配送・倉庫・製造の現場を担い、全国エリアへ広げています。</p><div class="tags"><span>配送・ドライバー</span><span>倉庫・軽作業</span><span>製造・工場</span></div></div>
   </div>
 </div></section>
 
@@ -315,14 +325,18 @@ footer{padding:54px 0 46px;border-top:1px solid var(--line)}
 </div></section>
 
 <section id="company"><div class="wrap">
-  <div class="shead"><div class="ey" data-rv>Company</div><h2 class="disp" data-rv>会社概要</h2></div>
+  <div class="shead"><div class="ey" data-rv>Company</div><h2 class="disp" data-rv>会社概要</h2><p data-rv>私たちの使命・目指す姿・価値観（MVV）と、会社の基本情報です。</p></div>
+  <div class="mvv" data-rv>
+    <div class="m"><div class="k">MISSION</div><div class="t">つくる力で、人と企業の可能性を解き放つ。</div><div class="d">Web・アプリ・AIの開発力を軸に、人と企業の「できる」を増やす。テクノロジーと創造力で、まだ無い価値を生み出します。</div></div>
+    <div class="m"><div class="k">VISION</div><div class="t">確かな価値を提供できる企業へ。</div><div class="d">デジタルの力で誰もが自分らしく活躍できる場をつくり、お客様・仲間・社会に、確かな価値を届け続けます。</div></div>
+    <div class="m"><div class="k">VALUE</div><div class="t">挑戦を楽しむ・本質にこだわる・仲間を信じる。</div><div class="d">前例がなくてもまず挑む。流行ではなく本質的な価値にこだわり、立場を越えて仲間を信じ、チームで成果をつくります。</div></div>
+  </div>
   <table class="info" data-rv>
     <tr><th>会社名</th><td>株式会社Social Quality</td></tr>
     <tr><th>代表者</th><td>安藤 嘉啓</td></tr>
     <tr><th>所在地</th><td>大阪府大阪市浪速区大国2丁目5-11-9F</td></tr>
     <tr><th>設立</th><td>2021年7月</td></tr>
-    <tr><th>事業内容</th><td>Web制作・LP制作／業務システム開発／コンテンツ制作・運用</td></tr>
-    <tr><th>法人番号</th><td>2120001239111</td></tr>
+    <tr><th>事業内容</th><td>Web・LP制作／システム・アプリ・AI開発／マーケティング・運用支援／物流・配送・製造</td></tr>
     <tr><th>お問い合わせ</th><td><a href="お問い合わせ.html" style="color:var(--accent);font-weight:700">お問い合わせフォーム</a>よりご連絡ください</td></tr>
   </table>
 </div></section>
