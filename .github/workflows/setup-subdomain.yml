@@ -1,0 +1,29 @@
+name: Setup subdomain cert (saiyou.social-quality.com)
+
+# 採用サイト(sq-saiyou)に独自サブドメイン saiyou.social-quality.com の
+# Let's Encrypt 証明書を要求し、必要なDNSレコードを表示する。
+# 手動実行(workflow_dispatch)。DNS(Cloudflare)側のCNAME追加後、Flyが自動で発行する。
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  cert:
+    name: Add cert + show required DNS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Add certificate and show DNS instructions
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          echo "===== certs add ====="
+          flyctl certs add saiyou.social-quality.com -a sq-saiyou || true
+          echo ""
+          echo "===== certs show (required DNS records) ====="
+          flyctl certs show saiyou.social-quality.com -a sq-saiyou || true
+          echo ""
+          echo "===== ips list (for reference) ====="
+          flyctl ips list -a sq-saiyou || true
