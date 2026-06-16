@@ -1221,14 +1221,7 @@ function topPageV2(jobs) {
   <h2 class="et-h2">エリアから探す</h2>
   <div class="et-h2sub">Search by area</div>
   <div class="et-areachips">
-    <a href="/preview/jobs?q=${encodeURIComponent('東京都')}" class="et-areachip">東京都</a>
-    <a href="/preview/jobs?q=${encodeURIComponent('神奈川県')}" class="et-areachip">神奈川県</a>
-    <a href="/preview/jobs?q=${encodeURIComponent('埼玉県')}" class="et-areachip">埼玉県</a>
-    <a href="/preview/jobs?q=${encodeURIComponent('千葉県')}" class="et-areachip">千葉県</a>
-    <a href="/preview/jobs?q=${encodeURIComponent('大阪府')}" class="et-areachip">大阪府</a>
-    <a href="/preview/jobs?q=${encodeURIComponent('兵庫県')}" class="et-areachip">兵庫県</a>
-    <a href="/preview/jobs?q=${encodeURIComponent('京都府')}" class="et-areachip">京都府</a>
-    <a href="/preview/jobs?q=${encodeURIComponent('和歌山県')}" class="et-areachip">和歌山県</a>
+    ${PREFS.filter(p => prefCounts[p]).map(p => `<a href="/preview/jobs?q=${encodeURIComponent(p)}" class="et-areachip">${esc(p)}</a>`).join('\n    ')}
   </div>
 </section>
 <section class="et-sec" id="voice">
