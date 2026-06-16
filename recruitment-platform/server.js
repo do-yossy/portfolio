@@ -947,7 +947,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── Preview: 採用トップページ（イーストアジア風） ──
   if (pathname === '/preview/top' && method === 'GET') {
-    const jobs = (await Jobs.findAll()).filter(j => j.is_published);
+    const jobs = (await Jobs.findAll()).filter(j => (j.target_media || '').includes('自社サイト'));
     send(res, 200, T.topPageV2(jobs));
     return;
   }
