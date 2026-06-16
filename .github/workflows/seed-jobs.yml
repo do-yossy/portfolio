@@ -1,0 +1,40 @@
+name: Seed production jobs (self-site)
+
+# 本番(sq-saiyou)の採用サイト用「自社サイト掲載」求人を、シードスクリプトで投入する。
+# 手動実行(workflow_dispatch)。シードは冪等（同タイトルは更新、無ければ作成）なので再実行も安全。
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  seed:
+    name: Seed self-site jobs into sq-saiyou
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Run self-site seed scripts on production
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          SEEDS="cosme-factory-job dm-director-job ec-warehouse-driver-shigino-job factory-fuchu-job factory-hachioji-job factory-hino-job graphic-designer-job it-engineer-umeda-job kikai-operator-sagamihara-job loke-driver-job night-driver-job takuhai-driver-job welfare-driver-nakamozu-job"
+          fail=0
+          ok=0
+          for s in $SEEDS; do
+            echo "::group::seed-$s"
+            if flyctl ssh console -a sq-saiyou -C "node /app/scripts/seed-$s.js"; then
+              echo "OK: seed-$s"
+              ok=$((ok+1))
+            else
+              echo "WARN: seed-$s failed"
+              fail=$((fail+1))
+            fi
+            echo "::endgroup::"
+          done
+          echo "----------------------------------------"
+          echo "Seed complete. success=$ok fail=$fail (of 13)"
+          if [ "$ok" -eq 0 ]; then
+            echo "All seeds failed." >&2
+            exit 1
+          fi
