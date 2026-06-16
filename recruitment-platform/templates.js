@@ -103,6 +103,8 @@ ${description ? `<meta name="description" content="${esc(description)}">` : ''}
 <meta property="og:url" content="${canonicalUrl}">
 ${description ? `<meta property="og:description" content="${esc(description)}">` : ''}
 ${jsonld}
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css?v=${process.env.ASSET_VERSION || '1'}">
 <style>
   /* カーソル追従の丸い円（コーポレートサイトと同じ演出） */
@@ -1068,7 +1070,7 @@ function topPageV2(jobs) {
   body.pub-body { background: #f4f1ea; font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; }
   .et-head { background: rgba(244,241,234,.95); backdrop-filter: blur(6px); border-bottom: 1px solid #e4dfd4; position: sticky; top: 0; z-index: 50; }
   .et-head-in { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 20px; flex-wrap: nowrap; }
-  .et-logo { font-size: 20px; font-weight: 900; color: #111; letter-spacing: -.01em; padding: 14px 0; margin-right: auto; white-space: nowrap; flex: 0 0 auto; }
+  .et-logo { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: #111; letter-spacing: -.01em; padding: 14px 0; margin-right: auto; white-space: nowrap; flex: 0 0 auto; }
   .et-logo-dot { color: #e0371f; }
   .et-nav { display: flex; flex-wrap: nowrap; align-items: center; overflow-x: auto; min-width: 0; scrollbar-width: none; }
   .et-nav::-webkit-scrollbar { display: none; }
