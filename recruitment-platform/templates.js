@@ -1055,6 +1055,14 @@ function topPageV2(jobs) {
   .et-nav a:hover { color: #e0371f; }
   .et-nav a.et-pill { background: #111; color: #fff; border-radius: 999px; padding: 9px 16px; margin-left: 8px; flex: 0 0 auto; }
   .et-nav a.et-pill:hover { background: #e0371f; color: #fff; }
+  /* モバイル: 区画リンクは隠し、ロゴ＋コーポレートサイト＋応募ボタンに整理（応募CTAを常に表示） */
+  @media (max-width: 760px) {
+    .et-nav a[href^="#"] { display: none; }
+    .et-logo { font-size: 17px; }
+    .et-head-in { gap: 4px; padding: 0 14px; }
+    .et-nav a { padding: 12px 6px; font-size: 12px; }
+    .et-nav a.et-pill { padding: 8px 14px; margin-left: 4px; }
+  }
   /* ヒーロー */
   .et-hero { position: relative; background: #f4f1ea; overflow: hidden; padding: 80px 20px 64px; }
   .et-hero::before { content: ''; position: absolute; top: -160px; right: -100px; width: 520px; height: 520px; background: radial-gradient(circle, rgba(236,118,88,.38), rgba(244,241,234,0) 64%); pointer-events: none; }
