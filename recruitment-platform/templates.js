@@ -104,8 +104,15 @@ ${description ? `<meta name="description" content="${esc(description)}">` : ''}
 ${description ? `<meta property="og:description" content="${esc(description)}">` : ''}
 ${jsonld}
 <link rel="stylesheet" href="/styles.css?v=${process.env.ASSET_VERSION || '1'}">
+<style>
+  /* カーソル追従の丸い円（コーポレートサイトと同じ演出） */
+  .cur{position:fixed;top:0;left:0;width:34px;height:34px;border:1.5px solid #111;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:9998;transition:width .3s cubic-bezier(.19,1,.22,1),height .3s cubic-bezier(.19,1,.22,1),background .3s,border-color .3s;mix-blend-mode:difference}
+  .cur.big{width:78px;height:78px;background:#fff;border-color:#fff}
+  @media(hover:none){.cur{display:none}}
+</style>
 </head>
 <body class="pub-body">
+<div class="cur" id="cur"></div>
 ${bare ? '' : `<header class="pub-header">
   <div class="pub-header-inner">
     <a href="/jobs" class="pub-header-logo">採用情報</a>
@@ -126,6 +133,20 @@ ${bare ? '' : `<footer class="pub-footer">
 </footer>`}
 <div id="toast-container"></div>
 <script src="/admin.js?v=${process.env.ASSET_VERSION || '1'}"></script>
+<script>
+(function(){
+  // カーソル追従の丸い円（PC・モーション許可時のみ）
+  if(!matchMedia('(hover:hover)').matches||matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  var cur=document.getElementById('cur');if(!cur)return;
+  var cx=innerWidth/2,cy=innerHeight/2,tx=cx,ty=cy;
+  addEventListener('mousemove',function(e){tx=e.clientX;ty=e.clientY},{passive:true});
+  (function loop(){cx+=(tx-cx)*.18;cy+=(ty-cy)*.18;cur.style.left=cx+'px';cur.style.top=cy+'px';requestAnimationFrame(loop)})();
+  document.querySelectorAll('a,button').forEach(function(el){
+    el.addEventListener('mouseenter',function(){cur.classList.add('big')});
+    el.addEventListener('mouseleave',function(){cur.classList.remove('big')});
+  });
+})();
+</script>
 </body>
 </html>`;
 }
