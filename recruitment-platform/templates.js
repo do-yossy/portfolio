@@ -1046,13 +1046,14 @@ function topPageV2(jobs) {
   /* Social Quality HP準拠: クリーム背景・黒・赤アクセント・書体=Noto Sans JP */
   body.pub-body { background: #f4f1ea; font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; }
   .et-head { background: rgba(244,241,234,.95); backdrop-filter: blur(6px); border-bottom: 1px solid #e4dfd4; position: sticky; top: 0; z-index: 50; }
-  .et-head-in { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 20px; flex-wrap: wrap; }
-  .et-logo { font-size: 22px; font-weight: 900; color: #111; letter-spacing: -.01em; padding: 14px 0; margin-right: auto; white-space: nowrap; }
+  .et-head-in { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 20px; flex-wrap: nowrap; }
+  .et-logo { font-size: 20px; font-weight: 900; color: #111; letter-spacing: -.01em; padding: 14px 0; margin-right: auto; white-space: nowrap; flex: 0 0 auto; }
   .et-logo-dot { color: #e0371f; }
-  .et-nav { display: flex; flex-wrap: wrap; align-items: center; }
-  .et-nav a { font-size: 13px; font-weight: 600; color: #111; text-decoration: none; padding: 14px 12px; }
+  .et-nav { display: flex; flex-wrap: nowrap; align-items: center; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+  .et-nav::-webkit-scrollbar { display: none; }
+  .et-nav a { font-size: 12.5px; font-weight: 600; color: #111; text-decoration: none; padding: 14px 8px; white-space: nowrap; flex: 0 0 auto; }
   .et-nav a:hover { color: #e0371f; }
-  .et-nav a.et-pill { background: #111; color: #fff; border-radius: 999px; padding: 9px 24px; margin-left: 10px; }
+  .et-nav a.et-pill { background: #111; color: #fff; border-radius: 999px; padding: 9px 16px; margin-left: 8px; flex: 0 0 auto; }
   .et-nav a.et-pill:hover { background: #e0371f; color: #fff; }
   /* ヒーロー */
   .et-hero { position: relative; background: #f4f1ea; overflow: hidden; padding: 80px 20px 64px; }
