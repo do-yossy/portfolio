@@ -120,7 +120,7 @@ ${bare ? '' : `<header class="pub-header">
     <a href="/jobs" class="pub-header-logo">採用情報</a>
     <nav class="pub-header-nav">
       <a href="/preview/jobs">求人一覧</a>
-      <a href="https://www.social-quality.com/">コーポレートサイト</a>
+      <a href="https://www.social-quality.com/">トップページ</a>
     </nav>
   </div>
 </header>`}
@@ -1188,11 +1188,7 @@ function topPageV2(jobs) {
   <div class="et-head-in">
     <div class="et-logo">${logoHtml}</div>
     <nav class="et-nav">
-      <a href="https://www.social-quality.com/">コーポレートサイト</a>
-      <a href="#type">職種から探す</a>
-      <a href="#area">エリアから探す</a>
-      <a href="#voice">スタッフの一言</a>
-      <a href="#about">会社の特徴</a>
+      <a href="https://www.social-quality.com/">トップページ</a>
       <a href="#company">企業情報</a>
       <a href="#faq">よくある質問</a>
       <a class="et-pill" href="/preview/jobs">応募はこちら</a>
@@ -1257,7 +1253,7 @@ function topPageV2(jobs) {
   </div>
 </section>
 <section class="et-sec" id="voice">
-  <h2 class="et-h2">働く人の声</h2>
+  <h2 class="et-h2">スタッフの一言</h2>
   <div class="et-h2sub">Staff Voice</div>
   <div class="et-voices">${voices}</div>
 </section>
@@ -1293,21 +1289,16 @@ function topPageV2(jobs) {
 
     <div class="et-biz">
       <div class="et-biz-col">
-        <div class="et-biz-head"><span class="et-biz-badge main">MAIN</span>メイン事業</div>
+        <div class="et-biz-head"><span class="et-biz-badge main">BUSINESS</span>事業内容</div>
         <ul class="et-biz-list">
           <li><b>Web制作・システム / アプリ / AI開発</b><span>企画・設計から開発・運用まで自社一貫</span></li>
           <li><b>マーケティング・販促支援</b><span>集客から採用広報まで成果ベースで支援</span></li>
           <li><b>自社プロダクト / SaaS開発</b><span>現場の課題から生まれた仕組みを製品化</span></li>
           <li><b>AI・DXソリューション</b><span>生成AIを活用した業務効率化・自動化支援</span></li>
-        </ul>
-      </div>
-      <div class="et-biz-col">
-        <div class="et-biz-head"><span class="et-biz-badge next">NEXT</span>これから展開していく事業</div>
-        <ul class="et-biz-list next">
           <li><b>物流・配送</b><span>EC配送・ルート配送を全国エリアで展開</span></li>
           <li><b>製造・倉庫管理</b><span>工場内作業・軽作業・倉庫運営を受託</span></li>
-          <li><b>EC・物流プラットフォーム</b><span>自社配送網を活かした通販・物流サービスの展開</span></li>
-          <li><b>全国エリアの事業拡大</b><span>物流・製造拠点を主要都市へ順次拡大</span></li>
+          <li><b>EC・物流プラットフォーム</b><span>自社配送網を活かした通販・物流サービスを展開</span></li>
+          <li><b>全国エリア展開</b><span>物流・製造拠点を主要都市に広げ全国に対応</span></li>
         </ul>
       </div>
     </div>
@@ -1369,20 +1360,20 @@ function topPageV2(jobs) {
   .et-mvv-text { font-size: 12.5px; color: #666; line-height: 1.95; }
   @media (max-width: 760px) { .et-mvv { grid-template-columns: 1fr; } }
   /* 事業（メイン / これから） */
-  .et-biz { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .et-biz-col { background: #faf8f3; border: 1px solid #ece7dc; border-radius: 12px; padding: 22px 22px 8px; }
+  .et-biz { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .et-biz-col { background: #faf8f3; border: 1px solid #ece7dc; border-radius: 12px; padding: 22px 24px 10px; }
   .et-biz-head { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; color: #111; margin-bottom: 16px; }
   .et-biz-badge { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; padding: 3px 10px; border-radius: 999px; }
   .et-biz-badge.main { background: #e0371f; color: #fff; }
   .et-biz-badge.next { background: #111; color: #fff; }
-  .et-biz-list { list-style: none; margin: 0; padding: 0; }
+  .et-biz-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; column-gap: 30px; }
   .et-biz-list li { padding: 12px 0 12px 22px; border-top: 1px solid #ece7dc; position: relative; }
-  .et-biz-list li:first-child { border-top: none; }
+  .et-biz-list li:first-child, .et-biz-list li:nth-child(2) { border-top: none; }
   .et-biz-list li::before { content: ''; position: absolute; left: 2px; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: #e0371f; }
   .et-biz-list.next li::before { background: #111; }
   .et-biz-list li b { display: block; font-size: 13.5px; font-weight: 800; color: #111; line-height: 1.5; }
   .et-biz-list li span { display: block; font-size: 12px; color: #777; line-height: 1.7; margin-top: 3px; }
-  @media (max-width: 760px) { .et-biz { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .et-biz-list { grid-template-columns: 1fr; } .et-biz-list li:nth-child(2) { border-top: 1px solid #ece7dc; } }
   @media (max-width: 640px) {
     .et-company-card { padding: 24px 18px; }
     .et-company-lead { font-size: 15.5px; }
