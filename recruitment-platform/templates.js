@@ -1718,6 +1718,13 @@ function jobDetailPageV2(job) {
         <label>住所</label>
         <input type="text" name="address" placeholder="東京都新宿区...">
       </div>
+      ${jobLocs.length ? `<div class="form-group">
+        <label>希望勤務地<span class="req">*</span></label>
+        <select name="workLocation" required style="width:100%;padding:11px 12px;border:1px solid #d8d2c4;border-radius:8px;background:#fff;font-size:14px;font-family:inherit;color:#111;box-sizing:border-box">
+          <option value="">選択してください</option>
+          ${jobLocs.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('')}
+        </select>
+      </div>` : ''}
       <div class="form-group">
         <label>メッセージ（任意）</label>
         <textarea name="notes" rows="3" placeholder="志望動機・質問等があればご記入ください"></textarea>

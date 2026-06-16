@@ -35,6 +35,7 @@ const TITLE_PREFIX = 'グラフィックデザイナー';
 const JOB = {
   title: 'グラフィックデザイナー（AD兼務）／＜月給30万円〜37万円＞完全週休2日制（土日）・年間休日120日以上・転勤なし★',
   location: '東京都新宿区',
+  locations: ["東京都昭島市田中町","東京都立川市柴崎町","東京都府中本町","東京都武蔵野市","東京都杉並区","東京都中野区中野","東京都世田谷区松原","東京都目黒区上目黒","東京都渋谷区","東京都新宿区","東京都豊島区南池袋","東京都千代田区飯田橋","東京都北区","東京都板橋区成増"],
   salary: '月給300,000円〜370,000円',
   jobType: 'IT',
   employmentType: '正社員',
@@ -201,6 +202,7 @@ async function main() {
     job = await Jobs.update(existing.id, {
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,
@@ -214,6 +216,7 @@ async function main() {
     job = await Jobs.create({
       title:          JOB.title,
       location:       JOB.location,
+      locations: JOB.locations,
       salary:         JOB.salary,
       jobType:        JOB.jobType,
       employmentType: JOB.employmentType,
