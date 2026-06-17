@@ -123,6 +123,7 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     }
     // listをid→レコードのMapに変換（直近重複の最終対応日参照用）
     const listById = new Map(list.map(a => [a.id, a]));
+    const listIdSet = new Set(list.map(a => a.id));
 
     const buildDupInfo = (a) => {
       const parts = [];
@@ -144,17 +145,19 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         parts.push(`直近重複 ${otherIds.length + 1}件${datePart}`);
       }
 
-      // ② 過去応募: アーカイブ済みレコードが存在する
+      // ② 過去応募: 今回プッシュ対象以外のレコード（アーカイブ済み・他社・他月）に同一電話/メールが存在する
+      // ※ is_archived=1 限定では、STATUSの変換等でアクティブに戻ったレコードを取り逃がすため全件対象にする
       let pastRow = null;
       if (a.normalized_phone) {
-        pastRow = db.prepare(`SELECT status, last_called_at, applied_at, updated_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_phone);
+        const rows = db.prepare(`SELECT id, status, last_called_at, applied_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' ORDER BY coalesce(last_called_at, applied_at) DESC LIMIT 20`).all(a.normalized_phone);
+        for (const r of rows) { if (!listIdSet.has(r.id)) { pastRow = r; break; } }
       }
       if (!pastRow && a.normalized_email) {
-        pastRow = db.prepare(`SELECT status, last_called_at, applied_at, updated_at FROM applicants WHERE normalized_email=? AND normalized_email!='' AND is_archived=1 ORDER BY updated_at DESC LIMIT 1`).get(a.normalized_email);
+        const rows = db.prepare(`SELECT id, status, last_called_at, applied_at FROM applicants WHERE normalized_email=? AND normalized_email!='' ORDER BY coalesce(last_called_at, applied_at) DESC LIMIT 20`).all(a.normalized_email);
+        for (const r of rows) { if (!listIdSet.has(r.id)) { pastRow = r; break; } }
       }
       if (pastRow) {
         // 実際に対応した日(last_called_at)を優先。無ければ過去の応募日(applied_at)。
-        // updated_at はアーカイブ等のDB更新で本日に書き換わるため使わない。
         const date = (pastRow.last_called_at || pastRow.applied_at || '').slice(0, 10);
         parts.push(`過去応募 最終対応:${date} (${pastRow.status})`);
       }
@@ -277,7 +280,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
 // スプレッドシート → DB（IDで突合し対応状況・架電回数・メモ・ふりがなを更新。IDなし行は新規作成）
 async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
   const STATUS_MIGRATE = {
-    '架電済(不通)': '不通', '対応終了': '終了', '断られた': '終了', '辞退': '終了', '重複': '新規',
+    '架電済(不通)': '不通', '対応終了': '終了', '断られた': '終了', '辞退': '終了',
+    // '重複'は除外: システムが設定する値のため pullで上書きしない（'新規'に変換されて誤アーカイブ解除が起きるのを防ぐ）
   };
   const { COMPANIES, MEDIA, db } = require('../db');
   // media名→IDマッピング（"Indeed"→"indeed", "求人ボックス"→"kyujinbox" 等）
@@ -383,13 +387,15 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       if (!existing) { notFound++; continue; }
       const ccRaw = row[pc.callCount];
       const newStatus = row[pc.status];
-      const normalizedStatus = STATUS_MIGRATE[newStatus] || newStatus;
+      // '重複'はシステム設定値のため、シートから取り込む際もステータス更新しない（誤アーカイブ解除を防ぐ）
+      const isSystemStatus = newStatus === '重複';
+      const normalizedStatus = isSystemStatus ? undefined : (STATUS_MIGRATE[newStatus] || newStatus || undefined);
       await Ops.updateCall(id, {
         callCount: (ccRaw !== undefined && ccRaw !== '') ? (parseInt(ccRaw) || 0) : undefined,
-        status: normalizedStatus || undefined,
+        status: normalizedStatus,
         // 空セルではDBのメモを消さない（手入力メモを保持）。値がある時だけ更新。
         notes: (row[pc.notes] !== undefined && String(row[pc.notes]).trim() !== '') ? row[pc.notes] : undefined,
-        skipAutoArchive: false,
+        skipAutoArchive: isSystemStatus, // '重複'の場合はアーカイブ状態を変更しない
       });
       // ふりがなをDBに同期
       if (pc.furigana >= 0) {
