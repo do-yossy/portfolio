@@ -1,71 +1,248 @@
-<!DOCTYPE html><html><head><meta charset='utf-8'><style>
-    body { font-family: 'Hiragino Sans', 'Yu Gothic', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.8; color: #333; }
-    h1 { color: #1a1a2e; border-bottom: 3px solid #e94560; padding-bottom: 10px; }
-    h2 { color: #16213e; border-left: 4px solid #e94560; padding-left: 12px; margin-top: 40px; }
-    h3 { color: #0f3460; }
-    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background: #1a1a2e; color: white; }
-    tr:nth-child(even) { background: #f5f5f5; }
-    code, pre { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
-    pre { padding: 16px; overflow-x: auto; }
-    strong { color: #e94560; }
-    li { margin: 6px 0; }
-    .price { font-size: 24px; font-weight: bold; color: #e94560; }
-  </style></head><body><h1></h1></p><p><strong></strong>
-<strong></strong>
-<strong></strong></p><p>---</p><p><h2></h2></p><p><li></li>
-<li></li>
-<li></li>
-<li></li></p><p><strong></strong></p><p>---</p><p><h2></h2></p><p>2026年、AIの使い方は「チャットでコードを生成する」段階から、「AIエージェントが自律的に業務を実行する」段階へと移りました。</p><p>その中心にいるのが <strong></strong> です。</p><p>これまで「システム開発」は、エンジニアだけの世界でした。
-しかし今、<strong></strong>になりました。</p><p>この教材は、その最前線を、実際にゼロから作った記録とともにお渡しします。</p><p>---</p><p><h2></h2></p><p><li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li></p><p>---</p><p><h2></h2></p><p><h3></h3></p><p><li></li>
-<li></li>
-<li></li></p><p>たったこれだけです。</p><p><h3></h3></p><p><li></li>
-<li></li>
-<li></li></p><p>各ツールのインストール手順を、画面のどこをクリックするかまで、画像付きで解説します。</p><p>（※実際の販売版では各ステップにスクリーンショットを添付）</p><p>---</p><p><h2></h2></p><p>Claude Codeを使いこなす鍵は、<strong></strong>です。</p><p><h3></h3></p><p>❌ 悪い例：「管理システム作って」
-→ 何の管理か、何を管理するか不明で、的外れなものができる</p><p>⭕ 良い例：「顧客の名前・電話番号・メールアドレス・対応状況を登録して、一覧で見られて、CSVで出力できる顧客管理システムを作って」
-→ 必要な要素が明確で、一発で意図通りになる</p><p><h3></h3></p><p>```
-【何を】〇〇を管理するシステム
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02_中単価_完全手順マニュアル</title>
+<style>
+  @page { margin: 18mm 20mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    line-height: 1.85;
+    color: #1a1a1a;
+    font-size: 11pt;
+    background: #fff;
+  }
+  h1 {
+    color: #fff;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    padding: 20px 24px;
+    border-radius: 10px;
+    font-size: 18pt;
+    margin: 0 -8px 32px;
+    page-break-before: always;
+    line-height: 1.4;
+  }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 {
+    color: #1e293b;
+    font-size: 14pt;
+    border-left: 5px solid #6366f1;
+    padding-left: 14px;
+    margin: 36px 0 16px;
+  }
+  h3 {
+    color: #334155;
+    font-size: 12pt;
+    margin: 24px 0 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  h4 {
+    color: #475569;
+    font-size: 11pt;
+    margin: 16px 0 8px;
+  }
+  p { margin: 10px 0; }
+  strong { color: #1e293b; }
+  blockquote {
+    background: #f0f4ff;
+    border-left: 4px solid #6366f1;
+    margin: 16px 0;
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 10.5pt;
+    color: #334155;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-size: 9.5pt;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 14px 0;
+    line-height: 1.6;
+  }
+  code {
+    background: #e8edf4;
+    color: #3730a3;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9.5pt;
+    font-family: 'Consolas', 'Monaco', monospace;
+  }
+  pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+    font-size: 10pt;
+  }
+  th {
+    background: #1e293b;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 9px 12px;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  ul, ol { padding-left: 24px; margin: 10px 0; }
+  li { margin: 5px 0; }
+  hr {
+    border: none;
+    border-top: 2px solid #e2e8f0;
+    margin: 32px 0;
+  }
+  .badge {
+    display: inline-block;
+    background: #6366f1;
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 9pt;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+  @media print {
+    body { padding: 0; font-size: 10.5pt; }
+    h1 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    pre { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="badge">メインコンテンツ｜29,800円</div>
+<h1>ゼロからClaude Codeで業務自動化システムを作って、ネット公開するまでの完全手順</h1>
+<p><strong>販売価格：29,800円</strong><br><strong>販売先：Brain / Tips</strong><br><strong>想定文字数：完全版・実コード付き</strong></p>
+<hr>
+<h2>この教材で得られること</h2>
+<ul><li>プログラミング未経験から、実際に動く業務システムを作れるようになる</li><li>作ったシステムを、自分のPCがなくても24時間動かせるようにする（ネット公開）</li><li>月額1,000円以下で本格的なWebサービスを運用する方法</li><li>作ったシステムを「受託開発」「システム販売」で収益化する方法</li></ul>
+<strong>読むだけの教材ではありません。手を動かせば、最後には本当に動くシステムが手元に残ります。</strong>
+<hr>
+<h2>はじめに：なぜ今、この教材なのか</h2>
+<p>2026年、AIの使い方は「チャットでコードを生成する」段階から、「AIエージェントが自律的に業務を実行する」段階へと移りました。</p>
+<p>その中心にいるのが <strong>Claude Code</strong> です。</p>
+<p>これまで「システム開発」は、エンジニアだけの世界でした。<br>しかし今、<strong>日本語で指示するだけで、未経験者が業務システムを丸ごと作れる時代</strong>になりました。</p>
+<p>この教材は、その最前線を、実際にゼロから作った記録とともにお渡しします。</p>
+<hr>
+<h2>目次</h2>
+<ol><li>環境構築：何も入っていないPCから始める</li><li>Claude Codeの基本：日本語で指示する技術</li><li>業務システムの設計：何を作るかを決める</li><li>データベースの準備：SQLiteで簡単に始める</li><li>実際にシステムを作る：ステップバイステップ</li><li>つまずきポイントと全解決法</li><li>ネット公開：Fly.ioで24時間動かす</li><li>独自ドメインの設定</li><li>収益化：受託・販売・月額サービス</li><li>トラブルシューティング完全版</li></ol>
+<hr>
+<h2>第1章：環境構築──何も入っていないPCから始める</h2>
+<h3>必要なもの</h3>
+<ul><li>パソコン（Windows / Mac どちらでもOK）</li><li>Claude Proプラン（月額約3,000円）</li><li>インターネット環境</li></ul>
+たったこれだけです。
+<h3>インストールするもの</h3>
+<ol><li><strong>Node.js</strong> — システムを動かす土台</li><li><strong>Git</strong> — コードを管理する道具</li><li><strong>Claude Code</strong> — 本体</li></ol>
+各ツールのインストール手順を、画面のどこをクリックするかまで、画像付きで解説します。
+<p>（※実際の販売版では各ステップにスクリーンショットを添付）</p>
+<hr>
+<h2>第2章：Claude Codeの基本──日本語で指示する技術</h2>
+<p>Claude Codeを使いこなす鍵は、<strong>「いかに的確に日本語で伝えるか」</strong>です。</p>
+<h3>伝え方の悪い例・良い例</h3>
+<p>❌ 悪い例：「管理システム作って」<br>→ 何の管理か、何を管理するか不明で、的外れなものができる</p>
+<p>⭕ 良い例：「顧客の名前・電話番号・メールアドレス・対応状況を登録して、一覧で見られて、CSVで出力できる顧客管理システムを作って」<br>→ 必要な要素が明確で、一発で意図通りになる</p>
+<h3>指示の黄金テンプレート</h3>
+<pre><code>【何を】〇〇を管理するシステム
 【誰が使う】〇〇な人
 【できること】登録・一覧・検索・出力
-【見た目】シンプルで見やすく
-```</p><p>このテンプレートに当てはめるだけで、指示の質が劇的に上がります。</p><p>---</p><p><h2></h2></p><p>この教材では、例として <strong></strong> を作ります。</p><p>なぜ顧客管理かというと：</p><p><li></li>
-<li></li>
-<li></li></p><p><h3></h3></p><p><li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li></p><p>---</p><p><h2></h2></p><p>データベースと聞くと身構えるかもしれませんが、<strong></strong> を使えば設定はほぼゼロです。</p><p>ファイル1つがデータベースになる、という手軽さ。サーバーも、複雑な設定もいりません。</p><p>Claude Codeに「SQLiteでデータベースを用意して」と伝えれば、必要なテーブルまで自動で作ってくれます。</p><p><h3></h3></p><p><li></li>
-<li></li>
-<li></li>
-<li></li></p><p>---</p><p><h2></h2></p><p>ここが本教材の核心です。</p><p>実際に私がClaude Codeに出した指示を、<strong></strong>します。</p><p><h3></h3></p><p><li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li></p><p><strong></strong></p><p>各指示に対してClaude Codeがどう反応し、どんなコードを生成したか、実際の出力とともに解説します。</p><p>---</p><p><h2></h2></p><p>未経験者が必ずぶつかる壁を、先回りして全部つぶしておきます。</p><p><h3></h3></p><p><li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li></p><p>それぞれ、<strong></strong>を具体的に解説します。</p><p>---</p><p><h2></h2></p><p>ここが他の教材にはない最大のポイントです。</p><p>自分のPCで動かしただけでは、PCを閉じたら止まってしまいます。</p><p><strong></strong> というサービスを使えば、月額1,000円以下で、あなたのシステムを24時間365日、ネット上で動かせます。</p><p><h3></h3></p><p><li></li>
-<li></li>
-<li></li>
-<li></li></p><p><strong></strong></p><p>---</p><p><h2></h2></p><p>`https://ランダムな文字.fly.dev` ではなく、`https://あなたの名前.com` でアクセスできるようにする方法。</p><p>Cloudflareを使った設定を、画面付きで解説します。</p><p>---</p><p><h2></h2></p><p>ここまでで「作れる人」になりました。次は「稼ぐ人」になります。</p><p><h3></h3></p><p>作った顧客管理システムを、そのまま完成品として販売する。
-価格：30,000〜50,000円</p><p><h3></h3></p><p>「こういうシステムを作ってほしい」という依頼を受ける。
-価格：1件 100,000〜300,000円</p><p><h3></h3></p><p>システムを「使わせる」かたちで月額課金。
-価格：月額3,000〜10,000円 × 顧客数</p><p><h3></h3></p><p><li></li>
-<li></li>
-<li></li></p><p>---</p><p><h2></h2></p><p>購入者が困らないよう、想定されるトラブルとその解決法を網羅的にまとめています。</p><p>---</p><p><h2></h2></p><p><li></li>
-<li></li>
-<li></li>
-<li></li></p><p>---</p><p><h2></h2></p><p>「自分で作るのは時間がかかる」「完成品をそのまま使いたい」という方には、<strong></strong>商品もご用意しています。</p><p>→ 「顧客管理システム完成品 丸ごとお渡しパッケージ」（49,800円）</p><p>---</p><p>*ご質問・ご感想はレビューにてお待ちしています。*
-</body></html>
+【見た目】シンプルで見やすく</code></pre>
+<p>このテンプレートに当てはめるだけで、指示の質が劇的に上がります。</p>
+<hr>
+<h2>第3章：業務システムの設計──何を作るかを決める</h2>
+<p>この教材では、例として <strong>顧客管理システム（CRM）</strong> を作ります。</p>
+<p>なぜ顧客管理かというと：</p>
+<ul><li>どんな業種でも使える（汎用性が高い）</li><li>構造がシンプルで初心者向け</li><li>作った後、そのまま販売・受託に転用できる</li></ul>
+<h3>作るシステムの機能</h3>
+<ul><li>顧客情報の登録・編集・削除</li><li>一覧表示・検索</li><li>対応ステータス管理</li><li>CSVインポート / エクスポート</li><li>ダッシュボード（集計画面）</li></ul>
+<hr>
+<h2>第4章：データベースの準備──SQLiteで簡単に始める</h2>
+<p>データベースと聞くと身構えるかもしれませんが、<strong>SQLite</strong> を使えば設定はほぼゼロです。</p>
+<p>ファイル1つがデータベースになる、という手軽さ。サーバーも、複雑な設定もいりません。</p>
+<p>Claude Codeに「SQLiteでデータベースを用意して」と伝えれば、必要なテーブルまで自動で作ってくれます。</p>
+<h3>なぜSQLiteが個人開発に最適なのか</h3>
+<ul><li>インストール不要</li><li>ファイル1つで完結</li><li>そのまま本番でも使える</li><li>バックアップはファイルをコピーするだけ</li></ul>
+<hr>
+<h2>第5章：実際にシステムを作る──ステップバイステップ</h2>
+<p>ここが本教材の核心です。</p>
+<p>実際に私がClaude Codeに出した指示を、<strong>順番に、そのまま公開</strong>します。</p>
+<h3>実際の指示の流れ（抜粋）</h3>
+<ol><li>「顧客管理システムの土台を作って。Node.jsとSQLiteで」</li><li>「顧客を登録できる画面を作って」</li><li>「登録した顧客を一覧で見られるようにして」</li><li>「ステータスで絞り込めるようにして」</li><li>「CSVで出力できるボタンをつけて」</li><li>「全体の見た目をきれいに整えて」</li></ol>
+<strong>この6つの指示だけで、システムの骨格が完成します。</strong>
+<p>各指示に対してClaude Codeがどう反応し、どんなコードを生成したか、実際の出力とともに解説します。</p>
+<hr>
+<h2>第6章：つまずきポイントと全解決法</h2>
+<p>未経験者が必ずぶつかる壁を、先回りして全部つぶしておきます。</p>
+<h3>よくあるトラブル</h3>
+<ul><li>「ポートが既に使われています」エラー</li><li>文字化け（日本語が□になる）</li><li>CSVが正しく読み込めない</li><li>起動したけど画面が表示されない</li><li>データが保存されない</li></ul>
+それぞれ、<strong>何が原因で、Claude Codeにどう伝えれば直るか</strong>を具体的に解説します。
+<hr>
+<h2>第7章：ネット公開──Fly.ioで24時間動かす</h2>
+<p>ここが他の教材にはない最大のポイントです。</p>
+<p>自分のPCで動かしただけでは、PCを閉じたら止まってしまいます。</p>
+<p><strong>Fly.io</strong> というサービスを使えば、月額1,000円以下で、あなたのシステムを24時間365日、ネット上で動かせます。</p>
+<h3>公開の手順</h3>
+<ol><li>Fly.ioのアカウント作成</li><li>デプロイ用ファイルの準備（Claude Codeが作ってくれる）</li><li>コマンド1つで公開</li><li>発行されたURLにアクセス</li></ol>
+<strong>世界中どこからでも、PCがなくてもアクセスできるシステムの完成です。</strong>
+<hr>
+<h2>第8章：独自ドメインの設定</h2>
+<p><code>https://ランダムな文字.fly.dev</code> ではなく、<code>https://あなたの名前.com</code> でアクセスできるようにする方法。</p>
+<p>Cloudflareを使った設定を、画面付きで解説します。</p>
+<hr>
+<h2>第9章：収益化──作ったものをお金に変える</h2>
+<p>ここまでで「作れる人」になりました。次は「稼ぐ人」になります。</p>
+<h3>収益化パターン①：システム販売</h3>
+<p>作った顧客管理システムを、そのまま完成品として販売する。<br>価格：30,000〜50,000円</p>
+<h3>収益化パターン②：受託開発</h3>
+<p>「こういうシステムを作ってほしい」という依頼を受ける。<br>価格：1件 100,000〜300,000円</p>
+<h3>収益化パターン③：月額サービス</h3>
+<p>システムを「使わせる」かたちで月額課金。<br>価格：月額3,000〜10,000円 × 顧客数</p>
+<h3>営業の具体的な方法</h3>
+<ul><li>既存の知人ネットワークへの声かけ方</li><li>ランサーズ・ココナラでの出品文の書き方</li><li>問い合わせを受けてから契約までの流れ</li></ul>
+<hr>
+<h2>第10章：トラブルシューティング完全版</h2>
+<p>購入者が困らないよう、想定されるトラブルとその解決法を網羅的にまとめています。</p>
+<hr>
+<h2>特典</h2>
+<ul><li>実際のソースコード一式</li><li>指示テンプレート集</li><li>Fly.ioデプロイのチェックリスト</li><li>収益化の営業文テンプレート</li></ul>
+<hr>
+<h2>さらに上を目指す方へ</h2>
+<p>「自分で作るのは時間がかかる」「完成品をそのまま使いたい」という方には、<strong>顧客管理システムの完成品をそのままお渡しする</strong>商品もご用意しています。</p>
+<p>→ 「顧客管理システム完成品 丸ごとお渡しパッケージ」（49,800円）</p>
+<hr>
+<p><em>ご質問・ご感想はレビューにてお待ちしています。</em></p>
+
+<style>
+  .print-btn {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #6366f1; color: #fff;
+    border: none; border-radius: 50px;
+    padding: 12px 24px; font-size: 14px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+    transition: background 0.2s;
+    z-index: 999;
+  }
+  .print-btn:hover { background: #4f46e5; }
+  @media print { .print-btn { display: none; } }
+</style>
+<button class="print-btn" onclick="window.print()">🖨️ PDF保存 / 印刷</button>
+
+</body>
+</html>

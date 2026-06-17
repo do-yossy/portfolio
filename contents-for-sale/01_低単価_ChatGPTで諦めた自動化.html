@@ -1,31 +1,221 @@
-<!DOCTYPE html><html><head><meta charset='utf-8'><style>
-    body { font-family: 'Hiragino Sans', 'Yu Gothic', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.8; color: #333; }
-    h1 { color: #1a1a2e; border-bottom: 3px solid #e94560; padding-bottom: 10px; }
-    h2 { color: #16213e; border-left: 4px solid #e94560; padding-left: 12px; margin-top: 40px; }
-    h3 { color: #0f3460; }
-    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background: #1a1a2e; color: white; }
-    tr:nth-child(even) { background: #f5f5f5; }
-    code, pre { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
-    pre { padding: 16px; overflow-x: auto; }
-    strong { color: #e94560; }
-    li { margin: 6px 0; }
-    .price { font-size: 24px; font-weight: bold; color: #e94560; }
-  </style></head><body><h1></h1></p><p><strong></strong>
-<strong></strong></p><p>---</p><p><h2></h2></p><p><li></li>
-<li></li>
-<li></li>
-<li></li></p><p>この記事は、<strong></strong>までの、リアルな記録です。</p><p>きれいな成功談ではありません。失敗して、つまずいて、それでも最後に動くものができた、等身大の話です。</p><p>---</p><p><h2></h2></p><p>最初、私はChatGPTで業務を自動化しようとしました。</p><p>毎日くり返す単純作業──データの整理、ファイルの仕分け、リストの出力。これをAIに任せられたら、どれだけ楽になるだろうと。</p><p>ChatGPTは確かにコードを書いてくれました。Pythonのコードも、自動化のスクリプトも、聞けば出してくれる。</p><p><strong></strong></p><p><h3></h3></p><p>ChatGPTがコードを出してくれても、それをどこに貼り付けて、どう実行するのかがわからない。</p><p>「このコードをターミナルで実行してください」と言われても、ターミナルって何？という状態。</p><p><h3></h3></p><p>実行するとエラーが出る。そのエラーをChatGPTに貼ると、別の解決策が返ってくる。それを試すとまた別のエラー。</p><p><strong></strong></p><p><h3></h3></p><p>少し複雑なことをやろうとすると、ファイルが複数になる。「このファイルのここを直して、あっちのファイルのここも直して」という作業を、ChatGPTとの会話の中で人間が手作業でやらないといけない。</p><p><strong></strong></p><p>ここで私は、一度完全に諦めました。</p><p>「やっぱり、コードが書けない人間に自動化は無理なんだ」と。</p><p>---</p><p><h2></h2></p><p>諦めかけていたとき、Claude Codeの存在を知りました。</p><p>ChatGPTが「コードを教えてくれるAI」なら、<strong></strong>でした。</p><p>ここが決定的に違いました。</p><p><h3></h3></p><p>| 項目 | ChatGPT | Claude Code |
-|------|---------|-------------|
-| コードを書く | ◯ | ◯ |
-| <strong></strong> | ✕（コピペが必要） | ◯（自動で編集） |
-| <strong></strong> | ✕（人間が手作業） | ◯（自動で横断） |
-| <strong></strong> | ✕（会話で往復） | ◯（自分で修正） |
-| <strong></strong> | ✕ | ◯ |</p><p>ChatGPTは「コードの部品工場」。
-Claude Codeは「プロジェクト全体を見るエンジニア」。</p><p><strong></strong></p><p>---</p><p><h2></h2></p><p>私がClaude Codeで実際に作って、自動化できたことを紹介します。</p><p><li></li>
-<li></li>
-<li></li>
-<li></li>
-<li></li></p><p><strong></strong></p><p>やったことは、「こういうものを作りたい」と日本語で伝えただけ。</p><p>あとはClaude Codeが、コードを書いて、実行して、エラーが出たら自分で直して、完成させてくれました。</p><p>---</p><p><h2></h2></p><p>ここからは、実際に私がやった手順を、未経験者向けに解説します。</p><p><h3></h3></p><p>Claude Proプラン（月額約3,000円）に加入すると、Claude Codeが追加料金なしで使えます。ChatGPT Plusと同じ価格帯で、コーディングに特化した機能が手に入ります。</p><p><h3></h3></p><p>ここがコツです。専門用語は不要。</p><p>「毎日CSVファイルを開いて、名前と電話番号だけを別のファイルにまとめる作業を自動化したい」</p><p>このレベルの日本語でOK。</p><p><h3></h3></p><p>あとは待つだけ。Claude Codeがファイルを作り、コードを書き、動かして、確認します。</p><p><h3></h3></p><p>「エラーが出た」と伝えるだけ。Claude Codeがエラーの原因を調べて、自分で修正します。</p><p>---</p><p><h2></h2></p><p>逆説的ですが、<strong></strong></p><p>なぜなら、ChatGPTで「何ができて、何ができないか」を体感しているから。</p><p>Claude Codeを使うと、「ChatGPTでできなかったこれが、こんなに簡単にできるのか」という感動があります。</p><p>---</p><p><h2></h2></p><p>私は、本当にただの未経験者でした。</p><p>ターミナルって何？という状態から、Claude Codeを使って業務システムを丸ごと自動化できるようになりました。</p><p>特別な才能は一切いりません。必要なのは、「日本語で伝える力」だけ。</p><p>---</p><p><h2></h2></p><p>この記事では「ChatGPTとの違い」と「自動化の入口」を解説しました。</p><p>もし、<strong></strong>は、完全版マニュアルを用意しています。</p><p>実際のソースコード、つまずきポイントの全解決法、そして作ったシステムを使って収益化する方法まで、すべて公開しています。</p><p>→ 完全版マニュアル「ゼロからClaude Codeで業務自動化システムを作る完全手順」（29,800円）</p><p>---</p><p>*この記事が役に立ったら、レビューをいただけると嬉しいです。*
-</body></html>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>01_低単価_ChatGPTで諦めた自動化</title>
+<style>
+  @page { margin: 18mm 20mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    line-height: 1.85;
+    color: #1a1a1a;
+    font-size: 11pt;
+    background: #fff;
+  }
+  h1 {
+    color: #fff;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    padding: 20px 24px;
+    border-radius: 10px;
+    font-size: 18pt;
+    margin: 0 -8px 32px;
+    page-break-before: always;
+    line-height: 1.4;
+  }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 {
+    color: #1e293b;
+    font-size: 14pt;
+    border-left: 5px solid #6366f1;
+    padding-left: 14px;
+    margin: 36px 0 16px;
+  }
+  h3 {
+    color: #334155;
+    font-size: 12pt;
+    margin: 24px 0 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  h4 {
+    color: #475569;
+    font-size: 11pt;
+    margin: 16px 0 8px;
+  }
+  p { margin: 10px 0; }
+  strong { color: #1e293b; }
+  blockquote {
+    background: #f0f4ff;
+    border-left: 4px solid #6366f1;
+    margin: 16px 0;
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 10.5pt;
+    color: #334155;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-size: 9.5pt;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 14px 0;
+    line-height: 1.6;
+  }
+  code {
+    background: #e8edf4;
+    color: #3730a3;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9.5pt;
+    font-family: 'Consolas', 'Monaco', monospace;
+  }
+  pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+    font-size: 10pt;
+  }
+  th {
+    background: #1e293b;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 9px 12px;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  ul, ol { padding-left: 24px; margin: 10px 0; }
+  li { margin: 5px 0; }
+  hr {
+    border: none;
+    border-top: 2px solid #e2e8f0;
+    margin: 32px 0;
+  }
+  .badge {
+    display: inline-block;
+    background: #6366f1;
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 9pt;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+  @media print {
+    body { padding: 0; font-size: 10.5pt; }
+    h1 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    pre { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="badge">無料コンテンツ①｜無料</div>
+<h1>ChatGPTで諦めた自動化を、Claude Codeで全部解決した話</h1>
+<p><strong>販売価格：1,980円</strong><br><strong>販売先：Brain / Tips</strong></p>
+<hr>
+<h2>はじめに：この記事を読んでほしい人</h2>
+<ul><li>ChatGPTで業務自動化に挑戦したけど、途中で挫折した人</li><li>「コードが書けないから自動化は無理」と諦めている人</li><li>AIを使って仕事を楽にしたいけど、何から始めればいいかわからない人</li><li>ChatGPTとClaude Codeの違いが正直よくわからない人</li></ul>
+この記事は、<strong>プログラミング未経験の私が、ChatGPTで何度も挫折した末に、Claude Codeで業務システムを丸ごと自動化できた</strong>までの、リアルな記録です。
+<p>きれいな成功談ではありません。失敗して、つまずいて、それでも最後に動くものができた、等身大の話です。</p>
+<hr>
+<h2>第1章：ChatGPTで自動化に挑戦して、私が諦めた理由</h2>
+<p>最初、私はChatGPTで業務を自動化しようとしました。</p>
+<p>毎日くり返す単純作業──データの整理、ファイルの仕分け、リストの出力。これをAIに任せられたら、どれだけ楽になるだろうと。</p>
+<p>ChatGPTは確かにコードを書いてくれました。Pythonのコードも、自動化のスクリプトも、聞けば出してくれる。</p>
+<p><strong>でも、そこからが地獄でした。</strong></p>
+<h3>つまずきポイント①：コードをもらっても「動かせない」</h3>
+<p>ChatGPTがコードを出してくれても、それをどこに貼り付けて、どう実行するのかがわからない。</p>
+<p>「このコードをターミナルで実行してください」と言われても、ターミナルって何？という状態。</p>
+<h3>つまずきポイント②：エラーが出ても解決できない</h3>
+<p>実行するとエラーが出る。そのエラーをChatGPTに貼ると、別の解決策が返ってくる。それを試すとまた別のエラー。</p>
+<p><strong>この無限ループから抜け出せませんでした。</strong></p>
+<h3>つまずきポイント③：複数のファイルをまたぐと破綻する</h3>
+<p>少し複雑なことをやろうとすると、ファイルが複数になる。「このファイルのここを直して、あっちのファイルのここも直して」という作業を、ChatGPTとの会話の中で人間が手作業でやらないといけない。</p>
+<p><strong>1つ直すと別の場所が壊れる。</strong></p>
+<p>ここで私は、一度完全に諦めました。</p>
+<p>「やっぱり、コードが書けない人間に自動化は無理なんだ」と。</p>
+<hr>
+<h2>第2章：Claude Codeとの出会いで、すべてが変わった</h2>
+<p>諦めかけていたとき、Claude Codeの存在を知りました。</p>
+<p>ChatGPTが「コードを教えてくれるAI」なら、<strong>Claude Codeは「コードを書いて、実行して、エラーまで直してくれるAI」</strong>でした。</p>
+<p>ここが決定的に違いました。</p>
+<h3>ChatGPTとClaude Codeの決定的な違い</h3>
+<table><thead><tr><th>項目</th><th>ChatGPT</th><th>Claude Code</th></tr></thead><tbody><tr><td>コードを書く</td><td>◯</td><td>◯</td></tr><tr><td><strong>ファイルを直接編集する</strong></td><td>✕（コピペが必要）</td><td>◯（自動で編集）</td></tr><tr><td><strong>複数ファイルをまたいで作業</strong></td><td>✕（人間が手作業）</td><td>◯（自動で横断）</td></tr><tr><td><strong>エラーを自動で直す</strong></td><td>✕（会話で往復）</td><td>◯（自分で修正）</td></tr><tr><td><strong>プロジェクト全体を理解</strong></td><td>✕</td><td>◯</td></tr></tbody></table>
+ChatGPTは「コードの部品工場」。
+Claude Codeは「プロジェクト全体を見るエンジニア」。
+<p><strong>この違いが、未経験の私でも自動化を完成させられた最大の理由でした。</strong></p>
+<hr>
+<h2>第3章：実際にClaude Codeで自動化できたこと</h2>
+<p>私がClaude Codeで実際に作って、自動化できたことを紹介します。</p>
+<ul><li>毎日手作業でやっていたデータ整理</li><li>ファイルの自動仕分け</li><li>リストの自動出力</li><li>Webからの情報自動取得</li><li>業務管理システムそのもの</li></ul>
+<strong>しかも、ほとんど私はコードを書いていません。</strong>
+<p>やったことは、「こういうものを作りたい」と日本語で伝えただけ。</p>
+<p>あとはClaude Codeが、コードを書いて、実行して、エラーが出たら自分で直して、完成させてくれました。</p>
+<hr>
+<h2>第4章：未経験者がClaude Codeを使う具体的な手順</h2>
+<p>ここからは、実際に私がやった手順を、未経験者向けに解説します。</p>
+<h3>ステップ1：Claude Codeを使えるようにする</h3>
+<p>Claude Proプラン（月額約3,000円）に加入すると、Claude Codeが追加料金なしで使えます。ChatGPT Plusと同じ価格帯で、コーディングに特化した機能が手に入ります。</p>
+<h3>ステップ2：「何を作りたいか」を日本語で伝える</h3>
+<p>ここがコツです。専門用語は不要。</p>
+<p>「毎日CSVファイルを開いて、名前と電話番号だけを別のファイルにまとめる作業を自動化したい」</p>
+<p>このレベルの日本語でOK。</p>
+<h3>ステップ3：Claude Codeに任せる</h3>
+<p>あとは待つだけ。Claude Codeがファイルを作り、コードを書き、動かして、確認します。</p>
+<h3>ステップ4：エラーが出ても、自分で直してもらう</h3>
+<p>「エラーが出た」と伝えるだけ。Claude Codeがエラーの原因を調べて、自分で修正します。</p>
+<hr>
+<h2>第5章：ChatGPTで挫折した人ほど、Claude Codeで成功する理由</h2>
+<p>逆説的ですが、<strong>ChatGPTで一度挫折した経験が、Claude Codeでは武器になります。</strong></p>
+<p>なぜなら、ChatGPTで「何ができて、何ができないか」を体感しているから。</p>
+<p>Claude Codeを使うと、「ChatGPTでできなかったこれが、こんなに簡単にできるのか」という感動があります。</p>
+<hr>
+<h2>おわりに：あなたも今日から始められる</h2>
+<p>私は、本当にただの未経験者でした。</p>
+<p>ターミナルって何？という状態から、Claude Codeを使って業務システムを丸ごと自動化できるようになりました。</p>
+<p>特別な才能は一切いりません。必要なのは、「日本語で伝える力」だけ。</p>
+<hr>
+<h2>さらに本格的に作りたい方へ</h2>
+<p>この記事では「ChatGPTとの違い」と「自動化の入口」を解説しました。</p>
+<p>もし、<strong>「ゼロから実際に業務システムを作って、ネット上に公開するところまで」を、完全な手順付きで知りたい方</strong>は、完全版マニュアルを用意しています。</p>
+<p>実際のソースコード、つまずきポイントの全解決法、そして作ったシステムを使って収益化する方法まで、すべて公開しています。</p>
+<p>→ 完全版マニュアル「ゼロからClaude Codeで業務自動化システムを作る完全手順」（29,800円）</p>
+<hr>
+<p><em>この記事が役に立ったら、レビューをいただけると嬉しいです。</em></p>
+
+<style>
+  .print-btn {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #6366f1; color: #fff;
+    border: none; border-radius: 50px;
+    padding: 12px 24px; font-size: 14px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+    transition: background 0.2s;
+    z-index: 999;
+  }
+  .print-btn:hover { background: #4f46e5; }
+  @media print { .print-btn { display: none; } }
+</style>
+<button class="print-btn" onclick="window.print()">🖨️ PDF保存 / 印刷</button>
+
+</body>
+</html>

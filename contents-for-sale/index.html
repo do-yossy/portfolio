@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>コンテンツ一覧</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Sans','Meiryo',sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 40px 20px; }
+  h1 { text-align: center; font-size: 24px; color: #fff; margin-bottom: 8px; }
+  .sub { text-align: center; color: #64748b; margin-bottom: 40px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; max-width: 1000px; margin: 0 auto; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px 24px; text-decoration: none; color: inherit; transition: all 0.15s; display: block; }
+  .card:hover { border-color: #6366f1; transform: translateY(-2px); }
+  .card-label { font-size: 11px; color: #6366f1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .card-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; line-height: 1.4; }
+  .card-price { font-size: 20px; font-weight: 700; color: #4ade80; }
+  .card-price.free { color: #94a3b8; font-size: 14px; }
+  .card-price.ref { color: #64748b; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>📄 コンテンツ一覧</h1>
+<p class="sub">各カードをクリックするとHTMLで表示。ブラウザの印刷機能でPDF保存できます。</p>
+<div class="grid">
+  <a class="card" href="01_低単価_ChatGPTで諦めた自動化.html">
+    <div class="card-label">無料コンテンツ①</div>
+    <div class="card-title">低単価 ChatGPTで諦めた自動化</div>
+    <div class="card-price free">無料</div>
+  </a>
+  <a class="card" href="02_中単価_完全手順マニュアル.html">
+    <div class="card-label">メインコンテンツ</div>
+    <div class="card-title">中単価 完全手順マニュアル</div>
+    <div class="card-price ">29,800円</div>
+  </a>
+  <a class="card" href="03_高単価_顧客管理システム完成品.html">
+    <div class="card-label">高単価コンテンツ</div>
+    <div class="card-title">高単価 顧客管理システム完成品</div>
+    <div class="card-price ">49,800円</div>
+  </a>
+  <a class="card" href="04_note無料記事_集客用.html">
+    <div class="card-label">集客用note記事</div>
+    <div class="card-title">note無料記事 集客用</div>
+    <div class="card-price free">無料</div>
+  </a>
+  <a class="card" href="05_販売ページ説明文.html">
+    <div class="card-label">販売ページ説明文</div>
+    <div class="card-title">販売ページ説明文</div>
+    <div class="card-price ref">参考資料</div>
+  </a>
+  <a class="card" href="06_低単価A_Claudeテンプレート集.html">
+    <div class="card-label">低単価コンテンツA</div>
+    <div class="card-title">低単価A Claudeテンプレート集</div>
+    <div class="card-price ">1,980円</div>
+  </a>
+  <a class="card" href="07_低単価B_セットアップガイド.html">
+    <div class="card-label">低単価コンテンツB</div>
+    <div class="card-title">低単価B セットアップガイド</div>
+    <div class="card-price ">1,980円</div>
+  </a>
+  <a class="card" href="08_低単価C_Flyioデプロイ手順書.html">
+    <div class="card-label">低単価コンテンツC</div>
+    <div class="card-title">低単価C Flyioデプロイ手順書</div>
+    <div class="card-price ">1,980円</div>
+  </a>
+</div>
+</body>
+</html>

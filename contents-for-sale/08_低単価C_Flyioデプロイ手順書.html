@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>08_低単価C_Flyioデプロイ手順書</title>
+<style>
+  @page { margin: 18mm 20mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    line-height: 1.85;
+    color: #1a1a1a;
+    font-size: 11pt;
+    background: #fff;
+  }
+  h1 {
+    color: #fff;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    padding: 20px 24px;
+    border-radius: 10px;
+    font-size: 18pt;
+    margin: 0 -8px 32px;
+    page-break-before: always;
+    line-height: 1.4;
+  }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 {
+    color: #1e293b;
+    font-size: 14pt;
+    border-left: 5px solid #6366f1;
+    padding-left: 14px;
+    margin: 36px 0 16px;
+  }
+  h3 {
+    color: #334155;
+    font-size: 12pt;
+    margin: 24px 0 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  h4 {
+    color: #475569;
+    font-size: 11pt;
+    margin: 16px 0 8px;
+  }
+  p { margin: 10px 0; }
+  strong { color: #1e293b; }
+  blockquote {
+    background: #f0f4ff;
+    border-left: 4px solid #6366f1;
+    margin: 16px 0;
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 10.5pt;
+    color: #334155;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-size: 9.5pt;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 14px 0;
+    line-height: 1.6;
+  }
+  code {
+    background: #e8edf4;
+    color: #3730a3;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9.5pt;
+    font-family: 'Consolas', 'Monaco', monospace;
+  }
+  pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+    font-size: 10pt;
+  }
+  th {
+    background: #1e293b;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 9px 12px;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  ul, ol { padding-left: 24px; margin: 10px 0; }
+  li { margin: 5px 0; }
+  hr {
+    border: none;
+    border-top: 2px solid #e2e8f0;
+    margin: 32px 0;
+  }
+  .badge {
+    display: inline-block;
+    background: #6366f1;
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 9pt;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+  @media print {
+    body { padding: 0; font-size: 10.5pt; }
+    h1 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    pre { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="badge">低単価コンテンツC｜1,980円</div>
+<h1>Fly.ioで無料公開するまでの手順書〜Node.jsアプリを世界に公開しよう〜</h1>
+<p><strong>価格：1,980円</strong><br><strong>対象：Node.jsアプリをローカルで動かせた、次は公開したい人</strong></p>
+<hr>
+<h2>SECTION 1: 本編コンテンツ</h2>
+<hr>
+<h3>はじめに</h3>
+<p>「ローカルでは動いてるのに、どうやって外から見せるの？」</p>
+<p>これ、わたしが1年くらいずっと悩んでいたことです。せっかく作ったアプリを友達に見せたくても「えっとURLは…localhost:3000です」って言うしかなくて、当然相手には見えない。</p>
+<p>Fly.ioに出会ったのは、HerokuがFreeプランを廃止したタイミングでした。代替を探してたくさん試した中で、「これが一番わかりやすかった」のがFly.ioです。</p>
+<p><strong>Fly.ioとは何か？</strong></p>
+<p>Fly.ioは、アプリをインターネット上のサーバーで動かすためのサービスです。無料枠があって、Node.jsのアプリなら月0円で公開できます。コマンドラインで操作するので最初はちょっと怖いですが、この手順書の通りにやれば大丈夫です。</p>
+<p><strong>なぜFly.ioがおすすめか？</strong></p>
+<ul><li>無料枠が現実的（256MBメモリのマシンが1台、ずっと無料）</li><li>SQLiteが使える（他のサービスはDBが有料のことが多い）</li><li>コマンドが比較的わかりやすい</li><li>日本のリージョン（nrt = 東京）があるのでレスポンスが速い</li></ul>
+<strong>わたしが最初にやらかした失敗</strong>
+<ul><li>PORTの環境変数を設定し忘れてずっとクラッシュしてた</li><li>SQLiteのファイルがデプロイのたびに消えてた（Volumeを知らなかった）</li><li>.envファイルをそのままアップしようとしてた</li></ul>
+同じ失敗をしなくていいように、この手順書に全部まとめました。
+<hr>
+<h3>Fly.ioの料金について</h3>
+<p>「無料って言っても、後から請求されたりしない？」</p>
+<p>これ、わたしも最初めちゃくちゃ不安でした。正直に説明します。</p>
+<p><strong>無料でできること</strong></p>
+<table><thead><tr><th>リソース</th><th>無料枠</th></tr></thead><tbody><tr><td>マシン（shared-cpu-1x、256MB RAM）</td><td>月2,340時間まで（実質1台ずっと無料）</td></tr><tr><td>ストレージ（Volume）</td><td>3GB</td></tr><tr><td>帯域</td><td>月160GB</td></tr><tr><td>アプリ数</td><td>複数OK</td></tr></tbody></table>
+256MBって少ない気がしますが、Expressで作ったシンプルなアプリなら余裕で動きます。
+<p><strong>お金がかかるケース</strong></p>
+<ul><li>マシンをスペックアップしたとき（1GB RAMにするなど）</li><li>Volume（ストレージ）を3GB以上使ったとき</li><li>複数台マシンを同時に常時起動したとき</li></ul>
+個人の趣味プロジェクトなら、無料枠の範囲で十分です。わたしは3つアプリを動かしていますが、月の請求はずっと$0です。
+<p><strong>クレジットカードは必要</strong></p>
+<p>登録時にクレジットカードが必要です。「無料なのになんで？」と思いますよね。スパム対策と、万が一超過した場合の支払い手段確保のためだそうです。</p>
+<p>でも、設定をきちんとすれば請求されません。auto_stop_machines（後で説明します）を有効にしておけば、使っていないときはマシンが自動停止するので安心です。</p>
+<p><strong>趣味プロジェクトの目安：月$0〜$5程度</strong></p>
+<hr>
+<h3>Step 1: Fly.ioアカウント作成</h3>
+<ol><li>[https://fly.io](https://fly.io) にアクセス</li><li>「Get Started」または「Sign Up」をクリック</li><li>メールアドレスとパスワードで登録（GitHubアカウントでも登録できます）</li><li>メール認証を完了させる</li><li>クレジットカードを登録する</li></ol>
+クレジットカード登録画面が出たら、素直に登録してください。登録しないと無料枠も使えません。繰り返しになりますが、無料枠の範囲で使う限り請求されません。
+<hr>
+<h3>Step 2: flyctlのインストール</h3>
+<p>flyctlは、コマンドラインからFly.ioを操作するためのツールです。これをインストールして、ターミナルからコマンドを叩けるようにします。</p>
+<p><strong>Macの場合（Homebrewを使用）</strong></p>
+<pre><code>brew install flyctl</code></pre>
+<p><strong>Windowsの場合（PowerShell）</strong></p>
+<pre><code>pwsh -Command "iwr https://fly.io/install.ps1 -useb | iex"</code></pre>
+<p>PowerShellを管理者権限で開いて実行してください。</p>
+<p><strong>Linuxの場合</strong></p>
+<pre><code>curl -L https://fly.io/install.sh | sh</code></pre>
+<p><strong>インストール確認</strong></p>
+<pre><code>flyctl version</code></pre>
+<p>こんな感じのバージョン情報が出ればOKです：</p>
+<pre><code>flyctl v0.3.xx linux/amd64 Commit: xxxxxxxx BuildDate: 2024-xx-xx</code></pre>
+<p><strong>ログイン</strong></p>
+<pre><code>flyctl auth login</code></pre>
+<p>ブラウザが開いて、さっき作ったアカウントでログインするよう求められます。ログイン完了後、ターミナルに戻ると「Successfully logged in」と表示されます。</p>
+<hr>
+<h3>Step 3: アプリの準備</h3>
+<p>デプロイする前に、Node.jsアプリがFly.io対応になっているか確認します。</p>
+<p><strong>① package.jsonに"start"スクリプトがあるか</strong></p>
+<pre><code>{
+  "name": "my-app",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}</code></pre>
+<p><code>"start": "node index.js"</code> の部分が重要です。Fly.ioはデプロイ後にこのコマンドでアプリを起動します。</p>
+<p><strong>② PORTを環境変数から受け取っているか</strong></p>
+<p>これが一番ハマるポイントです。ローカルでは <code>3000</code> 番ポートで動かしていても、Fly.io上では別のポート番号が割り当てられます。</p>
+<pre><code>// ❌ これだと動かない
+const PORT = 3000;
+<p>// ✅ これが正しい<br>const PORT = process.env.PORT || 3000;</p>
+<p>app.listen(PORT, () =&gt; {<br>  console.log(<code>Server running on port ${PORT}</code>);<br>});</code></pre></p>
+<p><code>process.env.PORT</code> を使うことで、Fly.ioが指定したポートで自動的に起動してくれます。</p>
+<p><strong>③ .gitignoreの設定</strong></p>
+<p>プロジェクトのルートに <code>.gitignore</code> ファイルを作って、以下を含めてください：</p>
+<pre><code>node_modules/
+.env
+*.sqlite
+*.db</code></pre>
+<p><code>node_modules</code> をアップしようとするとデプロイが激重になります。必ず除外してください。</p>
+<hr>
+<h3>Step 4: fly.tomlの設定</h3>
+<p><code>fly.toml</code> はFly.ioの設定ファイルです。プロジェクトのルートディレクトリに作成します。</p>
+<p><strong>完全なfly.tomlの例</strong></p>
+<pre><code>app = "your-app-name"
+primary_region = "nrt"
+<p>[build]</p>
+<p>[http_service]<br>  internal_port = 3000<br>  force_https = true<br>  auto_stop_machines = true<br>  auto_start_machines = true<br>  min_machines_running = 0</p>
+<p>[[vm]]<br>  memory = "256mb"<br>  cpu_kind = "shared"<br>  cpus = 1</code></pre></p>
+<p><strong>各設定の説明</strong></p>
+<ul><li><code>app = "your-app-name"</code> — アプリの名前。<code>your-app-name.fly.dev</code> というURLになります。小文字とハイフンだけ使えます</li><li><code>primary_region = "nrt"</code> — 東京リージョン。日本向けならこれが一番速い</li><li><code>internal_port = 3000</code> — アプリが内部的に使うポート番号。Step 3で設定した番号と合わせる</li><li><code>force_https = true</code> — HTTPSを強制。これはそのままにしておく</li><li><code>auto_stop_machines = true</code> — アクセスがないときマシンを自動停止。無料枠維持のために必須</li><li><code>auto_start_machines = true</code> — アクセスがきたら自動起動。auto_stopとセットで使う</li><li><code>min_machines_running = 0</code> — 常時起動マシン数を0に。0にすることで、使っていないときは完全停止して無料枠に収まる</li><li><code>memory = "256mb"</code> — メモリ256MB。無料枠の最大</li><li><code>cpu_kind = "shared"</code> — 共有CPU。無料枠はこれ</li></ul>
+<strong>注意：</strong> <code>min_machines_running = 0</code> にすると、しばらく使わないとマシンが止まります。次にアクセスしたとき起動に数秒かかります（コールドスタート）。個人プロジェクトなら許容範囲です。
+<hr>
+<h3>Step 5: SQLiteの永続化設定（Volumeの作成）</h3>
+<p><strong>なぜVolume（ボリューム）が必要か</strong></p>
+<p>Fly.ioはデプロイするたびにアプリのファイルが新しくなります。SQLiteのデータベースファイルも一緒にリセットされてしまいます。「デプロイしたらデータが消えた！」はわたしが最初にやらかした失敗です。</p>
+<p>これを防ぐには、データが消えない「ボリューム」という永続ストレージにSQLiteファイルを置く必要があります。</p>
+<p><strong>ボリュームの作成</strong></p>
+<pre><code>flyctl volumes create myapp_data --region nrt --size 1</code></pre>
+<ul><li><code>myapp_data</code> — ボリュームの名前（任意）</li><li><code>--region nrt</code> — 東京リージョン（アプリと同じリージョンにする）</li><li><code>--size 1</code> — 1GB（無料枠3GB以内）</li></ul>
+<strong>fly.tomlにマウント設定を追加</strong>
+<pre><code>app = "your-app-name"
+primary_region = "nrt"
+<p>[build]</p>
+<p>[http_service]<br>  internal_port = 3000<br>  force_https = true<br>  auto_stop_machines = true<br>  auto_start_machines = true<br>  min_machines_running = 0</p>
+<p>[mounts]<br>  source = "myapp_data"<br>  destination = "/data"</p>
+<p>[[vm]]<br>  memory = "256mb"<br>  cpu_kind = "shared"<br>  cpus = 1</code></pre></p>
+<p><code>[mounts]</code> セクションを追加しました。これで <code>/data</code> というディレクトリがボリュームになります。</p>
+<p><strong>アプリのコードを修正</strong></p>
+<p>SQLiteのファイルパスを <code>/data</code> ディレクトリに変更します。</p>
+<pre><code>const Database = require('better-sqlite3');
+<p>// ❌ これだとデプロイのたびにリセットされる<br>const db = new Database('./myapp.sqlite');</p>
+<p>// ✅ /dataディレクトリに保存する<br>const dbPath = process.env.DB_PATH || './myapp.sqlite';<br>const db = new Database(dbPath);</code></pre></p>
+<p>そして環境変数でパスを設定します（次のStepで説明）。</p>
+<hr>
+<h3>Step 6: 環境変数の設定</h3>
+<p><code>.env</code> ファイルにある秘密の情報（APIキー、DBパスなど）は、<code>flyctl secrets</code> コマンドで設定します。絶対に <code>fly.toml</code> に直接書かないでください。</p>
+<p><strong>環境変数を設定するコマンド</strong></p>
+<pre><code>flyctl secrets set DB_PATH=/data/myapp.sqlite
+flyctl secrets set SESSION_SECRET=ランダムな文字列
+flyctl secrets set OPENAI_API_KEY=sk-xxxxxxxxxxxx</code></pre>
+<p>複数まとめて設定することもできます：</p>
+<pre><code>flyctl secrets set DB_PATH=/data/myapp.sqlite SESSION_SECRET=abc123 NODE_ENV=production</code></pre>
+<p><strong>設定済みの環境変数を確認する</strong></p>
+<pre><code>flyctl secrets list</code></pre>
+<pre><code>NAME            DIGEST          CREATED AT
+DB_PATH         sha256:xxxxxx   2024-01-01T00:00:00Z
+SESSION_SECRET  sha256:xxxxxx   2024-01-01T00:00:00Z</code></pre>
+<p>値そのものは表示されません（セキュリティのため）。設定されているかどうかだけ確認できます。</p>
+<p><strong>削除したい場合</strong></p>
+<pre><code>flyctl secrets unset SESSION_SECRET</code></pre>
+<hr>
+<h3>Step 7: 初回デプロイ</h3>
+<p>いよいよデプロイです！</p>
+<p><strong><code>flyctl launch</code> と <code>flyctl deploy</code> の違い</strong></p>
+<ul><li><code>flyctl launch</code> — 初回だけ使う。アプリをFly.ioに登録して、最初のデプロイをする</li><li><code>flyctl deploy</code> — 2回目以降の更新に使う</li></ul>
+<strong>初回デプロイ（fly.tomlが既にある場合）</strong>
+<p>fly.tomlを自分で作成した場合は、<code>flyctl launch</code> ではなく直接 <code>flyctl deploy</code> を使います：</p>
+<pre><code>flyctl deploy</code></pre>
+<p><strong>初回デプロイ（fly.tomlがまだない場合）</strong></p>
+<pre><code>flyctl launch</code></pre>
+<p>対話式で質問されます：</p>
+<pre><code>? Choose an app name (leave blank to generate one): your-app-name
+? Select Organization: personal
+? Do you want to tweak these settings before proceeding? No</code></pre>
+<p><strong>デプロイ中の出力（こんな感じになります）</strong></p>
+<pre><code>==&gt; Building image
+--&gt; Building image done
+==&gt; Pushing image to fly
+--&gt; Pushing image done
+==&gt; Creating release
+--&gt; release v1 created
+==&gt; Monitoring deployment
+ 1 desired, 1 placed, 0 healthy, 0 unhealthy [health checks: 0 total]
+ 1 desired, 1 placed, 1 healthy, 0 unhealthy [health checks: 1 total]
+--&gt; v1 deployed successfully</code></pre>
+<p>最後に <code>deployed successfully</code> と出ればOKです！</p>
+<p><strong>デプロイしたアプリを開く</strong></p>
+<pre><code>flyctl open</code></pre>
+<p>ブラウザが開いて、<code>https://your-app-name.fly.dev</code> が表示されます。</p>
+<hr>
+<h3>Step 8: 独自ドメインの設定（オプション）</h3>
+<p><code>your-app-name.fly.dev</code> というURLでも十分ですが、独自ドメインを使いたい場合の手順です。</p>
+<p><strong>証明書の追加</strong></p>
+<pre><code>flyctl certs add yourdomain.com</code></pre>
+<p><code>yourdomain.com</code> を実際のドメイン名に変えてください。</p>
+<p><strong>DNS設定</strong></p>
+<p>ドメインのDNS設定画面で、CNAMEレコードを追加します：</p>
+<pre><code>タイプ: CNAME
+ホスト: @ または www
+値: your-app-name.fly.dev
+TTL: 3600</code></pre>
+<p>ドメイン購入サービス（お名前.com、Xserverなど）の管理画面でこの設定をします。</p>
+<p><strong>証明書の確認</strong></p>
+<pre><code>flyctl certs show yourdomain.com</code></pre>
+<p>DNS設定が反映されるまで数分〜数十分かかります。Let's Encryptの証明書が自動で発行されるので、HTTPSが使えるようになります。</p>
+<hr>
+<h3>Step 9: よくあるエラーと解決法</h3>
+<p>デプロイ中によく遭遇するエラーと、その対処法をまとめました。</p>
+<hr>
+<p><strong>エラー①「Error: failed to fetch an image or build from source」</strong></p>
+<pre><code>Error: failed to fetch an image or build from source: error connecting to docker: ...</code></pre>
+<p><strong>原因と解決策</strong></p>
+<p>Dockerfileがない、またはビルドに失敗しています。Fly.ioはNode.jsアプリを自動検出してビルドしますが、うまくいかない場合はルートディレクトリに <code>Dockerfile</code> を作成します：</p>
+<pre><code>FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+EXPOSE 3000
+CMD ["npm", "start"]</code></pre>
+<hr>
+<p><strong>エラー②「データベースのデータがデプロイのたびに消える」</strong></p>
+<p>エラーメッセージはなく、デプロイ後にDBが空になっている状態。</p>
+<p><strong>原因と解決策</strong></p>
+<p>SQLiteファイルをボリューム外に置いているのが原因です。Step 5の手順でボリュームを作成して、<code>/data</code> ディレクトリにSQLiteファイルを移動してください。</p>
+<p>確認コマンド：</p>
+<pre><code>flyctl ssh console
+ls /data/</code></pre>
+<p>ボリュームが正しくマウントされていれば <code>/data/</code> ディレクトリが存在します。</p>
+<hr>
+<p><strong>エラー③「bind: address already in use」</strong></p>
+<pre><code>Error: listen EADDRINUSE: address already in use :::3000</code></pre>
+<p><strong>原因と解決策</strong></p>
+<p>アプリが3000番ポートを使おうとしていますが、Fly.ioが指定したポートと違います。Step 3の手順で <code>process.env.PORT</code> を使うように修正してください。</p>
+<p>また、<code>fly.toml</code> の <code>internal_port</code> がアプリのポート番号と一致しているか確認してください。</p>
+<hr>
+<p><strong>エラー④「デプロイ成功なのにアプリがクラッシュしている」</strong></p>
+<p>デプロイが <code>deployed successfully</code> で終わったのに、ブラウザで開くとエラーになる。</p>
+<p><strong>ログの確認方法</strong></p>
+<pre><code>flyctl logs</code></pre>
+<p>リアルタイムのログが流れます。エラーメッセージを探してください。</p>
+<pre><code>flyctl logs --no-tail</code></pre>
+<p>過去のログを一覧で表示します。</p>
+<p>よくある原因：<br><ul><li>必要なnpmパッケージがインストールされていない（<code>dependencies</code> に書き忘れ）</li><li>環境変数が設定されていない（<code>flyctl secrets list</code> で確認）</li><li>データベースのパスが間違っている</li></ul><br><hr></p>
+<p><strong>エラー⑤「Error: scale failed」</strong></p>
+<pre><code>Error: scale failed: ... insufficient capacity</code></pre>
+<p><strong>原因と解決策</strong></p>
+<p>指定したマシンサイズが空いていません。無料枠の <code>shared-cpu-1x</code> を使っているか確認してください。</p>
+<pre><code>flyctl scale show</code></pre>
+<pre><code>flyctl scale vm shared-cpu-1x --memory 256</code></pre>
+<hr>
+<p><strong>エラー⑥「環境変数が読み込まれていない」</strong></p>
+<p>アプリのコードで <code>process.env.MY_KEY</code> を使っているのに <code>undefined</code> になる。</p>
+<p><strong>確認と解決策</strong></p>
+<p>まず設定されているか確認：</p>
+<pre><code>flyctl secrets list</code></pre>
+<p>設定されていない場合は追加：</p>
+<pre><code>flyctl secrets set MY_KEY=my-value</code></pre>
+<p>シークレットを設定すると自動的に再デプロイが走ります。それでも解決しない場合は手動でデプロイ：</p>
+<pre><code>flyctl deploy</code></pre>
+<p>アプリ内でのデバッグ方法（一時的に）：</p>
+<pre><code>console.log('ENV CHECK:', {
+  PORT: process.env.PORT,
+  MY_KEY: process.env.MY_KEY ? '設定済み' : '未設定'
+});</code></pre>
+<hr>
+<h3>運用・メンテナンスのコツ</h3>
+<p><strong>ログの確認</strong></p>
+<p>問題が起きたらまずログを見る習慣をつけましょう：</p>
+<pre><code># リアルタイムで流れるログ
+flyctl logs
+<h1>過去のログをまとめて見る</h1>
+flyctl logs --no-tail | head -50</code></pre>
+<p><strong>アプリの状態確認</strong></p>
+<pre><code>flyctl status</code></pre>
+<pre><code>App
+  Name     = your-app-name
+  Owner    = personal
+  Hostname = your-app-name.fly.dev
+  Image    = your-app-name:deployment-xxxxxxxx
+<p>Machines<br>ID            PROCESS  VERSION  REGION  STATE    CHECKS             LAST UPDATED<br>xxxxxxxxxx    app      1        nrt     started  1 total, 1 passing 2024-01-01T00:00:00Z</code></pre></p>
+<p><code>STATE</code> が <code>started</code> なら動いています。</p>
+<p><strong>アプリの更新（再デプロイ）</strong></p>
+<p>コードを変更したら：</p>
+<pre><code>flyctl deploy</code></pre>
+<p>これだけです。ダウンタイムなしでデプロイされます。</p>
+<p><strong>マシンを一時停止してコストを下げる</strong></p>
+<p><code>auto_stop_machines = true</code> にしていれば自動停止しますが、手動で停止することもできます：</p>
+<pre><code># マシンの一覧を確認
+flyctl machines list
+<h1>停止</h1>
+flyctl machines stop &lt;MACHINE_ID&gt;
+<h1>再起動</h1>
+flyctl machines start &lt;MACHINE_ID&gt;</code></pre>
+<p><strong>使わなくなったアプリを削除する</strong></p>
+<pre><code>flyctl apps destroy your-app-name</code></pre>
+<p>ボリュームも一緒に削除されます。</p>
+<hr>
+<h3>さいごに</h3>
+<p>ここまで読んでくれてありがとうございます。</p>
+<p>最初は「コマンドラインって怖い」「英語のエラーが読めない」と思うかもしれません。わたしもそうでした。でも何度かデプロイを繰り返すうちに、「あ、これはポートの設定ミスだな」「これはVolume忘れてるな」と、パターンで読めるようになってきます。</p>
+<p>公開したアプリのURLを誰かに送ったとき、「ちゃんと動いてる！」と言ってもらえたときの達成感は格別です。ローカルで動くものと、世界中からアクセスできるものでは、全然違います。</p>
+<p>ポートフォリオとして採用担当者に見せる、副業のお客さんにデモを見せる、友達に使ってもらう——URLが1個あるだけで、できることが全然変わります。</p>
+<p>ぜひ、最初の1デプロイを成功させてみてください。うまくいくと、次もまた作りたくなります。</p>
+<hr>
+<h2>SECTION 2: 販売ページ説明文</h2>
+<hr>
+<h3>販売タイトル（30文字以内）</h3>
+<p>Fly.ioでNode.jsアプリを無料公開する手順書</p>
+<hr>
+<h3>キャッチコピー（インパクトのある一文）</h3>
+<p>「ローカルでは動いてる」を卒業しよう。月0円でNode.jsアプリを世界に公開する、失敗込みの完全手順書。</p>
+<hr>
+<h3>販売ページ本文（700〜1000文字）</h3>
+<p>せっかく作ったアプリ、誰にも見せられていませんか？</p>
+<p>「localhost:3000で動いてます」——この一言で何度もどかしい思いをしました。ポートフォリオに載せたい、友達に使ってもらいたい、副業のお客さんにデモを見せたい。そのたびに「公開できない」が壁になっていました。</p>
+<p>この手順書は、Fly.ioというサービスを使ってNode.jsアプリを無料公開するまでの全工程を、非エンジニアのわたしが実際に試行錯誤した経験をもとにまとめたものです。</p>
+<p><strong>この手順書でわかること</strong></p>
+<ul><li>Fly.ioのアカウント作成〜デプロイまでの全ステップ</li><li>無料枠の正確な内容（何が無料で何が有料か）</li><li>fly.tomlの書き方（実際に動くコード例つき）</li><li>SQLiteのデータが消えないようにするVolume設定</li><li>APIキーなど秘密情報の安全な管理方法</li><li>よくあるエラー6種類とその解決法</li></ul>
+<strong>こんな方に向けて書きました</strong>
+<p>Node.jsアプリをローカルで動かせた、次は公開したい——でもAWSやGCPは難しそう、Herokuは有料になった、VPSはサーバー設定がわからない、という方です。技術的な前提知識は「ターミナルでコマンドを打てること」だけで大丈夫です。</p>
+<p>わたし自身、最初のデプロイに成功するまで3日かかりました。PORTの環境変数を忘れてクラッシュしまくり、SQLiteのデータが消えて途方に暮れ、英語のエラーに何度も挫折しそうになりました。この手順書にはその失敗が全部詰まっています。</p>
+<p>同じ回り道をしなくていいように、コマンド・設定ファイルの実例・エラーの対処法を全部まとめました。公開URLが1本あるだけで、できることが変わります。</p>
+<hr>
+<h3>ハッシュタグ（10個）</h3>
+<pre><code>#Flyio
+#Node.js
+#個人開発
+#Webアプリ公開
+#無料デプロイ
+#プログラミング初心者
+#ポートフォリオ
+#副業エンジニア
+#SQLite
+#個人開発者</code></pre>
+
+<style>
+  .print-btn {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #6366f1; color: #fff;
+    border: none; border-radius: 50px;
+    padding: 12px 24px; font-size: 14px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+    transition: background 0.2s;
+    z-index: 999;
+  }
+  .print-btn:hover { background: #4f46e5; }
+  @media print { .print-btn { display: none; } }
+</style>
+<button class="print-btn" onclick="window.print()">🖨️ PDF保存 / 印刷</button>
+
+</body>
+</html>
