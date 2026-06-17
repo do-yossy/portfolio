@@ -237,39 +237,65 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       catch (e) { warnings.push(`${title}: 年齢数式設定失敗 (${e.message || e})`); }
     }
 
-    // 書式・プルダウンは毎回（冪等）適用。失敗してもデータ反映は止めず警告に。
-    try {
-      await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
-      // S〜V列（架電回数・対応状況・最終架電日・メモ）のヘッダー1行目のみオレンジ
-      if (gsheets.setColumnBackground) {
-        await gsheets.setColumnBackground(props.sheetId, SHEET_COL.callCount, SHEET_COL.notes,
-          { red: 0.918, green: 0.722, blue: 0 },        // #eab800 濃い黄色（白文字で視認可）
-          { red: 1, green: 1, blue: 1 });                // 文字色: 白
-      }
-      // Q〜V列（index16〜21）のデータ行（row2以降）の背景色を白にリセット
-      // 過去のpushで誤ってデータ行にオレンジが付いている場合のクリア
-      if (gsheets.clearColumnDataBackground) {
-        await gsheets.clearColumnDataBackground(props.sheetId, 16, SHEET_HEADERS.length - 1);
-      }
-      // 過去レイアウトの余分なプルダウン（応募日列など）を一度全クリアしてから必要な列だけ再設定
-      if (gsheets.clearDataValidations) {
-        await gsheets.clearDataValidations(props.sheetId);
-      }
-      await gsheets.setDropdowns(props.sheetId, [
-        { colIndex: SHEET_COL.callCount, list: ['1','2','3','4','5','6','7','8','9','10'] },
-        { colIndex: SHEET_COL.status,    list: ['新規','不通','対応中','終了'] },
-      ]);
-      if (sectionRowIdx.length && gsheets.styleSectionRows) {
-        await gsheets.styleSectionRows(props.sheetId, sectionRowIdx, SHEET_HEADERS.length);
-      }
-    } catch (e) {
-      warnings.push(`${title}: 書式/プルダウン設定に失敗 (${e.message || e})`);
-    }
-    // 対応状況の値に応じて「行全体」を着色（マスだけでなく行全体）
-    if (gsheets.setStatusConditionalFormats) {
+    // 書式・プルダウン・条件付き書式を1回の batchUpdate にまとめて適用（APIクォータ節約）。
+    // 個別呼び出しだと1タブで7回以上の書き込みになり 429（Quota exceeded）を誘発するため。
+    // 生成版ヘルパーが揃っている場合はまとめ送り、無ければ従来の個別呼び出しにフォールバック。
+    if (gsheets.batchUpdate && gsheets.styleHeaderReqs) {
       try {
-        await gsheets.setStatusConditionalFormats(props.sheetId, SHEET_COL.status, SHEET_HEADERS.length, SHEET_COL.dupInfo);
-      } catch (e) { warnings.push(`${title}: 条件付き書式設定失敗 (${e.message || e})`); }
+        const reqs = [];
+        reqs.push(...gsheets.styleHeaderReqs(props.sheetId, SHEET_HEADERS.length));
+        // S〜V列のヘッダー1行目のみ濃い黄色（白文字）
+        reqs.push(...gsheets.setColumnBackgroundReqs(props.sheetId, SHEET_COL.callCount, SHEET_COL.notes,
+          { red: 0.918, green: 0.722, blue: 0 }, { red: 1, green: 1, blue: 1 }));
+        // データ行(row2以降)Q〜V列の背景を白にリセット
+        reqs.push(...gsheets.clearColumnDataBackgroundReqs(props.sheetId, 16, SHEET_HEADERS.length - 1));
+        // 余分なプルダウンを全クリアしてから必要な列だけ再設定
+        reqs.push(...gsheets.clearDataValidationsReqs(props.sheetId));
+        reqs.push(...gsheets.setDropdownsReqs(props.sheetId, [
+          { colIndex: SHEET_COL.callCount, list: ['1','2','3','4','5','6','7','8','9','10'] },
+          { colIndex: SHEET_COL.status,    list: ['新規','不通','対応中','終了'] },
+        ]));
+        if (sectionRowIdx.length) {
+          reqs.push(...gsheets.styleSectionRowsReqs(props.sheetId, sectionRowIdx, SHEET_HEADERS.length));
+        }
+        // 条件付き書式: 既存削除 → 追加（削除分も同一バッチに含める）
+        const delReqs = await gsheets.deleteConditionalFormatsReqs(props.sheetId);
+        reqs.push(...delReqs);
+        reqs.push(...gsheets.statusConditionalFormatAddReqs(
+          props.sheetId, SHEET_COL.status, SHEET_HEADERS.length, SHEET_COL.dupInfo, delReqs.length ? 0 : 0));
+        await gsheets.batchUpdate(reqs);
+      } catch (e) {
+        warnings.push(`${title}: 書式/プルダウン設定に失敗 (${e.message || e})`);
+      }
+    } else {
+      // フォールバック（旧テストモック等）
+      try {
+        await gsheets.styleHeader(props.sheetId, SHEET_HEADERS.length);
+        if (gsheets.setColumnBackground) {
+          await gsheets.setColumnBackground(props.sheetId, SHEET_COL.callCount, SHEET_COL.notes,
+            { red: 0.918, green: 0.722, blue: 0 }, { red: 1, green: 1, blue: 1 });
+        }
+        if (gsheets.clearColumnDataBackground) {
+          await gsheets.clearColumnDataBackground(props.sheetId, 16, SHEET_HEADERS.length - 1);
+        }
+        if (gsheets.clearDataValidations) {
+          await gsheets.clearDataValidations(props.sheetId);
+        }
+        await gsheets.setDropdowns(props.sheetId, [
+          { colIndex: SHEET_COL.callCount, list: ['1','2','3','4','5','6','7','8','9','10'] },
+          { colIndex: SHEET_COL.status,    list: ['新規','不通','対応中','終了'] },
+        ]);
+        if (sectionRowIdx.length && gsheets.styleSectionRows) {
+          await gsheets.styleSectionRows(props.sheetId, sectionRowIdx, SHEET_HEADERS.length);
+        }
+      } catch (e) {
+        warnings.push(`${title}: 書式/プルダウン設定に失敗 (${e.message || e})`);
+      }
+      if (gsheets.setStatusConditionalFormats) {
+        try {
+          await gsheets.setStatusConditionalFormats(props.sheetId, SHEET_COL.status, SHEET_HEADERS.length, SHEET_COL.dupInfo);
+        } catch (e) { warnings.push(`${title}: 条件付き書式設定失敗 (${e.message || e})`); }
+      }
     }
     tabs++;
   }

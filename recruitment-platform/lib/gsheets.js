@@ -86,22 +86,37 @@ async function getAccessToken() {
   return data.access_token;
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function api(path, { method = 'GET', body } = {}) {
-  const token = await getAccessToken();
-  const res = await fetch(SHEETS_BASE + path, {
-    method,
-    headers: {
-      Authorization: 'Bearer ' + token,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  let data; try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
-  if (!res.ok) {
+  const maxRetries = 5;
+  for (let attempt = 0; ; attempt++) {
+    const token = await getAccessToken();
+    const res = await fetch(SHEETS_BASE + path, {
+      method,
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    let data; try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    if (res.ok) return data;
+
+    // 429（クォータ超過）・5xx（一時的エラー）はバックオフして再試行
+    const retryable = res.status === 429 || (res.status >= 500 && res.status < 600);
+    if (retryable && attempt < maxRetries) {
+      // Retry-After ヘッダーがあれば尊重。なければ指数バックオフ（2s,4s,8s,16s,32s）+ゆらぎ
+      const retryAfter = parseInt(res.headers.get('retry-after') || '', 10);
+      const wait = Number.isFinite(retryAfter)
+        ? retryAfter * 1000
+        : Math.min(32000, 2000 * 2 ** attempt) + Math.floor(Math.random() * 500);
+      await sleep(wait);
+      continue;
+    }
     throw new Error(`Sheets API エラー (${res.status}): ${data.error?.message || text || ''}`);
   }
-  return data;
 }
 
 // 操作対象スプレッドシートIDの一時上書き（過去応募者用など別シートに出力する際に使用）
@@ -409,9 +424,156 @@ async function writeSingleCell(title, row1based, col0based, value) {
   });
 }
 
+// 複数の batchUpdate リクエストを1回のAPI呼び出しにまとめて送る（クォータ節約用）
+async function batchUpdate(requests) {
+  const reqs = (requests || []).filter(Boolean);
+  if (!reqs.length) return;
+  await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests: reqs } });
+}
+
+// ── リクエスト生成版（送信せず request オブジェクトを返す。batchUpdateでまとめ送りする用）──
+
+function styleHeaderReqs(tabSheetId, numCols) {
+  return [{
+    repeatCell: {
+      range: { sheetId: tabSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: numCols },
+      cell: {
+        userEnteredFormat: {
+          backgroundColor: { red: 0.31, green: 0.275, blue: 0.898 },
+          textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true },
+        },
+      },
+      fields: 'userEnteredFormat(backgroundColor,textFormat)',
+    },
+  }, {
+    updateSheetProperties: {
+      properties: { sheetId: tabSheetId, gridProperties: { frozenRowCount: 1 } },
+      fields: 'gridProperties.frozenRowCount',
+    },
+  }];
+}
+
+function setColumnBackgroundReqs(tabSheetId, startColIndex, endColIndex, bgColor, textColor = null) {
+  const fmt = { backgroundColor: bgColor };
+  if (textColor) fmt.textFormat = { foregroundColor: textColor, bold: true };
+  const fields = textColor ? 'userEnteredFormat(backgroundColor,textFormat)' : 'userEnteredFormat.backgroundColor';
+  return [{
+    repeatCell: {
+      range: { sheetId: tabSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: startColIndex, endColumnIndex: endColIndex + 1 },
+      cell: { userEnteredFormat: fmt },
+      fields,
+    },
+  }];
+}
+
+function clearColumnDataBackgroundReqs(tabSheetId, startColIndex, endColIndex) {
+  return [{
+    repeatCell: {
+      range: { sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: startColIndex, endColumnIndex: endColIndex + 1 },
+      cell: { userEnteredFormat: { backgroundColor: { red: 1, green: 1, blue: 1 } } },
+      fields: 'userEnteredFormat.backgroundColor',
+    },
+  }];
+}
+
+function clearDataValidationsReqs(tabSheetId) {
+  return [{ setDataValidation: { range: { sheetId: tabSheetId, startRowIndex: 1 } } }];
+}
+
+function setDropdownsReqs(tabSheetId, validations) {
+  return validations.map(v => ({
+    setDataValidation: {
+      range: {
+        sheetId: tabSheetId,
+        startRowIndex: v.startRow != null ? v.startRow : 1,
+        startColumnIndex: v.colIndex,
+        endColumnIndex: v.colIndex + 1,
+      },
+      rule: {
+        condition: { type: 'ONE_OF_LIST', values: v.list.map(s => ({ userEnteredValue: String(s) })) },
+        showCustomUi: true,
+        strict: false,
+      },
+    },
+  }));
+}
+
+function styleSectionRowsReqs(tabSheetId, rowIndices, numCols) {
+  if (!rowIndices || !rowIndices.length) return [];
+  return rowIndices.map(r => ({
+    repeatCell: {
+      range: { sheetId: tabSheetId, startRowIndex: r, endRowIndex: r + 1, startColumnIndex: 0, endColumnIndex: numCols },
+      cell: {
+        userEnteredFormat: {
+          backgroundColor: { red: 0.886, green: 0.91, blue: 1 },
+          textFormat: { foregroundColor: { red: 0.18, green: 0.16, blue: 0.45 }, bold: true },
+        },
+      },
+      fields: 'userEnteredFormat(backgroundColor,textFormat)',
+    },
+  }));
+}
+
+// 条件付き書式の「追加」リクエストのみ生成（既存削除は別途 deleteConditionalFormatsReqs で）
+function statusConditionalFormatAddReqs(tabSheetId, statusColIndex, numCols = 26, dupColIndex = null, startIdx = 0) {
+  const requests = [];
+  let idx = startIdx;
+  if (dupColIndex !== null) {
+    requests.push({
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: dupColIndex, endColumnIndex: dupColIndex + 1 }],
+          booleanRule: { condition: { type: 'NOT_BLANK' }, format: { backgroundColor: { red: 1, green: 0.8, blue: 0.8 } } },
+        },
+        index: idx++,
+      },
+    });
+  }
+  const statusRules = [
+    { value: '不通',   red: 1,    green: 0.85, blue: 0.65 },
+    { value: '対応中', red: 1,    green: 0.95, blue: 0.6  },
+    { value: '終了',   red: 0.78, green: 0.96, blue: 1    },
+  ];
+  const colL = colLetter(statusColIndex);
+  for (const r of statusRules) {
+    requests.push({
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [{ sheetId: tabSheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: numCols }],
+          booleanRule: {
+            condition: { type: 'CUSTOM_FORMULA', values: [{ userEnteredValue: `=$${colL}2="${r.value}"` }] },
+            format: { backgroundColor: { red: r.red, green: r.green, blue: r.blue } },
+          },
+        },
+        index: idx++,
+      },
+    });
+  }
+  return requests;
+}
+
+// 既存の条件付き書式ルールを削除するリクエストを生成（meta読み取り結果から）
+async function deleteConditionalFormatsReqs(tabSheetId) {
+  try {
+    const meta = await api(`/${sheetId()}?fields=sheets(properties(sheetId),conditionalFormats)`);
+    const sh = (meta.sheets || []).find(s => s.properties.sheetId === tabSheetId);
+    const count = (sh?.conditionalFormats || []).length;
+    if (count > 0) {
+      return Array.from({ length: count }, (_, i) => count - 1 - i)
+        .map(i => ({ deleteConditionalFormatRule: { sheetId: tabSheetId, index: i } }));
+    }
+  } catch {}
+  return [];
+}
+
 module.exports = {
   isConfigured, isPastConfigured, sheetUrl, pastSheetUrl, withSheetId, getAccessToken,
   getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
   setDropdowns, styleHeader, styleSectionRows, colLetter, setStatusConditionalFormats,
   clearDataValidations, setColumnBackground, clearColumnDataBackground, writeSingleCell,
+  batchUpdate,
+  // リクエスト生成版（クォータ節約のためまとめ送り用）
+  styleHeaderReqs, setColumnBackgroundReqs, clearColumnDataBackgroundReqs,
+  clearDataValidationsReqs, setDropdownsReqs, styleSectionRowsReqs,
+  statusConditionalFormatAddReqs, deleteConditionalFormatsReqs,
 };
