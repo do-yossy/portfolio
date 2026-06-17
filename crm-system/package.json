@@ -1,0 +1,9 @@
+{
+  "name": "crm-system",
+  "version": "1.0.0",
+  "description": "顧客管理システム（CRM）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js"
+  }
+}
