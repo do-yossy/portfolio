@@ -69,9 +69,29 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
   };
   let count = 0, tabs = 0;
   const warnings = [];
+
+  // ── 全社横断の重複検出マップを事前構築（① 直近重複は会社をまたいで検出する）──
+  const { db } = require('../db');
+  const allActive = await Ops.listCalls({ archived });
+  const globalPhoneCount = new Map(); // normalized_phone → [id, ...]
+  const globalEmailCount = new Map(); // normalized_email → [id, ...]
+  const globalById       = new Map(); // id → record
+  for (const a of allActive) {
+    globalById.set(a.id, a);
+    if (a.normalized_phone) {
+      if (!globalPhoneCount.has(a.normalized_phone)) globalPhoneCount.set(a.normalized_phone, []);
+      globalPhoneCount.get(a.normalized_phone).push(a.id);
+    }
+    if (a.normalized_email) {
+      if (!globalEmailCount.has(a.normalized_email)) globalEmailCount.set(a.normalized_email, []);
+      globalEmailCount.get(a.normalized_email).push(a.id);
+    }
+  }
+  const globalIdSet = new Set(allActive.map(a => a.id)); // ②過去応募から除外するID集合
+  // ────────────────────────────────────────────────────────────────
+
   // 全員をシートに反映（重複・過去応募に関わらず除外しない）
   for (const co of companies) {
-    const { db } = require('../db');
     const list = (await Ops.listCalls({ company: co.id, archived }));
     const title = co.short || co.name || co.id;
     const props = await gsheets.ensureTab(title);
@@ -107,36 +127,19 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       });
     }
 
-    // ── 重複検出 ──────────────────────────────────────────────
-    // ① 直近重複: 今回プッシュ対象の中に同一電話/メールが複数いる
-    const phoneCount = new Map(); // normalized_phone → [id, ...]
-    const emailCount = new Map(); // normalized_email → [id, ...]
-    for (const a of list) {
-      if (a.normalized_phone) {
-        if (!phoneCount.has(a.normalized_phone)) phoneCount.set(a.normalized_phone, []);
-        phoneCount.get(a.normalized_phone).push(a.id);
-      }
-      if (a.normalized_email) {
-        if (!emailCount.has(a.normalized_email)) emailCount.set(a.normalized_email, []);
-        emailCount.get(a.normalized_email).push(a.id);
-      }
-    }
-    // listをid→レコードのMapに変換（直近重複の最終対応日参照用）
-    const listById = new Map(list.map(a => [a.id, a]));
-    const listIdSet = new Set(list.map(a => a.id));
-
+    // ── 重複検出（グローバルマップを使用・会社をまたいで検出）──────
     const buildDupInfo = (a) => {
       const parts = [];
 
-      // ① 直近重複: 今回プッシュ対象に同一電話/メールが複数存在する
-      const pIds = (a.normalized_phone && phoneCount.get(a.normalized_phone)) || [];
-      const eIds = (a.normalized_email && emailCount.get(a.normalized_email)) || [];
+      // ① 直近重複: 全社のアクティブ応募者に同一電話/メールが存在する（会社問わず）
+      const pIds = (a.normalized_phone && globalPhoneCount.get(a.normalized_phone)) || [];
+      const eIds = (a.normalized_email && globalEmailCount.get(a.normalized_email)) || [];
       const otherIds = [...new Set([...pIds, ...eIds])].filter(id => id !== a.id);
       if (otherIds.length > 0) {
-        // 直近の他レコードのうち最終架電日が最新のものを取得
+        // 他レコードのうち最終架電日が最新のものを取得
         let latestDate = '', latestStatus = '';
         for (const oid of otherIds) {
-          const other = listById.get(oid);
+          const other = globalById.get(oid);
           if (!other) continue;
           const d = other.last_called_at || other.applied_at || '';
           if (d > latestDate) { latestDate = d; latestStatus = other.status; }
@@ -145,16 +148,15 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         parts.push(`直近重複 ${otherIds.length + 1}件${datePart}`);
       }
 
-      // ② 過去応募: 今回プッシュ対象以外のレコード（アーカイブ済み・他社・他月）に同一電話/メールが存在する
-      // ※ is_archived=1 限定では、STATUSの変換等でアクティブに戻ったレコードを取り逃がすため全件対象にする
+      // ② 過去応募: 全アクティブリスト以外のレコード（アーカイブ済み・他月）に同一電話/メールが存在する
       let pastRow = null;
       if (a.normalized_phone) {
         const rows = db.prepare(`SELECT id, status, last_called_at, applied_at FROM applicants WHERE normalized_phone=? AND normalized_phone!='' ORDER BY coalesce(last_called_at, applied_at) DESC LIMIT 20`).all(a.normalized_phone);
-        for (const r of rows) { if (!listIdSet.has(r.id)) { pastRow = r; break; } }
+        for (const r of rows) { if (!globalIdSet.has(r.id)) { pastRow = r; break; } }
       }
       if (!pastRow && a.normalized_email) {
         const rows = db.prepare(`SELECT id, status, last_called_at, applied_at FROM applicants WHERE normalized_email=? AND normalized_email!='' ORDER BY coalesce(last_called_at, applied_at) DESC LIMIT 20`).all(a.normalized_email);
-        for (const r of rows) { if (!listIdSet.has(r.id)) { pastRow = r; break; } }
+        for (const r of rows) { if (!globalIdSet.has(r.id)) { pastRow = r; break; } }
       }
       if (pastRow) {
         // 実際に対応した日(last_called_at)を優先。無ければ過去の応募日(applied_at)。
