@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ログイン - CRM System</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #0f172a; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .login-wrap { width: 100%; max-width: 400px; padding: 20px; }
+  .login-logo { text-align: center; margin-bottom: 32px; }
+  .login-logo h1 { color: #fff; font-size: 28px; font-weight: 700; letter-spacing: 0.05em; }
+  .login-logo p { color: #94a3b8; font-size: 14px; margin-top: 6px; }
+  .login-card { background: #1e293b; border-radius: 16px; padding: 32px; box-shadow: 0 25px 50px rgba(0,0,0,0.4); }
+  .form-group { margin-bottom: 20px; }
+  label { display: block; color: #cbd5e1; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  input { width: 100%; padding: 12px 16px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #f1f5f9; font-size: 15px; outline: none; transition: border-color 0.2s; }
+  input:focus { border-color: #6366f1; }
+  .btn-login { width: 100%; padding: 13px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.2s; margin-top: 8px; }
+  .btn-login:hover { background: #4f46e5; }
+  .btn-login:disabled { background: #334155; cursor: not-allowed; }
+  .error-msg { background: #7f1d1d; color: #fca5a5; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .error-msg.show { display: block; }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-logo">
+    <h1>CRM System</h1>
+    <p>顧客管理システム</p>
+  </div>
+  <div class="login-card">
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="form-group">
+      <label>ユーザー名</label>
+      <input type="text" id="username" placeholder="username" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>パスワード</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="loginBtn" onclick="login()">ログイン</button>
+  </div>
+</div>
+<script>
+document.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+async function login() {
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('errorMsg');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  if (!username || !password) { showError('ユーザー名とパスワードを入力してください'); return; }
+  btn.disabled = true;
+  btn.textContent = 'ログイン中...';
+  err.classList.remove('show');
+  try {
+    const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || 'ログインに失敗しました'); return; }
+    location.href = '/';
+  } catch(e) { showError('サーバーエラーが発生しました'); }
+  finally { btn.disabled = false; btn.textContent = 'ログイン'; }
+}
+function showError(msg) {
+  const err = document.getElementById('errorMsg');
+  err.textContent = msg;
+  err.classList.add('show');
+}
+</script>
+</body>
+</html>
