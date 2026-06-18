@@ -1682,6 +1682,8 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     }
     try {
       const r = await pullFromSheets({ gsheets, Ops, Applicants, Logs });
+      // 取込後に即シートを更新: アーカイブされた不通/終了/対応中の行を削除し新規のみ表示
+      await pushToSheets({ gsheets, Ops, Logs, companies: OPS_COMPANIES, statuses: CALL_STATUSES, mediaList: OPS_MEDIA });
       sendJSON(res, 200, { ok: true, ...r, url: gsheets.sheetUrl() });
     } catch (e) {
       await Logs.create('sheets_pull', 'error', String(e.message || e));
