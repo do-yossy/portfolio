@@ -2551,7 +2551,13 @@ def run_publish_drafts():
             human_type(page, pass_sel, password)
             rand_delay(0.3, 0.8)
             page.click('button[type="submit"], input[type="submit"], form button')
-            page.wait_for_load_state('networkidle', timeout=15000)
+            try:
+                page.wait_for_url(lambda u: 'login' not in u.lower(), timeout=15000)
+            except Exception:
+                try:
+                    page.wait_for_load_state('domcontentloaded', timeout=10000)
+                except Exception:
+                    pass
             if 'login' in page.url.lower():
                 progress("❌ ログイン失敗", "error")
                 browser.close(); sys.exit(1)
@@ -2707,7 +2713,13 @@ def main():
 
             page.click('button[type="submit"], input[type="submit"], .login-btn, form button')
             rand_delay(0.8, 1.5)
-            page.wait_for_load_state('networkidle', timeout=15000)
+            try:
+                page.wait_for_url(lambda u: 'login' not in u.lower(), timeout=15000)
+            except Exception:
+                try:
+                    page.wait_for_load_state('domcontentloaded', timeout=10000)
+                except Exception:
+                    pass
 
             current_url = page.url
             progress(f"📍 ログイン後URL: {current_url}", "info")
