@@ -2586,6 +2586,22 @@ server.listen(PORT, () => {
     if (c > 0) console.log(`[cleanup] ${c}件の求人データを整理しました`);
   } catch (e) { console.error('[cleanup] startup error:', e.message); }
 
+  // 起動時: expires_at未設定・期限切れ求人を30日延長（Google Jobs validThrough対策）
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    const _dbPath = process.env.DATA_DIR
+      ? require('path').join(process.env.DATA_DIR, 'recruitment.db')
+      : require('path').join(__dirname, 'data', 'recruitment.db');
+    const _db = new DatabaseSync(_dbPath);
+    const _now = new Date().toISOString();
+    const _exp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const _today = _now.slice(0, 10);
+    const _r = _db.prepare(
+      `UPDATE jobs SET expires_at=?, published_at=?, updated_at=? WHERE is_published=1 AND (expires_at IS NULL OR expires_at < ?)`
+    ).run(_exp, _now, _now, _today);
+    if (_r.changes > 0) console.log(`[google-jobs-fix] expires_atを延長: ${_r.changes}件`);
+  } catch (e) { console.error('[google-jobs-fix] startup error:', e.message); }
+
   // Auto-expire jobs on startup
   try {
     const n = Jobs.expireOld();
