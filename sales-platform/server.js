@@ -124,6 +124,35 @@ const server = http.createServer(async (req, res) => {
       if (!token) return json(res, 503, { error: 'inbound無効（INBOUND_TOKEN/ADMIN_PASSWORD未設定）' });
       if (given !== token) return json(res, 401, { error: 'bad token' });
       const b = await parseJSON(req);
+
+      // ── コンテンツ購入（Brain/Tips/note 等）→ 売上(won)として記録＋通知 ──
+      if (b.kind === 'sale') {
+        const platform = String(b.source || 'brain').toLowerCase();
+        const product = String(b.product || b.title || b.subject || 'コンテンツ').slice(0, 120);
+        const buyer = String(b.from || b.buyer || '').slice(0, 120);
+        const amount = parseYen(b.amount) || parseYen(b.body) || parseYen(b.text) || 0;
+        const body = String(b.body || b.text || '').slice(0, 4000);
+        // 二重計上の防止：同じ ref（メールID/注文番号）が既にあれば計上しない
+        if (b.ref) {
+          const ex = Deals.findAll().find(d => d.ref && d.ref === String(b.ref) && d.source === platform);
+          if (ex) { json(res, 200, { ok: true, id: ex.id, dedup: true }); return; }
+        }
+        const deal = Deals.create({
+          title: `【購入】${platformLabel(platform)}：${product}`,
+          source: platform, type: 'content', stage: 'won', amount,
+          client: buyer, score: 100, priority: 'A', pred_win_rate: 100,
+          ref: b.ref ? String(b.ref) : '',
+          notes: `[購入通知 ${platformLabel(platform)}]\n金額：¥${amount.toLocaleString()}\n購入者：${buyer || '—'}\n\n${body}`
+        });
+        json(res, 200, { ok: true, id: deal.id, amount });
+        notify(`🎉 コンテンツ購入 ¥${amount.toLocaleString()}`, `${platformLabel(platform)}：${product}\n購入者：${buyer || '—'}`);
+        mail.sendSaleAlert({ product, amount, platform: platformLabel(platform), buyer, body })
+          .then(r => { if (r && !r.ok && !r.skipped) Logs.create('sale_mail', 'error', `売上メール失敗: ${r.status || r.error || ''}`); })
+          .catch(() => {});
+        Logs.create('sale', 'success', `${platformLabel(platform)} 購入 ¥${amount.toLocaleString()}: ${product}`);
+        return;
+      }
+
       const source = b.source || 'lancers';
       const body = String(b.body || b.text || '').slice(0, 4000);
       if (!body.trim()) return json(res, 400, { error: 'body required' });
@@ -287,6 +316,17 @@ function pick(s) {
 function mapType(v = '') {
   if (/AI/i.test(v)) return 'ai'; if (/LINE/i.test(v)) return 'line'; if (/EC/i.test(v)) return 'ec';
   if (/ツール|システム|アプリ/.test(v)) return 'system'; if (/コーポレート/.test(v)) return 'corp'; return 'LP';
+}
+// 「¥1,980」「1,980円」「1980」等から金額(整数)を取り出す。取れなければ0。
+function parseYen(v) {
+  if (typeof v === 'number' && isFinite(v)) return Math.max(0, Math.round(v));
+  const s = String(v || '');
+  const m = s.match(/[¥￥]\s*([0-9][0-9,]{1,})|([0-9][0-9,]{1,})\s*円/);
+  const n = m ? (m[1] || m[2] || '').replace(/,/g, '') : '';
+  return n ? parseInt(n, 10) || 0 : 0;
+}
+function platformLabel(p = '') {
+  return ({ brain: 'Brain', tips: 'Tips', note: 'note', booth: 'BOOTH', stores: 'STORES' })[String(p).toLowerCase()] || p;
 }
 function serveFile(res, name) {
   const fp = path.join(PUBLIC_DIR, name);

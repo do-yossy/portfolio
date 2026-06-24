@@ -49,3 +49,39 @@ A=媒体 / B=募集本文(入力) / C=案件名 / D=スコア / E=優先度 / F=
 - 返信したら **「✓返信済み」** で要返信を解除
 - 二重送信は Gmail ラベル「管制塔通知済み」で防止
 - 検知対象の絞り込みは `SUBJECT_HINTS`（件名キーワード）で調整可能
+
+---
+
+# コンテンツ販売通知（`コンテンツ販売通知.gs`）— 購入を管制塔の「売上」に自動計上
+
+Brain / Tips / note などから届く**「購入されました」系メール**を5分おきにGmailで検知し、
+管制塔の `/api/inbound` に `kind:"sale"` で送って **売上(won)として記録＋通知**する。
+売上は管制塔の **revenue_month（今月の売上）に自動反映**される。
+
+## 事前準備（プラットフォーム側）
+- **Brain / Tips / note の「購入時メール通知」をON**にし、通知先を連携済みGmail
+  （`social.recruiting.information@gmail.com`）に届くようにしておく。
+
+## セットアップ（5分）
+1. <https://script.google.com> で**新規プロジェクト** → `コンテンツ販売通知.gs` を貼り付けて保存
+2. **歯車（プロジェクトの設定）→ スクリプト プロパティ** に2つ追加：
+   - `API_BASE` = `https://sq-sales-tanto20.fly.dev`
+   - `INBOUND_TOKEN` = 管制塔のログインパスワード（専用トークン設定時はその値）
+3. 関数 `checkSalesMail` を **▶実行** → 初回は権限を**許可**
+4. 時計アイコン（トリガー）→ `checkSalesMail` を **時間主導・5分おき** に追加（または `createSalesTrigger` を1回実行）
+
+## 動き
+- 購入メール → 5分以内に管制塔へ **「売上(won)」カード**を作成（`【購入】Tips：商品名` 等）
+- 同時に **Slack通知**（`SLACK_WEBHOOK_URL` 設定時）＋ **自分宛メール**（`NOTIFY_EMAIL`＋Resend設定時）
+- 金額は件名・本文から自動抽出（`金額/価格/¥/円` を解析）。取れなければ0円で記録 → 管制塔で手修正可
+- 二重計上は Gmail ラベル「管制塔売上通知済み」＋ メールIDの `ref` で防止
+- 送信元ドメイン・件名キーワードは実際の通知メールに合わせて `SOURCES` / `SALE_HINTS` で調整
+
+## 管制塔側の設定（任意・通知を出したいとき）
+```bash
+# Slackに売上を流す
+fly secrets set SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXX" -a sq-sales-tanto20
+# 自分宛に売上メールを送る（Resendの認証ドメインが必要）
+fly secrets set NOTIFY_EMAIL="you@example.com" -a sq-sales-tanto20
+```
+※ 通知を出さなくても、購入は管制塔に記録され売上に反映されます。

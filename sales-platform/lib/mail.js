@@ -58,4 +58,23 @@ https://www.social-quality.com/
   return send({ to, subject: '【株式会社Social Quality】お問い合わせありがとうございます', text });
 }
 
-module.exports = { send, sendAck };
+// 自分への売上アラート（Brain/Tips/note等でコンテンツが売れたとき）。
+//   宛先は NOTIFY_EMAIL（無ければ MAIL_REPLY_TO）。Resend 未設定なら {skipped:true}。
+function sendSaleAlert({ product = 'コンテンツ', amount = 0, platform = '', buyer = '', body = '' } = {}) {
+  const to = process.env.NOTIFY_EMAIL || process.env.MAIL_REPLY_TO;
+  if (!to) return Promise.resolve({ skipped: true, reason: 'NOTIFY_EMAIL/MAIL_REPLY_TO 未設定' });
+  const yen = Number(amount || 0).toLocaleString();
+  const text =
+`🎉 コンテンツが売れました！
+
+プラットフォーム：${platform || '—'}
+商品：${product}
+金額：¥${yen}
+購入者：${buyer || '—'}
+
+管制塔で確認：https://sq-sales-tanto20.fly.dev/admin
+${body ? `\n──── 元メール抜粋 ────\n${String(body).slice(0, 800)}` : ''}`;
+  return send({ to, subject: `🎉【売上】${platform || 'コンテンツ'} ¥${yen}：${product}`, text });
+}
+
+module.exports = { send, sendAck, sendSaleAlert };
