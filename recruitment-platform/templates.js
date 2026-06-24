@@ -1517,7 +1517,7 @@ function jobDetailPageV2(job) {
   } : undefined;
 
   const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
-  const jobUrl  = `${siteUrl}/jobs/${job.id}`;
+  const jobUrl  = `${siteUrl}/preview/jobs/${job.id}`;
 
   const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
   const addressRegion = PREFS.find(p => firstLoc.includes(p)) || '';
@@ -1777,7 +1777,7 @@ function jobDetailPageV2(job) {
   return publicLayout(`${esc(job.title)} | 求人詳細`, content, {
     description: `${job.location}・${job.salary}・${job.employment_type}。${job.description.slice(0, 100)}`,
     jsonld,
-    canonical: `${siteUrl}/jobs/${job.id}`
+    canonical: `${siteUrl}/preview/jobs/${job.id}`
   });
 }
 
