@@ -1023,19 +1023,34 @@ const server = http.createServer(async (req, res) => {
     const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
     const jobs = await Jobs.findAll(true);
     const today = new Date().toISOString().slice(0, 10);
-    const jobUrls = jobs.map(j => `  <url>
+    const jobUrls = jobs.map(j => {
+      const lastmod = (j.updated_at || j.created_at || today).slice(0, 10);
+      return `  <url>
+    <loc>${siteUrl}/preview/jobs/${j.id}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>${siteUrl}/jobs/${j.id}</loc>
-    <lastmod>${(j.updated_at || j.created_at || today).slice(0, 10)}</lastmod>
+    <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-  </url>`).join('\n');
+  </url>`;
+    }).join('\n');
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${siteUrl}/preview/top</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
   <url>
     <loc>${siteUrl}/jobs</loc>
     <lastmod>${today}</lastmod>
     <changefreq>daily</changefreq>
-    <priority>1.0</priority>
+    <priority>0.9</priority>
   </url>
 ${jobUrls}
 </urlset>`;
@@ -1048,7 +1063,7 @@ ${jobUrls}
   if (pathname === '/robots.txt' && method === 'GET') {
     const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end(`User-agent: *\nAllow: /jobs\nAllow: /jobs/\nDisallow: /admin\nDisallow: /api/\n\nSitemap: ${siteUrl}/sitemap.xml\n`);
+    res.end(`User-agent: *\nAllow: /jobs\nAllow: /jobs/\nAllow: /preview/\nDisallow: /admin\nDisallow: /api/\n\nSitemap: ${siteUrl}/sitemap.xml\n`);
     return;
   }
 
