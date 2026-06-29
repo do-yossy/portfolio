@@ -12,17 +12,29 @@
 //   node scripts/seniorjob_daily_export.js --reset         # 出力済み記録をリセット
 //   node scripts/seniorjob_daily_export.js --status        # 残り件数を表示
 //
-// 出力: scripts/out/seniorjob-YYYYMMDD-NN.csv （UTF-8 BOM付き）
-//   ※Shift-JISが必要なら Windows PowerShell で:
-//     Get-Content 出力.csv | Out-File -Encoding Default 出力-sjis.csv
+// 出力: scripts/out/seniorjob-YYYYMMDD-NN.csv （Shift-JIS・シニアジョブ取込形式）
 
 const fs = require('fs');
 const path = require('path');
 
 const DIR = __dirname;
 const REF = require(path.join(DIR, 'seniorjob', 'ref_job.json'));      // {headers:[153], ref:[153]}
-const STATIONS = require(path.join(DIR, 'seniorjob', 'stations.json')); // [{station,postal,pref,city,address}]
+const STATIONS = require(path.join(DIR, 'seniorjob', 'stations.json')); // [{station,postal,pref,city,address,nearest}]
+const SJIS = require(path.join(DIR, 'seniorjob', 'sjis_table.json'));   // {codePoint: "hexbytes"} CP932変換表
 const OUT_DIR = path.join(DIR, 'out');
+
+// UTF-8文字列 → Shift-JIS(CP932) Buffer（シニアジョブはShift-JIS必須・BOMなし）
+function toSjis(str) {
+  const bytes = [];
+  for (const ch of str) {
+    const cp = ch.codePointAt(0);
+    if (cp < 0x80) { bytes.push(cp); continue; }     // ASCIIはそのまま
+    const hex = SJIS[cp];
+    if (hex) { for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.substr(i, 2), 16)); }
+    else { bytes.push(0x3F); }                        // 変換不能は '?'（通常発生しない）
+  }
+  return Buffer.from(bytes);
+}
 const STATE = path.join(OUT_DIR, 'seniorjob_used.json');
 
 // ── 引数 ──
@@ -82,13 +94,13 @@ function buildRow(st) {
 
 const lines = [H.map(q).join(',')];
 for (const st of pick) lines.push(buildRow(st));
-const csv = '﻿' + lines.join('\r\n') + '\r\n';
+const csv = lines.join('\r\n') + '\r\n';   // BOMなし
 
 // ファイル名（日付＋連番）
 const stamp = (process.env.SENIORJOB_DATE || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
 let n = 1, file;
 do { file = path.join(OUT_DIR, `seniorjob-${stamp}-${String(n).padStart(2, '0')}.csv`); n++; } while (fs.existsSync(file));
-fs.writeFileSync(file, csv, 'utf8');
+fs.writeFileSync(file, toSjis(csv));   // Shift-JIS(CP932)で書き出し
 
 // 出力済みを記録
 used.push(...pick.map(s => s.station));
@@ -97,4 +109,4 @@ fs.writeFileSync(STATE, JSON.stringify(used, null, 0));
 console.log(`出力: ${pick.length}件 → ${file}`);
 console.log(`  ${pick.map(s => s.station).join('・')}`);
 console.log(`残り未出力: ${STATIONS.length - used.length}件`);
-console.log('（UTF-8 BOM付き。Shift-JISが必要なら PowerShell: Get-Content <file> | Out-File -Encoding Default <file>-sjis.csv）');
+console.log('（Shift-JIS形式で出力済み。シニアジョブにそのまま取込できます）');
