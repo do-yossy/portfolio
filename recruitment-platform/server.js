@@ -543,6 +543,54 @@ ${items}
 </items>`;
 }
 
+// シニアジョブ用フィード（Indeed標準XML互換・シニア歓迎メタ付き）
+// シニアジョブ独自仕様が非公開のため、最も多くの媒体が取り込めるIndeed標準<source>形式で出力する
+function generateSeniorJobXML(jobs) {
+  const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
+  const company = process.env.COMPANY_NAME || '採用企業';
+  const buildDate = new Date().toUTCString();
+
+  const items = jobs.map(j => {
+    const sal     = parseSalaryNums(j.salary);
+    const salType = kyujinboxSalaryType(sal.type);
+    const loc     = normLocation(j.location);
+    // 都道府県と市区町村を分離（Indeed標準の state / city 用）
+    const pref    = loc.match(/^(.{2,3}[都道府県])/)?.[1] || '';
+    const city    = pref ? loc.slice(pref.length) : loc;
+    const pubDate = (j.published_at || j.created_at || new Date().toISOString()).slice(0, 10);
+    const tags    = (() => { try { return JSON.parse(j.tags || '[]'); } catch { return []; } })();
+    // シニア歓迎を明示（年齢不問・未経験OKを含む求人はシニア層に適合）
+    const seniorFlag = /年齢不問|未経験|シニア|ミドル|60|50/.test(`${j.title}${j.description}${tags.join('')}`) ? 'シニア・ミドル歓迎' : '年齢不問';
+    return `  <job>
+    <title><![CDATA[${j.title}]]></title>
+    <date><![CDATA[${pubDate}]]></date>
+    <referencenumber><![CDATA[${j.id}]]></referencenumber>
+    <url><![CDATA[${siteUrl}/jobs/${j.id}]]></url>
+    <company><![CDATA[${company}]]></company>
+    <city><![CDATA[${city}]]></city>
+    <state><![CDATA[${pref}]]></state>
+    <country><![CDATA[JP]]></country>
+    <postalcode><![CDATA[]]></postalcode>
+    <description><![CDATA[${j.description}]]></description>
+    <salary><![CDATA[${j.salary}]]></salary>
+    <salary-type><![CDATA[${salType}]]></salary-type>
+    <salary-min><![CDATA[${sal.min || ''}]]></salary-min>
+    <salary-max><![CDATA[${sal.max || ''}]]></salary-max>
+    <jobtype><![CDATA[${j.employment_type}]]></jobtype>
+    <category><![CDATA[${j.job_type}]]></category>
+    <experience><![CDATA[${seniorFlag}]]></experience>
+  </job>`;
+  }).join('\n');
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<source>
+  <publisher><![CDATA[${company}]]></publisher>
+  <publisherurl>${siteUrl}</publisherurl>
+  <lastBuildDate>${buildDate}</lastBuildDate>
+${items}
+</source>`;
+}
+
 // CSV export
 function generateCSV(applicants, includeCompany = false) {
   const headers = includeCompany
@@ -1860,6 +1908,14 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const xml = generateStanbyXML(jobs);
     await Logs.create('xml_generate', 'success', `スタンバイXML生成${query.company ? '(' + query.company + ')' : ''}: ${jobs.length}件`);
     res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': 'attachment; filename="stanby-feed.xml"' });
+    res.end(xml);
+    return;
+  }
+  if (pathname === '/api/feed/seniorjob' && method === 'GET') {
+    const jobs = await Jobs.findAll(true);
+    const xml = generateSeniorJobXML(jobs);
+    await Logs.create('xml_generate', 'success', `シニアジョブXML生成: ${jobs.length}件`);
+    res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': 'attachment; filename="seniorjob-feed.xml"' });
     res.end(xml);
     return;
   }
