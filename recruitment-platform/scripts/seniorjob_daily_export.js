@@ -26,7 +26,6 @@ const fs = require('fs');
 const path = require('path');
 
 const DIR = __dirname;
-const REF = require(path.join(DIR, 'seniorjob', 'ref_job.json'));      // {headers:[153], ref:[153]}
 const STATIONS = require(path.join(DIR, 'seniorjob', 'stations.json')); // [{station,postal,pref,city,address,nearest}]
 const SJIS = require(path.join(DIR, 'seniorjob', 'sjis_table.json'));   // {codePoint: "hexbytes"} CP932変換表
 const OUT_DIR = path.join(DIR, 'out');
@@ -44,18 +43,25 @@ function toSjis(str) {
   }
   return Buffer.from(bytes);
 }
-const STATE = path.join(OUT_DIR, 'seniorjob_used.json');
-
 // ── 引数 ──
 const args = process.argv.slice(2);
 const has = f => args.includes(f);
 const getN = (f, d) => { const i = args.indexOf(f); return i >= 0 && args[i + 1] ? parseInt(args[i + 1], 10) : d; };
+const getS = (f, d) => { const i = args.indexOf(f); return i >= 0 && args[i + 1] ? args[i + 1] : d; };
+
+// 会社（既定sq）。会社ごとに雛形・出力状況を分ける。
+const COMPANY = (getS('--company', 'sq') || 'sq').toLowerCase();
+// 雛形パス: sq は ref_job.json、その他は ref-<会社>.json
+const refPath = co => path.join(DIR, 'seniorjob', co === 'sq' ? 'ref_job.json' : `ref-${co}.json`);
+const loadRef = co => { try { return require(refPath(co)); } catch { return null; } };
+// 出力状況ファイル: sq は従来名、その他は会社別（出社状況を会社ごとに独立管理）
+const STATE = path.join(OUT_DIR, COMPANY === 'sq' ? 'seniorjob_used.json' : `seniorjob_used-${COMPANY}.json`);
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 let used = [];
 try { used = JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch {}
 
-if (has('--reset')) { fs.writeFileSync(STATE, '[]'); console.log('出力済み記録をリセットしました'); process.exit(0); }
+if (has('--reset')) { fs.writeFileSync(STATE, '[]'); console.log(`出力済み記録をリセットしました (${COMPANY})`); process.exit(0); }
 
 // 仕事内容テンプレ一覧
 function listContents() {
@@ -89,8 +95,15 @@ let contentText = null, contentLabel = '雛形(ロケ同行ドライバー)';
 
 const remaining = STATIONS.filter(s => !used.includes(s.station));
 if (has('--status')) {
-  console.log(`全駅: ${STATIONS.length} / 出力済み: ${used.length} / 残り: ${remaining.length}`);
+  console.log(`会社: ${COMPANY} / 全駅: ${STATIONS.length} / 出力済み: ${used.length} / 残り: ${remaining.length}`);
   process.exit(0);
+}
+
+// 雛形（会社別）を読み込む。未登録の会社はここで終了。
+const REF = loadRef(COMPANY);
+if (!REF) {
+  console.error(`雛形が未登録です（会社: ${COMPANY}）。${path.basename(refPath(COMPANY))} がありません。掲載済み求人のCSVから雛形を作成してください。`);
+  process.exit(2);
 }
 
 const count = has('--all') ? remaining.length : getN('--count', 10);
@@ -143,7 +156,7 @@ const csv = lines.join('\r\n') + '\r\n';   // BOMなし
 // ファイル名（日付＋連番）
 const stamp = (process.env.SENIORJOB_DATE || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
 let n = 1, file;
-do { file = path.join(OUT_DIR, `seniorjob-${stamp}-${String(n).padStart(2, '0')}.csv`); n++; } while (fs.existsSync(file));
+do { file = path.join(OUT_DIR, `seniorjob-${COMPANY}-${stamp}-${String(n).padStart(2, '0')}.csv`); n++; } while (fs.existsSync(file));
 fs.writeFileSync(file, toSjis(csv));   // Shift-JIS(CP932)で書き出し
 
 // 出力済みを記録

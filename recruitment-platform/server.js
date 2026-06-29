@@ -44,13 +44,24 @@ const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
 
-// ── シニアジョブ 日次CSV: 掲載状況の取得 ──
-function seniorjobStatus() {
+// 会社IDの正規化（未知の会社は sq にフォールバック）
+function seniorjobCompany(co) {
+  return OPS_COMPANIES.find(c => c.id === co) ? co : 'sq';
+}
+
+// ── シニアジョブ 日次CSV: 掲載状況の取得（会社別） ──
+function seniorjobStatus(coRaw) {
+  const co = seniorjobCompany(coRaw);
   const sjDir = path.join(SCRIPTS_DIR, 'seniorjob');
   let total = 0;
   try { total = JSON.parse(fs.readFileSync(path.join(sjDir, 'stations.json'), 'utf8')).length; } catch {}
+  // 雛形の有無（sq=ref_job.json / 他=ref-<co>.json）
+  const refFile = co === 'sq' ? 'ref_job.json' : `ref-${co}.json`;
+  const hasTemplate = fs.existsSync(path.join(sjDir, refFile));
+  // 出力状況ファイル（sqは従来名）
+  const usedFile = co === 'sq' ? 'seniorjob_used.json' : `seniorjob_used-${co}.json`;
   let used = [];
-  try { used = JSON.parse(fs.readFileSync(path.join(SCRIPTS_DIR, 'out', 'seniorjob_used.json'), 'utf8')); } catch {}
+  try { used = JSON.parse(fs.readFileSync(path.join(SCRIPTS_DIR, 'out', usedFile), 'utf8')); } catch {}
   let contents = [];
   try {
     contents = fs.readdirSync(path.join(sjDir, 'contents'))
@@ -59,7 +70,7 @@ function seniorjobStatus() {
       .map(f => ({ key: f.replace(/\.txt$/, ''), label: f.replace(/\.txt$/, '') }));
   } catch {}
   const usedN = Array.isArray(used) ? used.length : 0;
-  return { total, used: usedN, remaining: Math.max(0, total - usedN), contents };
+  return { company: co, hasTemplate, total, used: usedN, remaining: Math.max(0, total - usedN), contents };
 }
 
 // ── シニアジョブ 日次CSV: ジェネレーターを実行（CLIと同じロジック・状態を共有） ──
@@ -142,7 +153,7 @@ function parseSeniorjobApplicant(raw) {
 }
 
 // 解析結果 → Applicants.create() 用レコード（媒体=シニアジョブ・会社=SQ・連絡先なし）
-function buildSeniorjobApplicantRecord(p) {
+function buildSeniorjobApplicantRecord(p, company) {
   const notes = [
     p.sid ? `求職者ID:${p.sid}` : '',
     p.stage ? `選考状況:${p.stage}` : '',
@@ -165,8 +176,8 @@ function buildSeniorjobApplicantRecord(p) {
     job_title: p.jobTitle || '',
     work_location: p.wantLocation || '',
     notes,
-    phone: '', email: '',            // シニアジョブは連絡先非公開（NOT NULL回避のため空文字）
-    company: 'sq',
+    phone: '', email: '',            // シニアジョブは連絡先非公開（NOT NULL回避のため空文字。後でスプレッドシートで手入力）
+    company: company || 'sq',
     media: 'seniorjob',              // 媒体クロス集計の「シニアジョブ」列に計上
     sourceMedia: 'シニアジョブ',
     status: '新規',                  // 新規応募・架電リストに表示される
@@ -2051,42 +2062,51 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
-  // ── API: シニアジョブ 掲載状況 ──
+  // ── API: シニアジョブ 掲載状況（会社別） ──
   if (pathname === '/api/seniorjob/status' && method === 'GET') {
-    sendJSON(res, 200, seniorjobStatus());
+    sendJSON(res, 200, seniorjobStatus(query.company));
     return;
   }
-  // ── API: シニアジョブ 応募者をコピペで1件取込 ──
+  // ── API: シニアジョブ 応募者をコピペで1件取込（会社別） ──
   if (pathname === '/api/seniorjob/applicant' && method === 'POST') {
     const body = await parseJSON(req);
+    const company = seniorjobCompany(body.company);
     const parsed = parseSeniorjobApplicant(body.text || '');
     if (!parsed.name) {
       sendError(res, 400, '氏名を検出できませんでした。シニアジョブの応募者詳細（氏名・年齢が含まれる範囲）をコピーして貼り付けてください。');
       return;
     }
-    // 求職者IDで重複チェック（連絡先が無いため通常の重複判定が効かない）
+    // 求職者IDで重複チェック（連絡先が無いため通常の重複判定が効かない。会社単位で判定）
     if (parsed.sid) {
       try {
         const all = await Applicants.findAll({});
-        const dup = (all || []).find(a => (a.media === 'seniorjob') && String(a.notes || '').includes(`求職者ID:${parsed.sid}`));
+        const dup = (all || []).find(a => (a.media === 'seniorjob') && (a.company === company) && String(a.notes || '').includes(`求職者ID:${parsed.sid}`));
         if (dup) { sendJSON(res, 200, { ok: true, duplicate: true, name: parsed.name, sid: parsed.sid, id: dup.id }); return; }
       } catch {}
     }
-    const created = await Applicants.create(buildSeniorjobApplicantRecord(parsed));
-    await Logs.create('seniorjob_applicant', 'success', `シニアジョブ応募者取込: ${parsed.name}（求職者ID:${parsed.sid || '-'}）`);
-    sendJSON(res, 201, { ok: true, id: created.id, name: parsed.name, sid: parsed.sid, stage: parsed.stage, jobTitle: parsed.jobTitle });
+    const created = await Applicants.create(buildSeniorjobApplicantRecord(parsed, company));
+    await Logs.create('seniorjob_applicant', 'success', `シニアジョブ応募者取込: ${parsed.name}（${company}/求職者ID:${parsed.sid || '-'}）`);
+    sendJSON(res, 201, { ok: true, id: created.id, name: parsed.name, sid: parsed.sid, stage: parsed.stage, jobTitle: parsed.jobTitle, company });
     return;
   }
-  // ── API: シニアジョブ 記録リセット ──
+  // ── API: シニアジョブ 記録リセット（会社別） ──
   if (pathname === '/api/seniorjob/reset' && method === 'POST') {
-    try { fs.writeFileSync(path.join(SCRIPTS_DIR, 'out', 'seniorjob_used.json'), '[]'); } catch {}
-    sendJSON(res, 200, { ok: true });
+    const body = await parseJSON(req);
+    const company = seniorjobCompany(body.company);
+    const usedFile = company === 'sq' ? 'seniorjob_used.json' : `seniorjob_used-${company}.json`;
+    try { fs.writeFileSync(path.join(SCRIPTS_DIR, 'out', usedFile), '[]'); } catch {}
+    sendJSON(res, 200, { ok: true, company });
     return;
   }
-  // ── API: シニアジョブ 次のN件のCSVを生成してダウンロード（Shift-JIS） ──
+  // ── API: シニアジョブ 次のN件のCSVを生成してダウンロード（Shift-JIS・会社別） ──
   if (pathname === '/api/seniorjob/csv' && method === 'GET') {
+    const company = seniorjobCompany(query.company);
+    if (!seniorjobStatus(company).hasTemplate) {
+      sendError(res, 409, `この会社（${company}）の雛形が未登録です。掲載済み求人のCSVから雛形（ref-${company}.json）を作成してください。`);
+      return;
+    }
     const count = Math.max(1, Math.min(136, parseInt(query.count, 10) || 10));
-    const cliArgs = ['--count', String(count)];
+    const cliArgs = ['--company', company, '--count', String(count)];
     if (query.content) cliArgs.push('--content', String(query.content));
     let stdout;
     try { stdout = await runSeniorjob(cliArgs); }
