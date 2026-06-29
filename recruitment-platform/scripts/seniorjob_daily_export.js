@@ -11,6 +11,14 @@
 //   node scripts/seniorjob_daily_export.js --all           # 残り全件を出力
 //   node scripts/seniorjob_daily_export.js --reset         # 出力済み記録をリセット
 //   node scripts/seniorjob_daily_export.js --status        # 残り件数を表示
+//   node scripts/seniorjob_daily_export.js --content 02    # 仕事内容を差し替え（contents/02*.txt を使用）
+//   node scripts/seniorjob_daily_export.js --list          # 仕事内容テンプレ一覧を表示
+//
+// 仕事内容の変え方（一巡したら別内容にしたい場合）:
+//   1. scripts/seniorjob/contents/ に新しいテキストファイルを作る（例: 02-警備.txt）。中身が仕事内容本文。
+//   2. node scripts/seniorjob_daily_export.js --reset    （出力済み記録をリセット）
+//   3. node scripts/seniorjob_daily_export.js --content 02   （以後この内容で出力）
+//   ※--content を付けない場合は雛形（ロケ同行ドライバー）の仕事内容のまま出力します。
 //
 // 出力: scripts/out/seniorjob-YYYYMMDD-NN.csv （Shift-JIS・シニアジョブ取込形式）
 
@@ -22,6 +30,7 @@ const REF = require(path.join(DIR, 'seniorjob', 'ref_job.json'));      // {heade
 const STATIONS = require(path.join(DIR, 'seniorjob', 'stations.json')); // [{station,postal,pref,city,address,nearest}]
 const SJIS = require(path.join(DIR, 'seniorjob', 'sjis_table.json'));   // {codePoint: "hexbytes"} CP932変換表
 const OUT_DIR = path.join(DIR, 'out');
+const CONTENTS_DIR = path.join(DIR, 'seniorjob', 'contents'); // 仕事内容テンプレ置き場（*.txt）
 
 // UTF-8文字列 → Shift-JIS(CP932) Buffer（シニアジョブはShift-JIS必須・BOMなし）
 function toSjis(str) {
@@ -48,6 +57,36 @@ try { used = JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch {}
 
 if (has('--reset')) { fs.writeFileSync(STATE, '[]'); console.log('出力済み記録をリセットしました'); process.exit(0); }
 
+// 仕事内容テンプレ一覧
+function listContents() {
+  try { return fs.readdirSync(CONTENTS_DIR).filter(f => f.endsWith('.txt')).sort(); } catch { return []; }
+}
+if (has('--list')) {
+  const files = listContents();
+  console.log('仕事内容テンプレ (scripts/seniorjob/contents/):');
+  if (!files.length) console.log('  （なし。--content を付けなければ雛形の仕事内容を使用します）');
+  files.forEach(f => console.log('  ' + f));
+  console.log('使用例: node scripts/seniorjob_daily_export.js --content ' + (files[0] ? files[0].replace(/\.txt$/, '').slice(0, 2) : '02'));
+  process.exit(0);
+}
+
+// --content <名前>: contents/ から「名前」で始まる .txt を読み、仕事内容を差し替える
+let contentText = null, contentLabel = '雛形(ロケ同行ドライバー)';
+{
+  const i = args.indexOf('--content');
+  const key = i >= 0 && args[i + 1] ? args[i + 1] : null;
+  if (key) {
+    const files = listContents();
+    const hit = files.find(f => f === key || f === key + '.txt' || f.startsWith(key));
+    if (!hit) {
+      console.error(`仕事内容テンプレ「${key}」が見つかりません。--list で一覧を確認してください。`);
+      process.exit(1);
+    }
+    contentText = fs.readFileSync(path.join(CONTENTS_DIR, hit), 'utf8').replace(/\r\n/g, '\n').replace(/\s+$/, '');
+    contentLabel = hit;
+  }
+}
+
 const remaining = STATIONS.filter(s => !used.includes(s.station));
 if (has('--status')) {
   console.log(`全駅: ${STATIONS.length} / 出力済み: ${used.length} / 残り: ${remaining.length}`);
@@ -69,6 +108,7 @@ const I = {
   city: idx('勤務地1市区町村'),
   addr: idx('勤務地1詳細住所'),
   eki:  idx('勤務地1最寄駅'),
+  content: idx('(必須)仕事内容'),
 };
 
 // 政令市は「市区町村」を区のみにする（参照求人の形式に合わせる: 大阪府 / 西区 / 江戸堀1-27-8）
@@ -92,6 +132,7 @@ function buildRow(st) {
   // 無ければ空欄（コード無しのテキストはバリデーションエラーになるため）。
   const ekiName = st.ekiName || (st.nearest ? st.nearest.replace(/\s*徒歩.*$/, '') : (st.station + '駅'));
   row[I.eki]    = st.code ? `${ekiName}(コード:${st.code}) 徒歩5分` : '';
+  if (contentText && I.content >= 0) row[I.content] = contentText;  // 仕事内容の差し替え
   return row.map(q).join(',');
 }
 
@@ -110,6 +151,7 @@ used.push(...pick.map(s => s.station));
 fs.writeFileSync(STATE, JSON.stringify(used, null, 0));
 
 console.log(`出力: ${pick.length}件 → ${file}`);
+console.log(`  仕事内容: ${contentLabel}`);
 console.log(`  ${pick.map(s => s.station).join('・')}`);
 console.log(`残り未出力: ${STATIONS.length - used.length}件`);
 console.log('（Shift-JIS形式で出力済み。シニアジョブにそのまま取込できます）');
