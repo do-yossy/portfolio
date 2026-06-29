@@ -35,7 +35,6 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     jobs:      (c) => `/admin/jobs?co=${c}`,
     analytics: (c) => `/admin/analytics?co=${c}`,
     logs:      (c) => `/admin/logs?co=${c}`,
-    seniorjob: (c) => `/admin/seniorjob?co=${c}`,
     site:      ()  => '/jobs',
   };
   const getHref = (key, c) => pageHref[key] ? pageHref[key](c) : `/admin/ops?tab=posts&co=${c}`;
@@ -46,7 +45,6 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     { key: 'past',      icon: '📚', label: '過去応募者' },
     { key: 'calls',     icon: '📞', label: '架電リスト' },
     { key: 'jobs',      icon: '💼', label: '求人管理' },
-    { key: 'seniorjob', icon: '🚃', label: 'シニアジョブ' },
     { key: 'analytics', icon: '📈', label: '分析・レポート' },
     { key: 'logs',      icon: '📋', label: '投稿ログ' },
     { key: 'site',      icon: '🌐', label: '求人サイトを見る' },
@@ -2112,6 +2110,63 @@ function privacyPolicyPage() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// シニアジョブ 掲載パネル（掲載管理ページに組み込み）／応募者取込パネル（架電リストに組み込み）
+// どちらも /api/seniorjob/* を叩く自己完結UI。
+// ══════════════════════════════════════════════════════════════
+function seniorjobPostPanel() {
+  return `
+    <section class="card" id="sj-post-panel" style="margin-top:24px">
+      <h2>🚃 シニアジョブ 求人掲載（CSVダウンロード）</h2>
+      <p class="muted" style="margin-top:4px">掲載済み求人を雛形に、勤務地（駅）を差し替えた取込用CSVを作成します。ボタンでCSVをダウンロード → シニアジョブに取込してください。</p>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;margin:8px 0 14px">
+        <div><div class="muted" style="font-size:12px">全駅</div><div style="font-size:24px;font-weight:700" id="sj-total">-</div></div>
+        <div><div class="muted" style="font-size:12px">掲載済み</div><div style="font-size:24px;font-weight:700;color:#16a34a" id="sj-used">-</div></div>
+        <div><div class="muted" style="font-size:12px">残り</div><div style="font-size:24px;font-weight:700;color:#7c3aed" id="sj-remaining">-</div></div>
+      </div>
+      <div style="background:#eee;border-radius:8px;height:10px;overflow:hidden;max-width:520px;margin-bottom:16px"><div id="sj-bar" style="background:#7c3aed;height:100%;width:0%"></div></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <label>件数<br><input id="sj-count" type="number" value="10" min="1" max="136" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px"></label>
+        <label>仕事内容<br><select id="sj-content" style="padding:8px;border:1px solid #ccc;border-radius:6px"><option value="">雛形（ロケ同行ドライバー）</option></select></label>
+        <button class="btn btn-primary" id="sj-download">⬇ 求人掲載（CSVダウンロード）</button>
+        <button class="btn btn-ghost" id="sj-reset">記録をリセット</button>
+      </div>
+      <p class="muted" id="sj-msg" style="margin-top:12px;font-size:13px"></p>
+    </section>
+    <script>
+    (function(){
+      var msg=document.getElementById('sj-msg');
+      async function refresh(){try{var s=await(await fetch('/api/seniorjob/status')).json();
+        document.getElementById('sj-total').textContent=s.total;document.getElementById('sj-used').textContent=s.used;document.getElementById('sj-remaining').textContent=s.remaining;
+        document.getElementById('sj-bar').style.width=(s.total?Math.round(s.used/s.total*100):0)+'%';
+        var sel=document.getElementById('sj-content');if(sel&&sel.options.length<=1&&s.contents){s.contents.forEach(function(c){var o=document.createElement('option');o.value=c.key;o.textContent=c.label;sel.appendChild(o);});}
+      }catch(e){}}
+      document.getElementById('sj-download').onclick=async function(){var n=document.getElementById('sj-count').value||10;var c=document.getElementById('sj-content').value;msg.textContent='CSVを生成中…';try{var url='/api/seniorjob/csv?count='+encodeURIComponent(n)+(c?'&content='+encodeURIComponent(c):'');var r=await fetch(url);if(!r.ok){msg.textContent='エラー: '+(await r.text());return;}var blob=await r.blob();var cd=r.headers.get('Content-Disposition')||'';var m=cd.match(/filename="?([^"]+)"?/);var fn=m?decodeURIComponent(m[1]):'seniorjob.csv';var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();msg.textContent='ダウンロードしました: '+fn+'（シニアジョブに取込してください）';refresh();}catch(e){msg.textContent='エラー: '+e.message;}};
+      document.getElementById('sj-reset').onclick=async function(){if(!confirm('掲載済み記録をリセットして最初の駅から出力しますか？'))return;await fetch('/api/seniorjob/reset',{method:'POST'});msg.textContent='記録をリセットしました';refresh();};
+      refresh();
+    })();
+    </script>`;
+}
+function seniorjobCallPanel() {
+  return `
+    <section class="card" id="sj-app-panel" style="margin-top:24px">
+      <h2>🚃 シニアジョブ 応募者の取込（コピペ）</h2>
+      <p class="muted" style="margin-top:4px">シニアジョブは応募者の一括ダウンロードが無いため1人ずつ取り込みます。選考管理の<b>応募者詳細</b>を選択コピーして貼り付け → 「取込」。会社=SQ・媒体=シニアジョブで登録され、この架電リスト／新規応募に表示されます。<br>※電話番号・メールは媒体仕様で取得できません（連絡は媒体内メッセージ／面接時のみ）。</p>
+      <textarea id="sj-app-text" rows="6" placeholder="応募者詳細を貼り付け（氏名・年齢〜希望勤務地のあたり）" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:13px"></textarea>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:10px">
+        <button class="btn btn-primary" id="sj-app-import">➕ 応募者を取込</button>
+        <button class="btn btn-ghost" id="sj-app-clear">クリア</button>
+        <span id="sj-app-msg" style="font-size:13px"></span>
+      </div>
+    </section>
+    <script>
+    (function(){var amsg=document.getElementById('sj-app-msg');
+      document.getElementById('sj-app-clear').onclick=function(){document.getElementById('sj-app-text').value='';amsg.textContent='';};
+      document.getElementById('sj-app-import').onclick=async function(){var t=document.getElementById('sj-app-text').value||'';if(!t.trim()){amsg.style.color='#b91c1c';amsg.textContent='応募者の内容を貼り付けてください';return;}amsg.style.color='';amsg.textContent='取込中…';try{var r=await fetch('/api/seniorjob/applicant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});var j=await r.json();if(!r.ok){amsg.style.color='#b91c1c';amsg.textContent='エラー: '+(j.error||r.status);return;}if(j.duplicate){amsg.style.color='#b45309';amsg.textContent='既に取込済み: '+j.name+'（求職者ID:'+(j.sid||'-')+'）';return;}amsg.style.color='#16a34a';amsg.textContent='取込みました: '+j.name+'（'+(j.jobTitle||'')+' / '+(j.stage||'')+'）。一覧を更新します…';document.getElementById('sj-app-text').value='';setTimeout(function(){location.reload();},1200);}catch(e){amsg.style.color='#b91c1c';amsg.textContent='エラー: '+e.message;}};
+    })();
+    </script>`;
+}
+
 // 運用管理ページ（3タブ）
 // ══════════════════════════════════════════════════════════════
 function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applicantsCross = {}, todayTargets = {}, stats = {}, pastApplicants = [], months = [], filter = {}, siteUrl = '', indeedRepostCount = 0 } = {}) {
@@ -2175,7 +2230,8 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
         <h2>媒体別 × 会社別 掲載中件数</h2>
         ${crossTable(postsCross, '会社＼媒体', POSTS_MEDIA)}
       </section>
-      ${opsAutomationPanel(co, siteUrl, indeedRepostCount)}`;
+      ${opsAutomationPanel(co, siteUrl, indeedRepostCount)}
+      ${seniorjobPostPanel()}`;
   }
 
   // ── Tab B: 新規応募者 ──
@@ -2479,6 +2535,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
         </table>
       </div>
     </section>
+    ${seniorjobCallPanel()}
     ${callImportModalHtml(isAll ? COMPANIES_ORDER[0] : co, media)}`;
 
   return adminLayout('架電リスト', content, 'calls', isAll ? COMPANIES_ORDER[0] : co);
