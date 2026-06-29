@@ -7,6 +7,7 @@ node_modules/
 __pycache__/
 *.pyc
 logs/*.png
+scripts/out/
 
 # Google サービスアカウント鍵（絶対にコミットしない）
 google-key.json
