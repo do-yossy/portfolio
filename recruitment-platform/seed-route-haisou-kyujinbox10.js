@@ -1,6 +1,6 @@
 'use strict';
 // ルート配送ドライバー（企業配送）求人15件・第10弾（求人ボックス掲載）
-// 関西の未使用エリア（第1〜9弾と全エリア重複なし：京都府・奈良県・和歌山県・滋賀県）
+// 大阪近辺（京都府・兵庫県）の未使用エリア（第1〜9弾と全エリア重複なし）
 // 給与は「月給42万円〜62万円」
 // 冪等: 対象拠点のみ削除してから作り直す
 
@@ -18,35 +18,44 @@ const HAISOU_IMAGE = '/images/ec-haisou-koujikyuu.jpg';
 const SALARY_INCOME = '月給42万円〜62万円';
 const SALARY_DETAIL = '月給420,000円〜620,000円（歩合・各種手当込み）';
 
-// 既使用エリア（第1〜9弾）= 大阪府全域・兵庫県（神戸各区/明石/加古川/姫路/高砂/川西/三田）・京都向日
-// 本弾: 京都府・奈良県・和歌山県・滋賀県の未使用エリア（駅・町名単位）
+// 既使用エリア（第1〜9弾）= 大阪府全域・兵庫県（神戸 灘/中央/兵庫/長田/須磨/垂水/西/北・明石/加古川/姫路/高砂/川西/三田）・京都向日
+// 本弾: 大阪近辺（京都府・兵庫県）の未使用エリア。大阪府は第1〜9弾でエリアを使い切っているため隣接府県で構成。
 const AREAS = [
-  { pref: '京都府',   city: '京都市',     district: '伏見区桃山',   client: '食品・飲料メーカー' },
-  { pref: '京都府',   city: '京都市',     district: '右京区太秦',   client: '工場・倉庫向け資材' },
-  { pref: '京都府',   city: '宇治市',     district: '大久保',       client: '食品・日用品卸売' },
-  { pref: '京都府',   city: '亀岡市',     district: '篠町',         client: '医療機器・事業所向け用品' },
-  { pref: '京都府',   city: '城陽市',     district: '寺田',         client: '企業・商業施設向け日用品' },
-  { pref: '京都府',   city: '長岡京市',   district: '神足',         client: '食品・工業用品メーカー' },
-  { pref: '奈良県',   city: '奈良市',     district: '大宮町',       client: '食品・飲料メーカー' },
-  { pref: '奈良県',   city: '橿原市',     district: '八木町',       client: '工場・倉庫向け資材' },
-  { pref: '奈良県',   city: '生駒市',     district: '北新町',       client: '食品・日用品卸売' },
-  { pref: '奈良県',   city: '大和高田市', district: '北本町',       client: '企業・事業所向け日用品' },
-  { pref: '奈良県',   city: '香芝市',     district: '上中',         client: '医療機器・日用品卸' },
-  { pref: '和歌山県', city: '和歌山市',   district: '美園町',       client: '食品・飲料メーカー' },
-  { pref: '和歌山県', city: '岩出市',     district: '中黒',         client: '工場・倉庫向け資材' },
-  { pref: '滋賀県',   city: '大津市',     district: 'におの浜',     client: '食品・日用品卸売' },
-  { pref: '滋賀県',   city: '草津市',     district: '大路',         client: '企業・商業施設向け日用品' },
+  { pref: '京都府', city: '京都市',   district: '伏見区桃山', client: '食品・飲料メーカー' },
+  { pref: '京都府', city: '京都市',   district: '右京区西院', client: '工場・倉庫向け資材' },
+  { pref: '京都府', city: '京都市',   district: '西京区桂',   client: '企業・商業施設向け日用品' },
+  { pref: '京都府', city: '宇治市',   district: '大久保',     client: '食品・日用品卸売' },
+  { pref: '京都府', city: '長岡京市', district: '神足',       client: '食品・工業用品メーカー' },
+  { pref: '京都府', city: '城陽市',   district: '寺田',       client: '医療機器・事業所向け用品' },
+  { pref: '京都府', city: '八幡市',   district: '八幡',       client: '食品・日用品卸売' },
+  { pref: '京都府', city: '京田辺市', district: '田辺',       client: '工場・倉庫向け資材' },
+  { pref: '兵庫県', city: '西宮市',   district: '西宮',       client: '食品・飲料メーカー' },
+  { pref: '兵庫県', city: '尼崎市',   district: '立花',       client: '工場・倉庫向け資材' },
+  { pref: '兵庫県', city: '伊丹市',   district: '伊丹',       client: '食品・日用品卸売' },
+  { pref: '兵庫県', city: '宝塚市',   district: '宝塚',       client: '企業・商業施設向け日用品' },
+  { pref: '兵庫県', city: '芦屋市',   district: '打出',       client: '医療機器・事業所向け用品' },
+  { pref: '兵庫県', city: '神戸市',   district: '東灘区住吉', client: '食品・工業資材メーカー' },
+  { pref: '兵庫県', city: '猪名川町', district: '北田原',     client: '工場・倉庫向け資材' },
 ];
 
 const now = new Date().toISOString();
 const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
+// 旧第10弾（京都/奈良/和歌山/滋賀）のロケーション。エリア変更に伴い、旧分も削除して作り直す。
+const PREV_AREAS = [
+  '京都府京都市伏見区桃山', '京都府京都市右京区太秦', '京都府宇治市大久保', '京都府亀岡市篠町',
+  '京都府城陽市寺田', '京都府長岡京市神足', '奈良県奈良市大宮町', '奈良県橿原市八木町',
+  '奈良県生駒市北新町', '奈良県大和高田市北本町', '奈良県香芝市上中', '和歌山県和歌山市美園町',
+  '和歌山県岩出市中黒', '滋賀県大津市におの浜', '滋賀県草津市大路',
+];
+
 const locations = AREAS.map(a => `${a.pref}${a.city}${a.district}`);
-const placeholders = locations.map(() => '?').join(',');
+const delTargets = [...new Set([...PREV_AREAS, ...locations])];
+const placeholders = delTargets.map(() => '?').join(',');
 const del = db.prepare(
   `DELETE FROM jobs WHERE job_type='ルート配送ドライバー（企業配送）' AND target_media LIKE '%求人ボックス%' AND location IN (${placeholders})`
-).run(...locations);
-if (del.changes > 0) console.log(`既存を削除: ${del.changes}件`);
+).run(...delTargets);
+if (del.changes > 0) console.log(`既存（旧第10弾含む）を削除: ${del.changes}件`);
 
 const stmt = db.prepare(`
   INSERT INTO jobs (id,title,location,salary,job_type,employment_type,description,tags,catchcopy,image_url,is_published,target_media,published_at,expires_at,created_at,updated_at,company,rewarding,worktime_holiday,transportation,how_to_apply)
@@ -152,4 +161,4 @@ ${SALARY_DETAIL}
   created++;
 }
 
-console.log(`\n完了: ${created}件作成（ルート配送ドライバー（企業配送）第10弾・京都/奈良/和歌山/滋賀の未使用エリア15件）`);
+console.log(`\n完了: ${created}件作成（ルート配送ドライバー（企業配送）第10弾・大阪近辺（京都・兵庫）の未使用エリア15件）`);
