@@ -76,7 +76,7 @@ function buildRow(st) {
   row[I.pref]   = st.pref || '';
   row[I.city]   = wardForm(st.city || '');
   row[I.addr]   = st.address || '';
-  row[I.eki]    = '';                 // 最寄駅コードは内部値のため空（取込後に手動設定）
+  row[I.eki]    = st.nearest || '';   // 最寄駅（駅名＋徒歩分数）
   return row.map(q).join(',');
 }
 
