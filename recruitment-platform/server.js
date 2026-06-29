@@ -38,6 +38,7 @@ const gsheets = require('./lib/gsheets');
 const { pushToSheets, pullFromSheets, initRecruitmentSheets } = require('./lib/sheets-sync');
 const T = require('./templates');
 const { privacyPolicyPage } = T;
+const esc = T.esc;  // HTMLエスケープ（テンプレート側の実装を共用）
 
 const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -71,6 +72,105 @@ function runSeniorjob(argsArr) {
     p.on('error', reject);
     p.on('close', code => code === 0 ? resolve(out) : reject(new Error(err || out || ('exit ' + code))));
   });
+}
+
+// ── シニアジョブ 応募者: 選考管理画面のコピペテキストを解析 ──
+// シニアジョブは応募者の一括CSV出力が無いため、応募者詳細をコピペして1件ずつ取り込む。
+// 「ラベル行の次行が値」という画面構造を利用してフィールドを抽出する。
+function parseSeniorjobApplicant(raw) {
+  const text = String(raw || '').replace(/\r\n/g, '\n').replace(/　/g, ' ');
+  const lines = text.split('\n').map(s => s.trim());
+  // 値ブロックの区切りに使う既知ラベル
+  const LABELS = new Set(['応募者', '採用決定費', '求職者ID', '性別', '現住所', '保有資格',
+    '普通自動車免許', '今回の就職活動で外せない条件', '最終学歴', '経歴', '職務経歴',
+    '希望雇用形態', '希望職種', '希望給与', '希望勤務地', '出張・単身赴任', '外国語スキル']);
+  const after = (label) => {
+    const i = lines.indexOf(label);
+    if (i < 0) return '';
+    for (let j = i + 1; j < lines.length; j++) if (lines[j] !== '') return lines[j];
+    return '';
+  };
+  const block = (label) => {
+    const i = lines.indexOf(label);
+    if (i < 0) return '';
+    const out = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (LABELS.has(lines[j])) break;
+      if (lines[j] !== '') out.push(lines[j]);
+    }
+    return out.join('\n');
+  };
+  // 氏名＋年齢（例: "田中 雅博 58歳"）と、その直前のふりがな行
+  let name = '', age = null, furigana = '';
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(.+?)\s+(\d{1,3})歳$/);
+    if (m) {
+      name = m[1].trim(); age = parseInt(m[2], 10);
+      for (let k = i - 1; k >= 0; k--) {
+        if (lines[k] !== '') { if (/^[ぁ-ゖ゛゜ー\s]+$/.test(lines[k])) furigana = lines[k]; break; }
+      }
+      break;
+    }
+  }
+  // 選考状況・応募求人
+  const STAGES = ['入社日確定', '内定', '最終面接', '1次面接', '書類選考', '選考開始'];
+  let stage = ''; for (const s of STAGES) if (lines.includes(s)) { stage = s; break; }
+  let jobTitle = '';
+  const ai = lines.indexOf('応募者');
+  if (ai >= 0) for (let j = ai + 1; j < lines.length; j++) {
+    const l = lines[j];
+    if (!l || STAGES.includes(l) || l === '選考終了') continue;
+    jobTitle = l; break;
+  }
+  let currentJob = ''; const cj = text.match(/職種[:：]\s*(.+)/); if (cj) currentJob = cj[1].trim();
+  return {
+    name, age, furigana,
+    sid: after('求職者ID'),
+    gender: after('性別'),
+    address: after('現住所'),
+    qualification: after('保有資格'),
+    license: after('普通自動車免許'),
+    education: block('最終学歴'),
+    keireki: block('経歴'),
+    shokumu: block('職務経歴'),
+    empType: after('希望雇用形態'),
+    wantJob: block('希望職種'),
+    wantPay: after('希望給与'),
+    wantLocation: block('希望勤務地'),
+    stage, jobTitle, currentJob,
+  };
+}
+
+// 解析結果 → Applicants.create() 用レコード（媒体=シニアジョブ・会社=SQ・連絡先なし）
+function buildSeniorjobApplicantRecord(p) {
+  const notes = [
+    p.sid ? `求職者ID:${p.sid}` : '',
+    p.stage ? `選考状況:${p.stage}` : '',
+    p.qualification ? `保有資格:${p.qualification}` : '',
+    p.license ? `普通自動車免許:${p.license}` : '',
+    p.empType ? `希望雇用形態:${p.empType}` : '',
+    p.wantJob ? `希望職種:${p.wantJob.replace(/\n/g, ' ')}` : '',
+    p.wantPay ? `希望給与:${p.wantPay}` : '',
+    '※シニアジョブ応募（電話/メール非公開・連絡は媒体内メッセージ）',
+  ].filter(Boolean).join('\n');
+  return {
+    name: p.name,
+    furigana: p.furigana || '',
+    age: p.age,
+    gender: p.gender || '',
+    address: p.address || '',
+    education: p.education || '',
+    experience: [p.keireki, p.shokumu].filter(Boolean).join('\n'),
+    current_job: p.currentJob || '',
+    job_title: p.jobTitle || '',
+    work_location: p.wantLocation || '',
+    notes,
+    phone: '', email: '',            // シニアジョブは連絡先非公開（NOT NULL回避のため空文字）
+    company: 'sq',
+    media: 'seniorjob',              // 媒体クロス集計の「シニアジョブ」列に計上
+    sourceMedia: 'シニアジョブ',
+    status: '新規',                  // 新規応募・架電リストに表示される
+  };
 }
 // playwright が import できる Python を自動検出して使う。
 // Windows で複数 Python（Microsoft Store 版など）が混在していても、
@@ -1328,6 +1428,18 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       </div>
       <p class="text-sm text-muted" id="sj-msg" style="margin-top:14px"></p>
     </div>
+
+    <div class="card" style="max-width:720px;margin-top:20px">
+      <h3 style="margin:0 0 6px">応募者の取込（コピペ）</h3>
+      <p class="text-muted text-sm" style="margin-top:0">シニアジョブは応募者の一括ダウンロードが無いため、1人ずつ取り込みます。選考管理の<b>応募者詳細</b>（氏名・年齢〜希望勤務地のあたり）を選択してコピーし、下に貼り付けて「取込」を押してください。会社=SQ・媒体=シニアジョブで登録され、<b>新規応募・架電リスト</b>に表示されます。<br>※電話番号・メールは媒体仕様で取得できません（連絡は媒体内メッセージ／面接時のみ）。</p>
+      <textarea id="sj-app-text" rows="8" placeholder="応募者詳細をここに貼り付け（例: たなか まさひろ / 田中 雅博 58歳 / 求職者ID 82056 ...）" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:13px"></textarea>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:10px">
+        <button class="btn btn-primary" id="sj-app-import">➕ 応募者を取込</button>
+        <button class="btn btn-ghost" id="sj-app-clear">クリア</button>
+        <span class="text-sm" id="sj-app-msg"></span>
+      </div>
+    </div>
+
     <script>
     (function(){
       var msg=document.getElementById('sj-msg');
@@ -1359,6 +1471,23 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         if(!confirm('掲載済み記録をリセットして最初の駅から出力しますか？'))return;
         await fetch('/api/seniorjob/reset',{method:'POST'});
         msg.textContent='記録をリセットしました';refresh();
+      };
+      // 応募者コピペ取込
+      var amsg=document.getElementById('sj-app-msg');
+      document.getElementById('sj-app-clear').onclick=function(){document.getElementById('sj-app-text').value='';amsg.textContent='';};
+      document.getElementById('sj-app-import').onclick=async function(){
+        var t=document.getElementById('sj-app-text').value||'';
+        if(!t.trim()){amsg.style.color='#b91c1c';amsg.textContent='応募者の内容を貼り付けてください';return;}
+        amsg.style.color='';amsg.textContent='取込中…';
+        try{
+          var r=await fetch('/api/seniorjob/applicant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+          var j=await r.json();
+          if(!r.ok){amsg.style.color='#b91c1c';amsg.textContent='エラー: '+(j.error||r.status);return;}
+          if(j.duplicate){amsg.style.color='#b45309';amsg.textContent='既に取込済みです: '+j.name+'（求職者ID:'+(j.sid||'-')+'）';return;}
+          amsg.style.color='#16a34a';
+          amsg.textContent='取込みました: '+j.name+'（'+(j.jobTitle||'')+' / '+(j.stage||'')+'）→ 新規応募・架電リストに追加';
+          document.getElementById('sj-app-text').value='';
+        }catch(e){amsg.style.color='#b91c1c';amsg.textContent='エラー: '+e.message;}
       };
     })();
     </script>`;
@@ -2018,6 +2147,27 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   // ── API: シニアジョブ 掲載状況 ──
   if (pathname === '/api/seniorjob/status' && method === 'GET') {
     sendJSON(res, 200, seniorjobStatus());
+    return;
+  }
+  // ── API: シニアジョブ 応募者をコピペで1件取込 ──
+  if (pathname === '/api/seniorjob/applicant' && method === 'POST') {
+    const body = await parseJSON(req);
+    const parsed = parseSeniorjobApplicant(body.text || '');
+    if (!parsed.name) {
+      sendError(res, 400, '氏名を検出できませんでした。シニアジョブの応募者詳細（氏名・年齢が含まれる範囲）をコピーして貼り付けてください。');
+      return;
+    }
+    // 求職者IDで重複チェック（連絡先が無いため通常の重複判定が効かない）
+    if (parsed.sid) {
+      try {
+        const all = await Applicants.findAll({});
+        const dup = (all || []).find(a => (a.media === 'seniorjob') && String(a.notes || '').includes(`求職者ID:${parsed.sid}`));
+        if (dup) { sendJSON(res, 200, { ok: true, duplicate: true, name: parsed.name, sid: parsed.sid, id: dup.id }); return; }
+      } catch {}
+    }
+    const created = await Applicants.create(buildSeniorjobApplicantRecord(parsed));
+    await Logs.create('seniorjob_applicant', 'success', `シニアジョブ応募者取込: ${parsed.name}（求職者ID:${parsed.sid || '-'}）`);
+    sendJSON(res, 201, { ok: true, id: created.id, name: parsed.name, sid: parsed.sid, stage: parsed.stage, jobTitle: parsed.jobTitle });
     return;
   }
   // ── API: シニアジョブ 記録リセット ──
