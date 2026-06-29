@@ -88,7 +88,10 @@ function buildRow(st) {
   row[I.pref]   = st.pref || '';
   row[I.city]   = wardForm(st.city || '');
   row[I.addr]   = st.address || '';
-  row[I.eki]    = st.nearest || '';   // 最寄駅（駅名＋徒歩分数）
+  // 最寄駅: シニアジョブは駅コードでの照合が必要。コードがあれば「駅名(コード:XXXX) 徒歩5分」、
+  // 無ければ空欄（コード無しのテキストはバリデーションエラーになるため）。
+  const ekiName = st.ekiName || (st.nearest ? st.nearest.replace(/\s*徒歩.*$/, '') : (st.station + '駅'));
+  row[I.eki]    = st.code ? `${ekiName}(コード:${st.code}) 徒歩5分` : '';
   return row.map(q).join(',');
 }
 
