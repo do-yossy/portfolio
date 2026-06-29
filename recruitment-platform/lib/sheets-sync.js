@@ -89,6 +89,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const priorFuriCol       = existingHeader.findIndex(h => h === 'ふりがな');
     const priorLastCol       = existingHeader.findIndex(h => h === '最終架電日');
     const priorWorkHistoryCol= existingHeader.findIndex(h => h === '職歴');
+    const priorPhoneCol      = existingHeader.findIndex(h => h === '電話番号');
+    const priorEmailCol      = existingHeader.findIndex(h => h === 'メールアドレス');
     const priorIdCol         = existingHeader.findIndex(h => h === 'ID');
     const pcL  = layout ? layout.col : null;
     const idCl = pcL ? pcL.id : (priorIdCol >= 0 ? priorIdCol : 0);
@@ -104,6 +106,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
         gender:      priorGenderCol      >= 0 ? row[priorGenderCol]      : '',
         lastCalled:  priorLastCol        >= 0 ? row[priorLastCol]        : '',
         workHistory: priorWorkHistoryCol >= 0 ? row[priorWorkHistoryCol] : '',
+        phone:       priorPhoneCol       >= 0 ? row[priorPhoneCol]       : '',
+        email:       priorEmailCol       >= 0 ? row[priorEmailCol]       : '',
       });
     }
 
@@ -205,6 +209,9 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
             row[SHEET_COL.notes] = merged;
           }
           if (p.furigana) row[SHEET_COL.furigana] = p.furigana;
+          // 電話番号(index6)・メール(index7) の手入力値はDBが空でも保持（シニアジョブ等で手入力した連絡先を消さない）
+          if (p.phone && String(p.phone).trim() && !String(row[6] || '').trim()) row[6] = String(p.phone).trim();
+          if (p.email && String(p.email).trim() && !String(row[7] || '').trim()) row[7] = String(p.email).trim();
           // 生年月日(index9)・性別(index8)・最終架電日 の手入力値はDBが空でも保持
           if (p.birthDate && String(p.birthDate).trim() && !row[9]) row[9] = String(p.birthDate).trim();
           if (p.gender && String(p.gender).trim() && !row[8]) row[8] = String(p.gender).trim();
@@ -280,6 +287,7 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
     '架電済(不通)': '不通', '対応終了': '終了', '断られた': '終了', '辞退': '終了', '重複': '新規',
   };
   const { COMPANIES, MEDIA, db } = require('../db');
+  const { normalizePhone, normalizeEmail } = require('../normalize');
   // media名→IDマッピング（"Indeed"→"indeed", "求人ボックス"→"kyujinbox" 等）
   const mediaNameToId = {};
   for (const m of MEDIA) { mediaNameToId[m.name] = m.id; mediaNameToId[m.id] = m.id; }
@@ -413,6 +421,25 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
         if (sheetGender !== undefined && String(sheetGender).trim() !== '') {
           db.prepare('UPDATE applicants SET gender=?, updated_at=? WHERE id=?')
             .run(String(sheetGender).trim(), new Date().toISOString(), id);
+        }
+      }
+      // 電話番号をDBに同期（シニアジョブ等で空欄→シートで手入力した値を取り込む）。
+      // 正規化値も更新して重複判定が効くようにする。
+      if (colIdx.phone >= 0) {
+        const sheetPhone = row[colIdx.phone];
+        if (sheetPhone !== undefined && String(sheetPhone).trim() !== '') {
+          const ph = String(sheetPhone).trim();
+          db.prepare('UPDATE applicants SET phone=?, normalized_phone=?, updated_at=? WHERE id=?')
+            .run(ph, normalizePhone(ph), new Date().toISOString(), id);
+        }
+      }
+      // メールアドレスをDBに同期（同上）
+      if (colIdx.email >= 0) {
+        const sheetEmail = row[colIdx.email];
+        if (sheetEmail !== undefined && String(sheetEmail).trim() !== '') {
+          const em = String(sheetEmail).trim();
+          db.prepare('UPDATE applicants SET email=?, normalized_email=?, updated_at=? WHERE id=?')
+            .run(em, normalizeEmail(em), new Date().toISOString(), id);
         }
       }
       // 最終架電日をDBに同期（シートで手入力した値を取り込む）。
