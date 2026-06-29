@@ -632,6 +632,7 @@ const MEDIA = [
   { id: 'stanby',   name: 'スタンバイ' },
   { id: 'google',   name: 'Googleしごと検索' },
   { id: 'engage',   name: 'engage' },
+  { id: 'seniorjob', name: 'シニアジョブ' },
 ];
 // 架電対応状況
 const CALL_STATUSES = ['新規', '不通', '対応中', '終了'];

@@ -42,6 +42,36 @@ const { privacyPolicyPage } = T;
 const PORT     = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
+
+// ── シニアジョブ 日次CSV: 掲載状況の取得 ──
+function seniorjobStatus() {
+  const sjDir = path.join(SCRIPTS_DIR, 'seniorjob');
+  let total = 0;
+  try { total = JSON.parse(fs.readFileSync(path.join(sjDir, 'stations.json'), 'utf8')).length; } catch {}
+  let used = [];
+  try { used = JSON.parse(fs.readFileSync(path.join(SCRIPTS_DIR, 'out', 'seniorjob_used.json'), 'utf8')); } catch {}
+  let contents = [];
+  try {
+    contents = fs.readdirSync(path.join(sjDir, 'contents'))
+      .filter(f => f.endsWith('.txt'))
+      .sort()
+      .map(f => ({ key: f.replace(/\.txt$/, ''), label: f.replace(/\.txt$/, '') }));
+  } catch {}
+  const usedN = Array.isArray(used) ? used.length : 0;
+  return { total, used: usedN, remaining: Math.max(0, total - usedN), contents };
+}
+
+// ── シニアジョブ 日次CSV: ジェネレーターを実行（CLIと同じロジック・状態を共有） ──
+function runSeniorjob(argsArr) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(process.execPath, [path.join(SCRIPTS_DIR, 'seniorjob_daily_export.js'), ...argsArr], { cwd: __dirname });
+    let out = '', err = '';
+    p.stdout.on('data', d => out += d);
+    p.stderr.on('data', d => err += d);
+    p.on('error', reject);
+    p.on('close', code => code === 0 ? resolve(out) : reject(new Error(err || out || ('exit ' + code))));
+  });
+}
 // playwright が import できる Python を自動検出して使う。
 // Windows で複数 Python（Microsoft Store 版など）が混在していても、
 // 実際に playwright が入っている実行ファイルを選ぶ。
@@ -1271,6 +1301,71 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
+  // ── Admin: シニアジョブ掲載管理ページ ──
+  if (pathname === '/admin/seniorjob' && method === 'GET') {
+    const st = seniorjobStatus();
+    const pct = st.total ? Math.round(st.used / st.total * 100) : 0;
+    const opts = st.contents.map(c => `<option value="${esc(c.key)}">${esc(c.label)}</option>`).join('');
+    const content = `
+    <div class="page-header"><h2>🚃 シニアジョブ 掲載管理</h2>
+      <p class="text-muted">掲載済み求人を雛形に、勤務地（駅）を差し替えて毎日分のCSVを作成します。求人ボックスのように「掲載」ボタンでCSVをダウンロード→シニアジョブに取込してください。</p></div>
+    <div class="card" style="max-width:720px">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+        <div><div class="text-muted text-sm">全駅</div><div style="font-size:28px;font-weight:700" id="sj-total">${st.total}</div></div>
+        <div><div class="text-muted text-sm">掲載済み</div><div style="font-size:28px;font-weight:700;color:#16a34a" id="sj-used">${st.used}</div></div>
+        <div><div class="text-muted text-sm">残り</div><div style="font-size:28px;font-weight:700;color:#7c3aed" id="sj-remaining">${st.remaining}</div></div>
+      </div>
+      <div style="background:#eee;border-radius:8px;height:12px;overflow:hidden;margin-bottom:20px">
+        <div id="sj-bar" style="background:#7c3aed;height:100%;width:${pct}%"></div>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <label>件数<br><input id="sj-count" type="number" value="10" min="1" max="136" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px"></label>
+        <label>仕事内容<br><select id="sj-content" style="padding:8px;border:1px solid #ccc;border-radius:6px">
+          <option value="">雛形（ロケ同行ドライバー）</option>${opts}
+        </select></label>
+        <button class="btn btn-primary" id="sj-download">⬇ 求人掲載（CSVダウンロード）</button>
+        <button class="btn btn-ghost" id="sj-reset">記録をリセット</button>
+      </div>
+      <p class="text-sm text-muted" id="sj-msg" style="margin-top:14px"></p>
+    </div>
+    <script>
+    (function(){
+      var msg=document.getElementById('sj-msg');
+      async function refresh(){
+        try{var r=await fetch('/api/seniorjob/status');var s=await r.json();
+          document.getElementById('sj-total').textContent=s.total;
+          document.getElementById('sj-used').textContent=s.used;
+          document.getElementById('sj-remaining').textContent=s.remaining;
+          document.getElementById('sj-bar').style.width=(s.total?Math.round(s.used/s.total*100):0)+'%';
+        }catch(e){}
+      }
+      document.getElementById('sj-download').onclick=async function(){
+        var n=document.getElementById('sj-count').value||10;
+        var c=document.getElementById('sj-content').value;
+        msg.textContent='CSVを生成中…';
+        try{
+          var url='/api/seniorjob/csv?count='+encodeURIComponent(n)+(c?'&content='+encodeURIComponent(c):'');
+          var r=await fetch(url);
+          if(!r.ok){msg.textContent='エラー: '+(await r.text());return;}
+          var blob=await r.blob();
+          var cd=r.headers.get('Content-Disposition')||'';
+          var m=cd.match(/filename="?([^"]+)"?/); var fn=m?decodeURIComponent(m[1]):'seniorjob.csv';
+          var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();
+          msg.textContent='ダウンロードしました: '+fn+'（このCSVをシニアジョブに取込してください）';
+          refresh();
+        }catch(e){msg.textContent='エラー: '+e.message;}
+      };
+      document.getElementById('sj-reset').onclick=async function(){
+        if(!confirm('掲載済み記録をリセットして最初の駅から出力しますか？'))return;
+        await fetch('/api/seniorjob/reset',{method:'POST'});
+        msg.textContent='記録をリセットしました';refresh();
+      };
+    })();
+    </script>`;
+    send(res, 200, T.adminLayout('シニアジョブ掲載管理', content, 'seniorjob', co));
+    return;
+  }
+
   // ── Admin: Applicants page ──
   if (pathname === '/admin/applicants' && method === 'GET') {
     const filter = query.status || 'all';
@@ -1917,6 +2012,39 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     await Logs.create('xml_generate', 'success', `シニアジョブXML生成: ${jobs.length}件`);
     res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': 'attachment; filename="seniorjob-feed.xml"' });
     res.end(xml);
+    return;
+  }
+
+  // ── API: シニアジョブ 掲載状況 ──
+  if (pathname === '/api/seniorjob/status' && method === 'GET') {
+    sendJSON(res, 200, seniorjobStatus());
+    return;
+  }
+  // ── API: シニアジョブ 記録リセット ──
+  if (pathname === '/api/seniorjob/reset' && method === 'POST') {
+    try { fs.writeFileSync(path.join(SCRIPTS_DIR, 'out', 'seniorjob_used.json'), '[]'); } catch {}
+    sendJSON(res, 200, { ok: true });
+    return;
+  }
+  // ── API: シニアジョブ 次のN件のCSVを生成してダウンロード（Shift-JIS） ──
+  if (pathname === '/api/seniorjob/csv' && method === 'GET') {
+    const count = Math.max(1, Math.min(136, parseInt(query.count, 10) || 10));
+    const cliArgs = ['--count', String(count)];
+    if (query.content) cliArgs.push('--content', String(query.content));
+    let stdout;
+    try { stdout = await runSeniorjob(cliArgs); }
+    catch (e) { sendError(res, 500, 'CSV生成に失敗しました: ' + (e.message || e)); return; }
+    const m = stdout.match(/→\s*(.+\.csv)/);
+    if (!m) { sendError(res, 409, (stdout || '').trim() || '出力できる駅がありません（リセットしてください）'); return; }
+    const file = m[1].trim();
+    let buf;
+    try { buf = fs.readFileSync(file); } catch { sendError(res, 500, '生成ファイルの読み込みに失敗しました'); return; }
+    await Logs.create('seniorjob_csv', 'success', `シニアジョブCSV生成: ${count}件 (${path.basename(file)})`);
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=Shift_JIS',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(file))}"`
+    });
+    res.end(buf);
     return;
   }
 
