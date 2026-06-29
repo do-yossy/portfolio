@@ -16,6 +16,7 @@ const OPS_MEDIA = [
   { id: 'stanby',    name: 'スタンバイ' },
   { id: 'google',    name: 'Googleしごと検索' },
   { id: 'engage',    name: 'engage' },
+  { id: 'seniorjob', name: 'シニアジョブ' },
 ];
 const CALL_STATUS_COLORS = {
   '新規':  '#3b82f6',
@@ -34,6 +35,7 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     jobs:      (c) => `/admin/jobs?co=${c}`,
     analytics: (c) => `/admin/analytics?co=${c}`,
     logs:      (c) => `/admin/logs?co=${c}`,
+    seniorjob: (c) => `/admin/seniorjob?co=${c}`,
     site:      ()  => '/jobs',
   };
   const getHref = (key, c) => pageHref[key] ? pageHref[key](c) : `/admin/ops?tab=posts&co=${c}`;
@@ -44,6 +46,7 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     { key: 'past',      icon: '📚', label: '過去応募者' },
     { key: 'calls',     icon: '📞', label: '架電リスト' },
     { key: 'jobs',      icon: '💼', label: '求人管理' },
+    { key: 'seniorjob', icon: '🚃', label: 'シニアジョブ' },
     { key: 'analytics', icon: '📈', label: '分析・レポート' },
     { key: 'logs',      icon: '📋', label: '投稿ログ' },
     { key: 'site',      icon: '🌐', label: '求人サイトを見る' },
