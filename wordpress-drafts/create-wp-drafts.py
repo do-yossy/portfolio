@@ -61,7 +61,10 @@ def main():
             res = req("POST", "/wp/v2/pages", payload)
             print(f"      作成: 「{p['title']}」 id={res['id']}")
             print(f"        編集: {SITE}/wp-admin/post.php?post={res['id']}&action=edit")
-            print(f"        プレビュー: {res.get('link','(下書き)')}?preview=true")
+            link = res.get("link", "")
+            sep = "&" if "?" in link else "?"
+            preview = f"{link}{sep}preview=true" if link else "(下書き)"
+            print(f"        プレビュー: {preview}")
         except urllib.error.HTTPError as e:
             print(f"      失敗: 「{p['title']}」 HTTP {e.code} — {e.read().decode()[:300]}")
 
