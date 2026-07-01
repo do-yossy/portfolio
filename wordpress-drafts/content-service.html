@@ -230,6 +230,9 @@
 /* intro バナー */
 .savior-draft .banner-stack{display:flex;flex-direction:column;gap:26px}
 .savior-draft .fullbanner{width:100%;height:auto;display:block;border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.08)}
+.savior-draft .intro-lead{text-align:center;max-width:820px;margin:0 auto}
+.savior-draft .intro-lead h2{font-size:clamp(1.6rem,3.8vw,2.3rem);line-height:1.55;color:#0f2350;margin:12px 0 18px}
+.savior-draft .intro-lead p{color:#0f2350;opacity:.85;line-height:2}
 /* intro (旧) */
 .savior-draft .intro-sec{padding:86px 0}
 .savior-draft .intro{display:grid;grid-template-columns:1.05fr .95fr;gap:50px;align-items:center}
@@ -452,12 +455,13 @@
     </div>
   </div>
 
-  <!-- INTRO バナー（ご提供画像） -->
+  <!-- INTRO -->
   <section class="intro-sec">
     <div class="wrap">
-      <div class="banner-stack">
-        <img class="fullbanner" src="https://savior-corporation.com/wp-content/uploads/2026/07/savior-service-overview.webp" alt="現場を知る私たちが、伴走型で成長を支えます。人材紹介から飲食店の総合プロデュースまで、企業と店舗の課題に寄り添い、戦略の立案から実行までワンストップでサポートします。">
-        <img class="fullbanner" src="https://savior-corporation.com/wp-content/uploads/2026/07/savior-senior-recruit.webp" alt="豊かな経験を、次のステージへ。シニア専門の人材紹介サービス。経験・スキルの可視化、最適なマッチング、活躍の場のご提供。">
+      <div class="intro-lead">
+        <div class="kicker">INTRODUCTION</div>
+        <h2 class="mincho">現場を知る私たちが、<br>伴走型で成長を支えます。</h2>
+        <p>人材紹介から飲食店の総合プロデュースまで。企業と店舗の課題に寄り添い、戦略の立案から実行までワンストップでサポートします。「点」の支援ではなく、成果が出るまで伴走することが私たちの強みです。</p>
       </div>
     </div>
   </section>
@@ -554,17 +558,6 @@
         <h3 class="scheme-title">若年層からシニア層まで対応。特にシニア層の転職が強みです。</h3>
         <p class="scheme-desc">経験を活かして活躍したいシニア層と、即戦力を求める企業をつなぎます。「求人が少ない」と言われるシニアの転職市場でも、独自のネットワークで市場水準を上回るマッチングを実現します。</p>
       </div>
-      <div class="compare">
-        <div class="cmp">
-          <div class="cmp-bar-wrap"><div class="cmp-bar cmp-market" style="--v:38%"><span class="cmp-val">1.25<small>倍</small></span></div></div>
-          <div class="cmp-label">市場全体（全年齢）の<br>有効求人倍率</div>
-        </div>
-        <div class="cmp">
-          <div class="cmp-bar-wrap"><div class="cmp-bar cmp-savior" style="--v:100%"><span class="cmp-val">市場水準<br>を上回る</span></div></div>
-          <div class="cmp-label">当社のシニア層<br>マッチング力<span class="prov">※当社イメージ（実績値に差し替え）</span></div>
-        </div>
-      </div>
-      <p class="note">※ 市場全体の有効求人倍率は2023年で約1.25倍（厚生労働省「一般職業紹介状況」）。65歳以上の就業者数は930万人・21年連続増で過去最多（総務省, 2024）。就業ニーズが拡大する一方、シニア層は一般市場での求人の選択肢が限られやすい層です。当社の数値は暫定イメージのため、実績値が確定次第差し替えます。</p>
     </div>
   </div>
 
@@ -705,7 +698,7 @@
     ['.hero h1,.hero .jp','fadeInUp',90],
     ['.hero .lead,.hero .sub','fadeInUp',200],
     ['.sec-head','fadeInUp',0],
-    ['.fullbanner','fadeInUp',0,140],
+    ['.intro-lead','fadeInUp',0],
     ['.idx a','fadeInUp',0,60],
     ['.bignum','fadeInUp',0],
     ['.biz-block h2','fadeInUp',60],
