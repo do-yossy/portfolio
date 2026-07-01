@@ -227,7 +227,10 @@
 .savior-draft .hero-media{position:absolute;inset:0;z-index:0;background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.3) 62%,transparent 100%),linear-gradient(120deg,#e9edf5,#dbe4f5);opacity:1}
 .savior-draft .hero-media.has-img{background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.25) 60%,rgba(245,245,245,0) 100%),url('https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&q=80&auto=format&fit=crop') center/cover}
 .savior-draft .hero-lg .hero-in{position:relative;z-index:1}
-/* intro */
+/* intro バナー */
+.savior-draft .banner-stack{display:flex;flex-direction:column;gap:26px}
+.savior-draft .fullbanner{width:100%;height:auto;display:block;border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.08)}
+/* intro (旧) */
 .savior-draft .intro-sec{padding:86px 0}
 .savior-draft .intro{display:grid;grid-template-columns:1.05fr .95fr;gap:50px;align-items:center}
 @media(max-width:800px){.savior-draft .intro{grid-template-columns:1fr;gap:30px}}
@@ -447,18 +450,12 @@
     </div>
   </div>
 
-  <!-- INTRO + 写真 -->
+  <!-- INTRO バナー（ご提供画像） -->
   <section class="intro-sec">
-    <div class="wrap intro">
-      <div class="intro-tx">
-        <div class="kicker">INTRODUCTION</div>
-        <h2 class="mincho">現場を知る私たちが、<br>伴走型で成長を支えます。</h2>
-        <p>人材紹介から飲食店の総合プロデュースまで。企業と店舗の課題に寄り添い、戦略の立案から実行までワンストップでサポートします。「点」の支援ではなく、成果が出るまで伴走することが私たちの強みです。</p>
-      </div>
-      <div class="intro-photos">
-        <img src="https://images.unsplash.com/photo-1573497491208-6b1acb260507?w=1200&q=80&auto=format&fit=crop" alt="">
-        <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&q=80&auto=format&fit=crop" alt="">
-        <img src="https://images.unsplash.com/photo-1577896851231-70ef18881754?w=1200&q=80&auto=format&fit=crop" alt="">
+    <div class="wrap">
+      <div class="banner-stack">
+        <img class="fullbanner" src="https://savior-corporation.com/wp-content/uploads/2026/07/savior-service-overview.webp" alt="現場を知る私たちが、伴走型で成長を支えます。人材紹介から飲食店の総合プロデュースまで、企業と店舗の課題に寄り添い、戦略の立案から実行までワンストップでサポートします。">
+        <img class="fullbanner" src="https://savior-corporation.com/wp-content/uploads/2026/07/savior-senior-recruit.webp" alt="豊かな経験を、次のステージへ。シニア専門の人材紹介サービス。経験・スキルの可視化、最適なマッチング、活躍の場のご提供。">
       </div>
     </div>
   </section>
@@ -706,8 +703,7 @@
     ['.hero h1,.hero .jp','fadeInUp',90],
     ['.hero .lead,.hero .sub','fadeInUp',200],
     ['.sec-head','fadeInUp',0],
-    ['.intro-tx','fadeInLeft',0],
-    ['.intro-photos img','zoomIn',0,90],
+    ['.fullbanner','fadeInUp',0,140],
     ['.idx a','fadeInUp',0,60],
     ['.bignum','fadeInUp',0],
     ['.biz-block h2','fadeInUp',60],
