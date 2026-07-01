@@ -368,3 +368,86 @@
   </footer>
 
 </div>
+<style id="sd-motion">
+/* ===== SAVIOR 下書き モーション（参考サイト monolith-gr.com 準拠のスクロール出現アニメ） ===== */
+@media (prefers-reduced-motion:no-preference){
+  .savior-draft.sd-on .sd-reveal{opacity:0}
+  .savior-draft.sd-on .sd-reveal.sd-in{animation:sd-fadeInUp .85s cubic-bezier(.16,.7,.3,1) both}
+  .savior-draft.sd-on .sd-reveal.sd-in[data-a="fadeIn"]{animation-name:sd-fadeIn}
+  .savior-draft.sd-on .sd-reveal.sd-in[data-a="fadeInDown"]{animation-name:sd-fadeInDown}
+  .savior-draft.sd-on .sd-reveal.sd-in[data-a="fadeInLeft"]{animation-name:sd-fadeInLeft}
+  .savior-draft.sd-on .sd-reveal.sd-in[data-a="fadeInRight"]{animation-name:sd-fadeInRight}
+  .savior-draft.sd-on .sd-reveal.sd-in[data-a="zoomIn"]{animation-name:sd-zoomIn}
+  .savior-draft.sd-on .sd-reveal.sd-in[data-a="slideInUp"]{animation-name:sd-slideInUp}
+}
+@keyframes sd-fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes sd-fadeInUp{from{opacity:0;transform:translate3d(0,42px,0)}to{opacity:1;transform:none}}
+@keyframes sd-fadeInDown{from{opacity:0;transform:translate3d(0,-28px,0)}to{opacity:1;transform:none}}
+@keyframes sd-fadeInLeft{from{opacity:0;transform:translate3d(-46px,0,0)}to{opacity:1;transform:none}}
+@keyframes sd-fadeInRight{from{opacity:0;transform:translate3d(46px,0,0)}to{opacity:1;transform:none}}
+@keyframes sd-zoomIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+@keyframes sd-slideInUp{from{opacity:0;transform:translate3d(0,80px,0)}to{opacity:1;transform:none}}
+/* ホバーの動き（カード浮き上がり・ボタン） */
+.savior-draft .svc,.savior-draft .biz-card,.savior-draft .plan,.savior-draft .step,
+.savior-draft .stat,.savior-draft .term-item,.savior-draft .cred,.savior-draft .f{transition:transform .35s cubic-bezier(.16,.7,.3,1),box-shadow .35s,border-color .35s}
+.savior-draft.sd-on .svc:hover,.savior-draft.sd-on .biz-card:hover,.savior-draft.sd-on .plan:hover,
+.savior-draft.sd-on .term-item:hover,.savior-draft.sd-on .f:hover{transform:translateY(-6px);box-shadow:0 14px 34px rgba(2,71,179,.12)}
+.savior-draft .temple-btn,.savior-draft .btn,.savior-draft .contact-btn,.savior-draft .nav-cta,.savior-draft .more{transition:transform .3s,box-shadow .3s,background .3s,color .3s,letter-spacing .3s}
+.savior-draft.sd-on .btn:hover,.savior-draft.sd-on .temple-btn:hover,.savior-draft.sd-on .contact-btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(2,71,179,.28)}
+.savior-draft.sd-on .more:hover{letter-spacing:.12em}
+/* スクロール誘導キュー（ヒーロー） */
+.savior-draft .sd-scroll{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:10px;color:#0247b3;font:600 .62rem/1 "Montserrat",sans-serif;letter-spacing:.28em;pointer-events:none}
+.savior-draft .sd-scroll::after{content:"";width:1px;height:44px;background:#0247b3;transform-origin:top;animation:sd-cue 1.9s ease-in-out infinite}
+@keyframes sd-cue{0%{transform:scaleY(0);transform-origin:top}40%{transform:scaleY(1);transform-origin:top}60%{transform:scaleY(1);transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+</style>
+<script>
+(function(){
+  var root=document.querySelector('.savior-draft');
+  if(!root||root.classList.contains('sd-on'))return;
+  if(!('IntersectionObserver'in window))return;
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  root.classList.add('sd-on');
+  var rules=[
+    ['.hero .label,.hero .badge','fadeInDown',0],
+    ['.hero h1,.hero .jp','fadeInUp',90],
+    ['.hero .lead,.hero .sub','fadeInUp',200],
+    ['.hero .hero-cta,.hero .temple-btn','fadeInUp',300],
+    ['.sec-head','fadeInUp',0],
+    ['.svc','fadeInUp',0],
+    ['.biz-card','fadeInUp',0],
+    ['.biz-block > .wrap','fadeInUp',0],
+    ['.step','fadeInUp',0],
+    ['.plan','fadeInUp',0],
+    ['.stat','zoomIn',0],
+    ['.cred','fadeInUp',0],
+    ['.term-item','fadeInUp',0],
+    ['.chip','fadeIn',0,55],
+    ['.producer','zoomIn',0],
+    ['.result','zoomIn',0],
+    ['.tbl','fadeInLeft',0],
+    ['.roi-hi','fadeInRight',80],
+    ['.f','slideInUp',0],
+    ['.cta,.cta-band','zoomIn',0],
+    ['.divider','fadeIn',0],
+    ['.about-in > div','fadeInUp',0],
+    ['.draft-flag','fadeIn',0],
+    ['footer .foot > *','fadeInUp',0]
+  ];
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('sd-in');io.unobserve(e.target);}});
+  },{threshold:.12,rootMargin:'0px 0px -7% 0px'});
+  rules.forEach(function(r){
+    var sel=r[0],anim=r[1],base=r[2]||0,step=(r[3]!=null?r[3]:95);
+    var seen=new Map();
+    Array.prototype.forEach.call(root.querySelectorAll(sel),function(n){
+      if(n.classList.contains('sd-reveal'))return;
+      var i=seen.get(n.parentNode)||0;seen.set(n.parentNode,i+1);
+      n.setAttribute('data-a',anim);n.classList.add('sd-reveal');
+      var d=base+Math.min(i,6)*step;if(d)n.style.animationDelay=d+'ms';
+      io.observe(n);
+    });
+  });
+  var hero=root.querySelector('.hero');
+  if(hero){var sc=document.createElement('div');sc.className='sd-scroll';sc.textContent='SCROLL';hero.appendChild(sc);}
+})();
+</script>
