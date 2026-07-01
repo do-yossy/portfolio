@@ -372,6 +372,55 @@
 .savior-draft .who p{color:#0f2350;opacity:.85;margin-bottom:18px}
 .savior-draft .who-tags{display:flex;flex-wrap:wrap;gap:10px}
 .savior-draft .who-tags span{background:rgba(2,71,179,.06);border:1px solid #d6def0;border-radius:99px;padding:9px 18px;font-size:.82rem;color:#0247b3}
+/* hero catchcopy */
+.savior-draft .hero-catch{margin-top:22px;color:#0f2350;font-size:clamp(1.3rem,3.4vw,2rem);line-height:1.6;letter-spacing:.04em;font-weight:700}
+.savior-draft .hero-catch .hl{color:#0247b3}
+/* 飲食 トータルプロデュース（参考モックアップ準拠・ライト＋ブルー） */
+.savior-draft .fd-catch{text-align:center;max-width:820px;margin:8px auto 46px}
+.savior-draft .fd-kicker{font-family:"Montserrat",sans-serif;color:#0247b3;font-weight:600;letter-spacing:.12em;font-size:.9rem;margin-bottom:14px}
+.savior-draft .fd-title{color:#0f2350;font-size:clamp(1.7rem,4.6vw,2.6rem);line-height:1.5;letter-spacing:.04em;margin-bottom:18px}
+.savior-draft .fd-desc{color:#0f2350;opacity:.85;line-height:2}
+.savior-draft .circles{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:0 0 8px}
+@media(max-width:820px){.savior-draft .circles{grid-template-columns:repeat(2,1fr);gap:22px 14px}}
+@media(max-width:480px){.savior-draft .circles{grid-template-columns:1fr}}
+.savior-draft .circle{text-align:center;position:relative}
+.savior-draft .circle:not(:last-child)::after{content:"";position:absolute;top:38px;right:-9px;width:18px;height:2px;background:#c9d3e6}
+@media(max-width:820px){.savior-draft .circle::after{display:none}}
+.savior-draft .cnum{width:76px;height:76px;border-radius:50%;background:#fff;border:2px solid #0247b3;color:#0247b3;font-family:"Montserrat",sans-serif;font-weight:700;font-size:1.5rem;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(2,71,179,.12)}
+.savior-draft .circle h4{color:#0f2350;font-size:.98rem;margin-bottom:4px}
+.savior-draft .circle p{color:#0f2350;opacity:.72;font-size:.78rem;line-height:1.5}
+.savior-draft .fd-cards-head{margin:52px 0 18px}
+.savior-draft .fd-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+@media(max-width:900px){.savior-draft .fd-cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.savior-draft .fd-cards{grid-template-columns:1fr 1fr}}
+.savior-draft .fd-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.04);transition:transform .35s,box-shadow .35s}
+.savior-draft.sd-on .fd-card:hover{transform:translateY(-6px);box-shadow:0 16px 36px rgba(2,71,179,.12)}
+.savior-draft .fd-ph{aspect-ratio:4/3;overflow:hidden;background:#e9edf5}
+.savior-draft .fd-ph img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s}
+.savior-draft.sd-on .fd-card:hover .fd-ph img{transform:scale(1.06)}
+.savior-draft .fd-card h4{color:#0f2350;font-size:.98rem;margin:16px 16px 8px}
+.savior-draft .fd-card p{color:#0f2350;opacity:.78;font-size:.82rem;line-height:1.6;margin:0 16px 18px}
+.savior-draft .fd-close{text-align:center;color:#0f2350;font-size:clamp(1.2rem,3vw,1.6rem);letter-spacing:.05em;margin-top:44px}
+/* CASE STUDIES */
+.savior-draft .cases{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:18px}
+@media(max-width:820px){.savior-draft .cases{grid-template-columns:1fr}}
+.savior-draft .case{background:#fff;border:1px solid #e5e5e5;border-radius:14px;padding:28px 26px;box-shadow:0 6px 20px rgba(0,0,0,.04)}
+.savior-draft .case-hi{background:linear-gradient(135deg,#0f2350,#0247b3);border:none;color:#fff;box-shadow:0 18px 44px rgba(2,71,179,.24)}
+.savior-draft .case-tag{display:inline-block;font-weight:700;font-size:.95rem;color:#0247b3;background:rgba(2,71,179,.08);border-radius:99px;padding:7px 18px;margin-bottom:18px}
+.savior-draft .case-hi .case-tag{color:#fff;background:rgba(255,255,255,.16)}
+.savior-draft .kyaku{display:flex;align-items:center;gap:18px;margin-bottom:16px}
+.savior-draft .ku{text-align:center}
+.savior-draft .kcap{font-size:.78rem;opacity:.8;margin-bottom:2px}
+.savior-draft .kval{font-family:"Montserrat",sans-serif;font-weight:700;font-size:1.9rem;line-height:1}
+.savior-draft .kval-up{color:#8fd0ff}
+.savior-draft .karrow{font-size:1.4rem;opacity:.7}
+.savior-draft .kbig{font-size:1.05rem;border-top:1px solid rgba(255,255,255,.2);padding-top:16px}
+.savior-draft .kbig .up{font-family:"Montserrat",sans-serif;font-weight:700;font-size:2.4rem;color:#8fd0ff;vertical-align:-2px}
+.savior-draft .kbig .up small{font-size:1.1rem}
+.savior-draft .case ul{list-style:none;margin:0;padding:0}
+.savior-draft .case li{position:relative;padding:10px 0 10px 28px;border-top:1px solid #eef1f7;color:#0f2350;font-size:.92rem}
+.savior-draft .case li:first-of-type{border-top:none}
+.savior-draft .case li::before{content:"✓";position:absolute;left:2px;top:10px;color:#0247b3;font-weight:700}
 /* big footer wordmark */
 .savior-draft .bigmark-wrap{overflow:hidden;text-align:center;padding:56px 0 0;line-height:.8}
 .savior-draft .bigmark{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3.4rem,17vw,12rem);letter-spacing:.01em;color:#0f2350;opacity:.09;white-space:nowrap;user-select:none}
@@ -398,6 +447,7 @@
     <div class="wrap hero-in">
       <div class="label">SERVICE DETAIL</div>
       <h1 class="en">SERVICE</h1>
+      <p class="hero-catch mincho">人材と、飲食で。<br>企業と店舗の成長を、<span class="hl">伴走</span>して支える。</p>
     </div>
   </div>
 
@@ -528,27 +578,27 @@
     <div class="wrap">
       <div class="bignum mont">BUSINESS 02</div>
       <h2>飲食店総合プロデュース事業</h2>
-      <p class="lead">単なるSNS運用代行やコンサルティングではありません。現場を知るプロデューサーが、<b>売上改善から店舗開発、フランチャイズ展開まで一気通貫</b>で伴走します。</p>
-      <div class="proc">
-        <div class="proc-step"><div class="s-en">PILLAR 01</div><h4>飲食店売上改善</h4><p>既存店の収益を立て直す</p></div>
-        <div class="proc-step"><div class="s-en">PILLAR 02</div><h4>店舗開発支援</h4><p>新規出店を成功させる</p></div>
-        <div class="proc-step"><div class="s-en">PILLAR 03</div><h4>フランチャイズ支援</h4><p>店舗数を増やしていく</p></div>
+      <div class="fd-catch">
+        <div class="fd-kicker">飲食店の成功をトータルプロデュース</div>
+        <h3 class="fd-title mincho">想いをカタチにし、繁盛するお店をつくる。</h3>
+        <p class="fd-desc">市場調査・コンセプト設計から、デザイン・施工、開業後の運営サポートまで。お客様の理想を実現し、長く愛されるお店づくりを一貫してサポートします。</p>
       </div>
-      <div class="feat-rows">
-        <div class="feat-row">
-          <div class="ph"><img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80&auto=format&fit=crop" alt=""></div>
-          <div class="tx"><div class="s-en">PILLAR 01 ── 売上改善</div><h4>収益を、立て直す。</h4><p>店舗診断から顧問・実行支援まで。集客・メニュー・オペレーション・SNSを一体で見直し、数字を見ながら現場に入り込んで改善を実行します。</p></div>
-        </div>
-        <div class="feat-row rev">
-          <div class="ph"><img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1200&q=80&auto=format&fit=crop" alt=""></div>
-          <div class="tx"><div class="s-en">PILLAR 02 ── 店舗開発</div><h4>出店を、成功に導く。</h4><p>立地選びから開業、モール出店まで。商圏分析・物件選定・内装・求人・販促準備を一気通貫でサポートし、新規出店のリスクを抑えます。</p></div>
-        </div>
-        <div class="feat-row">
-          <div class="ph"><img src="https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&q=80&auto=format&fit=crop" alt=""></div>
-          <div class="tx"><div class="s-en">PILLAR 03 ── FC展開</div><h4>店舗数を、増やす。</h4><p>既存店の収益モデル化からFC本部の立ち上げまで。マニュアル整備・加盟条件の設計・加盟募集まで、店舗を増やす仕組みづくりを支援します。</p></div>
-        </div>
+      <div class="circles">
+        <div class="circle"><span class="cnum">01</span><h4>市場調査・分析</h4><p>エリアやターゲットを徹底リサーチ</p></div>
+        <div class="circle"><span class="cnum">02</span><h4>コンセプト設計</h4><p>お店の強みを活かした独自の価値を設計</p></div>
+        <div class="circle"><span class="cnum">03</span><h4>デザイン設計</h4><p>ブランドの世界観を空間に落とし込む</p></div>
+        <div class="circle"><span class="cnum">04</span><h4>施工・監理</h4><p>品質とコストを管理した確かな施工</p></div>
+        <div class="circle"><span class="cnum">05</span><h4>開業サポート・運営支援</h4><p>開業後の集客・運営まで継続的にサポート</p></div>
       </div>
-      <p class="note">※ 具体的なプラン・料金は、店舗の状況に合わせてご提案します。まずはお気軽にご相談ください。</p>
+      <div class="fd-cards-head"><span class="kicker">事業内容</span></div>
+      <div class="fd-cards">
+        <div class="fd-card"><div class="fd-ph"><img src="https://images.unsplash.com/photo-1517842645767-c639042777db?w=1200&q=80&auto=format&fit=crop" alt=""></div><h4>コンセプト開発</h4><p>お客様の想いを丁寧にヒアリングし、コンセプトやストーリーを構築します。</p></div>
+        <div class="fd-card"><div class="fd-ph"><img src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=1200&q=80&auto=format&fit=crop" alt=""></div><h4>店舗デザイン・設計</h4><p>機能性とデザイン性を両立させた、居心地の良い空間を設計します。</p></div>
+        <div class="fd-card"><div class="fd-ph"><img src="https://images.unsplash.com/photo-1503387837-b154d5074bd2?w=1200&q=80&auto=format&fit=crop" alt=""></div><h4>施工・監理</h4><p>経験豊富なパートナーと連携し、高品質な施工を実現します。</p></div>
+        <div class="fd-card"><div class="fd-ph"><img src="https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=1200&q=80&auto=format&fit=crop" alt=""></div><h4>メニュー開発・提案</h4><p>ターゲットに響くメニューやオペレーションをご提案し、売上向上に貢献します。</p></div>
+        <div class="fd-card"><div class="fd-ph"><img src="https://images.unsplash.com/photo-1556656793-08538906a9f8?w=1200&q=80&auto=format&fit=crop" alt=""></div><h4>集客・運営サポート</h4><p>SNS・広告・販促施策の提案や、運営改善まで伴走支援します。</p></div>
+      </div>
+      <p class="fd-close mincho">お店の未来を見据えたプロデュースで、確かな成功へ導きます。</p>
 
       <div class="who">
         <div class="who-en">PRODUCER</div>
@@ -568,30 +618,38 @@
   <section id="results">
     <div class="wrap">
       <div class="sec-head">
-        <div class="kicker">PROVEN RESULTS</div>
-        <h2>私たちが関与すると、こう変わる。</h2>
-        <p>某イタリアンレストランでの、売上改善のイメージです。</p>
+        <div class="kicker">CASE STUDIES</div>
+        <h2>現場で出してきた、改善の成果。</h2>
+        <p>飲食店の売上改善で、実際に生まれた変化の一例です。</p>
       </div>
-      <div class="statbar">
-        <div class="statbar-nums">
-          <div class="cap">就任当初 日商 約1万円 ── 約1ヶ月後</div>
-          <div class="statbar-big"><span class="num">10</span><span class="unit">倍</span><span class="up">UP</span></div>
-          <div class="cap">日商 約10万円 を達成</div>
+      <div class="cases">
+        <div class="case case-hi">
+          <span class="case-tag">客単価改善</span>
+          <div class="kyaku">
+            <div class="ku"><div class="kcap">現状</div><div class="kval">¥950</div></div>
+            <div class="karrow">→</div>
+            <div class="ku"><div class="kcap">改善後</div><div class="kval kval-up">¥1,180</div></div>
+          </div>
+          <div class="kbig">客単価 <span class="up">+24<small>%</small></span></div>
         </div>
-        <div class="bars" aria-hidden="true">
-          <div class="bar" style="--h:16%"></div>
-          <div class="bar" style="--h:22%"></div>
-          <div class="bar" style="--h:30%"></div>
-          <div class="bar" style="--h:34%"></div>
-          <div class="bar" style="--h:46%"></div>
-          <div class="bar" style="--h:55%"></div>
-          <div class="bar" style="--h:64%"></div>
-          <div class="bar" style="--h:78%"></div>
-          <div class="bar" style="--h:88%"></div>
-          <div class="bar" style="--h:100%"></div>
+        <div class="case">
+          <span class="case-tag">Google口コミ改善</span>
+          <ul>
+            <li>口コミ数の増加</li>
+            <li>来店導線の強化</li>
+            <li>検索順位の改善</li>
+          </ul>
+        </div>
+        <div class="case">
+          <span class="case-tag">オペレーション改善</span>
+          <ul>
+            <li>ピーク時の回転率向上</li>
+            <li>人件費の削減</li>
+            <li>スタッフ負担の軽減</li>
+          </ul>
         </div>
       </div>
-      <p class="note">※ 成果は店舗の状況により異なり、売上・利益等を保証するものではありません。</p>
+      <p class="note">※ 成果は店舗の状況により異なります。</p>
     </div>
   </section>
 
@@ -684,6 +742,12 @@
     ['.merit-card','fadeInUp',0,120],
     ['.compare','fadeInUp',0],
     ['.who','fadeInUp',0],
+    ['.hero-catch','fadeInUp',260],
+    ['.fd-catch','fadeInUp',0],
+    ['.circle','fadeInUp',0,110],
+    ['.fd-card','fadeInUp',0,90],
+    ['.fd-close','fadeIn',0],
+    ['.case','zoomIn',0,120],
     ['.feat-row:not(.rev) .ph','fadeInLeft',0],
     ['.feat-row:not(.rev) .tx','fadeInRight',80],
     ['.feat-row.rev .ph','fadeInRight',0],
