@@ -3,193 +3,380 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SAVIOR ｜ 人材紹介・飲食店総合プロデュース</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<title>トップページ（仮） | 株式会社Savior</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;500;700&family=Montserrat:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#0d0d0f; --bg2:#141416; --card:#17171a; --card2:#1d1d21;
-  --line:rgba(255,255,255,.09); --tx:#f4f2ee; --tx2:#a5a29b; --tx3:#6f6c66;
-  --gold:#e0a23c; --gold2:#f0c574; --orange:#dd7f2e; --ease:cubic-bezier(.6,.05,.2,1);
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);line-height:1.85;font-weight:300;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-.wrap{width:min(92%,1080px);margin:0 auto}
-.en{font-family:'Barlow Condensed',sans-serif;letter-spacing:.08em;font-weight:600}
+@import url('https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;500;700&family=Montserrat:wght@500;600;700&display=swap');
 
-header{position:sticky;top:0;z-index:50;background:rgba(13,13,15,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.nav{display:flex;align-items:center;justify-content:space-between;height:64px}
-.logo{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.4rem;letter-spacing:.18em}
-.logo span{color:var(--gold)}
-.nav-links{display:flex;gap:28px;font-size:.82rem;letter-spacing:.05em}
-.nav-links a{color:var(--tx2);transition:color .25s}
-.nav-links a:hover{color:var(--gold)}
-.nav-cta{padding:8px 18px;border:1px solid var(--gold);color:var(--gold);border-radius:2px;font-size:.78rem;letter-spacing:.08em}
-@media(max-width:720px){.nav-links{display:none}}
+/* ============================================================
+   SAVIOR 下書き2ページ共通スタイル（ライト＋ブルー）
+   全セレクタは .savior-draft 配下にスコープ
+   プライマリ青 #0247b3 / ネイビー文字 #0f2350 / 背景 白・#f5f5f5
+   ダーク背景・ゴールドは一切不使用
+   ============================================================ */
+
+/* ページ土台 */
+.savior-draft{
+  font-family:"SF Pro JP","Hiragino Kaku Gothic Pro","ヒラギノ角ゴ Pro W3",メイリオ,Meiryo,sans-serif;
+  color:#0f2350;
+  line-height:1.85;
+  background:#fff;
+  -webkit-font-smoothing:antialiased;
+}
+.savior-draft *{box-sizing:border-box;margin:0;padding:0}
+.savior-draft a{color:inherit;text-decoration:none}
+.savior-draft .wrap{width:min(92%,1080px);margin:0 auto}
+.savior-draft .mincho{font-family:"Zen Old Mincho",serif}
+.savior-draft .mont,
+.savior-draft .en{font-family:"Montserrat",sans-serif;letter-spacing:.08em;font-weight:600}
+
+/* header / nav */
+.savior-draft header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.9);backdrop-filter:blur(12px);border-bottom:1px solid #e5e5e5}
+.savior-draft .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+.savior-draft .logo{font-family:"Montserrat",sans-serif;font-weight:700;font-size:1.4rem;letter-spacing:.18em;color:#0f2350}
+.savior-draft .logo span{color:#0247b3}
+.savior-draft .nav-links{display:flex;gap:28px;font-size:.82rem;letter-spacing:.05em}
+.savior-draft .nav-links a{color:#0f2350;transition:color .25s}
+.savior-draft .nav-links a:hover{color:#0247b3}
+.savior-draft .nav-cta{padding:8px 18px;border:1px solid #0247b3;color:#0247b3;border-radius:2px;font-size:.78rem;letter-spacing:.08em;transition:background .25s,color .25s}
+.savior-draft .nav-cta:hover{background:#0247b3;color:#fff}
 
 /* hero */
-.hero{min-height:88vh;display:flex;align-items:center;position:relative;overflow:hidden;padding:80px 0}
-.hero::before{content:"";position:absolute;top:-160px;left:-140px;width:560px;height:560px;background:radial-gradient(circle,rgba(224,162,60,.13) 0%,transparent 70%);animation:orb 9s ease-in-out infinite}
-.hero::after{content:"";position:absolute;bottom:-120px;right:-100px;width:480px;height:480px;background:radial-gradient(circle,rgba(221,127,46,.08) 0%,transparent 70%);animation:orb2 11s ease-in-out infinite}
-@keyframes orb{0%,100%{transform:translate(0,0)}50%{transform:translate(50px,40px)}}
-@keyframes orb2{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,-30px)}}
-.hero-in{position:relative;z-index:1}
-.hero .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border:1px solid rgba(224,162,60,.3);background:rgba(224,162,60,.08);border-radius:99px;font-size:.72rem;letter-spacing:.2em;color:var(--gold);margin-bottom:32px}
-.hero h1{font-size:clamp(2.4rem,6.5vw,4.6rem);font-weight:700;line-height:1.18;letter-spacing:.01em;margin-bottom:24px}
-.hero h1 .hl{color:var(--gold)}
-.hero .lead{font-size:1.05rem;color:var(--tx2);max-width:600px;margin-bottom:38px}
-.hero-cta{display:inline-flex;gap:14px;flex-wrap:wrap}
-.btn{display:inline-block;background:var(--gold);color:#111;font-weight:700;padding:14px 34px;border-radius:3px;letter-spacing:.05em;transition:transform .25s,box-shadow .25s}
-.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(224,162,60,.25)}
-.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--tx)}
-.btn.ghost:hover{border-color:var(--gold);color:var(--gold);box-shadow:none}
+.savior-draft .hero{position:relative;overflow:hidden;padding:110px 0 70px;background:#f5f5f5;border-bottom:1px solid #e5e5e5}
+.savior-draft .hero::before{content:"";position:absolute;top:-160px;left:-140px;width:560px;height:560px;background:radial-gradient(circle,rgba(2,71,179,.08) 0%,transparent 70%);animation:sd-orb 9s ease-in-out infinite}
+.savior-draft .hero::after{content:"";position:absolute;bottom:-120px;right:-100px;width:480px;height:480px;background:radial-gradient(circle,rgba(38,111,163,.07) 0%,transparent 70%);animation:sd-orb2 11s ease-in-out infinite}
+@keyframes sd-orb{0%,100%{transform:translate(0,0)}50%{transform:translate(50px,40px)}}
+@keyframes sd-orb2{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,-30px)}}
+.savior-draft .hero-in{position:relative;z-index:1}
+.savior-draft .hero .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border:1px solid rgba(2,71,179,.3);background:rgba(2,71,179,.06);border-radius:99px;font-size:.72rem;letter-spacing:.2em;color:#0247b3;margin-bottom:32px}
+.savior-draft .hero .label{font-size:.72rem;letter-spacing:.35em;color:#0247b3;margin-bottom:22px}
+.savior-draft .hero h1{font-size:clamp(2.4rem,6.5vw,4.6rem);font-weight:700;line-height:1.18;letter-spacing:.01em;margin-bottom:24px;color:#0f2350}
+.savior-draft .hero h1.en{font-family:"Montserrat",sans-serif;font-size:clamp(3rem,9vw,6rem);line-height:1;letter-spacing:.02em;color:#0247b3}
+.savior-draft .hero h1 .hl{color:#0247b3}
+.savior-draft .hero .jp{font-size:1.15rem;color:#0f2350;font-weight:500;margin-bottom:10px}
+.savior-draft .hero .lead,
+.savior-draft .hero .sub{font-size:1.05rem;color:#0f2350;max-width:640px;margin-bottom:38px}
+.savior-draft .hero-cta{display:inline-flex;gap:14px;flex-wrap:wrap}
 
-section{padding:100px 0}
-.sec-head{text-align:center;margin-bottom:56px}
-.sec-head .kicker{font-size:.72rem;letter-spacing:.35em;color:var(--gold);margin-bottom:16px}
-.sec-head h2{font-size:clamp(1.6rem,4.5vw,2.6rem);font-weight:700;letter-spacing:.01em}
-.sec-head p{color:var(--tx2);margin-top:16px}
+/* buttons（現行 temple-btn 踏襲：青地・白文字・右矢印アニメ） */
+.savior-draft .btn{position:relative;display:inline-block;background:#0247b3;color:#fff;font-weight:700;padding:14px 34px;border-radius:3px;letter-spacing:.05em;border:2px solid #0247b3;transition:transform .25s,box-shadow .25s}
+.savior-draft .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(2,71,179,.25)}
+.savior-draft .btn.ghost{background:#fff;color:#0247b3}
+.savior-draft .btn.ghost:hover{background:rgba(2,71,179,.05);box-shadow:none}
 
-/* SERVICE — 2 businesses */
-.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-@media(max-width:720px){.svc-grid{grid-template-columns:1fr}}
-.svc{position:relative;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:44px 38px;overflow:hidden;transition:border-color .3s,transform .3s}
-.svc:hover{border-color:var(--gold);transform:translateY(-4px)}
-.svc .no{font-family:'Barlow Condensed',sans-serif;font-size:3.4rem;color:rgba(224,162,60,.28);line-height:1;position:absolute;top:24px;right:30px}
-.svc .cat{font-size:.72rem;letter-spacing:.2em;color:var(--gold);margin-bottom:14px}
-.svc h3{font-size:1.5rem;font-weight:700;margin-bottom:16px}
-.svc p{color:var(--tx2);font-size:.94rem;margin-bottom:24px}
-.svc ul{list-style:none;margin-bottom:28px}
-.svc ul li{font-size:.86rem;color:var(--tx2);padding:7px 0 7px 20px;position:relative;border-top:1px solid var(--line)}
-.svc ul li::before{content:"";position:absolute;left:2px;top:15px;width:6px;height:6px;background:var(--gold);border-radius:50%}
-.svc .more{display:inline-block;font-size:.82rem;color:var(--gold);letter-spacing:.06em;font-weight:500}
+/* section scaffolding */
+.savior-draft section{padding:90px 0}
+.savior-draft .sec-head{margin-bottom:48px}
+.savior-draft .sec-head .kicker{font-size:.72rem;letter-spacing:.3em;color:#0247b3;margin-bottom:14px}
+.savior-draft .sec-head h2{font-size:clamp(1.6rem,4.5vw,2.6rem);font-weight:700;line-height:1.35;letter-spacing:.01em;color:#0f2350}
+.savior-draft .sec-head p{color:#0f2350;margin-top:14px;max-width:720px}
+.savior-draft .divider{height:1px;background:#e5e5e5;width:100%}
 
-/* about */
-.about{background:var(--bg2)}
-.about-in{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center}
-@media(max-width:720px){.about-in{grid-template-columns:1fr}}
-.about-in h2{font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;line-height:1.4;margin-bottom:20px}
-.about-in .kicker{font-size:.72rem;letter-spacing:.3em;color:var(--gold);margin-bottom:14px}
-.about-in p{color:var(--tx2);font-size:.95rem;margin-bottom:14px}
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:26px}
-.stat .n{font-family:'Barlow Condensed',sans-serif;font-size:2.4rem;color:var(--gold2);line-height:1}
-.stat .l{color:var(--tx2);font-size:.82rem;margin-top:6px}
+/* SERVICE — svc cards（トップ） */
+.savior-draft .svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.savior-draft .svc{position:relative;background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:44px 38px;overflow:hidden;box-shadow:0 0 20px rgba(0,0,0,.05);transition:border-color .3s,transform .3s,box-shadow .3s}
+.savior-draft .svc:hover{border-color:#0247b3;transform:translateY(-4px);box-shadow:0 8px 28px rgba(2,71,179,.12)}
+.savior-draft .svc .no{font-family:"Montserrat",sans-serif;font-size:3.4rem;color:rgba(2,71,179,.22);line-height:1;position:absolute;top:24px;right:30px}
+.savior-draft .svc .cat{font-size:.72rem;letter-spacing:.2em;color:#0247b3;margin-bottom:14px}
+.savior-draft .svc h3{font-size:1.5rem;font-weight:700;margin-bottom:16px;color:#0f2350}
+.savior-draft .svc p{color:#0f2350;font-size:.94rem;margin-bottom:24px}
+.savior-draft .svc ul{list-style:none;margin-bottom:28px}
+.savior-draft .svc ul li{font-size:.86rem;color:#0f2350;padding:7px 0 7px 20px;position:relative;border-top:1px solid #e5e5e5}
+.savior-draft .svc ul li::before{content:"";position:absolute;left:2px;top:15px;width:6px;height:6px;background:#0247b3;border-radius:50%}
+.savior-draft .svc .more{display:inline-block;font-size:.82rem;color:#0247b3;letter-spacing:.06em;font-weight:600}
 
-/* cta */
-.cta-band{background:linear-gradient(135deg,#1a1712,var(--card));border:1px solid var(--gold);border-radius:12px;padding:60px 40px;text-align:center}
-.cta-band h2{font-size:clamp(1.6rem,4vw,2.4rem);font-weight:700;margin-bottom:14px}
-.cta-band p{color:var(--tx2);margin-bottom:30px}
+/* about（トップ） */
+.savior-draft .about{background:#f5f5f5}
+.savior-draft .about-in{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center}
+.savior-draft .about-in h2{font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;line-height:1.4;margin-bottom:20px;color:#0f2350}
+.savior-draft .about-in .kicker{font-size:.72rem;letter-spacing:.3em;color:#0247b3;margin-bottom:14px}
+.savior-draft .about-in p{color:#0f2350;font-size:.95rem;margin-bottom:14px}
+.savior-draft .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.savior-draft .stat{background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:26px;box-shadow:0 0 20px rgba(0,0,0,.05)}
+.savior-draft .stat .n{font-family:"Montserrat",sans-serif;font-size:2.4rem;color:#0247b3;line-height:1;font-weight:700}
+.savior-draft .stat .l{color:#0f2350;font-size:.82rem;margin-top:6px}
 
-.draft-flag{background:rgba(221,127,46,.12);border:1px dashed var(--orange);border-radius:6px;padding:14px 18px;font-size:.82rem;color:var(--gold2);margin:0 auto 40px;max-width:820px;text-align:center}
+/* biz intro cards（サービス） */
+.savior-draft .biz-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.savior-draft .biz-card{background:#fff;border:1px solid #e5e5e5;border-radius:6px;padding:34px 30px;box-shadow:0 0 20px rgba(0,0,0,.05);transition:border-color .3s,transform .3s,box-shadow .3s}
+.savior-draft .biz-card:hover{border-color:#0247b3;transform:translateY(-3px);box-shadow:0 8px 28px rgba(2,71,179,.12)}
+.savior-draft .biz-card .no{font-family:"Montserrat",sans-serif;font-size:2.4rem;color:#0247b3;line-height:1;margin-bottom:16px;font-weight:700}
+.savior-draft .biz-card h3{font-size:1.25rem;font-weight:700;margin-bottom:12px;color:#0f2350}
+.savior-draft .biz-card p{color:#0f2350;font-size:.92rem}
+.savior-draft .biz-card .more{display:inline-block;margin-top:20px;font-size:.8rem;color:#0247b3;letter-spacing:.06em;font-weight:600}
 
-footer{border-top:1px solid var(--line);padding:50px 0;color:var(--tx3);font-size:.82rem}
-.foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
+/* big numbered business block */
+.savior-draft .biz-block{padding:80px 0;border-top:1px solid #e5e5e5}
+.savior-draft .biz-block .bignum{font-family:"Montserrat",sans-serif;font-size:.8rem;letter-spacing:.3em;color:#0247b3;margin-bottom:10px;font-weight:600}
+.savior-draft .biz-block h2{font-size:clamp(1.6rem,4.5vw,2.4rem);font-weight:700;margin-bottom:16px;color:#0f2350}
+.savior-draft .biz-block .lead{color:#0f2350;max-width:760px;margin-bottom:40px}
+.savior-draft .biz-block .lead b{color:#0247b3}
+
+/* steps */
+.savior-draft .steps{display:flex;flex-wrap:wrap;gap:14px;align-items:stretch;margin:20px 0 10px}
+.savior-draft .step{flex:1;min-width:150px;background:#fff;border:1px solid #e5e5e5;border-radius:6px;padding:22px 20px;position:relative;box-shadow:0 0 20px rgba(0,0,0,.05)}
+.savior-draft .step .s-en{font-family:"Montserrat",sans-serif;color:#0247b3;font-size:.75rem;letter-spacing:.2em;margin-bottom:8px;font-weight:600}
+.savior-draft .step h4{font-size:1.05rem;font-weight:700;margin-bottom:6px;color:#0f2350}
+.savior-draft .step p{font-size:.85rem;color:#0f2350}
+
+/* plan cards */
+.savior-draft .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.savior-draft .plan{background:#fff;border:1px solid #e5e5e5;border-radius:6px;padding:26px 22px;display:flex;flex-direction:column;box-shadow:0 0 20px rgba(0,0,0,.05)}
+.savior-draft .plan.feat{border-color:#0247b3;background:rgba(2,71,179,.05)}
+.savior-draft .plan .tag{font-size:.68rem;letter-spacing:.15em;color:#0247b3;margin-bottom:10px;text-transform:uppercase}
+.savior-draft .plan h4{font-size:1.1rem;font-weight:700;margin-bottom:8px;color:#0f2350}
+.savior-draft .plan .price{font-family:"Montserrat",sans-serif;font-size:1.7rem;color:#0247b3;font-weight:700;line-height:1.1}
+.savior-draft .plan .term{font-size:.75rem;color:#0247b3;margin-bottom:16px}
+.savior-draft .plan .desc{font-size:.85rem;color:#0f2350;margin-bottom:16px}
+.savior-draft .plan ul{list-style:none;margin-top:auto}
+.savior-draft .plan ul li{font-size:.82rem;color:#0f2350;padding:5px 0 5px 18px;position:relative;border-top:1px solid #e5e5e5}
+.savior-draft .plan ul li::before{content:"";position:absolute;left:2px;top:13px;width:6px;height:6px;background:#0247b3;border-radius:50%}
+.savior-draft .plan .out{font-size:.76rem;color:#0f2350;margin-top:14px;padding-top:12px;border-top:1px solid #e5e5e5;line-height:1.6}
+
+/* two-col plans */
+.savior-draft .plans2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+
+/* table */
+.savior-draft .tbl{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:10px}
+.savior-draft .tbl th,.savior-draft .tbl td{text-align:left;padding:14px 16px;border-bottom:1px solid #e5e5e5;color:#0f2350}
+.savior-draft .tbl th{color:#0247b3;font-weight:600;font-size:.78rem;letter-spacing:.05em;background:#f5f5f5}
+.savior-draft .tbl td.gold{color:#0247b3;font-family:"Montserrat",sans-serif;font-size:1.05rem;font-weight:600}
+
+/* option chips */
+.savior-draft .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.savior-draft .chip{background:#f5f5f5;border:1px solid #e5e5e5;border-radius:99px;padding:8px 16px;font-size:.82rem;color:#0f2350}
+
+/* producer */
+.savior-draft .producer{display:grid;grid-template-columns:280px 1fr;gap:40px;align-items:center;background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:40px;box-shadow:0 0 20px rgba(0,0,0,.05)}
+.savior-draft .p-photo{aspect-ratio:1;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#0247b3;font-size:.8rem;border:1px solid #e5e5e5}
+.savior-draft .producer h3{font-size:1.5rem;font-weight:700;color:#0f2350}
+.savior-draft .producer h3 span{color:#0247b3;font-family:"Montserrat",sans-serif}
+.savior-draft .producer .role{color:#0247b3;font-size:.9rem;margin:6px 0 18px;letter-spacing:.05em}
+.savior-draft .producer .bio{color:#0f2350;font-size:.92rem;margin-bottom:20px}
+.savior-draft .creds{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.savior-draft .cred{background:#f5f5f5;border:1px solid #e5e5e5;border-radius:5px;padding:12px 14px;font-size:.82rem;color:#0f2350;text-align:left}
+.savior-draft .cred b{color:#0247b3;display:block;font-weight:600;font-size:.86rem}
+
+/* result / roi */
+.savior-draft .result{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:center;background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:40px;box-shadow:0 0 20px rgba(0,0,0,.05)}
+.savior-draft .result .big{font-family:"Montserrat",sans-serif;font-size:3rem;color:#0247b3;line-height:1;font-weight:700}
+.savior-draft .result .arrow{font-size:2rem;color:#0247b3;text-align:center}
+.savior-draft .result .cap{font-size:.82rem;color:#0f2350}
+.savior-draft .result .badge{display:inline-block;background:#0247b3;color:#fff;font-weight:700;padding:4px 14px;border-radius:99px;font-size:.85rem;margin-top:10px}
+
+.savior-draft .roi-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center}
+.savior-draft .roi-hi{background:rgba(2,71,179,.05);border:1px solid #0247b3;border-radius:8px;padding:30px}
+.savior-draft .roi-hi .cap{color:#0f2350}
+.savior-draft .roi-hi .num{font-family:"Montserrat",sans-serif;font-size:2.6rem;color:#0247b3;font-weight:700}
+.savior-draft .roi-hi p{color:#0f2350}
+
+/* common terms */
+.savior-draft .terms{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.savior-draft .term-item{background:#fff;border:1px solid #e5e5e5;border-radius:5px;padding:18px;box-shadow:0 0 20px rgba(0,0,0,.05)}
+.savior-draft .term-item b{color:#0247b3;font-size:.82rem;letter-spacing:.05em}
+.savior-draft .term-item p{color:#0f2350;font-size:.85rem;margin-top:4px}
+
+/* flow */
+.savior-draft .flow{display:flex;flex-wrap:wrap;gap:12px;counter-reset:sd-f}
+.savior-draft .flow .f{flex:1;min-width:140px;background:#fff;border:1px solid #e5e5e5;border-radius:6px;padding:22px 18px;counter-increment:sd-f;position:relative;box-shadow:0 0 20px rgba(0,0,0,.05)}
+.savior-draft .flow .f::before{content:counter(sd-f);font-family:"Montserrat",sans-serif;color:#0247b3;font-size:1.6rem;display:block;margin-bottom:8px;font-weight:700}
+.savior-draft .flow .f h4{font-size:.98rem;font-weight:700;color:#0f2350}
+
+/* cta / cta-band（青グラデ・白文字） */
+.savior-draft .cta,
+.savior-draft .cta-band{background:linear-gradient(135deg,#266fa3,#0247b3);border:none;border-radius:12px;padding:60px 40px;text-align:center;color:#fff}
+.savior-draft .cta h2,
+.savior-draft .cta-band h2{font-size:clamp(1.6rem,4vw,2.4rem);font-weight:700;margin-bottom:14px;color:#fff}
+.savior-draft .cta p,
+.savior-draft .cta-band p{color:rgba(255,255,255,.9);margin-bottom:30px}
+.savior-draft .cta .btn,
+.savior-draft .cta-band .btn{background:#fff;color:#0247b3;border-color:#fff}
+.savior-draft .cta .btn:hover,
+.savior-draft .cta-band .btn:hover{box-shadow:0 10px 30px rgba(0,0,0,.2)}
+
+.savior-draft .note{font-size:.78rem;color:#0f2350;opacity:.75;margin-top:20px;line-height:1.7}
+
+/* draft-flag（仮注記：破線・薄青地・青文字） */
+.savior-draft .draft-flag{background:rgba(2,71,179,.06);border:1px dashed #0247b3;border-radius:6px;padding:14px 18px;font-size:.82rem;color:#0247b3;margin:20px auto;max-width:820px}
+.savior-draft .draft-flag b{color:#0247b3}
+
+/* footer */
+.savior-draft footer{border-top:1px solid #e5e5e5;padding:50px 0;color:#0f2350;font-size:.82rem;background:#f5f5f5}
+.savior-draft .foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
+
+/* ============================================================
+   レスポンシブ（ソースの @media を踏襲、.savior-draft 配下）
+   ============================================================ */
+@media(max-width:900px){
+  .savior-draft .plans{grid-template-columns:1fr 1fr}
+}
+@media(max-width:720px){
+  .savior-draft .nav-links{display:none}
+  .savior-draft .svc-grid{grid-template-columns:1fr}
+  .savior-draft .about-in{grid-template-columns:1fr}
+  .savior-draft .biz-grid{grid-template-columns:1fr}
+  .savior-draft .plans2{grid-template-columns:1fr}
+  .savior-draft .producer{grid-template-columns:1fr;text-align:center}
+  .savior-draft .result{grid-template-columns:1fr}
+  .savior-draft .roi-grid{grid-template-columns:1fr}
+  .savior-draft .terms{grid-template-columns:1fr 1fr}
+}
+@media(max-width:560px){
+  .savior-draft .plans{grid-template-columns:1fr}
+  .savior-draft .creds{grid-template-columns:1fr}
+}
+@media(max-width:460px){
+  .savior-draft .terms{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
+<div class="savior-draft">
 
-<header>
-  <div class="wrap nav">
-    <div class="logo">SAV<span>I</span>OR</div>
-    <nav class="nav-links">
-      <a href="#service">SERVICE</a>
-      <a href="#about">ABOUT</a>
-      <a href="サービス詳細_仮.html">サービス詳細</a>
-      <a href="#contact">CONTACT</a>
-    </nav>
-    <a href="#contact" class="nav-cta">CONTACT</a>
-  </div>
-</header>
+  <header>
+    <div class="wrap nav">
+      <div class="logo">SAV<span>I</span>OR</div>
+      <nav class="nav-links">
+        <a href="#service">SERVICE</a>
+        <a href="#about">ABOUT</a>
+        <a href="サービス詳細_仮.html">サービス詳細</a>
+        <a href="#contact">CONTACT</a>
+      </nav>
+      <a href="#contact" class="nav-cta">CONTACT</a>
+    </div>
+  </header>
 
-<!-- HERO -->
-<div class="hero">
-  <div class="wrap hero-in">
-    <div class="badge"><span>●</span> HR &amp; RESTAURANT PRODUCE</div>
-    <h1>人材と、飲食で。<br>事業の成長を、<span class="hl">伴走</span>して支える。</h1>
-    <p class="lead">私たちSAVIORは、人材紹介事業と飲食店総合プロデュース事業の2軸で、企業と店舗の課題解決をワンストップでサポートします。</p>
-    <div class="hero-cta">
-      <a href="#service" class="btn">サービスを見る</a>
-      <a href="#contact" class="btn ghost">お問い合わせ</a>
+  <!-- ① HERO -->
+  <div class="hero">
+    <div class="wrap hero-in">
+      <div class="badge"><span>●</span> HR &amp; RESTAURANT PRODUCE</div>
+      <p class="label mont">HR &amp; RESTAURANT PRODUCE</p>
+      <h1>人材と、飲食で。<br>事業の成長を、<span class="hl">伴走</span>して支える。</h1>
+      <p class="lead">私たちSAVIORは、人材紹介事業と飲食店総合プロデュース事業の2軸で、企業と店舗の課題解決をワンストップでサポートします。</p>
+      <div class="hero-cta">
+        <a href="#service" class="btn">サービスを見る</a>
+        <a href="#contact" class="btn ghost">お問い合わせ</a>
+      </div>
     </div>
   </div>
+
+  <div class="wrap">
+    <div class="draft-flag">✎ これは配色・レイアウトをご確認いただくための <b>仮トップページ</b> です。ロゴ・キャッチコピー・理念文・実績数値・写真は仮置きのため、確定情報で差し替えます。</div>
+  </div>
+
+  <!-- ② 会社理念ブロック -->
+  <section id="philosophy">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker mont">PHILOSOPHY</div>
+        <h2>理念</h2>
+      </div>
+      <div class="producer">
+        <div class="p-photo">
+          <img src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png" alt="株式会社Savior ロゴ" style="max-width:100%;height:auto">
+        </div>
+        <div>
+          <p class="mincho" style="font-size:1.05rem;line-height:2.1">株式会社Saviorは、次世代が夢を描き、その夢に挑戦するための“きっかけ”を提供する救世主であることを使命としております。私たちは、この理念を軸に、次世代のリーダーやイノベーターとなる人材の発掘と育成に注力し、持続的な社会価値の創造を目指しております。当社の活動を通じて、個人はもちろん企業や社会全体が革新的な未来を共創できると確信しており、これからも「可能性の最大化」と「新たな価値の創出」に邁進してまいります。</p>
+          <p class="role" style="margin-top:22px">代表取締役　谷口 大介</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap"><div class="divider"></div></div>
+
+  <!-- ③ SERVICE（2事業カード） -->
+  <section id="service">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker mont">SERVICE</div>
+        <h2>2つの事業</h2>
+        <p>人材紹介にとどまらず、飲食店の総合プロデュースまで。求職者と企業の理想を見据え、個別のニーズに合わせた支援を提供します。</p>
+      </div>
+      <div class="svc-grid">
+        <a href="サービス詳細_仮.html#jinzai" class="svc">
+          <div class="no mont">01</div>
+          <div class="cat mont">BUSINESS 01</div>
+          <h3>人材紹介事業</h3>
+          <p>企業の採用課題と、求職者のキャリアをつなぐ。最適なマッチングで採用の成功を支援します。</p>
+          <ul>
+            <li>丁寧なヒアリングによるマッチング</li>
+            <li>業界・職種への深い理解</li>
+            <li>入社後の定着まで伴走</li>
+          </ul>
+          <span class="more">詳しく見る →</span>
+        </a>
+        <a href="サービス詳細_仮.html#food" class="svc">
+          <div class="no mont">02</div>
+          <div class="cat mont">BUSINESS 02</div>
+          <h3>飲食店総合プロデュース事業</h3>
+          <p>売上改善から出店・FC展開まで。ワンストップ・伴走型で飲食店の成長を支援します。</p>
+          <ul>
+            <li>飲食店売上改善（顧問・診断）</li>
+            <li>店舗開発支援（物件選定・開業・モール出店）</li>
+            <li>フランチャイズ支援（FC本部構築）</li>
+          </ul>
+          <span class="more">詳しく見る →</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ④ ABOUT / 実績スタッツ -->
+  <section class="about" id="about">
+    <div class="wrap about-in">
+      <div>
+        <div class="kicker mont">ABOUT</div>
+        <h2>「点」ではなく、<br>「ワンストップ」で支える。</h2>
+        <p>単なる代行やコンサルティングではありません。実務経験を活かした伴走型支援で、人材から店舗運営まで一気通貫でサポートします。</p>
+        <p>現場を知る私たちだからこそ提供できる、実行までの支援があります。</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat"><div class="n">2</div><div class="l">事業領域</div></div>
+        <div class="stat"><div class="n">10<span style="font-size:1.2rem">倍</span></div><div class="l">売上改善実績※</div></div>
+        <div class="stat"><div class="n">3</div><div class="l">飲食支援の柱</div></div>
+        <div class="stat"><div class="n">1st</div><div class="l">まずは無料相談</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="draft-flag">※「売上改善10倍」等の実績数値は仮の参考値です。確定した実績値に差し替えます。</div>
+  </div>
+
+  <!-- ⑤ CONTACT帯 -->
+  <section id="contact">
+    <div class="wrap">
+      <div class="cta-band">
+        <div class="kicker mont" style="color:rgba(255,255,255,.9)">CONTACT</div>
+        <h2>事業のご相談は、お気軽に。</h2>
+        <p>人材紹介・飲食店プロデュース、どちらのご相談も承ります。まずは無料相談から。</p>
+        <a href="#" class="btn">お問い合わせはこちら</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑥ FOOTER -->
+  <footer>
+    <div class="wrap foot">
+      <div>
+        <div class="logo">SAV<span>I</span>OR</div>
+        <p style="margin-top:10px">株式会社Savior</p>
+        <p>〒540-6138 大阪市中央区城見2丁目1-61 ツイン21 MIDタワー38階</p>
+        <p>代表取締役 谷口 大介</p>
+      </div>
+      <div class="nav-links" style="display:flex;flex-direction:column;gap:8px">
+        <a href="サービス詳細_仮.html">サービス</a>
+        <a href="#about">会社概要</a>
+        <a href="#contact">お問い合わせ</a>
+        <a href="#">プライバシーポリシー</a>
+      </div>
+      <div>© SAVIOR</div>
+    </div>
+  </footer>
+
 </div>
-
-<!-- SERVICE (2事業) -->
-<section id="service">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="kicker">SERVICE</div>
-      <h2>2つの事業</h2>
-      <p>人材紹介にとどまらず、飲食店の総合プロデュースまで。</p>
-    </div>
-    <div class="draft-flag">✎ これは配色・レイアウトを確認いただくための<b>仮トップページ</b>です。ロゴ・キャッチコピー・実績数値・写真は仮置きのため、確定情報で差し替えます。</div>
-    <div class="svc-grid">
-      <a href="サービス詳細_仮.html#jinzai" class="svc">
-        <div class="no en">01</div>
-        <div class="cat">BUSINESS 01</div>
-        <h3>人材紹介事業</h3>
-        <p>企業の採用課題と、求職者のキャリアをつなぐ。最適なマッチングで採用の成功を支援します。</p>
-        <ul>
-          <li>丁寧なヒアリングによるマッチング</li>
-          <li>業界・職種への深い理解</li>
-          <li>入社後の定着まで伴走</li>
-        </ul>
-        <span class="more">詳しく見る →</span>
-      </a>
-      <a href="サービス詳細_仮.html#food" class="svc">
-        <div class="no en">02</div>
-        <div class="cat">BUSINESS 02</div>
-        <h3>飲食店総合プロデュース事業</h3>
-        <p>売上改善から出店・FC展開まで。ワンストップ・伴走型で飲食店の成長を支援します。</p>
-        <ul>
-          <li>飲食店売上改善（顧問・診断）</li>
-          <li>店舗開発支援（物件選定・開業・モール出店）</li>
-          <li>フランチャイズ支援（FC本部構築）</li>
-        </ul>
-        <span class="more">詳しく見る →</span>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- ABOUT -->
-<section class="about" id="about">
-  <div class="wrap about-in">
-    <div>
-      <div class="kicker">ABOUT</div>
-      <h2>「点」ではなく、<br>「ワンストップ」で支える。</h2>
-      <p>単なる代行やコンサルティングではありません。実務経験を活かした伴走型支援で、人材から店舗運営まで一気通貫でサポートします。</p>
-      <p>現場を知る私たちだからこそ提供できる、実行までの支援があります。</p>
-    </div>
-    <div class="stat-grid">
-      <div class="stat"><div class="n">2</div><div class="l">事業領域</div></div>
-      <div class="stat"><div class="n">10<span style="font-size:1.2rem">倍</span></div><div class="l">売上改善実績※</div></div>
-      <div class="stat"><div class="n">3</div><div class="l">飲食支援の柱</div></div>
-      <div class="stat"><div class="n">1st</div><div class="l">まずは無料相談</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- CONTACT -->
-<section id="contact">
-  <div class="wrap">
-    <div class="cta-band">
-      <h2>事業のご相談は、お気軽に。</h2>
-      <p>人材紹介・飲食店プロデュース、どちらのご相談も承ります。</p>
-      <a href="#" class="btn">お問い合わせはこちら</a>
-    </div>
-  </div>
-</section>
-
-<footer>
-  <div class="wrap foot">
-    <div class="logo">SAV<span>I</span>OR</div>
-    <div>人材紹介事業 ／ 飲食店総合プロデュース事業</div>
-    <div>© SAVIOR</div>
-  </div>
-</footer>
-
 </body>
 </html>
