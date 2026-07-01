@@ -286,13 +286,135 @@
 /* big footer wordmark */
 .savior-draft .bigmark-wrap{overflow:hidden;text-align:center;padding:60px 0 0;line-height:.8}
 .savior-draft .bigmark{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3.4rem,17vw,12rem);letter-spacing:.01em;color:#0f2350;opacity:.09;white-space:nowrap;user-select:none}
+
+/* ===== v2 top: MONOLITH風のかっこいい構成（ライト＋ブルー） ===== */
+.savior-draft .hl{color:#0247b3}
+.savior-draft .logo-img{height:30px;width:auto;display:block}
+.savior-draft footer .logo-img{height:34px}
+.savior-draft .hero-cool{min-height:92vh;display:flex;align-items:center;position:relative;overflow:hidden;background:#fff;padding:120px 0}
+.savior-draft .hero-cool .hero-bg{position:absolute;inset:0;z-index:0;background:linear-gradient(90deg,#fff 44%,rgba(255,255,255,.15) 68%,rgba(255,255,255,0) 100%),url('https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp') right center/cover;opacity:.55}
+.savior-draft .hero-cool .wrap{position:relative;z-index:1}
+.savior-draft .hero-cool h1{font-family:"Zen Old Mincho",serif;font-weight:700;font-size:clamp(2.3rem,6.2vw,4.6rem);line-height:1.34;letter-spacing:.03em;color:#0f2350}
+.savior-draft .hero-cool .lead{margin-top:26px;font-size:1.05rem;color:#0f2350;opacity:.82;max-width:560px;line-height:1.9}
+.savior-draft .side-mark{position:absolute;left:24px;bottom:34px;z-index:2;writing-mode:vertical-rl;font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.4em;font-size:.7rem;color:#0247b3;opacity:.6}
+@media(max-width:820px){.savior-draft .side-mark{display:none}}
+/* big statement */
+.savior-draft .stmt{text-align:center;padding:120px 0;background:#f5f5f5;margin:0 calc(50% - 50vw)}
+.savior-draft .stmt .en-kick{font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.4em;font-size:.72rem;color:#0247b3;margin-bottom:22px}
+.savior-draft .stmt h2{font-family:"Zen Old Mincho",serif;font-weight:700;font-size:clamp(2rem,6vw,3.6rem);color:#0f2350;letter-spacing:.08em;line-height:1.4}
+/* huge section label */
+.savior-draft .big-label{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(2.6rem,7vw,5rem);letter-spacing:.02em;color:#0247b3;line-height:1;opacity:.14}
+.savior-draft .lbl-row{display:flex;align-items:baseline;gap:16px;margin:6px 0 20px}
+.savior-draft .lbl-row .jp{font-size:1rem;font-weight:700;color:#0247b3}
+.savior-draft .lbl-row .jp::before{content:"— "}
+/* split section */
+.savior-draft .split{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;padding:110px 0}
+@media(max-width:820px){.savior-draft .split{grid-template-columns:1fr;gap:30px;padding:70px 0}}
+.savior-draft .split h3{font-family:"Zen Old Mincho",serif;font-size:clamp(1.5rem,3.6vw,2.15rem);color:#0f2350;line-height:1.55;margin:0 0 18px}
+.savior-draft .split p{color:#0f2350;opacity:.85;margin-bottom:12px}
+.savior-draft .split .sign{margin-top:22px;font-family:"Zen Old Mincho",serif;color:#0f2350;font-size:1.05rem}
+.savior-draft .split-img{aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#e9edf5;box-shadow:0 20px 50px rgba(2,71,179,.14)}
+.savior-draft .split-img img{width:100%;height:100%;object-fit:cover;display:block}
+/* circle arrow button */
+.savior-draft .circle-btn{display:inline-flex;align-items:center;gap:14px;margin-top:26px;color:#0f2350;font-size:.85rem;letter-spacing:.08em;font-weight:600}
+.savior-draft .circle-btn .circ{width:56px;height:56px;border-radius:50%;background:#0247b3;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;transition:transform .3s,box-shadow .3s}
+.savior-draft.sd-on .circle-btn:hover .circ{transform:translateX(6px);box-shadow:0 10px 24px rgba(2,71,179,.3)}
+/* service big rows */
+.savior-draft .sec-lead{padding-bottom:10px}
+.savior-draft .svc2{border-top:1px solid #e5e5e5;margin-top:14px}
+.savior-draft .svc2 a{display:grid;grid-template-columns:auto 1fr auto;gap:34px;align-items:center;padding:46px 6px;border-bottom:1px solid #e5e5e5;transition:padding .35s,background .35s}
+@media(max-width:720px){.savior-draft .svc2 a{grid-template-columns:auto 1fr;gap:18px;padding:30px 4px}}
+.savior-draft.sd-on .svc2 a:hover{padding-left:24px;padding-right:24px;background:#f5f5f5}
+.savior-draft .svc2 .no{font-family:"Montserrat",sans-serif;font-weight:700;font-size:2.6rem;color:#0247b3;opacity:.5;line-height:1}
+.savior-draft .svc2 .mid h3{font-family:"Zen Old Mincho",serif;font-size:clamp(1.3rem,3vw,1.9rem);color:#0f2350;margin-bottom:8px}
+.savior-draft .svc2 .mid p{color:#0f2350;opacity:.75;font-size:.92rem;max-width:640px}
+.savior-draft .svc2 .go{width:52px;height:52px;border-radius:50%;border:1px solid #0247b3;display:inline-flex;align-items:center;justify-content:center;color:#0247b3;font-size:1.1rem;transition:all .3s}
+@media(max-width:720px){.savior-draft .svc2 .go{display:none}}
+.savior-draft.sd-on .svc2 a:hover .go{background:#0247b3;color:#fff}
+/* stats band */
+.savior-draft .stats-band{background:linear-gradient(135deg,#0f2350,#0247b3);margin:0 calc(50% - 50vw);padding:72px max(4vw,calc(50vw - 540px));color:#fff}
+.savior-draft .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;max-width:1080px;margin:0 auto}
+@media(max-width:720px){.savior-draft .stats-grid{grid-template-columns:1fr 1fr;gap:34px 20px}}
+.savior-draft .stat2 .n{font-family:"Montserrat",sans-serif;font-size:2.9rem;font-weight:700;line-height:1;color:#fff}
+.savior-draft .stat2 .n small{font-size:1.1rem}
+.savior-draft .stat2 .l{color:rgba(255,255,255,.82);font-size:.85rem;margin-top:10px}
+/* contact band */
+.savior-draft .contact-band{position:relative;overflow:hidden;text-align:center;margin:0 calc(50% - 50vw);padding:100px 20px;background:linear-gradient(135deg,#266fa3,#0247b3);color:#fff}
+.savior-draft .contact-band .en{font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.3em;font-size:clamp(1.5rem,5vw,2.2rem);margin-bottom:20px}
+.savior-draft .contact-band p{opacity:.9;margin-bottom:28px}
+.savior-draft .contact-band .cbtn{display:inline-block;background:#fff;color:#0247b3;font-weight:700;padding:15px 46px;border-radius:99px;transition:transform .3s,box-shadow .3s}
+.savior-draft.sd-on .contact-band .cbtn:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.2)}
+/* big footer wordmark */
+.savior-draft .bigmark-wrap{overflow:hidden;text-align:center;padding:60px 0 0;line-height:.8}
+.savior-draft .bigmark{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3.4rem,17vw,12rem);letter-spacing:.01em;color:#0f2350;opacity:.09;white-space:nowrap;user-select:none}
+
+/* ===== v2 top: MONOLITH風のかっこいい構成（ライト＋ブルー） ===== */
+.savior-draft .hl{color:#0247b3}
+.savior-draft .logo-img{height:30px;width:auto;display:block}
+.savior-draft footer .logo-img{height:34px}
+.savior-draft .hero-cool{min-height:92vh;display:flex;align-items:center;position:relative;overflow:hidden;background:#fff;padding:120px 0}
+.savior-draft .hero-cool .hero-bg{position:absolute;inset:0;z-index:0;background:linear-gradient(90deg,#fff 44%,rgba(255,255,255,.15) 68%,rgba(255,255,255,0) 100%),url('https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp') right center/cover;opacity:.55}
+.savior-draft .hero-cool .wrap{position:relative;z-index:1}
+.savior-draft .hero-cool h1{font-family:"Zen Old Mincho",serif;font-weight:700;font-size:clamp(2.3rem,6.2vw,4.6rem);line-height:1.34;letter-spacing:.03em;color:#0f2350}
+.savior-draft .hero-cool .lead{margin-top:26px;font-size:1.05rem;color:#0f2350;opacity:.82;max-width:560px;line-height:1.9}
+.savior-draft .side-mark{position:absolute;left:24px;bottom:34px;z-index:2;writing-mode:vertical-rl;font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.4em;font-size:.7rem;color:#0247b3;opacity:.6}
+@media(max-width:820px){.savior-draft .side-mark{display:none}}
+/* big statement */
+.savior-draft .stmt{text-align:center;padding:120px 0;background:#f5f5f5;margin:0 calc(50% - 50vw)}
+.savior-draft .stmt .en-kick{font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.4em;font-size:.72rem;color:#0247b3;margin-bottom:22px}
+.savior-draft .stmt h2{font-family:"Zen Old Mincho",serif;font-weight:700;font-size:clamp(2rem,6vw,3.6rem);color:#0f2350;letter-spacing:.08em;line-height:1.4}
+/* huge section label */
+.savior-draft .big-label{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(2.6rem,7vw,5rem);letter-spacing:.02em;color:#0247b3;line-height:1;opacity:.14}
+.savior-draft .lbl-row{display:flex;align-items:baseline;gap:16px;margin:6px 0 20px}
+.savior-draft .lbl-row .jp{font-size:1rem;font-weight:700;color:#0247b3}
+.savior-draft .lbl-row .jp::before{content:"— "}
+/* split section */
+.savior-draft .split{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;padding:110px 0}
+@media(max-width:820px){.savior-draft .split{grid-template-columns:1fr;gap:30px;padding:70px 0}}
+.savior-draft .split h3{font-family:"Zen Old Mincho",serif;font-size:clamp(1.5rem,3.6vw,2.15rem);color:#0f2350;line-height:1.55;margin:0 0 18px}
+.savior-draft .split p{color:#0f2350;opacity:.85;margin-bottom:12px}
+.savior-draft .split .sign{margin-top:22px;font-family:"Zen Old Mincho",serif;color:#0f2350;font-size:1.05rem}
+.savior-draft .split-img{aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#e9edf5;box-shadow:0 20px 50px rgba(2,71,179,.14)}
+.savior-draft .split-img img{width:100%;height:100%;object-fit:cover;display:block}
+/* circle arrow button */
+.savior-draft .circle-btn{display:inline-flex;align-items:center;gap:14px;margin-top:26px;color:#0f2350;font-size:.85rem;letter-spacing:.08em;font-weight:600}
+.savior-draft .circle-btn .circ{width:56px;height:56px;border-radius:50%;background:#0247b3;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem;transition:transform .3s,box-shadow .3s}
+.savior-draft.sd-on .circle-btn:hover .circ{transform:translateX(6px);box-shadow:0 10px 24px rgba(2,71,179,.3)}
+/* service big rows */
+.savior-draft .sec-lead{padding-bottom:10px}
+.savior-draft .svc2{border-top:1px solid #e5e5e5;margin-top:14px}
+.savior-draft .svc2 a{display:grid;grid-template-columns:auto 1fr auto;gap:34px;align-items:center;padding:46px 6px;border-bottom:1px solid #e5e5e5;transition:padding .35s,background .35s}
+@media(max-width:720px){.savior-draft .svc2 a{grid-template-columns:auto 1fr;gap:18px;padding:30px 4px}}
+.savior-draft.sd-on .svc2 a:hover{padding-left:24px;padding-right:24px;background:#f5f5f5}
+.savior-draft .svc2 .no{font-family:"Montserrat",sans-serif;font-weight:700;font-size:2.6rem;color:#0247b3;opacity:.5;line-height:1}
+.savior-draft .svc2 .mid h3{font-family:"Zen Old Mincho",serif;font-size:clamp(1.3rem,3vw,1.9rem);color:#0f2350;margin-bottom:8px}
+.savior-draft .svc2 .mid p{color:#0f2350;opacity:.75;font-size:.92rem;max-width:640px}
+.savior-draft .svc2 .go{width:52px;height:52px;border-radius:50%;border:1px solid #0247b3;display:inline-flex;align-items:center;justify-content:center;color:#0247b3;font-size:1.1rem;transition:all .3s}
+@media(max-width:720px){.savior-draft .svc2 .go{display:none}}
+.savior-draft.sd-on .svc2 a:hover .go{background:#0247b3;color:#fff}
+/* stats band */
+.savior-draft .stats-band{background:linear-gradient(135deg,#0f2350,#0247b3);margin:0 calc(50% - 50vw);padding:72px max(4vw,calc(50vw - 540px));color:#fff}
+.savior-draft .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;max-width:1080px;margin:0 auto}
+@media(max-width:720px){.savior-draft .stats-grid{grid-template-columns:1fr 1fr;gap:34px 20px}}
+.savior-draft .stat2 .n{font-family:"Montserrat",sans-serif;font-size:2.9rem;font-weight:700;line-height:1;color:#fff}
+.savior-draft .stat2 .n small{font-size:1.1rem}
+.savior-draft .stat2 .l{color:rgba(255,255,255,.82);font-size:.85rem;margin-top:10px}
+/* contact band */
+.savior-draft .contact-band{position:relative;overflow:hidden;text-align:center;margin:0 calc(50% - 50vw);padding:100px 20px;background:linear-gradient(135deg,#266fa3,#0247b3);color:#fff}
+.savior-draft .contact-band .en{font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.3em;font-size:clamp(1.5rem,5vw,2.2rem);margin-bottom:20px}
+.savior-draft .contact-band p{opacity:.9;margin-bottom:28px}
+.savior-draft .contact-band .cbtn{display:inline-block;background:#fff;color:#0247b3;font-weight:700;padding:15px 46px;border-radius:99px;transition:transform .3s,box-shadow .3s}
+.savior-draft.sd-on .contact-band .cbtn:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.2)}
+/* big footer wordmark */
+.savior-draft .bigmark-wrap{overflow:hidden;text-align:center;padding:60px 0 0;line-height:.8}
+.savior-draft .bigmark{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3.4rem,17vw,12rem);letter-spacing:.01em;color:#0f2350;opacity:.09;white-space:nowrap;user-select:none}
 </style>
 </head>
 <body>
 <div class="savior-draft">
   <header>
     <div class="wrap nav">
-      <div class="logo">Savior</div>
+      <div class="logo"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png" alt="株式会社Savior"></div>
       <nav class="nav-links">
         <a href="#about">ABOUT</a>
         <a href="#service">SERVICE</a>
@@ -330,7 +452,7 @@
         <p>個人はもちろん、企業や社会全体が革新的な未来を共創できると信じ、「可能性の最大化」と「新たな価値の創出」に邁進します。</p>
         <div class="sign">代表取締役　谷口 大介</div>
       </div>
-      <div class="split-img"><img src="https://savior-corporation.com/wp-content/uploads/2025/11/taniguchidaisuke.png" alt="代表取締役 谷口 大介"></div>
+      <div class="split-img"><img src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp" alt="株式会社Savior"></div>
     </div>
   </section>
 
@@ -356,18 +478,6 @@
     </div>
   </section>
 
-  <!-- STATS -->
-  <section style="padding:0 0 110px">
-    <div class="stats-band">
-      <div class="stats-grid">
-        <div class="stat2"><div class="n">2</div><div class="l">事業領域</div></div>
-        <div class="stat2"><div class="n">10<small>倍</small></div><div class="l">売上改善実績※</div></div>
-        <div class="stat2"><div class="n">3</div><div class="l">飲食支援の柱</div></div>
-        <div class="stat2"><div class="n">1st</div><div class="l">まずは無料相談</div></div>
-      </div>
-    </div>
-  </section>
-
   <!-- CONTACT band -->
   <div class="contact-band">
     <div class="en">CONTACT</div>
@@ -379,7 +489,7 @@
   <div class="bigmark-wrap"><div class="bigmark">Savior</div></div>
   <footer>
     <div class="wrap foot">
-      <div class="logo">Savior</div>
+      <div class="logo"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png" alt="株式会社Savior"></div>
       <div>人材紹介事業 ／ 飲食店総合プロデュース事業</div>
       <div>© Savior</div>
     </div>
@@ -424,7 +534,6 @@
     ['.split-img','fadeInRight',0],
     ['.sec-lead','fadeInUp',0],
     ['.svc2 a','fadeInUp',0],
-    ['.stat2','zoomIn',0,90],
     ['.contact-band .en','fadeInDown',0],
     ['.contact-band p','fadeInUp',90],
     ['.contact-band .cbtn','fadeInUp',180],
