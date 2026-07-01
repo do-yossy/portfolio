@@ -860,13 +860,9 @@ function jobDetailPage(job) {
     },
     "jobLocation": {
       "@type": "Place",
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": job.location,
-        ...(addressRegion ? { "addressRegion": addressRegion } : {}),
-        "addressCountry": "JP"
-      }
+      "address": buildJobAddress(job.location)
     },
+    ...(job.image_url ? { "image": job.image_url.startsWith('http') ? job.image_url : siteUrl + job.image_url } : {}),
     ...(salarySchema ? { "baseSalary": salarySchema } : {})
   };
 
@@ -1553,13 +1549,9 @@ function jobDetailPageV2(job) {
     },
     "jobLocation": {
       "@type": "Place",
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": job.location,
-        ...(addressRegion ? { "addressRegion": addressRegion } : {}),
-        "addressCountry": "JP"
-      }
+      "address": buildJobAddress(firstLoc || job.location)
     },
+    ...(job.image_url ? { "image": job.image_url.startsWith('http') ? job.image_url : siteUrl + job.image_url } : {}),
     ...(salarySchema ? { "baseSalary": salarySchema } : {})
   };
   const jsonld = `<script type="application/ld+json">${JSON.stringify(jsonldObj, null, 2)}<\/script>`;
@@ -1786,6 +1778,28 @@ function jobDetailPageV2(job) {
 function mapEmploymentType(t) {
   const m = { '正社員': 'FULL_TIME', 'パート・アルバイト': 'PART_TIME', '契約社員': 'CONTRACTOR', '派遣社員': 'TEMPORARY', '業務委託': 'OTHER' };
   return m[t] || 'OTHER';
+}
+
+// Build a Google-Jobs-friendly PostalAddress by splitting a Japanese location string
+// into 都道府県(addressRegion) / 市区町村(addressLocality) / それ以下(streetAddress)。
+// 例: "大阪府大阪市此花区四貫島" → region:大阪府, locality:大阪市此花区, street:四貫島
+//     "大阪府富田林市富田林"   → region:大阪府, locality:富田林市,   street:富田林
+//     "北海道室蘭市"           → region:北海道, locality:室蘭市,     street:""
+const JP_PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+function buildJobAddress(location) {
+  const loc = location || '';
+  const region = JP_PREFS.find(p => loc.includes(p)) || '';
+  let rest = region ? loc.slice(loc.indexOf(region) + region.length) : loc;
+  let locality = rest, street = '';
+  const seirei = rest.match(/^(.+?市.+?区)(.*)$/);   // 政令指定都市（市＋区）
+  const normal = rest.match(/^(.+?[市町村])(.*)$/);   // 通常の市町村
+  if (seirei) { locality = seirei[1]; street = seirei[2]; }
+  else if (normal) { locality = normal[1]; street = normal[2]; }
+  const address = { "@type": "PostalAddress", "addressCountry": "JP" };
+  if (region)   address.addressRegion = region;
+  if (locality) address.addressLocality = locality;
+  if (street)   address.streetAddress = street;
+  return address;
 }
 
 // Parse Japanese salary string → { min, max, unitText }
