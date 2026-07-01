@@ -231,7 +231,7 @@
 .savior-draft .bg-soft{background:#f5f5f5;margin:0 calc(50% - 50vw);padding-left:max(4vw,calc(50vw - 540px));padding-right:max(4vw,calc(50vw - 540px))}
 .savior-draft .hero-lg{padding:120px 0 96px}
 .savior-draft .hero-media{position:absolute;inset:0;z-index:0;background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.3) 62%,transparent 100%),linear-gradient(120deg,#e9edf5,#dbe4f5);opacity:1}
-.savior-draft .hero-media.has-img{background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.25) 60%,rgba(245,245,245,0) 100%),url('https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp') right center/cover}
+.savior-draft .hero-media.has-img{background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.25) 60%,rgba(245,245,245,0) 100%),url('https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=1200&q=80&auto=format&fit=crop') right center/cover}
 .savior-draft .hero-lg .hero-in{position:relative;z-index:1}
 /* intro */
 .savior-draft .intro-sec{padding:86px 0}
@@ -348,6 +348,30 @@
 .savior-draft .merit-card li{position:relative;padding:11px 0 11px 30px;border-top:1px solid #eef1f7;color:#0f2350;font-size:.92rem}
 .savior-draft .merit-card li:first-child{border-top:none}
 .savior-draft .merit-card li::before{content:"✓";position:absolute;left:4px;top:11px;color:#0247b3;font-weight:700}
+/* シニア強み 比較グラフ */
+.savior-draft .compare{display:grid;grid-template-columns:1fr 1fr;gap:36px;max-width:620px;margin:20px auto 0;align-items:end}
+.savior-draft .cmp{text-align:center}
+.savior-draft .cmp-bar-wrap{height:210px;display:flex;align-items:flex-end;justify-content:center}
+.savior-draft .cmp-bar{width:96px;border-radius:12px 12px 0 0;height:var(--v);display:flex;align-items:flex-start;justify-content:center;padding-top:16px;transform-origin:bottom}
+.savior-draft .cmp-market{background:#cdd7e8}
+.savior-draft .cmp-savior{background:linear-gradient(to top,#0247b3,#45bcde);box-shadow:0 16px 36px rgba(2,71,179,.28)}
+.savior-draft .cmp-val{font-family:"Montserrat",sans-serif;font-weight:700;font-size:1.2rem;line-height:1.15;color:#0f2350}
+.savior-draft .cmp-savior .cmp-val{color:#fff;font-size:1rem}
+.savior-draft .cmp-val small{font-size:.8rem}
+.savior-draft .cmp-label{margin-top:14px;color:#0f2350;font-size:.88rem;line-height:1.5}
+.savior-draft .prov{display:block;color:#0247b3;font-size:.7rem;margin-top:4px}
+@media (prefers-reduced-motion:no-preference){
+  .savior-draft.sd-on .compare.sd-reveal .cmp-bar{transform:scaleY(0)}
+  .savior-draft.sd-on .compare.sd-in .cmp-bar{animation:sd-bar 1s cubic-bezier(.2,.7,.2,1) both}
+  .savior-draft.sd-on .compare.sd-in .cmp-savior{animation-delay:.28s}
+}
+/* 飲食 担当プロデューサー（個人名・写真なし） */
+.savior-draft .who{margin-top:44px;background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:32px 30px;box-shadow:0 6px 20px rgba(0,0,0,.04)}
+.savior-draft .who-en{font-family:"Montserrat",sans-serif;font-size:.68rem;letter-spacing:.2em;color:#0247b3;opacity:.7;margin-bottom:6px}
+.savior-draft .who h4{color:#0f2350;font-size:1.3rem;margin-bottom:12px}
+.savior-draft .who p{color:#0f2350;opacity:.85;margin-bottom:18px}
+.savior-draft .who-tags{display:flex;flex-wrap:wrap;gap:10px}
+.savior-draft .who-tags span{background:rgba(2,71,179,.06);border:1px solid #d6def0;border-radius:99px;padding:9px 18px;font-size:.82rem;color:#0247b3}
 /* big footer wordmark */
 .savior-draft .bigmark-wrap{overflow:hidden;text-align:center;padding:56px 0 0;line-height:.8}
 .savior-draft .bigmark{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3.4rem,17vw,12rem);letter-spacing:.01em;color:#0f2350;opacity:.09;white-space:nowrap;user-select:none}
@@ -374,7 +398,6 @@
     <div class="wrap hero-in">
       <div class="label">SERVICE DETAIL</div>
       <h1 class="en">SERVICE</h1>
-      <p class="jp">2つの事業で、企業と店舗の成長を支える。</p>
     </div>
   </div>
 
@@ -387,9 +410,9 @@
         <p>人材紹介から飲食店の総合プロデュースまで。企業と店舗の課題に寄り添い、戦略の立案から実行までワンストップでサポートします。「点」の支援ではなく、成果が出るまで伴走することが私たちの強みです。</p>
       </div>
       <div class="intro-photos">
-        <img src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp" alt="">
-        <img src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp" alt="">
-        <img src="https://savior-corporation.com/wp-content/uploads/2024/02/contact-5-jpg.webp" alt="">
+        <img src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&q=80&auto=format&fit=crop" alt="">
+        <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&q=80&auto=format&fit=crop" alt="">
+        <img src="https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=1200&q=80&auto=format&fit=crop" alt="">
       </div>
     </div>
   </section>
@@ -480,6 +503,23 @@
           </ul>
         </div>
       </div>
+
+      <div class="scheme-head" style="margin-top:56px">
+        <div class="kicker">OUR STRENGTH</div>
+        <h3 class="scheme-title">若年層からシニア層まで。特に「シニア層」の転職に強み。</h3>
+        <p class="scheme-desc">経験を活かして活躍したいシニア層と、即戦力を求める企業をつなぎます。「求人が少ない」と言われるシニアの転職市場でも、独自のネットワークで市場水準を上回るマッチングを実現します。</p>
+      </div>
+      <div class="compare">
+        <div class="cmp">
+          <div class="cmp-bar-wrap"><div class="cmp-bar cmp-market" style="--v:38%"><span class="cmp-val">1.25<small>倍</small></span></div></div>
+          <div class="cmp-label">市場全体（全年齢）の<br>有効求人倍率</div>
+        </div>
+        <div class="cmp">
+          <div class="cmp-bar-wrap"><div class="cmp-bar cmp-savior" style="--v:100%"><span class="cmp-val">市場水準<br>を上回る</span></div></div>
+          <div class="cmp-label">当社のシニア層<br>マッチング力<span class="prov">※当社イメージ（実績値に差し替え）</span></div>
+        </div>
+      </div>
+      <p class="note">※ 市場全体の有効求人倍率は2023年で約1.25倍（厚生労働省「一般職業紹介状況」）。65歳以上の就業者数は930万人・21年連続増で過去最多（総務省, 2024）。就業ニーズが拡大する一方、シニア層は一般市場での求人の選択肢が限られやすい層です。当社の数値は暫定イメージのため、実績値が確定次第差し替えます。</p>
     </div>
   </div>
 
@@ -496,19 +536,31 @@
       </div>
       <div class="feat-rows">
         <div class="feat-row">
-          <div class="ph"><img src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp" alt=""></div>
+          <div class="ph"><img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80&auto=format&fit=crop" alt=""></div>
           <div class="tx"><div class="s-en">PILLAR 01 ── 売上改善</div><h4>収益を、立て直す。</h4><p>店舗診断から顧問・実行支援まで。集客・メニュー・オペレーション・SNSを一体で見直し、数字を見ながら現場に入り込んで改善を実行します。</p></div>
         </div>
         <div class="feat-row rev">
-          <div class="ph"><img src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp" alt=""></div>
+          <div class="ph"><img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1200&q=80&auto=format&fit=crop" alt=""></div>
           <div class="tx"><div class="s-en">PILLAR 02 ── 店舗開発</div><h4>出店を、成功に導く。</h4><p>立地選びから開業、モール出店まで。商圏分析・物件選定・内装・求人・販促準備を一気通貫でサポートし、新規出店のリスクを抑えます。</p></div>
         </div>
         <div class="feat-row">
-          <div class="ph"><img src="https://savior-corporation.com/wp-content/uploads/2024/02/contact-5-jpg.webp" alt=""></div>
+          <div class="ph"><img src="https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&q=80&auto=format&fit=crop" alt=""></div>
           <div class="tx"><div class="s-en">PILLAR 03 ── FC展開</div><h4>店舗数を、増やす。</h4><p>既存店の収益モデル化からFC本部の立ち上げまで。マニュアル整備・加盟条件の設計・加盟募集まで、店舗を増やす仕組みづくりを支援します。</p></div>
         </div>
       </div>
       <p class="note">※ 具体的なプラン・料金は、店舗の状況に合わせてご提案します。まずはお気軽にご相談ください。</p>
+
+      <div class="who">
+        <div class="who-en">PRODUCER</div>
+        <h4>担当するのは、現場を知る専任プロデューサー</h4>
+        <p>飲食店の開業・運営・売上改善からフランチャイズ展開まで、豊富な実務経験を積んだ専任プロデューサーが担当します。机上のコンサルティングではなく、現場に入り込んで成果まで伴走します。</p>
+        <div class="who-tags">
+          <span>飲食店の開業・運営経験</span>
+          <span>大型店舗の統括経験</span>
+          <span>ブランド立ち上げPM</span>
+          <span>調理・メディア出演の実績</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -566,8 +618,6 @@
     </div>
   </section>
 
-  <!-- 大きなフッターロゴ -->
-  <div class="bigmark-wrap"><div class="bigmark">Savior</div></div>
   <footer>
     <div class="wrap foot">
       <div class="logo"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png" alt="株式会社Savior"></div>
@@ -632,6 +682,8 @@
     ['.sfx','fadeInUp',0,90],
     ['.ob','zoomIn',0,120],
     ['.merit-card','fadeInUp',0,120],
+    ['.compare','fadeInUp',0],
+    ['.who','fadeInUp',0],
     ['.feat-row:not(.rev) .ph','fadeInLeft',0],
     ['.feat-row:not(.rev) .tx','fadeInRight',80],
     ['.feat-row.rev .ph','fadeInRight',0],
