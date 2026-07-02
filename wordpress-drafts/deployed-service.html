@@ -456,7 +456,7 @@ body{padding-top:0!important}
 /* ナビ項目の白い下線（他ページ準拠：ホバー／現在ページで表示） */
 .savior-draft .nav-links a{position:relative}
 .savior-draft .nav-links a::after{content:"";position:absolute;left:0;bottom:-6px;width:100%;height:2px;background:#fff;transform:scaleX(0);transition:transform .3s ease}
-.savior-draft .nav-links a:hover::after{transform:scaleX(1)}
+.savior-draft .nav-links a:hover::after,.savior-draft .nav-links a.is-current::after{transform:scaleX(1)}
 .savior-draft .nav-links a{color:#fff}
 .savior-draft .nav-links a:hover{color:#cfe0ff}
 .savior-draft .nav-cta{color:#fff;border-color:rgba(255,255,255,.7)}
@@ -498,7 +498,7 @@ body{padding-top:0!important}
     <div class="wrap nav">
       <div class="logo"><a href="/" aria-label="トップページへ戻る"><img class="logo-img logo-w" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo-white.png" alt="株式会社Savior"><img class="logo-img logo-c" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo-blue2.png" alt="株式会社Savior"></a></div>
       <nav class="nav-links">
-        <a href="/service">サービス</a>
+        <a href="/service" class="is-current">サービス</a>
         <a href="/company">会社概要</a>
         <a href="/contact">お問い合わせ</a>
       </nav>
