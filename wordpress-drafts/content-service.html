@@ -441,7 +441,7 @@
 .savior-draft{position:relative;--sd-hdr0:104px;--sd-hdr:104px;--sd-logo:90px}
 /* スクロールで縮むヘッダー（他ページ準拠：ロゴ90px→40px）。--sd-hdr0はヒーロー用の固定初期高さ。 */
 @media(min-width:721px){.savior-draft.sd-shrunk{--sd-hdr:64px;--sd-logo:40px}}
-.savior-draft header{position:sticky;top:0;z-index:60;height:auto!important;background:linear-gradient(to bottom,rgba(11,22,52,.62),rgba(11,22,52,.42))!important;border-bottom:1px solid rgba(255,255,255,.08);-webkit-backdrop-filter:none;backdrop-filter:none}
+.savior-draft header{position:fixed;top:0;left:0;right:0;z-index:60;height:auto!important;background:linear-gradient(to bottom,rgba(11,22,52,.62),rgba(11,22,52,.42))!important;border-bottom:1px solid rgba(255,255,255,.08);-webkit-backdrop-filter:none;backdrop-filter:none}
 /* ナビ項目の白い下線（他ページ準拠：フル高さリンクの下端＝ヘッダー下端に表示） */
 .savior-draft header .nav-links{align-self:stretch;gap:0}
 .savior-draft header .nav-links a{position:relative;display:flex;align-items:center;height:100%;padding:0 14px}
@@ -468,7 +468,7 @@
   .savior-draft .nav-cta{display:none}
 }
 /* 暗いヒーロー（透過ヘッダーを重ねる） */
-.savior-draft .hero{margin-top:calc(-1 * var(--sd-hdr0));background:#0c1c40;border-bottom:none}
+.savior-draft .hero{margin-top:0;background:#0c1c40;border-bottom:none}
 .savior-draft .hero::before,.savior-draft .hero::after{opacity:.55}
 .savior-draft .hero-media.has-img{background:linear-gradient(100deg,rgba(12,28,64,.95) 24%,rgba(12,28,64,.62) 55%,rgba(12,28,64,.14) 100%),url('https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80&auto=format&fit=crop') center/cover !important;opacity:1 !important}
 .savior-draft .hero .label{color:#9fc0ff}
