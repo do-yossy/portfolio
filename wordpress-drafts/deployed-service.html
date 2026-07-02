@@ -1,7 +1,7 @@
 <!-- wp:html -->
 <style id="sv-fullpage">
 /* /service ページ限定：テーマのヘッダー・フッター・タイトル・コンテンツ枠を無効化し、プレビューと同一の全画面表示にする */
-#header,.l-header,.l-fixHeader,.l-fixHeaderBg,.l-header__spacer,.sp-header-bar,#footer,.l-footer,.p-fixBtnWrap,#pagetop,.c-breadcrumb,.p-breadcrumb,.c-pageTitle,.p-pageHeader,.p-spMenu,.p-spMenu__overlay,.c-overlay,.c-modal{display:none!important}
+#header,.l-header,.l-fixHeader,.l-fixHeaderBg,.l-header__spacer,.sp-header-bar,#footer,.l-footer,.p-fixBtnWrap,#pagetop,.c-breadcrumb,.p-breadcrumb,.c-pageTitle,.p-pageHeader{display:none!important}
 #content,.l-content{max-width:none!important;width:100%!important;margin:0!important;padding:0!important}
 #main_content,.l-mainContent,.l-article{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;border:0!important}
 .post_content{max-width:none!important;margin:0!important;padding:0!important}
@@ -236,7 +236,7 @@ body{padding-top:0!important}
 
 /* ===== v2: 参考サイト(MONOLITH)準拠のサービス詳細 構成 追加コンポーネント（ライト＋ブルー） ===== */
 .savior-draft .bg-soft{background:#f5f5f5;margin:0 calc(50% - 50vw);padding-left:max(4vw,calc(50vw - 540px));padding-right:max(4vw,calc(50vw - 540px))}
-.savior-draft .hero-lg{padding:120px 0 96px}
+.savior-draft .hero-lg{padding:116px 0 96px}
 .savior-draft .hero-media{position:absolute;inset:0;z-index:0;background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.3) 62%,transparent 100%),linear-gradient(120deg,#e9edf5,#dbe4f5);opacity:1}
 .savior-draft .hero-media.has-img{background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.25) 60%,rgba(245,245,245,0) 100%),url('https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80&auto=format&fit=crop') center/cover}
 @media(max-width:720px){.savior-draft .hero-lg{padding:92px 0 116px}.savior-draft .sd-scroll{bottom:24px}.savior-draft .sd-scroll::after{height:36px}}
@@ -448,40 +448,54 @@ body{padding-top:0!important}
 .savior-draft .bigmark-wrap{overflow:hidden;text-align:center;padding:56px 0 0;line-height:.8}
 .savior-draft .bigmark{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3.4rem,17vw,12rem);letter-spacing:.01em;color:#0f2350;opacity:.09;white-space:nowrap;user-select:none}
 
-/* ===== ヘッダー統一：暗いヒーロー＋白い筆記体ロゴ＋透過ヘッダー（他ページの第一ビューに合わせる） =====
-   影響範囲は header と .hero のみ。以降のセクション（BUSINESS各節・図・CTA・フッター）は不変。 */
+/* ===== ヘッダー統一：他ページ準拠の濃紺ソリッド追従ヘッダー（#0f2350／白ロゴ・白ナビ・白ハンバーガー） =====
+   スクロールしても残る(sticky)。右上ハンバーガー(モバイル)でテーマ標準ドロワーを開く。
+   header{height:0} という既存CSSを height:auto で打ち消す。影響範囲は header と .hero のみ。 */
 .savior-draft{position:relative}
-.savior-draft header{position:absolute;top:0;left:0;right:0;z-index:60;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:none}
+.savior-draft header{position:sticky;top:0;z-index:60;height:auto!important;background:linear-gradient(to bottom,rgba(11,22,52,.62),rgba(11,22,52,.42))!important;border-bottom:1px solid rgba(255,255,255,.08);-webkit-backdrop-filter:none;backdrop-filter:none}
 .savior-draft .nav-links a{color:#fff}
 .savior-draft .nav-links a:hover{color:#cfe0ff}
-.savior-draft .nav-cta{color:#fff;border-color:rgba(255,255,255,.75)}
+.savior-draft .nav-cta{color:#fff;border-color:rgba(255,255,255,.7)}
 .savior-draft .nav-cta:hover{background:#fff;color:#0f2350}
-.savior-draft .logo-img{height:44px;width:auto;display:block}
-.savior-draft .hero{background:#0c1c40;border-bottom:none}
+.savior-draft .sd-burger{color:#fff}
+.savior-draft .logo-img{height:40px;width:auto;display:block}
+.savior-draft .logo-c{display:none}
+/* ハンバーガー（横三本線・モバイルのみ表示・テーマ標準ドロワーを開閉） */
+.savior-draft .sd-burger{display:none;flex-direction:column;justify-content:center;gap:6px;width:36px;height:36px;background:none;border:none;padding:0;margin:0;cursor:pointer}
+.savior-draft .sd-burger span{display:block;width:26px;height:2px;background:#fff;border-radius:2px;margin:0 auto;transition:background .25s}
+@media(max-width:720px){
+  .savior-draft .sd-burger{display:inline-flex}
+  .savior-draft .nav-cta{display:none}
+  .savior-draft .logo-img{height:32px}
+}
+/* 暗いヒーロー（透過ヘッダーを重ねる） */
+.savior-draft .hero{margin-top:-64px;background:#0c1c40;border-bottom:none}
 .savior-draft .hero::before,.savior-draft .hero::after{opacity:.55}
 .savior-draft .hero-media.has-img{background:linear-gradient(100deg,rgba(12,28,64,.95) 24%,rgba(12,28,64,.62) 55%,rgba(12,28,64,.14) 100%),url('https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80&auto=format&fit=crop') center/cover !important;opacity:1 !important}
 .savior-draft .hero .label{color:#9fc0ff}
 .savior-draft .hero h1.en{color:#fff}
 .savior-draft .hero-catch{color:#fff}
 .savior-draft .hero-catch .hl{color:#8fb4ff}
-.savior-draft .sd-scroll{color:#cfe0ff}
-.savior-draft .sd-scroll::after{background:#cfe0ff}
+.savior-draft .sd-scroll{color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.45)}
+.savior-draft .sd-scroll::after{background:#fff}
 @media(max-width:720px){
-  .savior-draft .logo-img{height:34px}
   .savior-draft .hero-media.has-img{background:linear-gradient(rgba(12,28,64,.9),rgba(12,28,64,.72)),url('https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80&auto=format&fit=crop') center/cover !important}
 }
+/* フッターの事業名リンク（各セクションへスクロール） */
+.savior-draft .foot-biz a{color:inherit;transition:color .25s}
+.savior-draft .foot-biz a:hover{color:#0247b3;text-decoration:underline;text-underline-offset:3px}
 </style>
 <div class="savior-draft">
   <header>
     <div class="wrap nav">
-      <div class="logo"><a href="/" aria-label="トップページへ戻る"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo-white.png" alt="株式会社Savior"></a></div>
+      <div class="logo"><a href="/" aria-label="トップページへ戻る"><img class="logo-img logo-w" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo-white.png" alt="株式会社Savior"><img class="logo-img logo-c" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo-blue2.png" alt="株式会社Savior"></a></div>
       <nav class="nav-links">
-        <a href="/">HOME</a>
-        <a href="#jinzai">人材紹介事業</a>
-        <a href="#food">飲食店総合プロデュース事業</a>
-        <a href="#contact">お問い合わせ</a>
+        <a href="/service">サービス</a>
+        <a href="/company">会社概要</a>
+        <a href="/contact">お問い合わせ</a>
       </nav>
       <a href="#contact" class="nav-cta">CONTACT</a>
+      <button type="button" class="sd-burger" aria-label="メニュー"><span></span><span></span><span></span></button>
     </div>
   </header>
 
@@ -656,7 +670,7 @@ body{padding-top:0!important}
   <footer>
     <div class="wrap foot">
       <div class="logo"><a href="/" aria-label="トップページへ戻る"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png" alt="株式会社Savior"></a></div>
-      <div>人材紹介事業 ／ 飲食店総合プロデュース事業</div>
+      <div class="foot-biz"><a href="#jinzai">人材紹介事業</a> ／ <a href="#food">飲食店総合プロデュース事業</a></div>
       <div>© Savior</div>
     </div>
   </footer>
@@ -755,6 +769,14 @@ body{padding-top:0!important}
   });
   var hero=root.querySelector('.hero');
   if(hero){var sc=document.createElement('div');sc.className='sd-scroll';sc.textContent='SCROLL';hero.appendChild(sc);}
+})();
+</script>
+<script>
+/* ハンバーガー（モバイル）でテーマ標準ドロワーを開閉（他ページと同一の data-spmenu 方式） */
+(function(){
+  var root=document.querySelector('.savior-draft');if(!root)return;
+  var burger=root.querySelector('.sd-burger');
+  if(burger){burger.addEventListener('click',function(e){e.preventDefault();var el=document.documentElement;el.setAttribute('data-spmenu',el.getAttribute('data-spmenu')==='opened'?'closed':'opened');});}
 })();
 </script>
 
