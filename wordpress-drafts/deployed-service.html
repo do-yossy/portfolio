@@ -466,7 +466,8 @@ body{padding-top:0!important}
 .savior-draft .nav-cta:hover{background:#fff;color:#0f2350}
 .savior-draft .sd-burger{color:#fff}
 /* ヘッダー幅を他ページ（--container_size:1200px）に合わせ、メニューを右端寄せに */
-.savior-draft header .wrap{width:min(94%,1200px)}
+.savior-draft header .wrap{width:100%;max-width:1264px;padding:0 4vw;margin:0 auto;box-sizing:border-box}
+@media(min-width:960px){.savior-draft header .wrap{padding:0 32px}}
 .savior-draft header .nav{height:var(--sd-hdr);transition:height .3s ease}
 /* テーマの画像アニメ(scale)がロゴに掛かって拡大されるのを打ち消す（サイズ統一の要） */
 .savior-draft .logo-img{height:var(--sd-logo);width:auto;display:block;transform:none!important;animation:none!important;opacity:1!important;transition:height .3s ease}
