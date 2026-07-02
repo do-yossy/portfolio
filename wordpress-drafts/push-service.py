@@ -16,7 +16,7 @@ body=body.replace('href="トップページ_仮.html"','href="/"')
 
 SV_FULLPAGE='''<style id="sv-fullpage">
 /* /service ページ限定：テーマのヘッダー・フッター・タイトル・コンテンツ枠を無効化し、プレビューと同一の全画面表示にする */
-#header,.l-header,.l-fixHeader,.l-fixHeaderBg,.l-header__spacer,.sp-header-bar,#footer,.l-footer,.p-fixBtnWrap,#pagetop,.c-breadcrumb,.p-breadcrumb,.c-pageTitle,.p-pageHeader{display:none!important}
+#header,.l-header,.l-fixHeader,.l-fixHeaderBg,.l-header__spacer,.sp-header-bar,#footer,.l-footer,.p-fixBtnWrap,#pagetop,.c-breadcrumb,.p-breadcrumb,.c-pageTitle,.p-pageHeader,.p-spMenu,.p-spMenu__overlay,.c-overlay,.c-modal{display:none!important}
 #content,.l-content{max-width:none!important;width:100%!important;margin:0!important;padding:0!important}
 #main_content,.l-mainContent,.l-article{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;border:0!important}
 .post_content{max-width:none!important;margin:0!important;padding:0!important}
