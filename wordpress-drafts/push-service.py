@@ -22,7 +22,7 @@ SV_FULLPAGE='''<style id="sv-fullpage">
 .post_content{max-width:none!important;margin:0!important;padding:0!important}
 body{padding-top:0!important}
 /* SWELLテーマが .post_content 内の見出しに付ける装飾（h2の濃紺バー・h3の下線・h4の左ボーダー等）を打ち消し、単体HTMLプレビューと同一表示にする */
-.savior-draft h1,.savior-draft h2,.savior-draft h3,.savior-draft h4,.savior-draft h5,.savior-draft h6{background:none!important;border:none!important;padding:0!important}
+.savior-draft h1,.savior-draft h2,.savior-draft h3,.savior-draft h4,.savior-draft h5,.savior-draft h6{background:none!important;border:none!important;padding:0!important;margin-top:0;margin-bottom:0}
 .savior-draft h1::before,.savior-draft h1::after,.savior-draft h2::before,.savior-draft h2::after,.savior-draft h3::before,.savior-draft h3::after,.savior-draft h4::before,.savior-draft h4::after,.savior-draft h5::before,.savior-draft h6::before{content:none!important;display:none!important;border:none!important;background:none!important}
 </style>
 '''

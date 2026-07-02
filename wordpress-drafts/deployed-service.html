@@ -7,7 +7,7 @@
 .post_content{max-width:none!important;margin:0!important;padding:0!important}
 body{padding-top:0!important}
 /* SWELLテーマが .post_content 内の見出しに付ける装飾（h2の濃紺バー・h3の下線・h4の左ボーダー等）を打ち消し、単体HTMLプレビューと同一表示にする */
-.savior-draft h1,.savior-draft h2,.savior-draft h3,.savior-draft h4,.savior-draft h5,.savior-draft h6{background:none!important;border:none!important;padding:0!important}
+.savior-draft h1,.savior-draft h2,.savior-draft h3,.savior-draft h4,.savior-draft h5,.savior-draft h6{background:none!important;border:none!important;padding:0!important;margin-top:0;margin-bottom:0}
 .savior-draft h1::before,.savior-draft h1::after,.savior-draft h2::before,.savior-draft h2::after,.savior-draft h3::before,.savior-draft h3::after,.savior-draft h4::before,.savior-draft h4::after,.savior-draft h5::before,.savior-draft h6::before{content:none!important;display:none!important;border:none!important;background:none!important}
 </style>
 
@@ -239,7 +239,7 @@ body{padding-top:0!important}
 .savior-draft .hero-lg{padding:120px 0 96px}
 .savior-draft .hero-media{position:absolute;inset:0;z-index:0;background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.3) 62%,transparent 100%),linear-gradient(120deg,#e9edf5,#dbe4f5);opacity:1}
 .savior-draft .hero-media.has-img{background:linear-gradient(100deg,#f5f5f5 42%,rgba(245,245,245,.25) 60%,rgba(245,245,245,0) 100%),url('https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80&auto=format&fit=crop') center/cover}
-@media(max-width:720px){.savior-draft .hero-lg{padding:78px 0 116px}.savior-draft .hero-media.has-img{opacity:.2}.savior-draft .sd-scroll{bottom:24px}.savior-draft .sd-scroll::after{height:36px}}
+@media(max-width:720px){.savior-draft .hero-lg{padding:92px 0 116px}.savior-draft .sd-scroll{bottom:24px}.savior-draft .sd-scroll::after{height:36px}}
 .savior-draft .hero-lg .hero-in{position:relative;z-index:1}
 /* intro バナー */
 .savior-draft .banner-stack{display:flex;flex-direction:column;gap:26px}
@@ -447,11 +447,34 @@ body{padding-top:0!important}
 /* big footer wordmark */
 .savior-draft .bigmark-wrap{overflow:hidden;text-align:center;padding:56px 0 0;line-height:.8}
 .savior-draft .bigmark{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3.4rem,17vw,12rem);letter-spacing:.01em;color:#0f2350;opacity:.09;white-space:nowrap;user-select:none}
+
+/* ===== ヘッダー統一：暗いヒーロー＋白い筆記体ロゴ＋透過ヘッダー（他ページの第一ビューに合わせる） =====
+   影響範囲は header と .hero のみ。以降のセクション（BUSINESS各節・図・CTA・フッター）は不変。 */
+.savior-draft{position:relative}
+.savior-draft header{position:absolute;top:0;left:0;right:0;z-index:60;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:none}
+.savior-draft .nav-links a{color:#fff}
+.savior-draft .nav-links a:hover{color:#cfe0ff}
+.savior-draft .nav-cta{color:#fff;border-color:rgba(255,255,255,.75)}
+.savior-draft .nav-cta:hover{background:#fff;color:#0f2350}
+.savior-draft .logo-img{height:44px;width:auto;display:block}
+.savior-draft .hero{background:#0c1c40;border-bottom:none}
+.savior-draft .hero::before,.savior-draft .hero::after{opacity:.55}
+.savior-draft .hero-media.has-img{background:linear-gradient(100deg,rgba(12,28,64,.95) 24%,rgba(12,28,64,.62) 55%,rgba(12,28,64,.14) 100%),url('https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80&auto=format&fit=crop') center/cover !important;opacity:1 !important}
+.savior-draft .hero .label{color:#9fc0ff}
+.savior-draft .hero h1.en{color:#fff}
+.savior-draft .hero-catch{color:#fff}
+.savior-draft .hero-catch .hl{color:#8fb4ff}
+.savior-draft .sd-scroll{color:#cfe0ff}
+.savior-draft .sd-scroll::after{background:#cfe0ff}
+@media(max-width:720px){
+  .savior-draft .logo-img{height:34px}
+  .savior-draft .hero-media.has-img{background:linear-gradient(rgba(12,28,64,.9),rgba(12,28,64,.72)),url('https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80&auto=format&fit=crop') center/cover !important}
+}
 </style>
 <div class="savior-draft">
   <header>
     <div class="wrap nav">
-      <div class="logo"><a href="/" aria-label="トップページへ戻る"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo-blue2.png" alt="株式会社Savior"></a></div>
+      <div class="logo"><a href="/" aria-label="トップページへ戻る"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo-white.png" alt="株式会社Savior"></a></div>
       <nav class="nav-links">
         <a href="/">HOME</a>
         <a href="#jinzai">人材紹介事業</a>
