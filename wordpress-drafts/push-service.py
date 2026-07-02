@@ -26,7 +26,12 @@ body{padding-top:0!important}
 .savior-draft h1::before,.savior-draft h1::after,.savior-draft h2::before,.savior-draft h2::after,.savior-draft h3::before,.savior-draft h3::after,.savior-draft h4::before,.savior-draft h4::after,.savior-draft h5::before,.savior-draft h6::before{content:none!important;display:none!important;border:none!important;background:none!important}
 </style>
 '''
-content=SV_FULLPAGE+'\n'+body
+# CRITICAL: wrap everything in a single Gutenberg Custom-HTML block so WordPress
+# outputs it VERBATIM. Freeform content otherwise runs through wpautop, which
+# injects stray <p>/<br> tags, corrupts the div nesting, and makes .hero-media
+# escape .hero -> the hero photo bleeds across the whole page.
+inner=SV_FULLPAGE+'\n'+body
+content='<!-- wp:html -->\n'+inner+'\n<!-- /wp:html -->'
 # persist the exact deployed payload for the record
 open(os.path.join(WD,'deployed-service.html'),'w',encoding='utf-8').write(content)
 
