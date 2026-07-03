@@ -5,11 +5,9 @@ SITE=os.environ['WP_SITE'].rstrip('/');USER=os.environ['WP_USER'];PW=os.environ[
 auth=base64.b64encode(f"{USER}:{PW}".encode()).decode()
 NEW=('<!-- wp:html -->\n<style id="sv-global-hdr">\n'
  '/* ヘッダー背景のみ半透明ネイビーに統一（/serviceに合わせる）。変数上書きで全レイヤー/全端末に適用。他要素は不変。 */\n'
- ':root{--color_header_bg:rgba(15,35,80,.92) !important}\n'
- '.l-header{background:rgba(15,35,80,.92) !important}\n'
- '.l-header__bar{background:transparent !important}\n'
- '.l-fixHeader{background:transparent !important}\n'
- '.l-fixHeader::before,.l-fixHeader:before{background:rgba(15,35,80,.92) !important}\n'
+ ':root{--color_header_bg:rgba(15,35,80,.95) !important}\n'
+ '.l-header,.l-fixHeader{background:rgba(15,35,80,.95) !important}\n'
+ '.l-header__bar,.l-fixHeader::before,.l-fixHeader:before{background:transparent !important}\n'
  '</style>\n<!-- /wp:html -->')
 BLOCK_RE=re.compile(r'<!-- wp:html -->\s*<style id="sv-global-hdr">.*?</style>\s*<!-- /wp:html -->\s*', re.S)
 def get_raw(pid):
