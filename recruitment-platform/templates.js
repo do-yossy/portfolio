@@ -2,7 +2,7 @@
 
 const COMPANIES = {
   sq: { label: 'Social Quality', full: '株式会社Social Quality', color: '#7c3aed' },
-  bg: { label: 'Bigeyes',        full: '株式会社Bigeyes',        color: '#ea580c' },
+  bg: { label: 'Bigeyes',        full: 'BigEyesコーポレーション株式会社', color: '#ea580c' },
   pe: { label: 'ピープル',        full: '合同会社ピープル',        color: '#16a34a' },
   lt: { label: 'Life Tailor',    full: '株式会社Life Tailor',    color: '#0891b2' },
   nc: { label: 'ニクール',        full: '合同会社ニクール',        color: '#db2777' },
