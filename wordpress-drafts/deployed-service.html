@@ -10,6 +10,11 @@
 :root{--color_header_bg:rgba(15,35,80,.95) !important}
 .l-header,.l-fixHeader{background:rgba(15,35,80,.95) !important}
 .l-header__bar,.l-fixHeader::before,.l-fixHeader:before{background:transparent !important}
+/* 他ページ(/contact等)とヘッダー構造は完全に同一(-body-solid / .l-fixHeader / scrollObserver)。
+   よってヘッダーの位置やfixHeaderの表示はテーマ標準のまま一切上書きしない。
+   これによりスクロール時のfixHeader(縮小ヘッダー)が他ページと同一に動作する。
+   ※以前 fixHeader を透明化していた事による「スクロールで消える」不具合は、
+     .l-fixHeader へ直接ネイビー背景を指定した上記ルールで既に解消済み。 */
 /* SWELLテーマが .post_content 内の見出しに付ける装飾（h2の濃紺バー・h3の下線・h4の左ボーダー等）を打ち消し、単体HTMLプレビューと同一表示にする */
 .savior-draft h1,.savior-draft h2,.savior-draft h3,.savior-draft h4,.savior-draft h5,.savior-draft h6{background:none!important;border:none!important;padding:0!important;margin-top:0;margin-bottom:0}
 .savior-draft h1::before,.savior-draft h1::after,.savior-draft h2::before,.savior-draft h2::after,.savior-draft h3::before,.savior-draft h3::after,.savior-draft h4::before,.savior-draft h4::after,.savior-draft h5::before,.savior-draft h6::before{content:none!important;display:none!important;border:none!important;background:none!important}
