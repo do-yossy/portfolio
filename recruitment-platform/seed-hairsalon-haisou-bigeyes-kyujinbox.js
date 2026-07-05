@@ -1,7 +1,7 @@
 'use strict';
 // ヘアサロン向け配送スタッフ 求人15件（Bigeyes・求人ボックス掲載）
 // 会社: BigEyesコーポレーション株式会社(bg) / 給与: 月給39万円〜45万円
-// 添付バナー（ヘアサロン向け配送スタッフ）をテンプレート化し、大阪府内の勤務地に拡散
+// 本文は求人ボックスの下書き（求人No.5148-4590-0004）の正式全文と同一
 // 冪等: 対象拠点のみ削除してから作り直す
 
 const { DatabaseSync } = require('node:sqlite');
@@ -17,8 +17,8 @@ const db = new DatabaseSync(DB_PATH);
 const COMPANY = 'bg';
 const IMAGE_URL = '/images/hairsalon-haisou.jpg';
 const JOB_TYPE = 'ヘアサロン向け配送スタッフ';
-const SALARY_INCOME = '月給39万円〜45万円';
-const SALARY_DETAIL = '月給390,000円〜450,000円（各種手当込み）';
+const TITLE_TAIL = '未経験歓迎★ヘアサロン向け配送スタッフ★月給39万円以上★普通免許OK★完全週休二日制';
+const SALARY_DETAIL = '月給390,000円〜450,000円';
 
 // 大阪府内15エリア（Bigeyesヘアサロン配送の勤務地）
 const AREAS = [
@@ -39,6 +39,94 @@ const AREAS = [
   { pref: '大阪府', city: '大東市',   district: '住道' },
 ];
 
+// ── 求人ボックス下書き 5148-4590-0004 の正式全文 ──
+const DESCRIPTION = `事業拡大および物流体制強化に伴い、関西エリアで新たな仲間を募集しています。
+
+現在、多くのヘアサロン・美容室・美容関連企業様よりご依頼をいただいており、さらなる事業拡大に向けて新しい仲間を募集しています。
+
+ヘアサロンや美容室へ美容用品やサロン専売品をお届けする配送スタッフのお仕事です。
+
+配送に使用する車両やガソリン代、保険、メンテナンス費用はすべて会社負担。
+
+固定ルート中心のため、未経験の方でも安心してスタートできます。
+
+【主な業務内容】
+
+■ 配送業務
+ヘアサロンや美容室への商品の配送
+美容用品やサロン専売品の納品
+配送ルートに沿った商品のお届け
+配送伝票や納品書の確認
+
+■ 商品管理業務
+商品の積み込み、積み下ろし
+納品商品の確認
+簡単な在庫確認
+
+■ その他業務
+配送完了報告
+車両の日常点検
+簡単な清掃業務
+配送記録の入力
+
+【取扱商品例】
+シャンプー
+トリートメント
+カラー剤
+スタイリング剤
+美容機器
+サロン専売品
+各種美容商材`;
+
+const REWARDING = `日勤専属で生活リズムが安定
+固定ルート中心で未経験でも始めやすい
+車両・ガソリン代など完全会社負担
+コスメ業界を支える安定企業
+配送業未経験スタート多数
+研修制度ありで安心スタート`;
+
+const QUALIFICATIONS = `普通自動車運転免許（AT限定可）
+運転経験3年以上の方
+未経験歓迎
+学歴不問
+
+【こんな方歓迎】
+運転が好きな方
+美容業界に興味がある方
+人と接することが苦にならない方`;
+
+const WORKTIME = `シフト制（実働8時間／休憩1時間）
+
+9:00～18:00
+完全週休二日制
+
+年次有給休暇
+長期休暇
+産休・育休制度
+夏季休暇
+介護休暇
+年間休日120日`;
+
+const TRANSPORTATION = `車通勤可能
+転勤なし`;
+
+const BENEFIT = `昇給・賞与あり（前年度実績あり）昇給年１回、賞与年２回
+通勤手当支給
+家族手当
+深夜手当
+月給 ￥390,000 ～ ￥450,000
+
+社会保険完備
+交通費支給
+定期健康診断
+有給休暇制度あり`;
+
+const HOW_TO_APPLY = `【応募後のご案内】
+
+ご応募確認後、採用受付代行担当者よりお電話にてご連絡いたします。
+
+また、ご経験・ご希望条件等を踏まえ、ご本人の同意をいただいた上で、関連求人や提携企業求人をご案内させていただく場合がございます。`;
+
 const now = new Date().toISOString();
 const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -50,8 +138,8 @@ const del = db.prepare(
 if (del.changes > 0) console.log(`既存ヘアサロン向け配送スタッフを削除: ${del.changes}件`);
 
 const stmt = db.prepare(`
-  INSERT INTO jobs (id,title,location,salary,job_type,employment_type,description,tags,catchcopy,image_url,is_published,target_media,published_at,expires_at,created_at,updated_at,company,rewarding,worktime_holiday,transportation,how_to_apply)
-  VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?)
+  INSERT INTO jobs (id,title,location,salary,job_type,employment_type,description,tags,catchcopy,image_url,is_published,target_media,published_at,expires_at,created_at,updated_at,company,rewarding,worktime_holiday,transportation,how_to_apply,qualifications,benefit)
+  VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?)
 `);
 
 let created = 0;
@@ -59,100 +147,25 @@ for (let i = 0; i < AREAS.length; i++) {
   const j = AREAS[i];
   const areaLabel = `${j.city}・${j.district}`;
   const id = crypto.randomBytes(10).toString('hex');
-  const title = `【${areaLabel}】未経験歓迎★ヘアサロン向け配送スタッフ★${SALARY_INCOME}★普通免許OK★完全週休二日`;
-  const catchcopy = `美容業界を支える、やりがいのあるお仕事♪ヘアサロンや美容室へ美容用品やサロン専売品をお届けします。${SALARY_INCOME}・普通免許OK・完全週休二日制・長距離運転なしで安心。車両費用はすべて会社負担です。`;
-  const description = `■お仕事内容
-ヘアサロンや美容室へ、美容用品やサロン専売品をお届けするお仕事です（${j.pref}${j.city}${j.district}エリア）。
-固定ルート配送なので未経験でも始めやすく、長距離運転もありません。あなたの運転で、美容の現場を支えませんか？
-
-■主な業務
-・ヘアサロン・美容室への美容用品／サロン専売品の配送
-・出発前の車両点検・荷積み
-・納品・荷降ろし
-・受け取りサイン・伝票管理
-・配達記録の入力
-
-■取扱商品例
-・シャンプー・トリートメント
-・カラー剤
-・スタイリング剤
-・美容機器
-・サロン専売品・各種美容商材
-
-※固定ルート配送で未経験でも始めやすい
-※長距離運転なしで安心
-※日勤メイン
-※ナビ使用のため土地感不要
-
-■アピールポイント
-◎${SALARY_INCOME}の高収入
-昇給年1回・賞与年2回あり。各種手当も充実で安心の待遇。
-
-◎車両・ガソリン代・保険・メンテナンス費用はすべて会社負担
-マイカー不要。コストは一切かかりません。
-
-◎未経験歓迎・研修制度が充実
-研修制度が充実しているので、配送のお仕事が初めての方も安心です。
-
-◎美容業界を支えるやりがい
-サロンの"キレイ"を陰から支える、やりがいのあるお仕事です。
-
-◎完全週休二日制・年間休日120日
-プライベートも充実。オン・オフの切り替えができます。
-
-◎正社員採用・普通免許OK
-普通自動車免許があればOK。安定して長く働けます。
-
-【給与】
-${SALARY_DETAIL}
-
-【シフト・勤務時間】
-日勤メイン（8:00〜17:00）
-実働8時間
-
-【休日・休暇】
-完全週休二日制
-年間休日120日
-有給休暇・慶弔休暇
-
-【応募資格】
-普通自動車運転免許（AT限定可）
-年齢・学歴・経験不問
-
-【待遇・福利厚生】
-社会保険完備（健康・厚生年金・雇用・労災）
-車両・燃料・保険・メンテナンス費用すべて会社負担
-昇給年1回・賞与年2回
-各種手当・研修制度あり
-
-【入社後の流れ】
-1週目：安全教育・配送ルール説明
-2〜3週目：先輩スタッフ同行OJT
-4週目以降：担当ルートを独立して配送
-
-転勤なし・長距離運転なし
-【勤務期間】長期`;
+  const title = `【${areaLabel}】${TITLE_TAIL}`;
+  const catchcopy = `美容業界を支える、やりがいのあるお仕事♪ヘアサロンや美容室へ美容用品やサロン専売品をお届けします。月給39万円以上・普通免許OK・完全週休二日制・固定ルート中心で安心。車両費用はすべて会社負担です。`;
 
   const tags = JSON.stringify([
     '未経験OK', '高収入', '正社員', '普通免許OK',
-    '車両費用会社負担', '完全週休2日', '固定ルート', '日勤メイン',
+    '車両費用会社負担', '完全週休2日', '固定ルート', '日勤専属',
     '長距離運転なし', '賞与年2回',
   ]);
-  const rewarding = `美容業界を支える、やりがいのあるお仕事です。あなたの運転でサロンの"キレイ"を陰から支えられます。${SALARY_INCOME}の高収入と充実した待遇で、未経験からでも安心して長く働けます。`;
-  const worktime = '日勤メイン（8:00〜17:00）　実働8時間　完全週休二日制　年間休日120日';
-  const transport = `${j.pref}${j.city}${j.district}エリア。社用車を貸与するためマイカー不要。車両・燃料・保険費用はすべて会社負担です。`;
-  const howToApply = 'このページよりWebでご応募ください。書類選考後、担当者よりご連絡いたします。面接は1回のみ・WEB面接も対応しております。';
 
   stmt.run(
     id, title, `${j.pref}${j.city}${j.district}`, SALARY_DETAIL, JOB_TYPE, '正社員',
-    description, tags, catchcopy, IMAGE_URL,
+    DESCRIPTION, tags, catchcopy, IMAGE_URL,
     JSON.stringify(['求人ボックス']),
     now, expires, now, now, COMPANY,
-    rewarding, worktime, transport, howToApply,
+    REWARDING, WORKTIME, TRANSPORTATION, HOW_TO_APPLY, QUALIFICATIONS, BENEFIT,
   );
 
   console.log(`✓ [${i + 1}/${AREAS.length}] ${title.slice(0, 55)}`);
   created++;
 }
 
-console.log(`\n完了: ${created}件作成（Bigeyes・ヘアサロン向け配送スタッフ・大阪府15件）`);
+console.log(`\n完了: ${created}件作成（Bigeyes・ヘアサロン向け配送スタッフ・大阪府15件・本文は求人No.5148-4590-0004と同一）`);

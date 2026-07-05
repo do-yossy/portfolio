@@ -563,6 +563,11 @@ function kyujinboxEnvForCompany(id) {
   if (groupId)  env.KYUJINBOX_GROUP_ID = groupId;
   if (phone)    env.KYUJINBOX_PHONE = phone;   else env.KYUJINBOX_PHONE = '';
   if (image)    env.KYUJINBOX_JOB_IMAGE = image;
+  // 会社別プロファイル（職場スライダー・特徴・求人ラベル）: env指定が無ければ scripts/kyujinbox-profile-<co>.json を自動使用
+  const profile = pick('KYUJINBOX_PROFILE_JSON') ||
+    (fs.existsSync(path.join(SCRIPTS_DIR, `kyujinbox-profile-${String(id || 'sq')}.json`))
+      ? path.join(SCRIPTS_DIR, `kyujinbox-profile-${String(id || 'sq')}.json`) : '');
+  if (profile) env.KYUJINBOX_PROFILE_JSON = profile;
   return { env, hasCreds: !!(email && password && groupId) };
 }
 

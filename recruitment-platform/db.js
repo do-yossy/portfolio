@@ -97,6 +97,8 @@ try { db.exec('ALTER TABLE jobs ADD COLUMN rewarding TEXT DEFAULT ""'); } catch 
 try { db.exec('ALTER TABLE jobs ADD COLUMN worktime_holiday TEXT DEFAULT ""'); } catch {}
 try { db.exec('ALTER TABLE jobs ADD COLUMN transportation TEXT DEFAULT ""'); } catch {}
 try { db.exec('ALTER TABLE jobs ADD COLUMN how_to_apply TEXT DEFAULT ""'); } catch {}
+try { db.exec('ALTER TABLE jobs ADD COLUMN qualifications TEXT DEFAULT ""'); } catch {}   // 対象となる方（応募資格）
+try { db.exec('ALTER TABLE jobs ADD COLUMN benefit TEXT DEFAULT ""'); } catch {}          // 給与補足・待遇（媒体のbenefit欄）
 
 // Migration: is_archived フラグ（重複チェック用に保持するが出力対象外）
 try { db.exec('ALTER TABLE applicants ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0'); } catch {}
