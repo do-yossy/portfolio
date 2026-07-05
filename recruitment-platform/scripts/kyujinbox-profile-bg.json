@@ -1,0 +1,60 @@
+{
+  "_comment": "BigEyesコーポレーション(bg)の求人ボックス投稿プロファイル。既存下書き(求人No.5148-4590-0001〜0005)の実データから抽出。payloadのキーは投稿ペイロードへ強制設定、labelRulesはタイトル・職種のmatch文字列で求人ラベルを選択（match空=デフォルト）。",
+  "payload": {
+    "characteristics": [1, 2, 3, 8, 10, 11, 12, 13, 16, 19, 22, 23, 24, 25, 26, 31, 43, 45, 46, 50, 52, 55, 59],
+    "showMood": true,
+    "moodCalmness": 2,
+    "moodTerm": 2,
+    "moodExchange": 2,
+    "moodEvaluate": 2,
+    "moodGender": 3,
+    "moodAge": [1, 2, 3, 4],
+    "showJob": true,
+    "jobTeam": 1,
+    "jobSpeed": 2,
+    "jobFlexibility": 2,
+    "jobRepetition": 2,
+    "jobTalk": 3,
+    "showCharacter": true,
+    "characterBoldness": 1,
+    "characterRepetition": 2,
+    "characterIdea": 3,
+    "characterTeam": 2,
+    "characterSmart": 2,
+    "characterTalk": 3,
+    "resumeRequired": 1,
+    "isPhoneNumberRequired": true
+  },
+  "labelRules": [
+    {
+      "match": "製造",
+      "labels": [
+        { "id": 84013, "name": "年間求人120日以上" },
+        { "id": 84014, "name": "未経験可能" },
+        { "id": 84015, "name": "正社員" },
+        { "id": 84016, "name": "美容" },
+        { "id": 84019, "name": "完全週休二日制" },
+        { "id": 84020, "name": "高収入" },
+        { "id": 84021, "name": "年収500万円以上可能" },
+        { "id": 84017, "name": "配送" },
+        { "id": 84025, "name": "工場" },
+        { "id": 84026, "name": "軽作業" }
+      ]
+    },
+    {
+      "match": "",
+      "labels": [
+        { "id": 84012, "name": "ドライバー" },
+        { "id": 84013, "name": "年間求人120日以上" },
+        { "id": 84014, "name": "未経験可能" },
+        { "id": 84015, "name": "正社員" },
+        { "id": 84016, "name": "美容" },
+        { "id": 84017, "name": "配送" },
+        { "id": 84018, "name": "送迎" },
+        { "id": 84019, "name": "完全週休二日制" },
+        { "id": 84020, "name": "高収入" },
+        { "id": 84021, "name": "年収500万円以上可能" }
+      ]
+    }
+  ]
+}

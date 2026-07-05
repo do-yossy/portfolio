@@ -125,6 +125,32 @@ def get_base_url(url):
     parsed = urlparse(url)
     return f"{parsed.scheme}://{parsed.netloc}"
 
+# ── 会社別プロファイル（職場スライダー・特徴・求人ラベル等） ──────────────
+# 環境変数 KYUJINBOX_PROFILE_JSON にJSONファイルパスを指定すると、
+# payload のキーを投稿ペイロードへ強制設定し、labelRules で求人ラベルを付与する。
+def _load_kyujinbox_profile():
+    p = os.environ.get("KYUJINBOX_PROFILE_JSON", "").strip()
+    if not p or not os.path.exists(p):
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+PROFILE = _load_kyujinbox_profile()
+
+def profile_labels_for(job):
+    """labelRules: [{"match": "製造", "labels": [...]}, {"match": "", "labels": [...]}]
+    job のタイトル・職種に match 文字列を含む最初のルールのラベルを返す（match空=デフォルト）。"""
+    rules = PROFILE.get("labelRules") or []
+    hay = str(job.get("title", "")) + str(job.get("jobType") or job.get("job_type") or "")
+    for r in rules:
+        m = str(r.get("match", ""))
+        if m == "" or m in hay:
+            return r.get("labels")
+    return None
+
 def resolve_job_image(job):
     """掲載画像のローカルパスを決定する。
     優先順:
@@ -657,6 +683,18 @@ def setup_submit_interceptor(page, job_type_val, phone_clear=True, full_payload=
                     if target.get('isPhoneNumberRequired'):
                         target['isPhoneNumberRequired'] = False
                         modified.append('phoneRequired=false')
+
+                # ── 会社別プロファイルを強制設定（職場スライダー・特徴・求人ラベル等）──
+                _prof_keys = list((PROFILE.get('payload') or {}).keys())
+                if full_payload.get('kyujinLabels') is not None:
+                    _prof_keys.append('kyujinLabels')
+                for k in _prof_keys:
+                    v = full_payload.get(k)
+                    if v is None:
+                        continue
+                    if k in target and target.get(k) != v:
+                        target[k] = v
+                        modified.append(f"profile:{k}")
 
                 if modified:
                     intercepted['count'] += 1
@@ -1485,7 +1523,7 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
     quals     = (job.get('qualifications') or '').strip()
     transport = (job.get('transportation') or job.get('access') or '').strip()
     worktime  = (job.get('worktimeHoliday') or job.get('worktime_holiday') or job.get('workTime') or '').strip()
-    benefit   = job.get('salary', '')
+    benefit   = (job.get('benefit') or '').strip() or job.get('salary', '')
     title     = job.get('title', '')
     location  = job.get('location', '')
     use_phone = bool(company_phone)
@@ -1528,6 +1566,12 @@ def patch_vue_kyujin_state(page, job, job_type_val, pay_type_val, pay_min, pay_m
         'applicationPhoneNumber': company_phone,
         'workLocations': [{'prefectureId': pref_id, 'location': city_text or location}],
     }
+    # ── 会社別プロファイル: スライダー・特徴・応募必須項目・求人ラベルを反映 ──
+    if PROFILE.get('payload'):
+        patch_data.update(PROFILE['payload'])
+    _lbls = profile_labels_for(job)
+    if _lbls is not None:
+        patch_data['kyujinLabels'] = _lbls
 
     try:
         result = page.evaluate("""(patch) => {
@@ -2404,13 +2448,15 @@ def fill_kyujinbox_form(page, job, company_name):
                       "WEBの応募フォームよりご応募ください。応募後、担当者より2〜3営業日以内に"
                       "お電話またはメールでご連絡します。面接日程を調整のうえ、面接（1回）を実施します。").strip()
 
-    # 給与補足（benefit）: 給与＋補足を充実させる
+    # 給与補足（benefit）: 求人データにbenefitがあればそれを最優先（媒体アカウントの正式文言）
     salary_str = (job.get('salary') or '').strip()
-    benefit_text = salary_str
-    if benefit_text:
-        benefit_text += ('\n※上記はあくまで一例です。経験・能力を考慮して決定します。\n'
-                         '・昇給あり／交通費規定支給／各種社会保険完備\n'
-                         '・試用期間あり（期間中の給与・待遇変更なし）')
+    benefit_text = (job.get('benefit') or '').strip()
+    if not benefit_text:
+        benefit_text = salary_str
+        if benefit_text:
+            benefit_text += ('\n※上記はあくまで一例です。経験・能力を考慮して決定します。\n'
+                             '・昇給あり／交通費規定支給／各種社会保険完備\n'
+                             '・試用期間あり（期間中の給与・待遇変更なし）')
 
     full_payload = {
         'company':         company_name,
@@ -2436,6 +2482,13 @@ def fill_kyujinbox_form(page, job, company_name):
     if company_phone:
         full_payload['applicationPhoneNumber'] = company_phone
         full_payload['isPhoneNumberRequired'] = True
+
+    # ── 会社別プロファイル: スライダー・特徴・応募必須項目などを反映 ──
+    if PROFILE.get('payload'):
+        full_payload.update(PROFILE['payload'])
+    _lbls = profile_labels_for(job)
+    if _lbls is not None:
+        full_payload['kyujinLabels'] = _lbls
 
     return selected_job_type_val, company_phone, full_payload
 
