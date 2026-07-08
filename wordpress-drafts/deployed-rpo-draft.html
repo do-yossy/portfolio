@@ -17,6 +17,8 @@
 /* 現在ページのナビ項目に白い下線を常時表示。WPのcurrent-menu-item と JSの.-current 両対応。content/位置も自前指定でmain.css非依存＝プレビューでも確実表示。 */
 .c-gnav > .-current > a,.c-gnav > .current-menu-item > a,.c-gnav > .current_page_item > a{position:relative}
 .c-gnav > .-current > a::after,.c-gnav > .current-menu-item > a::after,.c-gnav > .current_page_item > a::after{content:"" !important;display:block;position:absolute;left:0;bottom:0;width:100%;height:2px;background:var(--color_header_text);transform:scaleX(1) !important;opacity:1}
+/* モバイルのスクロール時ヘッダーバーもPCと同じ半透明ネイビーに統一（元は不透明#0f2350で色が濃かった） */
+.sp-header-bar{background:rgba(15,35,80,.75) !important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 /* 他ページ(/contact等)とヘッダー構造は完全に同一(-body-solid / .l-fixHeader / scrollObserver)。
    よってヘッダーの位置やfixHeaderの表示はテーマ標準のまま一切上書きしない。 */
 /* SWELLテーマが .post_content 内の見出しに付ける装飾（h2の濃紺バー・h3の下線・h4の左ボーダー等）を打ち消し、単体HTMLプレビューと同一表示にする */
@@ -81,6 +83,11 @@
 .savior-draft .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(2,71,179,.25)}
 .savior-draft .btn.ghost{background:#fff;color:#0247b3}
 .savior-draft .btn.ghost:hover{background:rgba(2,71,179,.05);box-shadow:none}
+/* 各事業ブロック末尾の問い合わせリンク */
+.savior-draft .biz-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:44px}
+.savior-draft .biz-cta .btn{font-size:.95rem}
+.savior-draft .h2-sub{font-size:.5em;font-weight:600;color:#0247b3;margin-left:.35em;letter-spacing:.02em}
+@media(max-width:600px){.savior-draft .biz-cta{flex-direction:column}.savior-draft .biz-cta .btn{width:100%;text-align:center}.savior-draft .h2-sub{display:block;margin:.3em 0 0}}
 
 /* section scaffolding */
 .savior-draft section{padding:90px 0}
@@ -652,6 +659,10 @@
         <h3 class="scheme-title">若年層からシニア層まで対応。特にシニア層の転職が強みです。</h3>
         <p class="scheme-desc">経験を活かして活躍したいシニア層と、即戦力を求める企業をつなぎます。「求人が少ない」と言われるシニアの転職市場でも、独自のネットワークで市場水準を上回るマッチングを実現します。</p>
       </div>
+      <div class="biz-cta">
+        <a href="/contact" class="btn ghost">お仕事をお探しの方はこちら</a>
+        <a href="/contact" class="btn">採用をお考えの企業様はこちら</a>
+      </div>
     </div>
   </div>
 
@@ -659,7 +670,7 @@
   <div class="biz-block bg-soft" id="rpo">
     <div class="wrap">
       <div class="bignum mont">BUSINESS 02</div>
-      <h2>RPO事業</h2>
+      <h2>RPO事業<span class="h2-sub">（採用代行事業）</span></h2>
       <p class="lead">RPO（採用代行）は、人材を“紹介”するのではなく、<b>貴社の採用チームの一員として、採用業務そのものを代行・運用</b>するサービスです。採用計画の策定から母集団形成、応募対応、選考、内定後フォローまで、採用の実務を一気通貫でお任せいただけます。</p>
 
       <div class="scheme-head">
@@ -712,6 +723,9 @@
         <div class="rpo-feat"><span class="rfk mont">FEATURE</span><span class="rfn">02</span><h4>必要なときに必要な分だけ</h4><p>採用計画の全体から一部業務のみまで、状況に合わせて柔軟に対応。繁忙期だけ・特定業務だけの依頼も可能です。</p></div>
         <div class="rpo-feat"><span class="rfk mont">FEATURE</span><span class="rfn">03</span><h4>採用の決定にこだわる</h4><p>候補者を集めて終わりにせず、採用の決定・入社まで見据えて伴走。定着を意識したフォローまで行います。</p></div>
       </div>
+      <div class="biz-cta">
+        <a href="/contact" class="btn">RPO（採用代行）のご相談はこちら</a>
+      </div>
     </div>
   </div>
 
@@ -752,6 +766,9 @@
           <span>ブランド立ち上げPM</span>
           <span>調理・メディア出演の実績</span>
         </div>
+      </div>
+      <div class="biz-cta">
+        <a href="/contact" class="btn">飲食店プロデュースのご相談はこちら</a>
       </div>
     </div>
   </div>
