@@ -1832,6 +1832,11 @@ header img{
 .sv-believe__head{position:relative;display:inline-block;margin:0 0 clamp(72px,10vw,130px);padding:.5em .35em .15em}
 .sv-believe__bg{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);z-index:0;font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.05em;font-size:clamp(3rem,9vw,7rem);line-height:1;white-space:nowrap;color:rgba(150,190,255,.13);pointer-events:none;-webkit-user-select:none;user-select:none}
 .sv-believe__sub{position:relative;z-index:1;font-family:"Zen Old Mincho","游明朝",serif;font-weight:400;letter-spacing:.24em;font-size:clamp(1.3rem,3vw,2.08rem);color:rgba(255,255,255,.94);margin:0;text-shadow:0 2px 18px rgba(0,0,0,.5)}
+/* 見出しをリンク化：下線なし・色継承・ホバーでウォーターマークと文字が少し明るく光る */
+a.sv-about__head,a.sv-kw-head{cursor:pointer;text-decoration:none !important;color:inherit}
+.sv-about__ttl,.sv-kw-word,.sv-about__bg,.sv-kw-bg{transition:color .45s ease,text-shadow .45s ease}
+a.sv-about__head:hover .sv-about__ttl,a.sv-kw-head:hover .sv-kw-word{color:#fff;text-shadow:0 2px 26px rgba(130,185,255,.6)}
+a.sv-about__head:hover .sv-about__bg,a.sv-kw-head:hover .sv-kw-bg{color:rgba(160,200,255,.3)}
 /* ふわっと現れる（ソフトなフェード＋わずかな拡大＋ぼかし抜け） */
 .sv-soft{opacity:0;transform:scale(.955);filter:blur(6px)}
 .sv-soft.sv-on{opacity:1;transform:none;filter:blur(0);transition:opacity 1.7s ease,transform 1.9s cubic-bezier(.22,.7,.25,1),filter 1.7s ease}
@@ -1907,15 +1912,15 @@ header img{
 </section>
 <section class="sv-about">
   <div class="sv-about__in">
-    <div class="sv-about__head sv-soft">
+    <a class="sv-about__head sv-soft" href="/company">
       <span class="sv-about__bg" aria-hidden="true">ABOUT</span>
       <p class="sv-about__ttl">Saviorについて（会社概要）</p>
-    </div>
+    </a>
     <p class="sv-about__lead sv-reveal">株式会社Saviorは、</p>
-    <div class="sv-kw-head sv-soft">
+    <a class="sv-kw-head sv-soft" href="/service">
       <span class="sv-kw-bg" aria-hidden="true">SERVICE</span>
       <p class="sv-kw-word">サービス（事業内容）</p>
-    </div>
+    </a>
     <p class="sv-about__lead sv-reveal">を通じ、<br>挑戦する人と企業の可能性を<br>最大化する会社です。</p>
     <div class="sv-about__gap"></div>
     <p class="sv-about__punch sv-reveal">私たちは、<br>サービスを提供しているのではありません。</p>
