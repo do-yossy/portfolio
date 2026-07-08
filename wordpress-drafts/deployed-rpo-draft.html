@@ -134,22 +134,30 @@
 .savior-draft .biz-block{padding:80px 0;border-top:1px solid #e5e5e5}
 .savior-draft .biz-block .bignum{font-family:"Montserrat",sans-serif;font-size:.8rem;letter-spacing:.3em;color:#0247b3;margin-bottom:10px;font-weight:600}
 /* ===== RPO事業：採用代行モデル（縦フロー）＋3つの特徴 ===== */
-.savior-draft .rpo-model{max-width:600px;margin:8px auto 0}
+.savior-draft .rpo-model{max-width:1000px;margin:8px auto 0}
 .savior-draft .rpo-model-head{text-align:center;background:linear-gradient(135deg,#0f2350,#0247b3);color:#fff;border-radius:16px 16px 0 0;padding:24px 20px}
 .savior-draft .rpo-model-head .rme{display:block;font:700 2.6rem/1 "Montserrat",sans-serif;letter-spacing:.14em}
 .savior-draft .rpo-model-head .rms{display:inline-block;font-size:.8rem;letter-spacing:.4em;margin-top:10px;opacity:.9}
 .savior-draft .rpo-model-head .rme2{display:block;font-family:"Montserrat",sans-serif;font-size:.86rem;letter-spacing:.32em;margin-top:2px;opacity:.7}
-.savior-draft .rpo-flow{border:1px solid #e5e5e5;border-top:0;border-radius:0 0 16px 16px;background:#eef2f8;padding:28px 20px}
-.savior-draft .rpo-step{position:relative;background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px 18px;box-shadow:0 6px 18px rgba(2,71,179,.06)}
-.savior-draft .rpo-step:not(:last-child){margin-bottom:42px}
-.savior-draft .rpo-step:not(:last-child)::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:24px;background:linear-gradient(#0247b3,#6f9de6);transform:translateX(-50%)}
-.savior-draft .rpo-step:not(:last-child)::before{content:"";position:absolute;left:50%;bottom:-42px;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:14px solid #0247b3;transform:translateX(-50%);z-index:2}
+/* PC：横並び（横長）。ステップ間は横線＋▶（塗り三角）。 */
+.savior-draft .rpo-flow{border:1px solid #e5e5e5;border-top:0;border-radius:0 0 16px 16px;background:#eef2f8;padding:30px 22px;display:flex;flex-direction:row;align-items:stretch;gap:38px}
+.savior-draft .rpo-step{position:relative;flex:1;min-width:0;background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px 14px;box-shadow:0 6px 18px rgba(2,71,179,.06)}
+.savior-draft .rpo-step:not(:last-child)::after{content:"";position:absolute;top:50%;left:100%;width:38px;height:2px;background:linear-gradient(90deg,#0247b3,#6f9de6);transform:translateY(-50%)}
+.savior-draft .rpo-step:not(:last-child)::before{content:"";position:absolute;top:50%;left:100%;margin-left:12px;width:0;height:0;border-top:9px solid transparent;border-bottom:9px solid transparent;border-left:14px solid #0247b3;transform:translateY(-50%);z-index:2}
 .savior-draft .rpo-step-h{display:inline-block;background:#0247b3;color:#fff;font-weight:700;font-size:.92rem;padding:5px 18px;border-radius:999px;margin-bottom:12px}
 .savior-draft .rpo-step-b ul{list-style:none;margin:0;padding:0;text-align:left}
 .savior-draft .rpo-step-b li{position:relative;padding-left:18px;font-size:.92rem;line-height:1.95}
 .savior-draft .rpo-step-b li::before{content:"";position:absolute;left:2px;top:.8em;width:7px;height:7px;border-radius:50%;background:#0247b3}
 .savior-draft .rpo-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .savior-draft .rpo-tags span{font-size:.72rem;color:#0247b3;background:#eaf1fb;border:1px solid #d4e2f7;border-radius:999px;padding:3px 11px}
+/* モバイル：縦並び（縦長）に戻し、矢印は▼（下向き塗り三角）。 */
+@media(max-width:720px){
+  .savior-draft .rpo-model{max-width:600px}
+  .savior-draft .rpo-flow{flex-direction:column;gap:42px;padding:28px 20px}
+  .savior-draft .rpo-step{flex:none}
+  .savior-draft .rpo-step:not(:last-child)::after{top:100%;left:50%;width:2px;height:24px;background:linear-gradient(#0247b3,#6f9de6);transform:translateX(-50%)}
+  .savior-draft .rpo-step:not(:last-child)::before{top:auto;bottom:-42px;left:50%;margin-left:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:14px solid #0247b3;border-bottom:0;transform:translateX(-50%)}
+}
 .savior-draft .rpo-feats{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .savior-draft .rpo-feat{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:30px 22px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.04)}
 .savior-draft .rpo-feat .rfn{display:block;font:700 2rem/1 "Montserrat",sans-serif;color:#0247b3;letter-spacing:.06em;margin-bottom:4px}
@@ -402,7 +410,7 @@
 .savior-draft .outcome{text-align:center;margin-top:30px}
 .savior-draft .outcome-badges{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
 .savior-draft .ob{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#0f2350,#0247b3);color:#fff;font-weight:700;font-size:1.15rem;padding:14px 32px;border-radius:99px;box-shadow:0 12px 30px rgba(2,71,179,.22)}
-.savior-draft .ob::before{content:"▲";font-size:.72rem;color:#8fd0ff}
+.savior-draft .ob::before{content:"・";font-size:1.5rem;line-height:0;color:#8fd0ff}
 .savior-draft .outcome p{color:#0f2350;opacity:.82;font-size:.92rem}
 /* merit cards */
 .savior-draft .merit2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:50px}
@@ -583,8 +591,8 @@
   <div class="biz-block" id="jinzai">
     <div class="wrap">
       <div class="bignum mont">BUSINESS 01</div>
-      <h2>人材紹介事業</h2>
-      <p class="lead">応募書類の添削から面接対策、条件交渉、入社後まで<b>一貫してサポート</b>。求職者の「収入アップ」「キャリアアップ」を実現し、企業には即戦力となる人材をご紹介します。</p>
+      <h2>人材紹介事業<span class="h2-sub">（あなたの転職・お仕事探しをサポート）</span></h2>
+      <p class="lead">「今より収入を上げたい」「キャリアアップしたい」——そんなあなたの想いに寄り添い、<b>あなたに合ったお仕事をご紹介</b>します。応募書類の添削から面接対策、言いづらい条件交渉、入社後のフォローまで、専任担当がすべて無料で伴走。はじめての転職でも安心して、理想の働き方を実現できます。</p>
       <div class="scheme-head">
         <div class="kicker">HOW IT WORKS</div>
         <h3 class="scheme-title">人材紹介の仕組み</h3>

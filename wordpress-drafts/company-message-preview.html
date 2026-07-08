@@ -2082,7 +2082,7 @@ $(document).ready(function() {
     function reveal(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-rv');n.style.transitionDelay=Math.min(i,7)*80+'ms';io.observe(n);});}
     // 図版用：左右それぞれの方向から1つずつスライドイン。list=[PC1枚, SP誠意, SP熱意, SP創意]。
     // SPの3円は 左→右→左 と双方向から交互に。PCの1枚は下から。登場後は浮遊へ。
-    var DIRS=['sv-fromB','sv-fromL','sv-fromR','sv-fromL','sv-fromR'];
+    var DIRS=['sv-fromB','sv-fromR','sv-fromL','sv-fromR','sv-fromL']; // SP: 誠意=右, 熱意=左, 創意=右
     // 円専用オブザーバ：lazyload画像の縮みで読込時に円が初期表示域へ入り込み、誤ってアニメが再生される問題を防ぐため、
     // 「まだスクロールしておらず、要素が画面の上半分に来ている」場合は無視（監視は継続）＝実際にスクロールして下から入った時だけ発火。
     var userScrolled=false; window.addEventListener('scroll', function(){userScrolled=true;}, {passive:true});
