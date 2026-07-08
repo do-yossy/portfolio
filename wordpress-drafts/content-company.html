@@ -49,20 +49,13 @@
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<div class="company-philosophy">
-
-<div class="company-text1 animated fadeIn delay-200ms">
-  <p class="p1 mont">MESSAGE</p>
-  <p class="p2">代表メッセージ</p>
-  <p class="p3"></p>
-  <p class="p5">
-株式会社Saviorは、次世代が夢を描き、<br class="sp">その夢に挑戦するための<br class="pc">“きっかけ”を<br class="sp">提供する救世主であることを使命としております。<br><br class="sp-custom-br">
-私たちは、この理念を軸に、<br class="sp">次世代のリーダーやイノベーターとなる<br class="sp">人材の発掘と育成に注力し、<br>持続的な社会価値の創造を目指しております。<br><br class="sp-custom-br">
-当社の活動を通じて、個人はもちろん<br class="sp">企業や社会全体が革新的な未来を<br class="sp">共創できると確信しており、<br>これからも「可能性の最大化」と<br class="sp">「新たな価値の創出」に邁進してまいります。
-  </p>
-  <p class="p4" style="padding-top:2.5rem;padding-bottom:0">代表取締役　谷口大介</p>
-</div>
-
+<div class="top-texts sv-msg">
+  <img src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png">
+  <p class="mincho">
+株式会社Saviorは、次世代が夢を描き、<br class="sp">その夢に挑戦するための<br class="pc">“きっかけ”を<br class="sp">提供する救世主であることを使命としております。<br><br class="sp sp-custom-br">
+私たちは、この理念を軸に、<br class="sp">次世代のリーダーやイノベーターとなる<br class="sp">人材の発掘と育成に注力し、<br>持続的な社会価値の創造を目指しております。<br><br class="sp sp-custom-br">
+当社の活動を通じて、個人はもちろん<br class="sp">企業や社会全体が革新的な未来を<br class="sp">共創できると確信しており、<br>これからも「可能性の最大化」と<br class="sp">「新たな価値の創出」に邁進してまいります。<br><br class="sp sp-custom-br">
+<span>代表取締役　<img src="https://savior-corporation.com/wp-content/uploads/2025/11/taniguchidaisuke.png" class="boss"></span></p>
 </div>
 <!-- /wp:html -->
 
@@ -163,11 +156,12 @@
 <style id="sv-company-motion">
 /* 会社概要：スクロール連動のフェードアップ（各カード内の要素を順に出現）。prefers-reduced-motion 尊重。 */
 @media (prefers-reduced-motion: no-preference){
-  .sv-rv{opacity:0;transform:translateY(30px);transition:opacity .9s cubic-bezier(.16,.7,.3,1), transform .9s cubic-bezier(.16,.7,.3,1)}
-  .sv-rv.sv-in{opacity:1;transform:none}
-  /* 企業理念の3つの図（誠意/熱意/創意）：下からふわっと浮き上がってきて、その後ゆっくり浮遊し続けるおしゃれな演出 */
-  .sv-pop{opacity:0;transform:translateY(64px) scale(.9);transition:opacity 1.1s ease, transform 1.2s cubic-bezier(.22,1,.36,1)}
-  .sv-pop.sv-in{opacity:1;transform:none}
+  /* transition は表示側(.sv-in)にだけ付与。隠し状態(.sv-rv)は瞬時に適用され、スクロールで入った時のみフェードイン再生（初期表示域でも逆再生フェードアウトしない） */
+  .sv-rv{opacity:0;transform:translateY(30px)}
+  .sv-rv.sv-in{opacity:1;transform:none;transition:opacity .9s cubic-bezier(.16,.7,.3,1), transform .9s cubic-bezier(.16,.7,.3,1)}
+  /* 企業理念の3つの図（誠意/熱意/創意）：下からゆっくり浮き上がってきて、その後ゆっくり浮遊し続けるおしゃれな演出 */
+  .sv-pop{opacity:0;transform:translateY(64px) scale(.92)}
+  .sv-pop.sv-in{opacity:1;transform:none;transition:opacity 1.7s ease, transform 2.1s cubic-bezier(.22,1,.36,1)}
   /* 登場完了後の常時ふわふわ（円ごとに位相をずらす） */
   .sv-float{animation:sv-bob 4.8s ease-in-out var(--fd,0s) infinite}
   @keyframes sv-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
@@ -183,7 +177,9 @@
     document.querySelectorAll('.page-texts,.company-philosophy .animated,.company-philosophy.animated,.company-details .animated,.company-details.animated,.top-service .animated').forEach(function(el){
       el.classList.remove('animated','fadeIn','fadeInUp','delay-200ms','delay-500ms','delay-1s','slow');
     });
-    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('sv-in');io.unobserve(e.target);}});},{threshold:0.12,rootMargin:'0px 0px -8% 0px'});
+    // 初期表示域(above the fold)の要素でも必ずトランジションが再生されるよう、
+    // 監視で入った要素は「隠し状態を1フレーム描画してから」sv-in を付与（ダブルrAF）。
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var t=e.target;io.unobserve(t);requestAnimationFrame(function(){requestAnimationFrame(function(){t.classList.add('sv-in');});});}});},{threshold:0.12,rootMargin:'0px 0px -8% 0px'});
     function reveal(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-rv');n.style.transitionDelay=Math.min(i,7)*80+'ms';io.observe(n);});}
     // 図版用：拡大フェードで一つずつ（ステップ大きめ）出現
     function revealPop(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-pop');n.style.transitionDelay=Math.min(i,5)*150+'ms';
@@ -195,6 +191,10 @@
       reveal(Array.prototype.slice.call(card.querySelectorAll('.p1,.p2,.p4,.p5')));
       // 企業理念の図（PCは1枚／SPは3枚）をおしゃれにポップ。SPは3つの円が順番に出現。
       revealPop(Array.prototype.slice.call(card.querySelectorAll('.company-img img')));
+    });
+    // 代表メッセージ（トップと同じ top-texts をそのまま）：ロゴ→本文を順にフェードアップ
+    document.querySelectorAll('.top-texts.sv-msg').forEach(function(m){
+      reveal([m.querySelector('img'), m.querySelector('.mincho')]);
     });
     // 企業情報（ラベル＋テーブル行）
     document.querySelectorAll('.company-text2').forEach(function(card){
