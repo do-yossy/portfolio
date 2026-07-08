@@ -50,20 +50,24 @@
 #sv-hero-bg .sv-slide:nth-child(3){background-image:url("https://savior-corporation.com/wp-content/uploads/2024/02/fv7-jpg.webp");animation-delay:14s}
 #sv-hero-bg::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(180deg,rgba(8,18,45,.28) 0%,rgba(8,18,45,.5) 100%)}
 @keyframes sv-kb{0%{opacity:0;transform:scale(1.05)}5%{opacity:1}30%{opacity:1}38%{opacity:0}100%{opacity:0;transform:scale(1.14)}}
-.sv-hero{position:relative;z-index:2;width:100vw;margin-left:calc(50% - 50vw);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:0 6vw}
-.sv-hero h1{font-family:"Zen Old Mincho","游明朝",serif;font-weight:500;line-height:1.35;letter-spacing:.09em;font-size:clamp(1.75rem,4.4vw,3.2rem);margin:0;text-shadow:0 4px 34px rgba(0,0,0,.4)}
-.sv-hero .sv-line{display:block;overflow:hidden;padding:.06em 0}
-.sv-hero .sv-line+.sv-line{margin-top:.42em}
-.sv-hero .sv-line>span{display:inline-block;transform:translateY(120%);opacity:0}
-.sv-hero.sv-on .sv-line>span{transform:translateY(0);opacity:1;transition:transform 1.3s cubic-bezier(.16,.84,.28,1),opacity 1.3s ease}
-.sv-hero.sv-on .sv-line:nth-child(2)>span{transition-delay:.24s}
+/* heroテキストは画面に固定。スクロールでグラデーション状にフェードアウトし、上に戻ると再び現れる（JSでスクロール量に連動） */
+.sv-hero-copy{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:0 6vw;pointer-events:none;will-change:opacity,transform,filter}
+.sv-hero-copy h1{font-family:"Zen Old Mincho","游明朝",serif;font-weight:500;line-height:1.35;letter-spacing:.09em;font-size:clamp(1.75rem,4.4vw,3.2rem);margin:0;text-shadow:0 4px 34px rgba(0,0,0,.4)}
+.sv-hero-copy .sv-line{display:block;overflow:hidden;padding:.09em 0}
+.sv-hero-copy .sv-line+.sv-line{margin-top:.4em}
+/* エモい登場：マスクから、わずかに傾いて・ぼけて→シャープに立ち上がる（2行を時間差で） */
+.sv-hero-copy .sv-line>span{display:inline-block;transform:translateY(128%) rotate(2.5deg);opacity:0;filter:blur(7px)}
+.sv-hero-copy.sv-on .sv-line>span{transform:none;opacity:1;filter:blur(0);transition:transform 1.7s cubic-bezier(.16,.84,.28,1),opacity 1.7s ease,filter 1.7s ease}
+.sv-hero-copy.sv-on .sv-line:nth-child(2)>span{transition-delay:.3s}
+/* heroテキスト分のスクロール領域を確保する透明スペーサー（映像もテキストも固定、その上をこの空間がスクロール） */
+.sv-hero-spacer{position:relative;z-index:1;width:100%;height:100vh;height:100dvh}
 /* hero直下のメッセージ帯（リード＋We Believe）：背景は敷かず、固定した映像の上を文字だけがスクロールする */
 .sv-over-video{position:relative;z-index:2;width:100vw;margin-left:calc(50% - 50vw)}
 /* この帯より下は不透明背景で固定映像を覆いながらスクロール（全幅化＝子要素の100vwブレイクアウトを無害化） */
 .top-over{position:relative;z-index:2;background:#fff;width:100vw;margin-left:calc(50% - 50vw)}
 /* ===== hero下の薄めリード（映像の上・今時のミニマル。余白広めでエモく） ===== */
 .sv-lead{padding:clamp(150px,24vw,330px) 6vw clamp(120px,18vw,250px);text-align:center}
-.sv-lead p{font-family:"Zen Old Mincho","游明朝",serif;margin:0 auto;max-width:940px;color:rgba(255,255,255,.88);font-weight:400;font-size:clamp(1.04rem,2.3vw,1.52rem);line-height:2.55;letter-spacing:.14em;text-shadow:0 2px 22px rgba(0,0,0,.4)}
+.sv-lead p{font-family:"Zen Old Mincho","游明朝",serif;margin:0 auto;max-width:1000px;color:rgba(255,255,255,.92);font-weight:400;font-size:clamp(1.3rem,3vw,2.08rem);line-height:2.4;letter-spacing:.14em;text-shadow:0 2px 22px rgba(0,0,0,.4)}
 /* ===== 汎用スクロールリビール（逆再生防止：transitionは.sv-on側のみ） ===== */
 .sv-reveal{opacity:0;transform:translateY(40px)}
 .sv-reveal.sv-on{opacity:1;transform:none;transition:opacity 1.1s ease,transform 1.35s cubic-bezier(.16,.84,.28,1)}
@@ -91,13 +95,14 @@
   <div class="sv-slide"></div>
   <div class="sv-slide"></div>
 </div>
-<section class="sv-hero">
+<div class="sv-hero-copy">
   <h1>
     <span class="sv-line"><span>挑戦する人に、機会を。</span></span>
     <span class="sv-line"><span>挑戦する企業に、未来を。</span></span>
   </h1>
   <div class="scrolldown"><span class="mont">scroll</span></div>
-</section>
+</div>
+<div class="sv-hero-spacer"></div>
 <div class="sv-over-video">
 <section class="sv-lead sv-reveal">
   <p>私たちは、人と企業の可能性を信じ、<br>挑戦する&ldquo;きっかけ&rdquo;を創り続けるビジネスパートナーです。</p>
@@ -234,8 +239,25 @@
 </div><!-- /.top-over -->
 <script id="sv-top-motion">
 (function(){
-  /* hero 2行：マスクからのスライドアップ（初回表示） */
-  function heroOn(){var h=document.querySelector('.sv-hero');if(h)requestAnimationFrame(function(){requestAnimationFrame(function(){h.classList.add('sv-on');});});}
+  /* hero 2行：マスクから傾き＋ぼかしのエモい登場（初回表示） */
+  function heroOn(){var h=document.querySelector('.sv-hero-copy');if(h)requestAnimationFrame(function(){requestAnimationFrame(function(){h.classList.add('sv-on');});});}
+  /* heroテキストは固定。スクロール量に連動してグラデーション状にフェード（下げると消え、戻すと現れる） */
+  function heroFade(){
+    var h=document.querySelector('.sv-hero-copy');if(!h)return;
+    var ticking=false;
+    function tick(){
+      var vh=window.innerHeight||1;
+      var y=window.pageYOffset||document.documentElement.scrollTop||0;
+      var p=Math.min(Math.max(y/(vh*0.72),0),1); /* 0(先頭)→1(約0.72画面スクロール) */
+      h.style.opacity=(1-p).toFixed(3);
+      h.style.transform='translateY('+(-p*64).toFixed(1)+'px)';
+      h.style.filter='blur('+(p*7).toFixed(1)+'px)';
+      h.style.pointerEvents=p>0.02?'none':'none';
+    }
+    window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(function(){tick();ticking=false;});}},{passive:true});
+    window.addEventListener('resize',tick,{passive:true});
+    tick();
+  }
   /* 汎用リビール＋creed行ごとのstagger（IntersectionObserver、逆再生なし） */
   function initReveal(){
     if(!('IntersectionObserver' in window)){document.querySelectorAll('.sv-reveal,.sv-creed li').forEach(function(el){el.classList.add('sv-on');});return;}
@@ -247,7 +269,7 @@
       lis.forEach(function(li){lio.observe(li);});
     });
   }
-  function boot(){heroOn();initReveal();}
+  function boot(){heroOn();heroFade();initReveal();}
   if(document.readyState!=='loading')boot();else document.addEventListener('DOMContentLoaded',boot);
 })();
 </script>
