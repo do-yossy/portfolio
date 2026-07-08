@@ -1,9 +1,13 @@
 <!-- wp:html -->
 <style id="sv-global-hdr">
 /* ヘッダー背景のみ半透明ネイビーに統一（/serviceに合わせる）。変数上書きで全レイヤー/全端末に適用。他要素は不変。 */
-:root{--color_header_bg:rgba(15,35,80,.95) !important}
-.l-header,.l-fixHeader{background:rgba(15,35,80,.95) !important}
+:root{--color_header_bg:rgba(15,35,80,.75) !important}
+.l-header,.l-fixHeader{background:rgba(15,35,80,.75) !important}
 .l-header__bar,.l-fixHeader::before,.l-fixHeader:before{background:transparent !important}
+/* 戻るボタン(↑)をフォント非依存のCSS描画に統一（アイコンフォント未読込でも必ず同じ「^」マークを表示） */
+#pagetop .c-fixBtn__icon::before{content:"" !important}
+#pagetop .c-fixBtn__icon{display:flex;align-items:center;justify-content:center}
+#pagetop .c-fixBtn__icon::after{content:"";width:10px;height:10px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(-45deg);margin-top:3px}
 </style>
 <!-- /wp:html -->
 
@@ -157,14 +161,14 @@
 /* 会社概要：スクロール連動のフェードアップ（各カード内の要素を順に出現）。prefers-reduced-motion 尊重。 */
 @media (prefers-reduced-motion: no-preference){
   /* transition は表示側(.sv-in)にだけ付与。隠し状態(.sv-rv)は瞬時に適用され、スクロールで入った時のみフェードイン再生（初期表示域でも逆再生フェードアウトしない） */
-  .sv-rv{opacity:0;transform:translateY(30px)}
-  .sv-rv.sv-in{opacity:1;transform:none;transition:opacity .9s cubic-bezier(.16,.7,.3,1), transform .9s cubic-bezier(.16,.7,.3,1)}
-  /* 企業理念の3つの図（誠意/熱意/創意）：下からゆっくり浮き上がってきて、その後ゆっくり浮遊し続けるおしゃれな演出 */
-  .sv-pop{opacity:0;transform:translateY(64px) scale(.92)}
-  .sv-pop.sv-in{opacity:1;transform:none;transition:opacity 1.7s ease, transform 2.1s cubic-bezier(.22,1,.36,1)}
-  /* 登場完了後の常時ふわふわ（円ごとに位相をずらす） */
-  .sv-float{animation:sv-bob 4.8s ease-in-out var(--fd,0s) infinite}
-  @keyframes sv-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+  .sv-rv{opacity:0;transform:translateY(52px)}
+  .sv-rv.sv-in{opacity:1;transform:none;transition:opacity 1s cubic-bezier(.16,.7,.3,1), transform 1.05s cubic-bezier(.16,.7,.3,1)}
+  /* 企業理念の3つの図（誠意/熱意/創意）：下から大きくゆっくり浮き上がってきて、その後ゆっくり浮遊し続ける演出 */
+  .sv-pop{opacity:0;transform:translateY(100px) scale(.78)}
+  .sv-pop.sv-in{opacity:1;transform:none;transition:opacity 1.8s ease, transform 2.1s cubic-bezier(.22,1,.36,1)}
+  /* 登場完了後の常時ふわふわ（円ごとに位相をずらす・振れ幅大きめ） */
+  .sv-float{animation:sv-bob 4.4s ease-in-out var(--fd,0s) infinite}
+  @keyframes sv-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
 }
 </style>
 <script>

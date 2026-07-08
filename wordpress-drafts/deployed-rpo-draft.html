@@ -7,9 +7,13 @@
 #main_content,.l-mainContent,.l-article{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;border:0!important}
 .post_content{max-width:none!important;margin:0!important;padding:0!important}
 /* ヘッダー背景を半透明ネイビーに統一（全ページ共通の値） */
-:root{--color_header_bg:rgba(15,35,80,.95) !important}
-.l-header,.l-fixHeader{background:rgba(15,35,80,.95) !important}
+:root{--color_header_bg:rgba(15,35,80,.75) !important}
+.l-header,.l-fixHeader{background:rgba(15,35,80,.75) !important}
 .l-header__bar,.l-fixHeader::before,.l-fixHeader:before{background:transparent !important}
+/* 戻るボタン(↑)をフォント非依存のCSS描画に統一（アイコンフォント未読込でも必ず同じ「^」マークを表示） */
+#pagetop .c-fixBtn__icon::before{content:"" !important}
+#pagetop .c-fixBtn__icon{display:flex;align-items:center;justify-content:center}
+#pagetop .c-fixBtn__icon::after{content:"";width:10px;height:10px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(-45deg);margin-top:3px}
 /* 他ページ(/contact等)とヘッダー構造は完全に同一(-body-solid / .l-fixHeader / scrollObserver)。
    よってヘッダーの位置やfixHeaderの表示はテーマ標準のまま一切上書きしない。 */
 /* SWELLテーマが .post_content 内の見出しに付ける装飾（h2の濃紺バー・h3の下線・h4の左ボーダー等）を打ち消し、単体HTMLプレビューと同一表示にする */
