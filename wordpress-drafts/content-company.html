@@ -131,18 +131,18 @@
 
 <!-- wp:html -->
 <style id="sv-greeting-css">
-.sv-greeting{text-align:center}
-.sv-greeting .sv-msg-ttl{font-family:"Zen Old Mincho","游明朝",serif;font-weight:600;font-size:clamp(1.6rem,4.2vw,2.6rem);letter-spacing:.16em;color:#0f2350;margin:0 0 1em}
-.sv-greeting>img{max-width:200px;height:auto;margin:0 auto .4em}
-.sv-greeting .sv-msg-body{max-width:760px;margin:1.8em auto 0;text-align:left}
+.sv-greeting{text-align:left;max-width:940px;margin-left:auto;margin-right:auto}
+.sv-greeting .msg-en{font-family:"Montserrat",sans-serif;font-weight:800;font-size:clamp(2.6rem,11vw,5.6rem);line-height:1;letter-spacing:.02em;margin:0 0 .3em;color:transparent;-webkit-text-stroke:1.6px #0f2350;text-stroke:1.6px #0f2350}
+.sv-greeting .msg-label{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(.95rem,2.2vw,1.2rem);letter-spacing:.34em;color:#0247b3;margin:0 0 1.6em}
+.sv-greeting .sv-msg-body{max-width:820px;margin:1.4em 0 0;text-align:left}
 .sv-greeting .sv-msg-body p{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1rem,2vw,1.14rem);line-height:2.35;letter-spacing:.03em;color:#3a3f4a;margin:0 0 1.7em}
 .sv-greeting .sv-msg-body p.em{color:#0f2350;font-weight:600;font-size:clamp(1.12rem,2.6vw,1.5rem);line-height:1.9;letter-spacing:.05em;margin:1.8em 0}
 .sv-greeting .sv-msg-body p b{color:#0f2350;font-weight:600}
 .sv-greeting .sv-msg-sign{text-align:right;margin:2.6em 0 0}
 </style>
 <div class="top-texts sv-msg sv-greeting">
-  <p class="sv-msg-ttl">代表挨拶</p>
-  <img src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png">
+  <p class="msg-en">MESSAGE</p>
+  <p class="msg-label">代表挨拶</p>
   <div class="sv-msg-body">
     <p>株式会社Saviorは、「挑戦する人に機会を。挑戦する企業に未来を。」という理念のもと、人・企業・社会が持つ可能性を最大限に引き出し、新たな価値を創造することを使命としています。</p>
     <p>私はこれまで、多くの方々との出会いを通じて、一つの確信を持つようになりました。</p>
@@ -270,7 +270,7 @@
     });
     // 代表メッセージ（トップと同じ top-texts をそのまま）：ロゴ→本文を順にフェードアップ
     document.querySelectorAll('.top-texts.sv-msg').forEach(function(m){
-      reveal([m.querySelector('.sv-msg-ttl'), m.querySelector('img'), m.querySelector('.sv-msg-body')]);
+      reveal([m.querySelector('.msg-en'), m.querySelector('.msg-label'), m.querySelector('.sv-msg-body')]);
     });
     // 企業情報（ラベル＋テーブル行）
     document.querySelectorAll('.company-text2').forEach(function(card){
