@@ -2775,4 +2775,28 @@ $(document).ready(function() {
     });
 });
 </script>
-<script>document.addEventListener('touchstart',function(){});</script></body></html>
+<script>document.addEventListener('touchstart',function(){});</script><style id="sv-nav-css">
+.p-spMenu a .sv-en{display:block;font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.14em;line-height:1.25}
+.p-spMenu a .sv-ja{display:block;font-size:.72em;letter-spacing:.06em;opacity:.68;margin-top:.3em}
+</style>
+<script id="sv-nav-relabel">
+/* このトップページのみ：PCナビは英字表記、モバイルのドロワーは「英字＋日本語」の2段表示に（公開中のメニュー設定には触れない） */
+(function(){
+  var PC=[['/service','SERVICE'],['/company','ABOUT'],['/contact','CONTACT']];
+  var SP=[['/service','SERVICE','事業内容'],['/company','ABOUT','会社概要'],['/contact','CONTACT','お問い合わせ'],['/policy','PRIVACY POLICY','プライバシーポリシー'],['/privacy','PRIVACY POLICY','プライバシーポリシー']];
+  function tail(a,path){var h=(a.getAttribute('href')||'').replace(/[#?].*$/,'').replace(/\/+$/,'');return h.slice(-path.length)===path;}
+  function applyPC(){
+    document.querySelectorAll('.c-gnav a').forEach(function(a){
+      for(var i=0;i<PC.length;i++){ if(tail(a,PC[i][0])){ var t=a.querySelector('.ttl')||a; if(t.textContent.trim()!==PC[i][1]) t.textContent=PC[i][1]; break; } }
+    });
+  }
+  function applySP(){
+    document.querySelectorAll('.p-spMenu a').forEach(function(a){
+      for(var i=0;i<SP.length;i++){ if(tail(a,SP[i][0])){ if(!a.querySelector('.sv-en')){ a.innerHTML='<span class="sv-en">'+SP[i][1]+'</span><span class="sv-ja">'+SP[i][2]+'</span>'; } break; } }
+    });
+  }
+  function apply(){applyPC();applySP();}
+  apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
+})();
+</script>
+</body></html>
