@@ -322,3 +322,25 @@
 })();
 </script>
 <!-- /wp:html -->
+
+<!-- wp:html -->
+<script id="sv-nav-relabel">
+/* このトップページのグローバルナビ表記のみ英字に（フッターや本文リンク・公開中のメニュー設定には触れない） */
+(function(){
+  var MAP=[['/service','SERVICE'],['/company','ABOUT'],['/contact','CONTACT']];
+  function apply(){
+    document.querySelectorAll('.c-gnav a,.l-fixHeader a,.p-spMenu a,.c-spnav a,.c-listMenu a').forEach(function(a){
+      var href=(a.getAttribute('href')||'').replace(/[#?].*$/,'').replace(/\/+$/,'');
+      for(var i=0;i<MAP.length;i++){
+        if(href.slice(-MAP[i][0].length)===MAP[i][0]){
+          var t=a.querySelector('.ttl')||a;
+          if(t.textContent.trim()!==MAP[i][1]) t.textContent=MAP[i][1];
+          break;
+        }
+      }
+    });
+  }
+  apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
+})();
+</script>
+<!-- /wp:html -->
