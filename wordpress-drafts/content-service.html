@@ -100,6 +100,33 @@
 /* big numbered business block */
 .savior-draft .biz-block{padding:80px 0;border-top:1px solid #e5e5e5}
 .savior-draft .biz-block .bignum{font-family:"Montserrat",sans-serif;font-size:.8rem;letter-spacing:.3em;color:#0247b3;margin-bottom:10px;font-weight:600}
+/* ===== RPO事業：採用代行モデル（縦フロー）＋3つの特徴 ===== */
+.savior-draft .rpo-model{max-width:600px;margin:8px auto 0}
+.savior-draft .rpo-model-head{text-align:center;background:linear-gradient(135deg,#0f2350,#0247b3);color:#fff;border-radius:16px 16px 0 0;padding:24px 20px}
+.savior-draft .rpo-model-head .rme{display:block;font:700 2.6rem/1 "Montserrat",sans-serif;letter-spacing:.14em}
+.savior-draft .rpo-model-head .rms{display:inline-block;font-size:.8rem;letter-spacing:.4em;margin-top:10px;opacity:.9}
+.savior-draft .rpo-model-head .rme2{display:block;font-family:"Montserrat",sans-serif;font-size:.86rem;letter-spacing:.32em;margin-top:2px;opacity:.7}
+.savior-draft .rpo-flow{border:1px solid #e5e5e5;border-top:0;border-radius:0 0 16px 16px;background:#eef2f8;padding:28px 20px}
+.savior-draft .rpo-step{position:relative;background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px 18px;box-shadow:0 6px 18px rgba(2,71,179,.06)}
+.savior-draft .rpo-step:not(:last-child){margin-bottom:42px}
+.savior-draft .rpo-step:not(:last-child)::after{content:"";position:absolute;left:50%;bottom:-42px;width:2px;height:42px;background:linear-gradient(#0247b3,#a9c4ef);transform:translateX(-50%)}
+.savior-draft .rpo-step:not(:last-child)::before{content:"";position:absolute;left:50%;bottom:-17px;width:11px;height:11px;border-right:2px solid #0247b3;border-bottom:2px solid #0247b3;transform:translateX(-50%) rotate(45deg);z-index:2}
+.savior-draft .rpo-step-h{display:inline-block;background:#0247b3;color:#fff;font-weight:700;font-size:.92rem;padding:5px 18px;border-radius:999px;margin-bottom:12px}
+.savior-draft .rpo-step-b ul{list-style:none;margin:0;padding:0;text-align:left}
+.savior-draft .rpo-step-b li{position:relative;padding-left:18px;font-size:.92rem;line-height:1.95}
+.savior-draft .rpo-step-b li::before{content:"";position:absolute;left:2px;top:.8em;width:7px;height:7px;border-radius:50%;background:#0247b3}
+.savior-draft .rpo-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.savior-draft .rpo-tags span{font-size:.72rem;color:#0247b3;background:#eaf1fb;border:1px solid #d4e2f7;border-radius:999px;padding:3px 11px}
+.savior-draft .rpo-feats{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.savior-draft .rpo-feat{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:30px 22px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.04)}
+.savior-draft .rpo-feat .rfn{display:block;font:700 2rem/1 "Montserrat",sans-serif;color:#0247b3;letter-spacing:.06em;margin-bottom:4px}
+.savior-draft .rpo-feat .rfk{display:block;font:600 .66rem/1 "Montserrat",sans-serif;letter-spacing:.28em;color:#9bb4d6;margin-bottom:14px}
+.savior-draft .rpo-feat h4{font-size:1.06rem;margin-bottom:10px}
+.savior-draft .rpo-feat p{font-size:.9rem;line-height:1.95;color:#444}
+@media(max-width:720px){
+  .savior-draft .rpo-feats{grid-template-columns:1fr;gap:14px}
+  .savior-draft .rpo-model-head .rme{font-size:2.1rem}
+}
 .savior-draft .biz-block h2{font-size:clamp(1.6rem,4.5vw,2.4rem);font-weight:700;margin-bottom:16px;color:#0f2350}
 .savior-draft .biz-block .lead{color:#0f2350;max-width:760px;margin-bottom:40px}
 .savior-draft .biz-block .lead b{color:#0247b3}
@@ -512,8 +539,8 @@
     <div class="wrap">
       <div class="idx">
         <a href="#jinzai"><span>01</span>人材紹介事業</a>
-        <a href="#food"><span>02</span>飲食店総合プロデュース事業</a>
-        <a href="#rpo"><span>03</span>RPO事業</a>
+        <a href="#rpo"><span>02</span>RPO事業</a>
+        <a href="#food"><span>03</span>飲食店総合プロデュース事業</a>
         <a href="#contact">お問い合わせ</a>
       </div>
     </div>
@@ -602,10 +629,70 @@
     </div>
   </div>
 
-  <!-- BUSINESS 02 飲食店総合プロデュース事業 -->
-  <div class="biz-block bg-soft" id="food">
+  <!-- BUSINESS 02 RPO事業 -->
+  <div class="biz-block bg-soft" id="rpo">
     <div class="wrap">
       <div class="bignum mont">BUSINESS 02</div>
+      <h2>RPO事業</h2>
+      <p class="lead">RPO（採用代行）は、人材を“紹介”するのではなく、<b>貴社の採用チームの一員として、採用業務そのものを代行・運用</b>するサービスです。採用計画の策定から母集団形成、応募対応、選考、内定後フォローまで、採用の実務を一気通貫でお任せいただけます。</p>
+
+      <div class="scheme-head">
+        <div class="kicker">RPO MODEL</div>
+        <h3 class="scheme-title">採用プロセスを、まるごと代行</h3>
+        <p class="scheme-desc">人材紹介が「企業と求職者をつなぐ」のに対し、RPOは採用計画から内定後フォローまで、貴社の採用活動そのものを代行します。</p>
+      </div>
+
+      <div class="rpo-model">
+        <div class="rpo-model-head">
+          <span class="rme">RPO</span>
+          <span class="rms">採用代行</span>
+          <span class="rme2">SERVICE</span>
+        </div>
+        <div class="rpo-flow">
+          <div class="rpo-step">
+            <div class="rpo-step-h">採用計画</div>
+            <div class="rpo-step-b"><ul><li>採用要件の策定</li><li>ペルソナの設計</li></ul></div>
+          </div>
+          <div class="rpo-step">
+            <div class="rpo-step-h">母集団形成</div>
+            <div class="rpo-step-b"><ul><li>求人媒体の運用</li><li>応募促進の施策</li><li>ベンダーコントロール</li></ul><div class="rpo-tags"><span>媒体運用</span><span>応募促進</span></div></div>
+          </div>
+          <div class="rpo-step">
+            <div class="rpo-step-h">応募対応</div>
+            <div class="rpo-step-b"><ul><li>応募受付</li><li>日程調整</li><li>問い合わせ対応 など</li></ul><div class="rpo-tags"><span>一次対応</span><span>日程調整</span></div></div>
+          </div>
+          <div class="rpo-step">
+            <div class="rpo-step-h">書類選考</div>
+            <div class="rpo-step-b"><ul><li>書類選考のサポート</li><li>合否連絡</li></ul><div class="rpo-tags"><span>合否連絡</span><span>日程調整</span></div></div>
+          </div>
+          <div class="rpo-step">
+            <div class="rpo-step-h">面接・選考</div>
+            <div class="rpo-step-b"><ul><li>面接の日程調整・同席</li><li>各種トレーニング</li><li>リファレンスチェック</li></ul><div class="rpo-tags"><span>同席</span><span>合否連絡</span></div></div>
+          </div>
+          <div class="rpo-step">
+            <div class="rpo-step-h">内定・入社</div>
+            <div class="rpo-step-b"><ul><li>条件交渉のサポート</li><li>内定後フォロー</li><li>各種面談</li></ul><div class="rpo-tags"><span>条件交渉</span><span>内定後フォロー</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scheme-head" style="margin-top:56px">
+        <div class="kicker">FEATURES</div>
+        <h3 class="scheme-title">RPOの3つの特徴</h3>
+        <p class="scheme-desc">「母集団を集めて終わり」ではなく、採用の“決定”と“定着”まで見据えて伴走します。</p>
+      </div>
+      <div class="rpo-feats">
+        <div class="rpo-feat"><span class="rfk mont">FEATURE</span><span class="rfn">01</span><h4>採用実務の経験が豊富</h4><p>幅広い採用支援の経験を持つ担当が伴走。現場を理解したうえで、成果につながる採用活動を設計・運用します。</p></div>
+        <div class="rpo-feat"><span class="rfk mont">FEATURE</span><span class="rfn">02</span><h4>必要なときに必要な分だけ</h4><p>採用計画の全体から一部業務のみまで、状況に合わせて柔軟に対応。繁忙期だけ・特定業務だけの依頼も可能です。</p></div>
+        <div class="rpo-feat"><span class="rfk mont">FEATURE</span><span class="rfn">03</span><h4>採用の決定にこだわる</h4><p>候補者を集めて終わりにせず、採用の決定・入社まで見据えて伴走。定着を意識したフォローまで行います。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUSINESS 03 飲食店総合プロデュース事業 -->
+  <div class="biz-block" id="food">
+    <div class="wrap">
+      <div class="bignum mont">BUSINESS 03</div>
       <h2>飲食店総合プロデュース事業</h2>
       <p class="lead">単なるSNS運用代行やコンサルティングではありません。現場を知るプロデューサーが、<b>売上改善から店舗開発、フランチャイズ展開まで一気通貫</b>で伴走します。</p>
       <div class="proc">
@@ -643,104 +730,6 @@
     </div>
   </div>
 
-  <!-- BUSINESS 03 RPO事業 -->
-  <div class="biz-block" id="rpo">
-    <div class="wrap">
-      <div class="bignum mont">BUSINESS 03</div>
-      <h2>RPO事業</h2>
-      <p class="lead">RPO（採用代行）は、企業の採用活動を<b>戦略設計から母集団形成、選考、内定フォローまで一気通貫で代行・支援</b>するサービスです。採用担当者の工数を大きく削減しながら、採用の“成果”にコミットします。</p>
-
-      <div class="scheme-head">
-        <div class="kicker">HOW IT WORKS</div>
-        <h3 class="scheme-title">RPOの仕組み</h3>
-        <p class="scheme-desc">貴社の採用チームの一員として、Saviorが採用業務を代行。企業は「意思決定」に集中し、候補者との出会いを最大化します。</p>
-      </div>
-      <div class="scheme">
-        <div class="node node-side">
-          <div class="node-en">CLIENT</div>
-          <h4>企業</h4>
-          <p>採用したい</p>
-        </div>
-        <div class="conn conn-swap">
-          <span class="conn-top">採用業務をおまかせ<i class="ar ar-r"></i></span>
-          <span class="conn-bot"><i class="ar ar-l"></i>候補者・進捗を報告</span>
-        </div>
-        <div class="node node-hub">
-          <div class="node-en">RPO</div>
-          <h4>Savior</h4>
-          <p>採用業務を代行</p>
-        </div>
-        <div class="conn">
-          <span class="conn-top"><i class="ar ar-l"></i>応募・面接</span>
-          <span class="conn-bot">母集団形成・選考対応<i class="ar ar-r"></i></span>
-        </div>
-        <div class="node node-side">
-          <div class="node-en">CANDIDATE</div>
-          <h4>候補者</h4>
-          <p>母集団</p>
-        </div>
-      </div>
-
-      <div class="scheme-head" style="margin-top:56px">
-        <div class="kicker">SERVICE SCOPE</div>
-        <h3 class="scheme-title">RPOの支援範囲</h3>
-        <p class="scheme-desc">「採用したいが、手が足りない・ノウハウがない」を、採用のプロがまるごと引き受けます。</p>
-      </div>
-      <div class="proc">
-        <div class="proc-step"><div class="s-en">PILLAR 01</div><h4>採用戦略設計</h4><p>要件・計画を固める</p></div>
-        <div class="proc-step"><div class="s-en">PILLAR 02</div><h4>母集団形成</h4><p>候補者を集める</p></div>
-        <div class="proc-step"><div class="s-en">PILLAR 03</div><h4>選考・内定フォロー</h4><p>採用を成功まで導く</p></div>
-      </div>
-
-      <div class="scheme-head" style="margin-top:56px">
-        <div class="kicker">PROCESS</div>
-        <h3 class="scheme-title">採用プロセスの流れ</h3>
-        <p class="scheme-desc">属人化しがちな採用実務を専任担当が代行。採用担当者は「意思決定」に集中できます。</p>
-      </div>
-      <div class="support-flow">
-        <div class="sfx"><span class="sfx-n">01</span><h4>採用要件の整理</h4><p>求める人物像・採用計画を言語化し、ペルソナと要件を明確にします。</p></div>
-        <div class="sfx"><span class="sfx-n">02</span><h4>母集団形成</h4><p>求人媒体・リファラルなどを組み合わせ、候補者を集めます。</p></div>
-        <div class="sfx"><span class="sfx-n">03</span><h4>応募者対応・日程調整</h4><p>応募者への連絡から、面接の日程調整までを代行します。</p></div>
-        <div class="sfx"><span class="sfx-n">04</span><h4>選考・内定フォロー</h4><p>面接同席・条件交渉・内定後の辞退防止まで、入社までを伴走します。</p></div>
-      </div>
-
-      <div class="outcome">
-        <div class="outcome-badges">
-          <span class="ob">採用工数の削減</span>
-          <span class="ob">採用成功率の向上</span>
-        </div>
-        <p>採用実務をまるごと引き受けることで、採用スピードと質の両立を目指します。</p>
-      </div>
-
-      <div class="merit2">
-        <div class="merit-card">
-          <div class="merit-en">FOR COMPANY</div>
-          <h4>企業様のメリット</h4>
-          <ul>
-            <li>採用にかかる工数・負担を大幅に削減できる</li>
-            <li>採用ノウハウがなくてもプロの設計で進められる</li>
-            <li>必要な期間・範囲だけ、柔軟に依頼できる</li>
-          </ul>
-        </div>
-        <div class="merit-card">
-          <div class="merit-en">FOR TEAM</div>
-          <h4>採用チームのメリット</h4>
-          <ul>
-            <li>煩雑な実務から解放され、意思決定に集中できる</li>
-            <li>候補者対応や日程調整の抜け漏れがなくなる</li>
-            <li>母集団形成のノウハウが社内に蓄積される</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="scheme-head" style="margin-top:56px">
-        <div class="kicker">OUR STRENGTH</div>
-        <h3 class="scheme-title">人材紹介で培ったネットワークと知見を、そのまま採用力に。</h3>
-        <p class="scheme-desc">求職者・企業の双方に向き合ってきた人材紹介事業の実績を基盤に、“採れる”要件設計と母集団形成を実現します。単なる代行ではなく、採用を成功させるパートナーとして伴走します。</p>
-      </div>
-    </div>
-  </div>
-
   <!-- CTA + flow -->
   <section id="contact">
     <div class="wrap">
@@ -758,7 +747,7 @@
       </div>
       <div class="cta">
         <h2>事業のご相談は、お気軽に。</h2>
-        <p>人材紹介・飲食店プロデュース・RPO、いずれのご相談も承ります。</p>
+        <p>人材紹介・RPO・飲食店プロデュース、いずれのご相談も承ります。</p>
         <a href="/contact" class="btn">お問い合わせはこちら</a>
       </div>
     </div>
@@ -767,7 +756,7 @@
   <footer>
     <div class="wrap foot">
       <div class="logo"><a href="/" aria-label="トップページへ戻る"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png" alt="株式会社Savior"></a></div>
-      <div class="foot-biz"><a href="#jinzai">人材紹介事業</a> ／ <a href="#food">飲食店総合プロデュース事業</a> ／ <a href="#rpo">RPO事業</a></div>
+      <div class="foot-biz"><a href="#jinzai">人材紹介事業</a> ／ <a href="#rpo">RPO事業</a> ／ <a href="#food">飲食店総合プロデュース事業</a></div>
       <div>© Savior</div>
     </div>
   </footer>

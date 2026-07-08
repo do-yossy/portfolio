@@ -1874,6 +1874,7 @@ header img{
     
     <div class="sv-choose">
       <a href="/service#jinzai" class="temple-btn">人材紹介事業</a>
+      <a href="/service#rpo" class="temple-btn">RPO事業</a>
       <a href="/service#food" class="temple-btn">飲食店総合プロデュース事業</a>
     </div>
   </div>
@@ -1897,6 +1898,7 @@ header img{
   
   <div class="sv-choose animated fadeIn delay-500ms">
     <a href="/service#jinzai" class="temple-btn">人材紹介事業</a>
+      <a href="/service#rpo" class="temple-btn">RPO事業</a>
     <a href="/service#food" class="temple-btn">飲食店総合プロデュース事業</a>
   </div>
 
@@ -2048,6 +2050,9 @@ $(document).ready(function() {
 @media (prefers-reduced-motion: no-preference){
   .sv-rv{opacity:0;transform:translateY(30px);transition:opacity .9s cubic-bezier(.16,.7,.3,1), transform .9s cubic-bezier(.16,.7,.3,1)}
   .sv-rv.sv-in{opacity:1;transform:none}
+  /* 企業理念の3つの図（誠意/熱意/創意）：ふわっと拡大しながら一つずつ出現するおしゃれな演出 */
+  .sv-pop{opacity:0;transform:translateY(26px) scale(.9);transition:opacity 1s cubic-bezier(.2,.75,.25,1), transform 1s cubic-bezier(.2,.75,.25,1)}
+  .sv-pop.sv-in{opacity:1;transform:none}
 }
 </style>
 <script>
@@ -2062,10 +2067,14 @@ $(document).ready(function() {
     });
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('sv-in');io.unobserve(e.target);}});},{threshold:0.12,rootMargin:'0px 0px -8% 0px'});
     function reveal(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-rv');n.style.transitionDelay=Math.min(i,7)*80+'ms';io.observe(n);});}
+    // 図版用：拡大フェードで一つずつ（ステップ大きめ）出現
+    function revealPop(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-pop');n.style.transitionDelay=Math.min(i,5)*150+'ms';io.observe(n);});}
     reveal([document.querySelector('.page-texts')]);
     // 企業理念・代表メッセージ（同一構造の .company-text1 を各カードごとに順次出現）
     document.querySelectorAll('.company-text1').forEach(function(card){
-      reveal(Array.prototype.slice.call(card.querySelectorAll('.p1,.p2,.p4,.p5,.company-img')));
+      reveal(Array.prototype.slice.call(card.querySelectorAll('.p1,.p2,.p4,.p5')));
+      // 企業理念の図（PCは1枚／SPは3枚）をおしゃれにポップ。SPは3つの円が順番に出現。
+      revealPop(Array.prototype.slice.call(card.querySelectorAll('.company-img img')));
     });
     // 企業情報（ラベル＋テーブル行）
     document.querySelectorAll('.company-text2').forEach(function(card){
