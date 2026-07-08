@@ -100,6 +100,27 @@ try { db.exec('ALTER TABLE jobs ADD COLUMN how_to_apply TEXT DEFAULT ""'); } cat
 try { db.exec('ALTER TABLE jobs ADD COLUMN qualifications TEXT DEFAULT ""'); } catch {}   // 対象となる方（応募資格）
 try { db.exec('ALTER TABLE jobs ADD COLUMN benefit TEXT DEFAULT ""'); } catch {}          // 給与補足・待遇（媒体のbenefit欄）
 
+// Migration: 求人ボックス自動改善ループ用
+try { db.exec('ALTER TABLE jobs ADD COLUMN kyujinbox_job_number TEXT DEFAULT ""'); } catch {}   // 求人ボックスの求人番号(例 5922-7577-1618)
+try { db.exec('ALTER TABLE jobs ADD COLUMN optimize_count INTEGER DEFAULT 0'); } catch {}       // AI改善を適用した回数
+try { db.exec('ALTER TABLE jobs ADD COLUMN last_optimized_at TEXT DEFAULT ""'); } catch {}      // 最終改善日時
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS job_metrics (
+    id TEXT PRIMARY KEY,
+    company TEXT NOT NULL DEFAULT 'sq',
+    job_number TEXT NOT NULL DEFAULT '',
+    job_id TEXT DEFAULT NULL,
+    title TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    status TEXT DEFAULT '',
+    views INTEGER DEFAULT 0,
+    applies INTEGER DEFAULT 0,
+    collected_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_job_metrics_co_num ON job_metrics(company, job_number)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_job_metrics_job ON job_metrics(job_id)`);
+} catch {}
+
 // Migration: is_archived フラグ（重複チェック用に保持するが出力対象外）
 try { db.exec('ALTER TABLE applicants ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0'); } catch {}
 
