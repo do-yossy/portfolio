@@ -130,13 +130,39 @@
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<div class="top-texts sv-msg">
+<style id="sv-greeting-css">
+.sv-greeting{text-align:center}
+.sv-greeting .sv-msg-ttl{font-family:"Zen Old Mincho","游明朝",serif;font-weight:600;font-size:clamp(1.6rem,4.2vw,2.6rem);letter-spacing:.16em;color:#0f2350;margin:0 0 1em}
+.sv-greeting>img{max-width:200px;height:auto;margin:0 auto .4em}
+.sv-greeting .sv-msg-body{max-width:760px;margin:1.8em auto 0;text-align:left}
+.sv-greeting .sv-msg-body p{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1rem,2vw,1.14rem);line-height:2.35;letter-spacing:.03em;color:#3a3f4a;margin:0 0 1.7em}
+.sv-greeting .sv-msg-body p.em{color:#0f2350;font-weight:600;font-size:clamp(1.12rem,2.6vw,1.5rem);line-height:1.9;letter-spacing:.05em;margin:1.8em 0}
+.sv-greeting .sv-msg-body p b{color:#0f2350;font-weight:600}
+.sv-greeting .sv-msg-sign{text-align:right;margin:2.6em 0 0}
+</style>
+<div class="top-texts sv-msg sv-greeting">
+  <p class="sv-msg-ttl">代表挨拶</p>
   <img src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png">
-  <p class="mincho">
-株式会社Saviorは、次世代が夢を描き、<br class="sp">その夢に挑戦するための<br class="pc">“きっかけ”を<br class="sp">提供する救世主であることを使命としております。<br><br class="sp sp-custom-br">
-私たちは、この理念を軸に、<br class="sp">次世代のリーダーやイノベーターとなる<br class="sp">人材の発掘と育成に注力し、<br>持続的な社会価値の創造を目指しております。<br><br class="sp sp-custom-br">
-当社の活動を通じて、個人はもちろん<br class="sp">企業や社会全体が革新的な未来を<br class="sp">共創できると確信しており、<br>これからも「可能性の最大化」と<br class="sp">「新たな価値の創出」に邁進してまいります。<br><br class="sp sp-custom-br">
-<span>代表取締役　<img src="https://savior-corporation.com/wp-content/uploads/2025/11/taniguchidaisuke.png" class="boss"></span></p>
+  <div class="sv-msg-body">
+    <p>株式会社Saviorは、「挑戦する人に機会を。挑戦する企業に未来を。」という理念のもと、人・企業・社会が持つ可能性を最大限に引き出し、新たな価値を創造することを使命としています。</p>
+    <p>私はこれまで、多くの方々との出会いを通じて、一つの確信を持つようになりました。</p>
+    <p class="em">人の人生を変えるのは、才能ではなく&ldquo;機会&rdquo;である。</p>
+    <p>どれほど大きな可能性を秘めていても、その力を発揮する環境や、一歩を踏み出すきっかけがなければ、その可能性は埋もれてしまいます。反対に、たった一度の出会い、たった一つの挑戦が、その人の人生や企業の未来を大きく変えることがあります。</p>
+    <p>だからこそ私たちは、「可能性を見つける」のではなく、「可能性が花開く機会を創る」ことに本気で向き合っています。</p>
+    <p>社名である「Savior」には、「救世主」という意味があります。</p>
+    <p>しかし、私たちが目指しているのは、誰かを救う存在になることではありません。</p>
+    <p>私たちが目指すのは、一人でも多くの人や企業が、自ら未来を切り拓き、今度は誰かに機会や希望を与えられる存在へと成長していく、その循環を創ることです。</p>
+    <p>採用支援、人材紹介、事業プロデュース、経営支援。</p>
+    <p>事業は違っても、私たちが届けたい価値は変わりません。</p>
+    <p class="em">それは、「挑戦するきっかけ」を創ること。</p>
+    <p>一人の挑戦が企業を変え、企業の成長が地域を活性化し、その積み重ねが社会をより豊かにしていく。</p>
+    <p>私たちは、その挑戦の連鎖を生み出す起点となり、人と企業が持つ無限の可能性を信じ、ともに未来を創り続けます。</p>
+    <p>株式会社Saviorは、これからも挑戦するすべての人と企業に寄り添い、新たな機会を創造し続ける企業でありたいと考えています。</p>
+    <p>「Saviorがいたから挑戦できた。」</p>
+    <p>そう言っていただける存在を目指し、一歩一歩、誠実に歩み続けてまいります。</p>
+    <p>今後とも、皆様のご支援とご愛顧を賜りますよう、心よりお願い申し上げます。</p>
+    <p class="sv-msg-sign"><span>代表取締役　<img src="https://savior-corporation.com/wp-content/uploads/2025/11/taniguchidaisuke.png" class="boss"></span></p>
+  </div>
 </div>
 <!-- /wp:html -->
 
@@ -244,7 +270,7 @@
     });
     // 代表メッセージ（トップと同じ top-texts をそのまま）：ロゴ→本文を順にフェードアップ
     document.querySelectorAll('.top-texts.sv-msg').forEach(function(m){
-      reveal([m.querySelector('img'), m.querySelector('.mincho')]);
+      reveal([m.querySelector('.sv-msg-ttl'), m.querySelector('img'), m.querySelector('.sv-msg-body')]);
     });
     // 企業情報（ラベル＋テーブル行）
     document.querySelectorAll('.company-text2').forEach(function(card){
