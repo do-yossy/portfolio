@@ -868,3 +868,15 @@
   window.addEventListener('scroll',upd,{passive:true});upd();
 })();
 </script>
+
+<!-- wp:html -->
+<script>
+/* 現在ページのグローバルナビ項目に白い下線(.-current)を付与。固定ヘッダーの複製にも対応。 */
+(function(){
+  var TARGET='/service';
+  function mark(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a){var h=a.getAttribute("href")||"";if(h.indexOf(TARGET)>-1)li.classList.add("-current");}});}
+  mark();setTimeout(mark,300);setTimeout(mark,700);setTimeout(mark,1200);window.addEventListener("load",mark);
+})();
+</script>
+<!-- /wp:html -->
+

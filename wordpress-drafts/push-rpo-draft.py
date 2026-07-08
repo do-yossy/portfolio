@@ -32,6 +32,9 @@ SV_FULLPAGE='''<style id="sv-fullpage">
 #pagetop .c-fixBtn__icon::before{content:"" !important}
 #pagetop .c-fixBtn__icon{display:flex;align-items:center;justify-content:center}
 #pagetop .c-fixBtn__icon::after{content:"";width:10px;height:10px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(-45deg);margin-top:3px}
+/* 現在ページのナビ項目に白い下線を常時表示。WPのcurrent-menu-item と JSの.-current 両対応。content/位置も自前指定でmain.css非依存＝プレビューでも確実表示。 */
+.c-gnav > .-current > a,.c-gnav > .current-menu-item > a,.c-gnav > .current_page_item > a{position:relative}
+.c-gnav > .-current > a::after,.c-gnav > .current-menu-item > a::after,.c-gnav > .current_page_item > a::after{content:"" !important;display:block;position:absolute;left:0;bottom:0;width:100%;height:2px;background:var(--color_header_text);transform:scaleX(1) !important;opacity:1}
 /* 他ページ(/contact等)とヘッダー構造は完全に同一(-body-solid / .l-fixHeader / scrollObserver)。
    よってヘッダーの位置やfixHeaderの表示はテーマ標準のまま一切上書きしない。 */
 /* SWELLテーマが .post_content 内の見出しに付ける装飾（h2の濃紺バー・h3の下線・h4の左ボーダー等）を打ち消し、単体HTMLプレビューと同一表示にする */

@@ -8,8 +8,23 @@
 #pagetop .c-fixBtn__icon::before{content:"" !important}
 #pagetop .c-fixBtn__icon{display:flex;align-items:center;justify-content:center}
 #pagetop .c-fixBtn__icon::after{content:"";width:10px;height:10px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(-45deg);margin-top:3px}
+/* 現在ページのナビ項目に白い下線を常時表示。WPのcurrent-menu-item と JSの.-current 両対応。content/位置も自前指定でmain.css非依存＝プレビューでも確実表示。 */
+.c-gnav > .-current > a,.c-gnav > .current-menu-item > a,.c-gnav > .current_page_item > a{position:relative}
+.c-gnav > .-current > a::after,.c-gnav > .current-menu-item > a::after,.c-gnav > .current_page_item > a::after{content:"" !important;display:block;position:absolute;left:0;bottom:0;width:100%;height:2px;background:var(--color_header_text);transform:scaleX(1) !important;opacity:1}
 </style>
 <!-- /wp:html -->
+
+<!-- wp:html -->
+<script>
+/* 現在ページのグローバルナビ項目に白い下線(.-current)を付与。固定ヘッダーの複製にも対応。 */
+(function(){
+  var TARGET='/contact';
+  function mark(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a){var h=a.getAttribute("href")||"";if(h.indexOf(TARGET)>-1)li.classList.add("-current");}});}
+  mark();setTimeout(mark,300);setTimeout(mark,700);setTimeout(mark,1200);window.addEventListener("load",mark);
+})();
+</script>
+<!-- /wp:html -->
+
 
 <!-- wp:html -->
 <style id="sv-choose-style">
