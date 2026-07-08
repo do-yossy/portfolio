@@ -2120,5 +2120,24 @@ $(document).ready(function() {
   if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init);
 })();
 </script>
-<script>(function(){var T="/company";function m(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a&&(a.getAttribute("href")||"").indexOf(T)>-1)li.classList.add("-current");});}m();setTimeout(m,300);setTimeout(m,800);window.addEventListener("load",m);})();</script>
+<script>
+/* トップと同一のクリック挙動：SERVICE枠は事業名ボタン=各事業/それ以外=/service、COMPANY枠はどこでも/company。 */
+(function(){
+  document.querySelectorAll('.top-service').forEach(function(sec){
+    sec.style.cursor='pointer';
+    sec.addEventListener('click', function(e){
+      if(e.target.closest('a')) return; // 事業名ボタン等のリンクはそのまま
+      window.location.href='/service';
+    });
+  });
+  document.querySelectorAll('.top-company').forEach(function(sec){
+    sec.style.cursor='pointer';
+    sec.addEventListener('click', function(e){
+      if(e.target.closest('a')) return;
+      window.location.href='/company';
+    });
+  });
+})();
+</script>
+<script>(function(){var T="/company";function m(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a&&(a.getAttribute("href")||"").indexOf(T)>-1)li.classList.add("-current");});}m();setTimeout(m,300);window.addEventListener("load",m);})();</script>
 </body></html>

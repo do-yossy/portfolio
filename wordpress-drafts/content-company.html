@@ -249,6 +249,28 @@
 </script>
 <!-- /wp:html -->
 
+<!-- wp:html -->
+<script>
+/* トップと同一のクリック挙動：SERVICE枠は事業名ボタン=各事業/それ以外=/service、COMPANY枠はどこでも/company。 */
+(function(){
+  document.querySelectorAll('.top-service').forEach(function(sec){
+    sec.style.cursor='pointer';
+    sec.addEventListener('click', function(e){
+      if(e.target.closest('a')) return; // 事業名ボタン等のリンクはそのまま
+      window.location.href='/service';
+    });
+  });
+  document.querySelectorAll('.top-company').forEach(function(sec){
+    sec.style.cursor='pointer';
+    sec.addEventListener('click', function(e){
+      if(e.target.closest('a')) return;
+      window.location.href='/company';
+    });
+  });
+})();
+</script>
+<!-- /wp:html -->
+
 <!-- wp:shortcode -->
 [blog_parts id="709"]
 <!-- /wp:shortcode -->
