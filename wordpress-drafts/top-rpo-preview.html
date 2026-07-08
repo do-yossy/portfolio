@@ -1822,9 +1822,6 @@ header img{
 /* ===== hero下の薄めリード（映像の上・今時のミニマル。余白広めでエモく） ===== */
 .sv-lead{padding:clamp(150px,24vw,330px) 6vw clamp(120px,18vw,250px);text-align:center}
 .sv-lead p{font-family:"Zen Old Mincho","游明朝",serif;margin:0 auto;max-width:1120px;color:rgba(255,255,255,.92);font-weight:400;font-size:clamp(1.28rem,2.9vw,2rem);line-height:2.3;letter-spacing:.09em;text-shadow:0 2px 22px rgba(0,0,0,.4);text-wrap:balance}
-/* リード文の改行制御：PCは「挑戦する」の後で2行。モバイル(≤600px)は4行＋行間広めで一行ずつ見せる */
-.sv-lead .sp-br{display:none}
-@media(max-width:600px){.sv-lead .sp-br{display:inline}.sv-lead p{line-height:2.9;text-wrap:normal}}
 /* ===== 汎用スクロールリビール（逆再生防止：transitionは.sv-on側のみ） ===== */
 .sv-reveal{opacity:0;transform:translateY(40px)}
 .sv-reveal.sv-on{opacity:1;transform:none;transition:opacity 1.1s ease,transform 1.35s cubic-bezier(.16,.84,.28,1)}
@@ -1891,6 +1888,9 @@ a.sv-about__head:hover .sv-go,a.sv-kw-head:hover .sv-go{animation-play-state:pau
 .footer-contact .contact-btn::before{content:"" !important;position:absolute !important;top:50% !important;left:auto !important;right:1.6em;width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;transform:translateY(-50%) !important;transition:right .3s}
 .footer-contact .contact-btn::after{display:none !important}
 .footer-contact .contact-btn:hover::before{right:1.1em}
+/* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示 */
+.p-spMenu a .sv-en{display:block;font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.14em;line-height:1.25}
+.p-spMenu a .sv-ja{display:block;font-size:.72em;letter-spacing:.06em;opacity:.68;margin-top:.3em}
 @media(max-width:768px){.sv-hero h1{line-height:1.55}.sv-creed li{line-height:1.9}}
 </style>
 <div id="sv-hero-bg" aria-hidden="true">
@@ -1908,7 +1908,7 @@ a.sv-about__head:hover .sv-go,a.sv-kw-head:hover .sv-go{animation-play-state:pau
 <div class="sv-hero-spacer"></div>
 <div class="sv-over-video">
 <section class="sv-lead sv-reveal">
-  <p>私たちは、人と企業の<br class="sp-br">可能性を信じ、挑戦する<br>&ldquo;きっかけ&rdquo;を創り続ける<br class="sp-br">ビジネスパートナーです。</p>
+  <p>私たちは、人と企業の可能性を信じ、挑戦する<br>&ldquo;きっかけ&rdquo;を創り続けるビジネスパートナーです。</p>
 </section>
 <section class="sv-believe">
   <div class="sv-believe__in">
@@ -1944,87 +1944,6 @@ a.sv-about__head:hover .sv-go,a.sv-kw-head:hover .sv-go{animation-play-state:pau
 </section>
 </div><!-- /.sv-over-video -->
 <div class="top-over">
-
-<div class="top-service bg-gray pc">
-
-  <div class="image animated fadeIn delay-500ms">
-    <img decoding="async" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp" class="lazyload" ><noscript><img decoding="async" src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp"></noscript>
-  </div>
-
-  <div class="texts animated fadeIn delay-500ms">
-    <p class="p1">事業案内</p>
-    <p class="p2 mont">SERVICE</p>
-    <p class="p3"></p>
-    <div class="sv-choose">
-      <a href="/service#jinzai" class="temple-btn">人材紹介事業</a>
-      <a href="/service#rpo" class="temple-btn">RPO事業</a>
-      <a href="/service#food" class="temple-btn">飲食店総合プロデュース事業</a>
-    </div>
-  </div>
-
-</div>
-
-
-
-<div class="top-service bg-gray sp">
-
-  <div class="texts animated fadeIn delay-500ms">
-    <p class="p1">事業案内</p>
-    <p class="p2 mont">SERVICE</p>
-    <p class="p3"></p>
-  </div>
-
-  <div class="image animated fadeIn delay-500ms">
-    <img decoding="async" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp" class="lazyload" ><noscript><img decoding="async" src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp"></noscript>
-  </div>
-
-  <div class="sv-choose animated fadeIn delay-500ms">
-    <a href="/service#jinzai" class="temple-btn">人材紹介事業</a>
-      <a href="/service#rpo" class="temple-btn">RPO事業</a>
-    <a href="/service#food" class="temple-btn">飲食店総合プロデュース事業</a>
-  </div>
-
-</div>
-
-
-
-<div class="top-company pc">
-
-  <div class="texts animated fadeIn delay-500ms">
-    <p class="p1">会社概要</p>
-    <p class="p2 mont">COMPANY</p>
-    <p class="p3"></p>
-    <p class="p4">若年層の可能性を信じ、<br>社会に貢献することを促進することに情熱を注いでいます。</p>
-    <a href="/company" class="temple-btn">私たちについて</a>
-  </div>
-
-  <div class="image animated fadeIn delay-500ms">
-    <img decoding="async" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp" class="lazyload" ><noscript><img decoding="async" src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp"></noscript>
-  </div>
-
-</div>
-
-
-
-<div class="top-company sp">
-
-  <div class="texts animated fadeIn delay-500ms">
-    <p class="p1">会社概要</p>
-    <p class="p2 mont">COMPANY</p>
-    <p class="p3"></p>
-  </div>
-
-  <div class="image animated fadeIn delay-500ms">
-    <img decoding="async" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp" class="lazyload" ><noscript><img decoding="async" src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp"></noscript>
-  </div>
-
-  <p class="p4 animated fadeIn delay-500ms">若年層の可能性を信じ、社会に貢献することを促進することに情熱を注いでいます。</p>
-  <a href="/company" class="temple-btn animated fadeIn delay-500ms">私たちについて</a>
-
-</div>
-
-
-
 
 <div class="p-blogParts post_content" data-partsID="709">
 <div class="footer-contact">
@@ -2305,21 +2224,22 @@ $('#slider').vegas({
 })();
 </script>
 <script id="sv-nav-relabel">
-/* このトップページのグローバルナビ表記のみ英字に（フッターや本文リンク・公開中のメニュー設定には触れない） */
+/* このトップページのみ：PCナビは英字表記、モバイルのドロワーは「英字＋日本語」の2段表示に（公開中のメニュー設定には触れない） */
 (function(){
-  var MAP=[['/service','SERVICE'],['/company','ABOUT'],['/contact','CONTACT']];
-  function apply(){
-    document.querySelectorAll('.c-gnav a,.l-fixHeader a,.p-spMenu a,.c-spnav a,.c-listMenu a').forEach(function(a){
-      var href=(a.getAttribute('href')||'').replace(/[#?].*$/,'').replace(/\/+$/,'');
-      for(var i=0;i<MAP.length;i++){
-        if(href.slice(-MAP[i][0].length)===MAP[i][0]){
-          var t=a.querySelector('.ttl')||a;
-          if(t.textContent.trim()!==MAP[i][1]) t.textContent=MAP[i][1];
-          break;
-        }
-      }
+  var PC=[['/service','SERVICE'],['/company','ABOUT'],['/contact','CONTACT']];
+  var SP=[['/service','SERVICE','事業内容'],['/company','ABOUT','会社概要'],['/contact','CONTACT','お問い合わせ'],['/policy','PRIVACY POLICY','プライバシーポリシー'],['/privacy','PRIVACY POLICY','プライバシーポリシー']];
+  function tail(a,path){var h=(a.getAttribute('href')||'').replace(/[#?].*$/,'').replace(/\/+$/,'');return h.slice(-path.length)===path;}
+  function applyPC(){
+    document.querySelectorAll('.c-gnav a').forEach(function(a){
+      for(var i=0;i<PC.length;i++){ if(tail(a,PC[i][0])){ var t=a.querySelector('.ttl')||a; if(t.textContent.trim()!==PC[i][1]) t.textContent=PC[i][1]; break; } }
     });
   }
+  function applySP(){
+    document.querySelectorAll('.p-spMenu a').forEach(function(a){
+      for(var i=0;i<SP.length;i++){ if(tail(a,SP[i][0])){ if(!a.querySelector('.sv-en')){ a.innerHTML='<span class="sv-en">'+SP[i][1]+'</span><span class="sv-ja">'+SP[i][2]+'</span>'; } break; } }
+    });
+  }
+  function apply(){applyPC();applySP();}
   apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
 })();
 </script>
