@@ -59,10 +59,10 @@
   <p class="p4">「未来の歯車となる、<br class="sp">若き救世主を発掘する」</p>
   <p class="p5">株式会社Saviorは、人々、企業、<br class="sp">そして社会全体の調和を促進し、<br>持続可能な社会発展を支援することを目指しています。<br class="sp-custom-br">当社は、特に若い世代の中から<br class="sp">未来を担うリーダーやイノベーターを発掘し、<br>彼らが人々、企業、社会との連携で<br class="sp">変革をもたらす力を引き出すことに注力しています。</p>
   <div class="company-img animated fadeIn delay-500ms">
-    <img src="https://savior-corporation.com/wp-content/uploads/2024/05/fix-texts.png" class="pc">
-    <img src="https://savior-corporation.com/wp-content/uploads/2024/05/fix-texts-1.png" class="sp">
-    <img src="https://savior-corporation.com/wp-content/uploads/2024/05/fix-texts-2.png" class="sp">
-    <img src="https://savior-corporation.com/wp-content/uploads/2024/05/fix-texts-3.png" class="sp">
+    <img src="https://savior-corporation.com/wp-content/uploads/2024/05/fix-texts.png" width="1824" height="1084" class="pc">
+    <img src="https://savior-corporation.com/wp-content/uploads/2024/05/fix-texts-1.png" width="896" height="568" class="sp">
+    <img src="https://savior-corporation.com/wp-content/uploads/2024/05/fix-texts-2.png" width="856" height="568" class="sp">
+    <img src="https://savior-corporation.com/wp-content/uploads/2024/05/fix-texts-3.png" width="838" height="568" class="sp">
   </div><br>
 </div>
 
@@ -181,11 +181,13 @@
   .sv-rv{opacity:0;transform:translateY(52px)}
   .sv-rv.sv-in{opacity:1;transform:none;transition:opacity 1s cubic-bezier(.16,.7,.3,1), transform 1.05s cubic-bezier(.16,.7,.3,1)}
   /* 企業理念の3つの図（誠意/熱意/創意）：左右それぞれの方向から大きく・ゆっくり1つずつスライドインし、その後ゆっくり浮遊 */
-  .sv-dir{opacity:0}
-  .sv-dir.sv-fromL{transform:translateX(-72%) scale(.86)}
-  .sv-dir.sv-fromR{transform:translateX(72%) scale(.86)}
+  /* 隠し状態は transition:none（テーマが画像に掛けるtransitionで初期オフセット適用時に勝手にスライドアウト＆早期発火するのを防止）。 */
+  .sv-dir{opacity:0;transition:none !important}
+  /* 距離は vw で指定（画像のlazyloadで幅0でも成立。%だとスライドが消える） */
+  .sv-dir.sv-fromL{transform:translateX(-60vw) scale(.86)}
+  .sv-dir.sv-fromR{transform:translateX(60vw) scale(.86)}
   .sv-dir.sv-fromB{transform:translateY(120px) scale(.86)}
-  .sv-dir.sv-in{opacity:1;transform:none;transition:opacity 1.6s ease, transform 2.3s cubic-bezier(.2,.7,.25,1)}
+  .sv-dir.sv-in{opacity:1;transform:none;transition:opacity 1.6s ease, transform 2.3s cubic-bezier(.2,.7,.25,1) !important}
   /* 登場完了後の常時ふわふわ（円ごとに位相をずらす・振れ幅大きめ） */
   .sv-float{animation:sv-bob 4.4s ease-in-out var(--fd,0s) infinite}
   @keyframes sv-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
@@ -208,9 +210,15 @@
     // 図版用：左右それぞれの方向から1つずつスライドイン。list=[PC1枚, SP誠意, SP熱意, SP創意]。
     // SPの3円は 左→右→左 と双方向から交互に。PCの1枚は下から。登場後は浮遊へ。
     var DIRS=['sv-fromB','sv-fromL','sv-fromR','sv-fromL','sv-fromR'];
+    // 円専用オブザーバ：lazyload画像の縮みで読込時に円が初期表示域へ入り込み、誤ってアニメが再生される問題を防ぐため、
+    // 「まだスクロールしておらず、要素が画面の上半分に来ている」場合は無視（監視は継続）＝実際にスクロールして下から入った時だけ発火。
+    var userScrolled=false; window.addEventListener('scroll', function(){userScrolled=true;}, {passive:true});
+    var ioDir=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;var t=e.target;
+      if(!userScrolled) return; // スクロール前は発火させない（読込時の縮み誤検出を確実に回避）。監視は継続し、スクロール後に入った時だけ発火。
+      ioDir.unobserve(t);requestAnimationFrame(function(){requestAnimationFrame(function(){t.classList.add('sv-in');});});});},{threshold:0.14,rootMargin:'0px 0px -10% 0px'});
     function revealDir(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-dir', DIRS[i]||'sv-fromB');n.style.transitionDelay=Math.min(i,5)*260+'ms';
       n.addEventListener('transitionend',function te(e){if(e.propertyName!=='transform')return;n.removeEventListener('transitionend',te);n.style.transitionDelay='';n.style.setProperty('--fd',(i*0.5)+'s');n.classList.add('sv-float');});
-      io.observe(n);});}
+      ioDir.observe(n);});}
     // ページ最上部のタイトル(COMPANY / 会社概要)を、ページを開いた時の"最初の動き"として先に出す
     reveal([document.querySelector('.page-texts .p1'), document.querySelector('.page-texts .p2')]);
     // 企業理念・代表メッセージ（同一構造の .company-text1 を各カードごとに順次出現）
