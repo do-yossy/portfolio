@@ -142,7 +142,7 @@
 /* PC：横並び（横長）。ステップ間は横線＋▶（塗り三角）。 */
 .savior-draft .rpo-flow{border:1px solid #e5e5e5;border-top:0;border-radius:0 0 16px 16px;background:#eef2f8;padding:30px 22px;display:flex;flex-direction:row;align-items:stretch;gap:38px}
 .savior-draft .rpo-step{position:relative;flex:1;min-width:0;background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px 14px;box-shadow:0 6px 18px rgba(2,71,179,.06)}
-.savior-draft .rpo-step:not(:last-child)::after{content:"";position:absolute;top:50%;left:100%;width:38px;height:2px;background:linear-gradient(90deg,#0247b3,#6f9de6);transform:translateY(-50%)}
+.savior-draft .rpo-step:not(:last-child)::after{content:none}
 .savior-draft .rpo-step:not(:last-child)::before{content:"";position:absolute;top:50%;left:100%;margin-left:12px;width:0;height:0;border-top:9px solid transparent;border-bottom:9px solid transparent;border-left:14px solid #0247b3;transform:translateY(-50%);z-index:2}
 .savior-draft .rpo-step-h{display:inline-block;background:#0247b3;color:#fff;font-weight:700;font-size:.92rem;padding:5px 18px;border-radius:999px;margin-bottom:12px}
 .savior-draft .rpo-step-b ul{list-style:none;margin:0;padding:0;text-align:left}
@@ -155,8 +155,8 @@
   .savior-draft .rpo-model{max-width:600px}
   .savior-draft .rpo-flow{flex-direction:column;gap:42px;padding:28px 20px}
   .savior-draft .rpo-step{flex:none}
-  .savior-draft .rpo-step:not(:last-child)::after{top:100%;left:50%;width:2px;height:24px;background:linear-gradient(#0247b3,#6f9de6);transform:translateX(-50%)}
-  .savior-draft .rpo-step:not(:last-child)::before{top:auto;bottom:-42px;left:50%;margin-left:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:14px solid #0247b3;border-bottom:0;transform:translateX(-50%)}
+  .savior-draft .rpo-step:not(:last-child)::after{content:none}
+  .savior-draft .rpo-step:not(:last-child)::before{top:auto;bottom:-30px;left:50%;margin-left:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:14px solid #0247b3;border-bottom:0;transform:translateX(-50%)}
 }
 .savior-draft .rpo-feats{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .savior-draft .rpo-feat{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:30px 22px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.04)}
@@ -395,7 +395,7 @@
 @media(max-width:820px){.savior-draft .scheme-flow{grid-template-columns:1fr 1fr 1fr}}
 @media(max-width:520px){.savior-draft .scheme-flow{grid-template-columns:1fr 1fr}}
 .savior-draft .sf{background:#f5f5f5;border-radius:10px;padding:18px 12px;text-align:center;position:relative}
-.savior-draft .sf:not(:last-child)::after{content:"›";position:absolute;right:-8px;top:50%;transform:translateY(-50%);color:#0247b3;font-weight:700;z-index:2}
+.savior-draft .sf:not(:last-child)::after{content:"";width:0;height:0;border-left:8px solid #0247b3;border-top:5px solid transparent;border-bottom:5px solid transparent;position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2}
 @media(max-width:820px){.savior-draft .sf:not(:last-child)::after{content:none}}
 .savior-draft .sf .sf-n{display:block;color:#0247b3;font-weight:700;font-size:1.15rem;margin-bottom:6px;font-family:"Montserrat",sans-serif}
 .savior-draft .sf .t{color:#0f2350;font-size:.8rem;line-height:1.5}
@@ -406,7 +406,7 @@
 @media(max-width:820px){.savior-draft .support-flow{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.savior-draft .support-flow{grid-template-columns:1fr}}
 .savior-draft .sfx{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:24px 20px;position:relative;box-shadow:0 6px 20px rgba(0,0,0,.04)}
-.savior-draft .sfx:not(:last-child)::after{content:"›";position:absolute;right:-11px;top:50%;transform:translateY(-50%);color:#0247b3;font-weight:700;font-size:1.3rem;z-index:2}
+.savior-draft .sfx:not(:last-child)::after{content:"";width:0;height:0;border-left:11px solid #0247b3;border-top:7px solid transparent;border-bottom:7px solid transparent;position:absolute;right:-14px;top:50%;transform:translateY(-50%);z-index:2}
 @media(max-width:820px){.savior-draft .sfx:not(:last-child)::after{content:none}}
 .savior-draft .sfx-n{display:block;font-family:"Montserrat",sans-serif;font-weight:700;color:#0247b3;font-size:1.4rem;margin-bottom:10px}
 .savior-draft .sfx h4{color:#0f2350;font-size:1.05rem;margin-bottom:8px}

@@ -15,6 +15,7 @@
 .sp-header-bar{background:rgba(15,35,80,.75) !important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 /* SERVICEボタン(temple-btn)の矢印の先端を塗り三角(▶)に統一（線＋▶）。他の矢印(仕組み図/RPO/PILLAR)と統一。 */
 .temple-btn::before{width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;top:50% !important;transform:translateY(-50%) !important}
+.temple-btn::after{display:none !important} /* 線(シャフト)を消して▶だけに */
 </style>
 <!-- /wp:html -->
 
@@ -265,6 +266,14 @@
     sec.addEventListener('click', function(e){
       if(e.target.closest('a')) return;
       window.location.href='/company';
+    });
+  });
+  /* お問い合わせ(CONTACT)枠(.footer-contact)：どこを押しても/contactへ。 */
+  document.querySelectorAll('.footer-contact').forEach(function(sec){
+    sec.style.cursor='pointer';
+    sec.addEventListener('click', function(e){
+      if(e.target.closest('a')) return;
+      window.location.href='/contact';
     });
   });
 })();
