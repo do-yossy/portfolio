@@ -1838,9 +1838,9 @@ a.sv-about__head,a.sv-kw-head{cursor:pointer;text-decoration:none !important;col
 a.sv-about__head:hover .sv-about__ttl,a.sv-kw-head:hover .sv-kw-word{color:#fff;text-shadow:0 2px 26px rgba(130,185,255,.6)}
 a.sv-about__head:hover .sv-about__bg,a.sv-kw-head:hover .sv-kw-bg{color:rgba(160,200,255,.3)}
 /* リンク見出し（Saviorについて / 当社のサービス）は「押せる」と伝えるためゴシック体＋矢印＋点滅 */
-.sv-about__ttl,.sv-kw-word{font-family:"游ゴシック体","Yu Gothic",YuGothic,"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",Meiryo,sans-serif !important;font-weight:800;letter-spacing:.08em}
-/* 矢印は三角系（塗り三角▶）のおしゃれな素材。CSS描画でくっきり。点滅で誘導 */
-.sv-go{display:inline-block;width:0;height:0;margin-left:.6em;border-top:.32em solid transparent;border-bottom:.32em solid transparent;border-left:.5em solid #9cc4ff;vertical-align:middle;filter:drop-shadow(0 2px 8px rgba(120,180,255,.45));animation:sv-go-pulse 1.5s ease-in-out infinite}
+.sv-about__ttl,.sv-kw-word{font-family:"游ゴシック体","Yu Gothic",YuGothic,"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",Meiryo,sans-serif !important;font-weight:800 !important;letter-spacing:.08em !important}
+/* 矢印は三角系（塗り三角▶）のおしゃれな素材。CSS描画でくっきり。点滅で誘導。文字の中心に合わせて微調整 */
+.sv-go{display:inline-block;width:0;height:0;margin-left:.55em;border-top:.34em solid transparent;border-bottom:.34em solid transparent;border-left:.52em solid #9cc4ff;position:relative;top:-.09em;vertical-align:middle;filter:drop-shadow(0 2px 8px rgba(120,180,255,.45));animation:sv-go-pulse 1.5s ease-in-out infinite}
 @keyframes sv-go-pulse{0%,100%{transform:translateX(0);opacity:.55}50%{transform:translateX(7px);opacity:1}}
 a.sv-about__head:hover .sv-go,a.sv-kw-head:hover .sv-go{animation-play-state:paused;transform:translateX(9px);opacity:1;border-left-color:#cfe4ff}
 /* ふわっと現れる（ソフトなフェード＋わずかな拡大＋ぼかし抜け） */
@@ -1884,6 +1884,10 @@ a.sv-about__head:hover .sv-go,a.sv-kw-head:hover .sv-go{animation-play-state:pau
 .sv-about__punch.sv-em{margin-top:clamp(22px,3.4vw,42px)}
 /* このトップページのみ：共有フッターの住所ブロックを非表示（公開中の他ページ・フッター設定には触れない） */
 .footer-main .address{display:none !important}
+/* フッターCONTACT(お問い合わせ)ボタンの線矢印を、他と同じ塗り三角▶に統一（線は消す） */
+.footer-contact .contact-btn::before{content:"" !important;position:absolute !important;top:50% !important;left:auto !important;right:1.6em;width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;transform:translateY(-50%) !important;transition:right .3s}
+.footer-contact .contact-btn::after{display:none !important}
+.footer-contact .contact-btn:hover::before{right:1.1em}
 @media(max-width:768px){.sv-hero h1{line-height:1.55}.sv-creed li{line-height:1.9}}
 </style>
 <div id="sv-hero-bg" aria-hidden="true">
