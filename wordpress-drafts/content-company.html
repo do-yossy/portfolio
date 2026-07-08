@@ -47,20 +47,28 @@
 <style id="sv-pagehead">
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定） */
 .page-tops{background-attachment:fixed !important}
-/* タイトル：会社概要の背後に半透明「ABOUT」を重ねる（トップのSaviorについてと同じ手法） */
-.page-texts .sv-page-wm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0;font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.05em;font-size:clamp(3.6rem,13vw,7.8rem);line-height:1;white-space:nowrap;color:rgba(255,255,255,.34);pointer-events:none;-webkit-user-select:none;user-select:none}
-.page-texts .p2{position:relative;z-index:1;font-weight:bold;font-size:clamp(1.4rem,3.6vw,2.1rem);letter-spacing:.12em}
+/* 企業情報カード：width:93vw+左右padding(5vw)が103vwとなりモバイルで横スクロールを生むためborder-box化 */
+.company-details .company-text2{box-sizing:border-box !important;max-width:100%}
+/* タイトル：事業内容ページのヒーローと統一（ラベル／大きな英字／キャッチの3段構成） */
+.page-texts{position:relative;z-index:1;text-align:center}
+.page-texts .h3-label{font-family:"Montserrat",sans-serif;font-size:clamp(.62rem,1.8vw,.8rem);letter-spacing:.35em;color:#9fc0ff;margin:0 0 18px;text-transform:uppercase}
+.page-texts .h3-en{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3rem,11vw,6rem);line-height:1;letter-spacing:.03em;color:#fff;margin:0;text-shadow:0 2px 24px rgba(0,0,0,.45)}
+.page-texts .h3-catch{margin:24px 0 0;color:#fff;font-size:clamp(1.2rem,3.6vw,2rem);line-height:1.5;letter-spacing:.06em;font-weight:700;text-shadow:0 2px 18px rgba(0,0,0,.5)}
+.page-texts .h3-catch .hl{color:#8fb4ff}
 /* フッターをトップと統一：住所を非表示、CONTACTボタンの矢印を塗り三角▶に */
 .footer-main .address{display:none !important}
 .footer-contact .contact-btn::before{content:"" !important;position:absolute !important;top:50% !important;left:auto !important;right:1.6em;width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;transform:translateY(-50%) !important;transition:right .3s}
 .footer-contact .contact-btn::after{display:none !important}
 .footer-contact .contact-btn:hover::before{right:1.1em}
+/* モバイル：フッターCONTACTボタンの左右パディング(5rem)が画面幅を超えて横スクロールを生むため縮小 */
+@media(max-width:600px){.footer-contact .contact-btn{padding-left:1.6rem !important;padding-right:2.6rem !important;max-width:100% !important;box-sizing:border-box !important}}
 </style>
 <div class="page-tops page-top2 animated fadeIn delay-200ms">
 </div>
 <div class="page-texts">
-  <span class="sv-page-wm" aria-hidden="true">ABOUT</span>
-  <p class="p2">会社概要</p>
+  <p class="h3-label">COMPANY</p>
+  <p class="h3-en">ABOUT</p>
+  <p class="h3-catch">人と企業の可能性を、<span class="hl">最大化</span>する。</p>
 </div>
 <!-- /wp:html -->
 
@@ -139,6 +147,8 @@
 .sv-greeting .sv-msg-body p.em{color:#0f2350;font-weight:600;font-size:clamp(1.12rem,2.6vw,1.5rem);line-height:1.9;letter-spacing:.05em;margin:1.8em 0}
 .sv-greeting .sv-msg-body p b{color:#0f2350;font-weight:600}
 .sv-greeting .sv-msg-sign{text-align:right;margin:2.6em 0 0}
+.sv-greeting .sv-msg-sign span{display:inline-flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:.2em;max-width:100%}
+.sv-greeting .sv-msg-sign img.boss{max-width:min(240px,70%);height:auto;vertical-align:middle}
 @media(max-width:600px){.sv-greeting .msg-en{font-size:clamp(1.6rem,8vw,2.6rem);-webkit-text-stroke-width:1.2px;text-stroke-width:1.2px}}
 </style>
 <div class="top-texts sv-msg sv-greeting">
@@ -261,8 +271,8 @@
     function revealDir(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-dir', DIRS[i]||'sv-fromB');n.style.transitionDelay=Math.min(i,5)*260+'ms';
       n.addEventListener('transitionend',function te(e){if(e.propertyName!=='transform')return;n.removeEventListener('transitionend',te);n.style.transitionDelay='';n.style.setProperty('--fd',(i*0.5)+'s');n.classList.add('sv-float');});
       ioDir.observe(n);});}
-    // ページ最上部のタイトル(COMPANY / 会社概要)を、ページを開いた時の"最初の動き"として先に出す
-    reveal([document.querySelector('.page-texts .p1'), document.querySelector('.page-texts .p2')]);
+    // ページ最上部のタイトル(COMPANY / ABOUT / キャッチ)を、ページを開いた時の"最初の動き"として先に出す
+    reveal([document.querySelector('.page-texts .h3-label'), document.querySelector('.page-texts .h3-en'), document.querySelector('.page-texts .h3-catch')]);
     // 企業理念・代表メッセージ（同一構造の .company-text1 を各カードごとに順次出現）
     document.querySelectorAll('.company-text1').forEach(function(card){
       reveal(Array.prototype.slice.call(card.querySelectorAll('.p1,.p2,.p4,.p5')));

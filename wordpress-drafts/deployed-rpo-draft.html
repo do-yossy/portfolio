@@ -587,7 +587,6 @@
         <a href="#jinzai"><span>01</span>人材紹介事業</a>
         <a href="#rpo"><span>02</span>RPO事業</a>
         <a href="#food"><span>03</span>飲食店総合プロデュース事業</a>
-        <a href="#contact">お問い合わせ</a>
       </div>
     </div>
   </section>
@@ -795,6 +794,11 @@
 .footer-contact .contact-btn::after{display:none !important}
 .footer-contact .contact-btn:hover::before{right:1.1em}
 .footer-main .address{display:none !important}
+/* 会社概要ページと同じテーマフッターのコピーライトを再現（このページのみ／テーマ設定には触れない） */
+.sv-copyright{background:#0f2350;color:#fff;text-align:center;margin:0;padding:26px 20px;font-size:13px;letter-spacing:.08em;line-height:1.7;width:100vw;margin-left:calc(50% - 50vw);box-sizing:border-box}
+.sv-copyright span[lang=en]{margin-right:.45em}
+/* モバイル：フッターCONTACTボタンの左右パディング(5rem)が画面幅を超えて横スクロールを生むため縮小 */
+@media(max-width:600px){.footer-contact .contact-btn{padding-left:1.6rem !important;padding-right:2.6rem !important;max-width:100% !important;box-sizing:border-box !important}}
 </style>
 <div class="footer-contact">
   <div class="wrap">
@@ -811,6 +815,7 @@
 　　　　  <a href="/policy">プライバシーポリシー</a>
   </div>
 </div>
+<p class="sv-copyright"><span lang="en">&copy;</span>株式会社Savior</p>
 <style id="sd-motion">
 /* ===== Savior 下書き モーション（参考サイト monolith-gr.com 準拠のスクロール出現アニメ） ===== */
 @media (prefers-reduced-motion:no-preference){

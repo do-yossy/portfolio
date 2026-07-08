@@ -1888,6 +1888,11 @@ a.sv-about__head:hover .sv-go,a.sv-kw-head:hover .sv-go{animation-play-state:pau
 .footer-contact .contact-btn::before{content:"" !important;position:absolute !important;top:50% !important;left:auto !important;right:1.6em;width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;transform:translateY(-50%) !important;transition:right .3s}
 .footer-contact .contact-btn::after{display:none !important}
 .footer-contact .contact-btn:hover::before{right:1.1em}
+/* このトップページのみ：会社概要ページと同じテーマフッターのコピーライトを再現（他ページ・テーマ設定には触れない） */
+.sv-copyright{background:#0f2350;color:#fff;text-align:center;margin:0;padding:26px 20px;font-size:13px;letter-spacing:.08em;line-height:1.7;width:100vw;margin-left:calc(50% - 50vw);box-sizing:border-box}
+.sv-copyright span[lang=en]{margin-right:.45em}
+/* モバイル：フッターCONTACTボタンの左右パディング(5rem)が画面幅を超えて横スクロールを生むため縮小 */
+@media(max-width:600px){.footer-contact .contact-btn{padding-left:1.6rem !important;padding-right:2.6rem !important;max-width:100% !important;box-sizing:border-box !important}}
 /* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示 */
 .p-spMenu a .sv-en{display:block;font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.14em;line-height:1.25}
 .p-spMenu a .sv-ja{display:block;font-size:.72em;letter-spacing:.06em;opacity:.68;margin-top:.3em}
@@ -1970,6 +1975,7 @@ a.sv-about__head:hover .sv-go,a.sv-kw-head:hover .sv-go{animation-play-state:pau
     <p>ツイン21 MIDタワー38階</p>
   </div>
 </div>
+<p class="sv-copyright"><span lang="en">&copy;</span>株式会社Savior</p>
 </div>
 		</div>
 			</div>
