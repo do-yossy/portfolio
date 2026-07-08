@@ -1842,6 +1842,24 @@ header img{
 .sv-creed li.sv-final{margin-top:clamp(70px,10vw,130px);font-size:clamp(1.06rem,2.5vw,1.66rem);color:rgba(255,255,255,.88)}
 .sv-creed li.sv-final b{font-weight:500;background:linear-gradient(90deg,#8fd0ff,#6f9de6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .sv-creed li.sv-on{opacity:1;transform:none;filter:blur(0);letter-spacing:.11em;transition:opacity 1.3s ease,transform 1.75s cubic-bezier(.16,.84,.28,1),filter 1.4s ease,letter-spacing 1.85s cubic-bezier(.16,.84,.28,1)}
+/* ===== Saviorとは（映像の上・エモく／We Believeと同じ世界観） ===== */
+.sv-grad{background:linear-gradient(90deg,#8fd0ff,#6f9de6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.sv-about{position:relative;color:#fff;padding:clamp(150px,24vw,330px) 6vw clamp(150px,22vw,300px)}
+.sv-about__in{position:relative;max-width:1000px;margin:0 auto;text-align:center}
+.sv-about__kicker{font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.44em;font-size:clamp(.88rem,1.9vw,1.14rem);color:#9cc4ff;margin:0 0 1em;padding-left:.44em;text-shadow:0 2px 18px rgba(0,0,0,.45)}
+.sv-about__ttl{font-family:"Zen Old Mincho","游明朝",serif;font-weight:500;letter-spacing:.12em;font-size:clamp(2rem,5vw,3.4rem);color:#fff;margin:0 0 clamp(56px,8vw,112px);text-shadow:0 3px 26px rgba(0,0,0,.5);background:none !important;border:none !important;padding:0 !important}
+/* テーマ(SWELL)のh2装飾（濃紺バー・上下ボーダー）を打ち消す */
+.sv-about__ttl::before,.sv-about__ttl::after{content:none !important;display:none !important;border:none !important;background:none !important}
+.sv-about__lead{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.1rem,2.5vw,1.66rem);line-height:2.35;letter-spacing:.12em;color:rgba(255,255,255,.9);margin:0;text-shadow:0 2px 20px rgba(0,0,0,.45)}
+.sv-kw{list-style:none;margin:clamp(26px,4vw,46px) 0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(18px,4vw,54px)}
+.sv-kw li{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.44rem,3.6vw,2.5rem);font-weight:500;letter-spacing:.08em;color:#fff;position:relative;text-shadow:0 3px 26px rgba(0,0,0,.5);opacity:0;transform:translateY(30px) scale(.96);filter:blur(8px);will-change:opacity,transform,filter}
+.sv-kw li::before{content:none !important;display:none !important}
+.sv-kw li::after{content:"";position:absolute;left:8%;right:8%;bottom:-.34em;height:2px;background:linear-gradient(90deg,#8fd0ff,#6f9de6);border-radius:2px;transform:scaleX(0);transform-origin:center}
+.sv-kw li.sv-on{opacity:1;transform:none;filter:blur(0);transition:opacity 1.05s ease,transform 1.3s cubic-bezier(.16,.84,.28,1),filter 1.15s ease}
+.sv-kw li.sv-on::after{transform:scaleX(1);transition:transform 1s cubic-bezier(.16,.84,.28,1) .28s}
+.sv-about__gap{height:clamp(60px,9vw,120px)}
+.sv-about__punch{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.14rem,2.7vw,1.78rem);line-height:2.25;letter-spacing:.1em;color:rgba(255,255,255,.92);margin:0;text-shadow:0 2px 20px rgba(0,0,0,.45)}
+.sv-about__punch.sv-em{margin-top:clamp(22px,3.4vw,42px);font-size:clamp(1.34rem,3.2vw,2.16rem)}
 @media(max-width:768px){.sv-hero h1{line-height:1.55}.sv-creed li{line-height:1.9}}
 </style>
 <div id="sv-hero-bg" aria-hidden="true">
@@ -1872,6 +1890,22 @@ header img{
       <li>企業を変えるのは、<br>「一度の挑戦」。</li>
       <li class="sv-final">私たちは、その一歩を生み出す<br><b>&ldquo;きっかけ&rdquo;を創る。</b></li>
     </ul>
+  </div>
+</section>
+<section class="sv-about">
+  <div class="sv-about__in">
+    <p class="sv-about__kicker sv-reveal">ABOUT</p>
+    <h2 class="sv-about__ttl sv-reveal">Saviorとは</h2>
+    <p class="sv-about__lead sv-reveal">株式会社Saviorは、</p>
+    <ul class="sv-kw">
+      <li>人材紹介</li>
+      <li>採用支援</li>
+      <li>事業プロデュース</li>
+    </ul>
+    <p class="sv-about__lead sv-reveal">を通じ、<br>挑戦する人と企業の可能性を<br>最大化する会社です。</p>
+    <div class="sv-about__gap"></div>
+    <p class="sv-about__punch sv-reveal">私たちは、<br>サービスを提供しているのではありません。</p>
+    <p class="sv-about__punch sv-em sv-reveal"><span class="sv-grad">未来を変える機会を創っています。</span></p>
   </div>
 </section>
 </div><!-- /.sv-over-video -->
@@ -2013,7 +2047,7 @@ header img{
     if(!('IntersectionObserver' in window)){document.querySelectorAll('.sv-reveal,.sv-creed li').forEach(function(el){el.classList.add('sv-on');});return;}
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('sv-on');io.unobserve(e.target);}});},{threshold:0.18,rootMargin:'0px 0px -8% 0px'});
     document.querySelectorAll('.sv-reveal').forEach(function(el){io.observe(el);});
-    document.querySelectorAll('.sv-creed').forEach(function(ul){
+    document.querySelectorAll('.sv-creed,.sv-kw').forEach(function(ul){
       var lis=Array.prototype.slice.call(ul.querySelectorAll('li'));
       var lio=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var i=lis.indexOf(e.target);e.target.style.transitionDelay=(i*0.22)+'s';e.target.classList.add('sv-on');lio.unobserve(e.target);}});},{threshold:0.3,rootMargin:'0px 0px -6% 0px'});
       lis.forEach(function(li){lio.observe(li);});
