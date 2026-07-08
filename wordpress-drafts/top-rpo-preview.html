@@ -1831,7 +1831,7 @@ header img{
 /* 見出し：日本語「私たちが信じていること」を大きく／その背後に半透明の「We Believe」を重ねてお洒落に */
 .sv-believe__head{position:relative;display:inline-block;margin:0 0 clamp(72px,10vw,130px);padding:.5em .35em .15em}
 .sv-believe__bg{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);z-index:0;font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.05em;font-size:clamp(3rem,9vw,7rem);line-height:1;white-space:nowrap;color:rgba(150,190,255,.13);pointer-events:none;-webkit-user-select:none;user-select:none}
-.sv-believe__sub{position:relative;z-index:1;font-family:"Zen Old Mincho","游明朝",serif;letter-spacing:.24em;font-size:clamp(1.3rem,3vw,2.08rem);color:rgba(255,255,255,.94);margin:0;text-shadow:0 2px 18px rgba(0,0,0,.5)}
+.sv-believe__sub{position:relative;z-index:1;font-family:"Zen Old Mincho","游明朝",serif;font-weight:400;letter-spacing:.24em;font-size:clamp(1.3rem,3vw,2.08rem);color:rgba(255,255,255,.94);margin:0;text-shadow:0 2px 18px rgba(0,0,0,.5)}
 /* ふわっと現れる（ソフトなフェード＋わずかな拡大＋ぼかし抜け） */
 .sv-soft{opacity:0;transform:scale(.955);filter:blur(6px)}
 .sv-soft.sv-on{opacity:1;transform:none;filter:blur(0);transition:opacity 1.7s ease,transform 1.9s cubic-bezier(.22,.7,.25,1),filter 1.7s ease}
@@ -1854,8 +1854,8 @@ header img{
 .sv-about__kicker{font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.44em;font-size:clamp(.88rem,1.9vw,1.14rem);color:#9cc4ff;margin:0 0 1em;padding-left:.44em;text-shadow:0 2px 18px rgba(0,0,0,.45)}
 /* 見出し：日本語「Saviorとは」の背後に半透明の「ABOUT」を重ねる（We Believeと同じお洒落レイヤー） */
 .sv-about__head{position:relative;display:inline-block;margin:0 0 clamp(56px,8vw,112px);padding:.5em .35em .15em}
-.sv-about__bg{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);z-index:0;font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.08em;font-size:clamp(3rem,9vw,7rem);line-height:1;white-space:nowrap;color:rgba(150,190,255,.13);pointer-events:none;-webkit-user-select:none;user-select:none}
-.sv-about__ttl{position:relative;z-index:1;font-family:"Zen Old Mincho","游明朝",serif;font-weight:500;letter-spacing:.24em;font-size:clamp(1.3rem,3vw,2.08rem);color:rgba(255,255,255,.94);margin:0;text-shadow:0 2px 18px rgba(0,0,0,.5);background:none !important;border:none !important;padding:0 !important}
+.sv-about__bg{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);z-index:0;font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.05em;font-size:clamp(3rem,9vw,7rem);line-height:1;white-space:nowrap;color:rgba(150,190,255,.13);pointer-events:none;-webkit-user-select:none;user-select:none}
+.sv-about__ttl{position:relative;z-index:1;font-family:"Zen Old Mincho","游明朝",serif;font-weight:400;letter-spacing:.24em;font-size:clamp(1.3rem,3vw,2.08rem);color:rgba(255,255,255,.94);margin:0;text-shadow:0 2px 18px rgba(0,0,0,.5);background:none !important;border:none !important;padding:0 !important}
 /* テーマ(SWELL)のh2装飾（濃紺バー・上下ボーダー）を打ち消す */
 .sv-about__ttl::before,.sv-about__ttl::after{content:none !important;display:none !important;border:none !important;background:none !important}
 /* ②本文（株式会社Saviorは…／私たちは…／未来を…）は文字サイズを統一 */
@@ -1866,7 +1866,7 @@ header img{
 .sv-about__punch,.sv-about__punch.sv-em{font-size:clamp(1.06rem,2.5vw,1.66rem)}
 /* ③3つの事業は三行で、左→右→左に交互スライドイン＋グラデーションで強調 */
 .sv-kw{list-style:none;margin:clamp(30px,4.6vw,58px) 0;padding:0;text-align:center}
-.sv-kw li{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.62rem,4.1vw,2.85rem);font-weight:600;letter-spacing:.12em;line-height:1.5;position:relative;opacity:0;filter:blur(9px);will-change:opacity,transform,filter;background:linear-gradient(90deg,#a7d8ff 0%,#7fb0ff 55%,#6f9de6 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.sv-kw li{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(.96rem,2.2vw,1.44rem);font-weight:600;letter-spacing:.12em;line-height:1.5;position:relative;opacity:0;filter:blur(9px);will-change:opacity,transform,filter;background:linear-gradient(90deg,#a7d8ff 0%,#7fb0ff 55%,#6f9de6 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .sv-kw li::before,.sv-kw li::marker{content:none !important;display:none !important}
 .sv-kw li+li{margin-top:clamp(12px,1.8vw,24px)}
 .sv-kw li:nth-child(odd){transform:translateX(-72px) translateY(12px)}
