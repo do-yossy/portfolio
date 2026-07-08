@@ -1671,7 +1671,6 @@ header img{
 </style>
 
 <link rel="stylesheet" href="https://savior-corporation.com/wp-content/themes/swell/build/css/print.css" media="print" >
-<style id="sv-chev">#pagetop .c-fixBtn__icon::before{content:"" !important}#pagetop .c-fixBtn__icon{display:flex;align-items:center;justify-content:center}#pagetop .c-fixBtn__icon::after{content:"";width:10px;height:10px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(-45deg);margin-top:3px}</style>
 </head>
 <body>
 <div id="body_wrap" class="wp-singular page-template-default page page-id-41 wp-theme-swell wp-child-theme-swell_child -body-solid -index-off -sidebar-off -frame-off id_41" >
@@ -1761,6 +1760,9 @@ header img{
 #pagetop .c-fixBtn__icon::before{content:"" !important}
 #pagetop .c-fixBtn__icon{display:flex;align-items:center;justify-content:center}
 #pagetop .c-fixBtn__icon::after{content:"";width:10px;height:10px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(-45deg);margin-top:3px}
+/* 現在ページのナビ項目に白い下線を常時表示。WPのcurrent-menu-item と JSの.-current 両対応。content/位置も自前指定でmain.css非依存＝プレビューでも確実表示。 */
+.c-gnav > .-current > a,.c-gnav > .current-menu-item > a,.c-gnav > .current_page_item > a{position:relative}
+.c-gnav > .-current > a::after,.c-gnav > .current-menu-item > a::after,.c-gnav > .current_page_item > a::after{content:"" !important;display:block;position:absolute;left:0;bottom:0;width:100%;height:2px;background:var(--color_header_text);transform:scaleX(1) !important;opacity:1}
 /* 他ページ(/contact等)とヘッダー構造は完全に同一(-body-solid / .l-fixHeader / scrollObserver)。
    よってヘッダーの位置やfixHeaderの表示はテーマ標準のまま一切上書きしない。 */
 /* SWELLテーマが .post_content 内の見出しに付ける装飾（h2の濃紺バー・h3の下線・h4の左ボーダー等）を打ち消し、単体HTMLプレビューと同一表示にする */
@@ -2636,6 +2638,16 @@ header img{
   /* スクロールでヘッダーを縮める（他ページ準拠） */
   var upd=function(){if(window.pageYOffset>80){root.classList.add('sd-shrunk');}else{root.classList.remove('sd-shrunk');}};
   window.addEventListener('scroll',upd,{passive:true});upd();
+})();
+</script>
+
+
+<script>
+/* 現在ページのグローバルナビ項目に白い下線(.-current)を付与。固定ヘッダーの複製にも対応。 */
+(function(){
+  var TARGET='/service';
+  function mark(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a){var h=a.getAttribute("href")||"";if(h.indexOf(TARGET)>-1)li.classList.add("-current");}});}
+  mark();setTimeout(mark,300);setTimeout(mark,700);setTimeout(mark,1200);window.addEventListener("load",mark);
 })();
 </script>
 

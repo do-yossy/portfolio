@@ -1673,7 +1673,6 @@ header img{
 <link rel="stylesheet" href="https://savior-corporation.com/wp-content/themes/swell/build/css/print.css" media="print" >
 <link rel='stylesheet' id='otter-animation-css' href='https://savior-corporation.com/wp-content/plugins/blocks-animation/build/animation/index.css?ver=85c87361b4be0dc88708' media='all' />
 
-<style id="sv-chev">#pagetop .c-fixBtn__icon::before{content:"" !important}#pagetop .c-fixBtn__icon{display:flex;align-items:center;justify-content:center}#pagetop .c-fixBtn__icon::after{content:"";width:10px;height:10px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(-45deg);margin-top:3px}</style>
 </head>
 <body>
 <div id="body_wrap" class="wp-singular page-template-default page page-id-46 wp-theme-swell wp-child-theme-swell_child -body-solid -index-off -sidebar-off -frame-off id_46" >
@@ -1754,6 +1753,15 @@ header img{
 :root{--color_header_bg:rgba(15,35,80,.75) !important}
 .l-header,.l-fixHeader{background:rgba(15,35,80,.75) !important}
 .l-header__bar,.l-fixHeader::before,.l-fixHeader:before{background:transparent !important}
+/* 戻るボタン(↑)をフォント非依存のCSS描画に統一（アイコンフォント未読込でも必ず同じ「^」マークを表示） */
+#pagetop .c-fixBtn__icon::before{content:"" !important}
+#pagetop .c-fixBtn__icon{display:flex;align-items:center;justify-content:center}
+#pagetop .c-fixBtn__icon::after{content:"";width:10px;height:10px;border-top:2px solid currentColor;border-right:2px solid currentColor;transform:rotate(-45deg);margin-top:3px}
+/* 現在ページのナビ項目に白い下線を常時表示。WPのcurrent-menu-item と JSの.-current 両対応。content/位置も自前指定でmain.css非依存＝プレビューでも確実表示。 */
+.c-gnav > .-current > a,.c-gnav > .current-menu-item > a,.c-gnav > .current_page_item > a{position:relative}
+.c-gnav > .-current > a::after,.c-gnav > .current-menu-item > a::after,.c-gnav > .current_page_item > a::after{content:"" !important;display:block;position:absolute;left:0;bottom:0;width:100%;height:2px;background:var(--color_header_text);transform:scaleX(1) !important;opacity:1}
+/* モバイルのスクロール時ヘッダーバーもPCと同じ半透明ネイビーに統一（元は不透明#0f2350で色が濃かった） */
+.sp-header-bar{background:rgba(15,35,80,.75) !important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 </style>
 
 
@@ -2071,7 +2079,8 @@ $(document).ready(function() {
     function revealPop(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-pop');n.style.transitionDelay=Math.min(i,5)*150+'ms';
       n.addEventListener('transitionend',function te(e){if(e.propertyName!=='transform')return;n.removeEventListener('transitionend',te);n.style.transitionDelay='';n.style.setProperty('--fd',(i*0.5)+'s');n.classList.add('sv-float');});
       io.observe(n);});}
-    reveal([document.querySelector('.page-texts')]);
+    // ページ最上部のタイトル(COMPANY / 会社概要)を、ページを開いた時の"最初の動き"として先に出す
+    reveal([document.querySelector('.page-texts .p1'), document.querySelector('.page-texts .p2')]);
     // 企業理念・代表メッセージ（同一構造の .company-text1 を各カードごとに順次出現）
     document.querySelectorAll('.company-text1').forEach(function(card){
       reveal(Array.prototype.slice.call(card.querySelectorAll('.p1,.p2,.p4,.p5')));
@@ -2096,4 +2105,5 @@ $(document).ready(function() {
   if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init);
 })();
 </script>
+<script>(function(){var T="/company";function m(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a&&(a.getAttribute("href")||"").indexOf(T)>-1)li.classList.add("-current");});}m();setTimeout(m,300);setTimeout(m,700);setTimeout(m,1200);window.addEventListener("load",m);})();</script>
 </body></html>
