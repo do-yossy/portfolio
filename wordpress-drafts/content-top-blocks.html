@@ -72,10 +72,15 @@
 .sv-reveal{opacity:0;transform:translateY(40px)}
 .sv-reveal.sv-on{opacity:1;transform:none;transition:opacity 1.1s ease,transform 1.35s cubic-bezier(.16,.84,.28,1)}
 /* ===== We Believe（信念）：背景なし・映像の上に重ねる。余白広め ===== */
-.sv-believe{position:relative;color:#fff;padding:clamp(80px,13vw,180px) 6vw clamp(150px,22vw,300px)}
+.sv-believe{position:relative;color:#fff;padding:clamp(80px,13vw,180px) 6vw clamp(150px,22vw,300px);overflow-x:clip}
 .sv-believe__in{position:relative;max-width:980px;margin:0 auto;text-align:center}
-.sv-believe__kicker{font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.44em;font-size:clamp(.88rem,1.9vw,1.14rem);color:#9cc4ff;margin:0 0 1.1em;padding-left:.44em;text-shadow:0 2px 18px rgba(0,0,0,.45)}
-.sv-believe__sub{font-family:"Zen Old Mincho","游明朝",serif;letter-spacing:.26em;font-size:clamp(1.12rem,2.4vw,1.46rem);color:rgba(255,255,255,.8);margin:0 0 clamp(72px,10vw,130px);text-shadow:0 2px 18px rgba(0,0,0,.45)}
+/* 見出し：日本語「私たちが信じていること」を大きく／その背後に半透明の「We Believe」を重ねてお洒落に */
+.sv-believe__head{position:relative;display:inline-block;margin:0 0 clamp(72px,10vw,130px);padding:.5em .35em .15em}
+.sv-believe__bg{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);z-index:0;font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.05em;font-size:clamp(3rem,9vw,7rem);line-height:1;white-space:nowrap;color:rgba(150,190,255,.13);pointer-events:none;-webkit-user-select:none;user-select:none}
+.sv-believe__sub{position:relative;z-index:1;font-family:"Zen Old Mincho","游明朝",serif;letter-spacing:.24em;font-size:clamp(1.3rem,3vw,2.08rem);color:rgba(255,255,255,.94);margin:0;text-shadow:0 2px 18px rgba(0,0,0,.5)}
+/* ふわっと現れる（ソフトなフェード＋わずかな拡大＋ぼかし抜け） */
+.sv-soft{opacity:0;transform:scale(.955);filter:blur(6px)}
+.sv-soft.sv-on{opacity:1;transform:none;filter:blur(0);transition:opacity 1.7s ease,transform 1.9s cubic-bezier(.22,.7,.25,1),filter 1.7s ease}
 .sv-creed{list-style:none !important;margin:0;padding:0}
 /* テーマ(SWELL)が.post_content内のli左に付ける「・」マーカーを打ち消す */
 .sv-creed li{list-style:none !important}
@@ -129,8 +134,10 @@
 </section>
 <section class="sv-believe">
   <div class="sv-believe__in">
-    <p class="sv-believe__kicker">We Believe</p>
-    <p class="sv-believe__sub">私たちが信じていること</p>
+    <div class="sv-believe__head sv-soft">
+      <span class="sv-believe__bg" aria-hidden="true">We Believe</span>
+      <p class="sv-believe__sub">私たちが信じていること</p>
+    </div>
     <ul class="sv-creed">
       <li>人の可能性は、<br>才能では決まらない。</li>
       <li>企業の未来は、<br>規模では決まらない。</li>
@@ -295,9 +302,9 @@
   }
   /* 汎用リビール＋creed行ごとのstagger（IntersectionObserver、逆再生なし） */
   function initReveal(){
-    if(!('IntersectionObserver' in window)){document.querySelectorAll('.sv-reveal,.sv-creed li').forEach(function(el){el.classList.add('sv-on');});return;}
+    if(!('IntersectionObserver' in window)){document.querySelectorAll('.sv-reveal,.sv-soft,.sv-creed li,.sv-kw li').forEach(function(el){el.classList.add('sv-on');});return;}
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('sv-on');io.unobserve(e.target);}});},{threshold:0.18,rootMargin:'0px 0px -8% 0px'});
-    document.querySelectorAll('.sv-reveal').forEach(function(el){io.observe(el);});
+    document.querySelectorAll('.sv-reveal,.sv-soft').forEach(function(el){io.observe(el);});
     document.querySelectorAll('.sv-creed,.sv-kw').forEach(function(ul){
       var lis=Array.prototype.slice.call(ul.querySelectorAll('li'));
       var lio=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var i=lis.indexOf(e.target);e.target.style.transitionDelay=(i*0.22)+'s';e.target.classList.add('sv-on');lio.unobserve(e.target);}});},{threshold:0.3,rootMargin:'0px 0px -6% 0px'});
