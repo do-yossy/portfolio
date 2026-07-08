@@ -382,10 +382,15 @@
 .savior-draft .node-hub p{color:rgba(255,255,255,.88)}
 .savior-draft .conn{display:flex;flex-direction:column;justify-content:center;gap:14px;min-width:118px}
 .savior-draft .conn span{font-size:.72rem;color:#0247b3;white-space:nowrap;text-align:center;padding:5px 4px;border-radius:6px;background:rgba(2,71,179,.06)}
-.savior-draft .conn .ar{display:inline-block;margin:0 .18em;font-style:normal}
-.savior-draft .conn .ar-r::after{content:"→"}
-.savior-draft .conn .ar-l::before{content:"←"}
-@media(max-width:820px){.savior-draft .conn{min-width:0;gap:8px;padding:6px 0}.savior-draft .conn .ar-r::after{content:"↓"}.savior-draft .conn .ar-l::before{content:"↑"}.savior-draft .conn-swap{flex-direction:column-reverse}}
+.savior-draft .conn .ar{display:inline-block;margin:0 .28em;font-style:normal}
+/* 矢印を塗り三角（飲食店PILLARの▶に統一）：PCは横向き▶/◀ */
+.savior-draft .conn .ar-r::after,.savior-draft .conn .ar-l::before{content:"";display:inline-block;width:0;height:0;vertical-align:middle}
+.savior-draft .conn .ar-r::after{border-left:9px solid #0247b3;border-top:6px solid transparent;border-bottom:6px solid transparent}
+.savior-draft .conn .ar-l::before{border-right:9px solid #0247b3;border-top:6px solid transparent;border-bottom:6px solid transparent}
+@media(max-width:820px){.savior-draft .conn{min-width:0;gap:8px;padding:6px 0}
+  .savior-draft .conn .ar-r::after{border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #0247b3;border-bottom:0}
+  .savior-draft .conn .ar-l::before{border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:9px solid #0247b3;border-top:0}
+  .savior-draft .conn-swap{flex-direction:column-reverse}}
 .savior-draft .scheme-flow{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:24px}
 @media(max-width:820px){.savior-draft .scheme-flow{grid-template-columns:1fr 1fr 1fr}}
 @media(max-width:520px){.savior-draft .scheme-flow{grid-template-columns:1fr 1fr}}
