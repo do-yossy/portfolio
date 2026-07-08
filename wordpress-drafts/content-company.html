@@ -49,30 +49,20 @@
 <!-- /wp:html -->
 
 <!-- wp:html -->
-<style id="sv-company-message-style">
-/* 代表メッセージ セクション（企業理念と企業情報の間）。既存 .company-text2 のカード/ラベル体裁に合わせる。 */
-.company-message{max-width:60vw;margin:5rem auto 0;background:#fff;box-shadow:0 0 20px 0 rgba(0,0,0,.15);padding:3rem 5rem;text-align:center}
-.company-message .p1{font-size:3rem;letter-spacing:.3rem;color:#0f2350;position:relative;top:1rem;font-family:"Montserrat",sans-serif;font-weight:600}
-.company-message .p2{color:#0f2350;font-weight:bold;font-size:1.2rem}
-.company-message .p3{width:2rem;display:inline-block;border-top:solid .2rem #0f2350;position:relative;bottom:.7rem}
-.company-message .top-texts{padding-top:1.5rem;padding-bottom:0;height:auto}
-@media(max-width:900px){
-  .company-message{max-width:93vw;padding:2.5rem 6vw}
-  .company-message .p1{font-size:2.5rem}
-}
-</style>
-<div class="company-message">
+<div class="company-philosophy">
+
+<div class="company-text1 animated fadeIn delay-200ms">
   <p class="p1 mont">MESSAGE</p>
   <p class="p2">代表メッセージ</p>
   <p class="p3"></p>
-  <div class="top-texts">
-    <img src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png">
-    <p class="mincho">
-株式会社Saviorは、次世代が夢を描き、<br class="sp">その夢に挑戦するための<br class="pc">“きっかけ”を<br class="sp">提供する救世主であることを使命としております。<br><br class="sp sp-custom-br">
-私たちは、この理念を軸に、<br class="sp">次世代のリーダーやイノベーターとなる<br class="sp">人材の発掘と育成に注力し、<br>持続的な社会価値の創造を目指しております。<br><br class="sp sp-custom-br">
-当社の活動を通じて、個人はもちろん<br class="sp">企業や社会全体が革新的な未来を<br class="sp">共創できると確信しており、<br>これからも「可能性の最大化」と<br class="sp">「新たな価値の創出」に邁進してまいります。<br><br class="sp sp-custom-br">
-<span>代表取締役　<img src="https://savior-corporation.com/wp-content/uploads/2025/11/taniguchidaisuke.png" class="boss"></span></p>
-  </div>
+  <p class="p5">
+株式会社Saviorは、次世代が夢を描き、<br class="sp">その夢に挑戦するための<br class="pc">“きっかけ”を<br class="sp">提供する救世主であることを使命としております。<br><br class="sp-custom-br">
+私たちは、この理念を軸に、<br class="sp">次世代のリーダーやイノベーターとなる<br class="sp">人材の発掘と育成に注力し、<br>持続的な社会価値の創造を目指しております。<br><br class="sp-custom-br">
+当社の活動を通じて、個人はもちろん<br class="sp">企業や社会全体が革新的な未来を<br class="sp">共創できると確信しており、<br>これからも「可能性の最大化」と<br class="sp">「新たな価値の創出」に邁進してまいります。
+  </p>
+  <p class="p4" style="padding-top:2.5rem;padding-bottom:0">代表取締役　谷口大介</p>
+</div>
+
 </div>
 <!-- /wp:html -->
 
@@ -169,7 +159,7 @@
 
 <!-- wp:html -->
 <style id="sv-company-motion">
-/* 会社概要：スクロール連動のフェードアップ演出（各セクションを順に出現）。動きを好まない設定では無効。 */
+/* 会社概要：スクロール連動のフェードアップ（各カード内の要素を順に出現）。prefers-reduced-motion 尊重。 */
 @media (prefers-reduced-motion: no-preference){
   .sv-rv{opacity:0;transform:translateY(30px);transition:opacity .9s cubic-bezier(.16,.7,.3,1), transform .9s cubic-bezier(.16,.7,.3,1)}
   .sv-rv.sv-in{opacity:1;transform:none}
@@ -180,28 +170,27 @@
   function init(){
     if(!('IntersectionObserver' in window)) return;
     if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var scope='.page-texts,.company-philosophy,.company-message,.company-details,.top-service';
-    if(!document.querySelector(scope)) return;
-    // 既存の animate.css（読み込み時一括フェード）を外し、スクロール演出に一本化
-    document.querySelectorAll('.page-texts,.company-philosophy .animated,.company-message .animated,.company-details .animated,.top-service .animated').forEach(function(el){
+    if(!document.querySelector('.company-philosophy,.company-details,.top-service')) return;
+    // 読み込み時一括の animate.css を外し、スクロール演出に一本化
+    document.querySelectorAll('.page-texts,.company-philosophy .animated,.company-philosophy.animated,.company-details .animated,.company-details.animated,.top-service .animated').forEach(function(el){
       el.classList.remove('animated','fadeIn','fadeInUp','delay-200ms','delay-500ms','delay-1s','slow');
     });
-    var groups=[
-      ['.page-texts'],
-      ['.company-text1 .p1','.company-text1 .p2','.company-text1 .p4','.company-text1 .p5','.company-img'],
-      ['.company-message .p1','.company-message .p2','.company-message .top-texts img','.company-message .mincho'],
-      ['.company-text2 .p1','.company-text2 .p2','.company-details table tr'],
-      ['.top-service .texts > *','.top-service .image']
-    ];
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('sv-in');io.unobserve(e.target);}});},{threshold:0.12,rootMargin:'0px 0px -8% 0px'});
-    groups.forEach(function(sels){
-      var els=[];
-      sels.forEach(function(s){document.querySelectorAll(s).forEach(function(n){els.push(n);});});
-      els.forEach(function(n,i){
-        n.classList.add('sv-rv');
-        n.style.transitionDelay=Math.min(i,7)*80+'ms';
-        io.observe(n);
-      });
+    function reveal(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-rv');n.style.transitionDelay=Math.min(i,7)*80+'ms';io.observe(n);});}
+    reveal([document.querySelector('.page-texts')]);
+    // 企業理念・代表メッセージ（同一構造の .company-text1 を各カードごとに順次出現）
+    document.querySelectorAll('.company-text1').forEach(function(card){
+      reveal(Array.prototype.slice.call(card.querySelectorAll('.p1,.p2,.p4,.p5,.company-img')));
+    });
+    // 企業情報（ラベル＋テーブル行）
+    document.querySelectorAll('.company-text2').forEach(function(card){
+      var items=Array.prototype.slice.call(card.querySelectorAll('.p1,.p2'));
+      items=items.concat(Array.prototype.slice.call(card.querySelectorAll('table tr')));
+      reveal(items);
+    });
+    // SERVICE
+    document.querySelectorAll('.top-service').forEach(function(sec){
+      reveal(Array.prototype.slice.call(sec.querySelectorAll('.texts > *, .image')));
     });
   }
   if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init);
