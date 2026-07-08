@@ -1789,6 +1789,11 @@ header img{
 /* タイトル：会社概要の背後に半透明「ABOUT」を重ねる（トップのSaviorについてと同じ手法） */
 .page-texts .sv-page-wm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0;font-family:"Montserrat",sans-serif;font-weight:700;letter-spacing:.05em;font-size:clamp(3.6rem,13vw,7.8rem);line-height:1;white-space:nowrap;color:rgba(255,255,255,.34);pointer-events:none;-webkit-user-select:none;user-select:none}
 .page-texts .p2{position:relative;z-index:1;font-weight:bold;font-size:clamp(1.4rem,3.6vw,2.1rem);letter-spacing:.12em}
+/* フッターをトップと統一：住所を非表示、CONTACTボタンの矢印を塗り三角▶に */
+.footer-main .address{display:none !important}
+.footer-contact .contact-btn::before{content:"" !important;position:absolute !important;top:50% !important;left:auto !important;right:1.6em;width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;transform:translateY(-50%) !important;transition:right .3s}
+.footer-contact .contact-btn::after{display:none !important}
+.footer-contact .contact-btn:hover::before{right:1.1em}
 </style>
 <div class="page-texts">
   <span class="sv-page-wm" aria-hidden="true">ABOUT</span>

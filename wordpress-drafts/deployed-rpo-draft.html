@@ -640,10 +640,6 @@
         <div class="sfx"><span class="sfx-n">04</span><h4>入社まで伴走</h4><p>内定後の手続き・入社準備まで、一貫してサポートします。</p></div>
       </div>
       <div class="outcome">
-        <div class="outcome-badges">
-          <span class="ob">収入アップ</span>
-          <span class="ob">キャリアアップ</span>
-        </div>
         <p>一貫したサポートで、求職者が理想のキャリアを叶えることを目指します。</p>
       </div>
       <div class="merit2">
@@ -795,13 +791,28 @@
     </div>
   </section>
 
-  <footer>
-    <div class="wrap foot">
-      <div class="logo"><a href="/" aria-label="トップページへ戻る"><img class="logo-img" src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png" alt="株式会社Savior"></a></div>
-      <div class="foot-biz"><a href="#jinzai">人材紹介事業</a> ／ <a href="#rpo">RPO事業</a> ／ <a href="#food">飲食店総合プロデュース事業</a></div>
-      <div>© Savior</div>
-    </div>
-  </footer>
+</div>
+<!-- フッターをトップページと統一（CONTACT枠＋フッター／住所は非表示・矢印は塗り三角） -->
+<style id="sv-svc-footer">
+.footer-contact .contact-btn::before{content:"" !important;position:absolute !important;top:50% !important;left:auto !important;right:1.6em;width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;transform:translateY(-50%) !important;transition:right .3s}
+.footer-contact .contact-btn::after{display:none !important}
+.footer-contact .contact-btn:hover::before{right:1.1em}
+.footer-main .address{display:none !important}
+</style>
+<div class="footer-contact">
+  <div class="wrap">
+    <p class="p1 mont">CONTACT</p>
+    <a href="/contact" class="contact-btn">お問い合わせ</a>
+  </div>
+</div>
+<div class="footer-main">
+  <a href="/"><img src="https://savior-corporation.com/wp-content/uploads/2024/02/logo3.png"></a>
+  <div class="list">
+    <a href="/service">サービス</a>
+    <a href="/company">会社概要</a>
+    <a href="/contact">お問い合わせ</a>
+    <a href="/policy">プライバシーポリシー</a>
+  </div>
 </div>
 <style id="sd-motion">
 /* ===== Savior 下書き モーション（参考サイト monolith-gr.com 準拠のスクロール出現アニメ） ===== */
