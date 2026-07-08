@@ -2053,12 +2053,12 @@ $(document).ready(function() {
   /* transition は表示側(.sv-in)にだけ付与。隠し状態(.sv-rv)は瞬時に適用され、スクロールで入った時のみフェードイン再生（初期表示域でも逆再生フェードアウトしない） */
   .sv-rv{opacity:0;transform:translateY(52px)}
   .sv-rv.sv-in{opacity:1;transform:none;transition:opacity 1s cubic-bezier(.16,.7,.3,1), transform 1.05s cubic-bezier(.16,.7,.3,1)}
-  /* 企業理念の3つの図（誠意/熱意/創意）：左右それぞれの方向から1つずつスライドインし、その後ゆっくり浮遊 */
+  /* 企業理念の3つの図（誠意/熱意/創意）：左右それぞれの方向から大きく・ゆっくり1つずつスライドインし、その後ゆっくり浮遊 */
   .sv-dir{opacity:0}
-  .sv-dir.sv-fromL{transform:translateX(-140px) scale(.9)}
-  .sv-dir.sv-fromR{transform:translateX(140px) scale(.9)}
-  .sv-dir.sv-fromB{transform:translateY(90px) scale(.9)}
-  .sv-dir.sv-in{opacity:1;transform:none;transition:opacity 1.3s ease, transform 1.5s cubic-bezier(.22,1,.36,1)}
+  .sv-dir.sv-fromL{transform:translateX(-72%) scale(.86)}
+  .sv-dir.sv-fromR{transform:translateX(72%) scale(.86)}
+  .sv-dir.sv-fromB{transform:translateY(120px) scale(.86)}
+  .sv-dir.sv-in{opacity:1;transform:none;transition:opacity 1.6s ease, transform 2.3s cubic-bezier(.2,.7,.25,1)}
   /* 登場完了後の常時ふわふわ（円ごとに位相をずらす・振れ幅大きめ） */
   .sv-float{animation:sv-bob 4.4s ease-in-out var(--fd,0s) infinite}
   @keyframes sv-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
@@ -2081,7 +2081,7 @@ $(document).ready(function() {
     // 図版用：左右それぞれの方向から1つずつスライドイン。list=[PC1枚, SP誠意, SP熱意, SP創意]。
     // SPの3円は 左→右→左 と双方向から交互に。PCの1枚は下から。登場後は浮遊へ。
     var DIRS=['sv-fromB','sv-fromL','sv-fromR','sv-fromL','sv-fromR'];
-    function revealDir(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-dir', DIRS[i]||'sv-fromB');n.style.transitionDelay=Math.min(i,5)*180+'ms';
+    function revealDir(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-dir', DIRS[i]||'sv-fromB');n.style.transitionDelay=Math.min(i,5)*260+'ms';
       n.addEventListener('transitionend',function te(e){if(e.propertyName!=='transform')return;n.removeEventListener('transitionend',te);n.style.transitionDelay='';n.style.setProperty('--fd',(i*0.5)+'s');n.classList.add('sv-float');});
       io.observe(n);});}
     // ページ最上部のタイトル(COMPANY / 会社概要)を、ページを開いた時の"最初の動き"として先に出す
