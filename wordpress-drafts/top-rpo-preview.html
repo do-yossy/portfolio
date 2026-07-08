@@ -1847,19 +1847,21 @@ header img{
 .sv-about{position:relative;color:#fff;padding:clamp(150px,24vw,330px) 6vw clamp(150px,22vw,300px)}
 .sv-about__in{position:relative;max-width:1000px;margin:0 auto;text-align:center}
 .sv-about__kicker{font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.44em;font-size:clamp(.88rem,1.9vw,1.14rem);color:#9cc4ff;margin:0 0 1em;padding-left:.44em;text-shadow:0 2px 18px rgba(0,0,0,.45)}
-.sv-about__ttl{font-family:"Zen Old Mincho","游明朝",serif;font-weight:500;letter-spacing:.12em;font-size:clamp(2rem,5vw,3.4rem);color:#fff;margin:0 0 clamp(56px,8vw,112px);text-shadow:0 3px 26px rgba(0,0,0,.5);background:none !important;border:none !important;padding:0 !important}
+.sv-about__ttl{font-family:"Zen Old Mincho","游明朝",serif;font-weight:500;letter-spacing:.14em;font-size:clamp(2.4rem,6vw,4.2rem);color:#fff;margin:0 0 clamp(56px,8vw,112px);text-shadow:0 3px 26px rgba(0,0,0,.5);background:none !important;border:none !important;padding:0 !important}
 /* テーマ(SWELL)のh2装飾（濃紺バー・上下ボーダー）を打ち消す */
 .sv-about__ttl::before,.sv-about__ttl::after{content:none !important;display:none !important;border:none !important;background:none !important}
-.sv-about__lead{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.1rem,2.5vw,1.66rem);line-height:2.35;letter-spacing:.12em;color:rgba(255,255,255,.9);margin:0;text-shadow:0 2px 20px rgba(0,0,0,.45)}
-.sv-kw{list-style:none;margin:clamp(26px,4vw,46px) 0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(18px,4vw,54px)}
-.sv-kw li{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.44rem,3.6vw,2.5rem);font-weight:500;letter-spacing:.08em;color:#fff;position:relative;text-shadow:0 3px 26px rgba(0,0,0,.5);opacity:0;transform:translateY(30px) scale(.96);filter:blur(8px);will-change:opacity,transform,filter}
-.sv-kw li::before{content:none !important;display:none !important}
-.sv-kw li::after{content:"";position:absolute;left:8%;right:8%;bottom:-.34em;height:2px;background:linear-gradient(90deg,#8fd0ff,#6f9de6);border-radius:2px;transform:scaleX(0);transform-origin:center}
-.sv-kw li.sv-on{opacity:1;transform:none;filter:blur(0);transition:opacity 1.05s ease,transform 1.3s cubic-bezier(.16,.84,.28,1),filter 1.15s ease}
-.sv-kw li.sv-on::after{transform:scaleX(1);transition:transform 1s cubic-bezier(.16,.84,.28,1) .28s}
+/* ②本文（株式会社Saviorは…／私たちは…／未来を…）は文字サイズを統一 */
+.sv-about__lead,.sv-about__punch,.sv-about__punch.sv-em{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.2rem,2.7vw,1.76rem);line-height:2.35;letter-spacing:.12em;color:rgba(255,255,255,.9);margin:0;text-shadow:0 2px 20px rgba(0,0,0,.45)}
+/* ③3つの事業は三行で、左→右→左に交互スライドイン＋グラデーションで強調 */
+.sv-kw{list-style:none;margin:clamp(30px,4.6vw,58px) 0;padding:0;text-align:center}
+.sv-kw li{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.62rem,4.1vw,2.85rem);font-weight:600;letter-spacing:.12em;line-height:1.5;position:relative;opacity:0;filter:blur(9px);will-change:opacity,transform,filter;background:linear-gradient(90deg,#a7d8ff 0%,#7fb0ff 55%,#6f9de6 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.sv-kw li::before,.sv-kw li::marker{content:none !important;display:none !important}
+.sv-kw li+li{margin-top:clamp(12px,1.8vw,24px)}
+.sv-kw li:nth-child(odd){transform:translateX(-72px) translateY(12px)}
+.sv-kw li:nth-child(even){transform:translateX(72px) translateY(12px)}
+.sv-kw li.sv-on{opacity:1;transform:none;filter:blur(0);transition:opacity 1.1s ease,transform 1.45s cubic-bezier(.16,.84,.28,1),filter 1.2s ease}
 .sv-about__gap{height:clamp(60px,9vw,120px)}
-.sv-about__punch{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1.14rem,2.7vw,1.78rem);line-height:2.25;letter-spacing:.1em;color:rgba(255,255,255,.92);margin:0;text-shadow:0 2px 20px rgba(0,0,0,.45)}
-.sv-about__punch.sv-em{margin-top:clamp(22px,3.4vw,42px);font-size:clamp(1.34rem,3.2vw,2.16rem)}
+.sv-about__punch.sv-em{margin-top:clamp(22px,3.4vw,42px)}
 @media(max-width:768px){.sv-hero h1{line-height:1.55}.sv-creed li{line-height:1.9}}
 </style>
 <div id="sv-hero-bg" aria-hidden="true">
@@ -1894,7 +1896,6 @@ header img{
 </section>
 <section class="sv-about">
   <div class="sv-about__in">
-    <p class="sv-about__kicker sv-reveal">ABOUT</p>
     <h2 class="sv-about__ttl sv-reveal">Saviorとは</h2>
     <p class="sv-about__lead sv-reveal">株式会社Saviorは、</p>
     <ul class="sv-kw">
