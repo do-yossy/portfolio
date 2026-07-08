@@ -1826,13 +1826,18 @@ header img{
 .sv-believe__in{position:relative;max-width:980px;margin:0 auto;text-align:center}
 .sv-believe__kicker{font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.44em;font-size:clamp(.88rem,1.9vw,1.14rem);color:#9cc4ff;margin:0 0 1.1em;padding-left:.44em;text-shadow:0 2px 18px rgba(0,0,0,.45)}
 .sv-believe__sub{font-family:"Zen Old Mincho","游明朝",serif;letter-spacing:.26em;font-size:clamp(1.12rem,2.4vw,1.46rem);color:rgba(255,255,255,.8);margin:0 0 clamp(72px,10vw,130px);text-shadow:0 2px 18px rgba(0,0,0,.45)}
-.sv-creed{list-style:none;margin:0;padding:0}
-/* 下記（信条）だけ動きを複雑に：ブラー抜け＋スライドアップ＋字間の収束＋わずかな拡大。逆再生防止でtransitionは.sv-on側のみ */
-.sv-creed li{font-family:"Zen Old Mincho","游明朝",serif;line-height:1.95;font-size:clamp(1.06rem,2.5vw,1.66rem);color:#f4f7fc;margin:0;text-shadow:0 3px 26px rgba(0,0,0,.5);opacity:0;transform:translateY(70px) scale(.965);filter:blur(12px);letter-spacing:.42em;will-change:opacity,transform,filter,letter-spacing}
+.sv-creed{list-style:none !important;margin:0;padding:0}
+/* テーマ(SWELL)が.post_content内のli左に付ける「・」マーカーを打ち消す */
+.sv-creed li{list-style:none !important}
+.sv-creed li::before,.sv-creed li::marker{content:none !important;display:none !important;background:none !important}
+/* 下記（信条）だけ動きを複雑に：左右交互のスライドイン＋ブラー抜け＋字間の収束。逆再生防止でtransitionは.sv-on側のみ */
+.sv-creed li{font-family:"Zen Old Mincho","游明朝",serif;line-height:1.95;font-size:clamp(.96rem,2.2vw,1.44rem);color:rgba(240,244,252,.6);margin:0;text-shadow:0 2px 20px rgba(0,0,0,.45);opacity:0;filter:blur(12px);letter-spacing:.34em;will-change:opacity,transform,filter,letter-spacing}
+.sv-creed li:nth-child(odd){transform:translateX(-68px) translateY(18px) scale(.975)}
+.sv-creed li:nth-child(even){transform:translateX(68px) translateY(18px) scale(.975)}
 .sv-creed li+li{margin-top:clamp(44px,6vw,84px)}
-.sv-creed li.sv-final{margin-top:clamp(70px,10vw,130px);font-size:clamp(1.2rem,2.9vw,1.94rem);color:#fff}
+.sv-creed li.sv-final{margin-top:clamp(70px,10vw,130px);font-size:clamp(1.06rem,2.5vw,1.66rem);color:rgba(255,255,255,.88)}
 .sv-creed li.sv-final b{font-weight:500;background:linear-gradient(90deg,#8fd0ff,#6f9de6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.sv-creed li.sv-on{opacity:1;transform:none;filter:blur(0);letter-spacing:.11em;transition:opacity 1.25s ease,transform 1.7s cubic-bezier(.16,.84,.28,1),filter 1.35s ease,letter-spacing 1.8s cubic-bezier(.16,.84,.28,1)}
+.sv-creed li.sv-on{opacity:1;transform:none;filter:blur(0);letter-spacing:.11em;transition:opacity 1.3s ease,transform 1.75s cubic-bezier(.16,.84,.28,1),filter 1.4s ease,letter-spacing 1.85s cubic-bezier(.16,.84,.28,1)}
 @media(max-width:768px){.sv-hero h1{line-height:1.55}.sv-creed li{line-height:1.9}}
 </style>
 <div id="sv-hero-bg" aria-hidden="true">
