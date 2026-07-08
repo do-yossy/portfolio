@@ -2053,9 +2053,12 @@ $(document).ready(function() {
   /* transition は表示側(.sv-in)にだけ付与。隠し状態(.sv-rv)は瞬時に適用され、スクロールで入った時のみフェードイン再生（初期表示域でも逆再生フェードアウトしない） */
   .sv-rv{opacity:0;transform:translateY(52px)}
   .sv-rv.sv-in{opacity:1;transform:none;transition:opacity 1s cubic-bezier(.16,.7,.3,1), transform 1.05s cubic-bezier(.16,.7,.3,1)}
-  /* 企業理念の3つの図（誠意/熱意/創意）：下から大きくゆっくり浮き上がってきて、その後ゆっくり浮遊し続ける演出 */
-  .sv-pop{opacity:0;transform:translateY(100px) scale(.78)}
-  .sv-pop.sv-in{opacity:1;transform:none;transition:opacity 1.8s ease, transform 2.1s cubic-bezier(.22,1,.36,1)}
+  /* 企業理念の3つの図（誠意/熱意/創意）：左右それぞれの方向から1つずつスライドインし、その後ゆっくり浮遊 */
+  .sv-dir{opacity:0}
+  .sv-dir.sv-fromL{transform:translateX(-140px) scale(.9)}
+  .sv-dir.sv-fromR{transform:translateX(140px) scale(.9)}
+  .sv-dir.sv-fromB{transform:translateY(90px) scale(.9)}
+  .sv-dir.sv-in{opacity:1;transform:none;transition:opacity 1.3s ease, transform 1.5s cubic-bezier(.22,1,.36,1)}
   /* 登場完了後の常時ふわふわ（円ごとに位相をずらす・振れ幅大きめ） */
   .sv-float{animation:sv-bob 4.4s ease-in-out var(--fd,0s) infinite}
   @keyframes sv-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
@@ -2075,8 +2078,10 @@ $(document).ready(function() {
     // 監視で入った要素は「隠し状態を1フレーム描画してから」sv-in を付与（ダブルrAF）。
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var t=e.target;io.unobserve(t);requestAnimationFrame(function(){requestAnimationFrame(function(){t.classList.add('sv-in');});});}});},{threshold:0.12,rootMargin:'0px 0px -8% 0px'});
     function reveal(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-rv');n.style.transitionDelay=Math.min(i,7)*80+'ms';io.observe(n);});}
-    // 図版用：拡大フェードで一つずつ（ステップ大きめ）出現
-    function revealPop(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-pop');n.style.transitionDelay=Math.min(i,5)*150+'ms';
+    // 図版用：左右それぞれの方向から1つずつスライドイン。list=[PC1枚, SP誠意, SP熱意, SP創意]。
+    // SPの3円は 左→右→左 と双方向から交互に。PCの1枚は下から。登場後は浮遊へ。
+    var DIRS=['sv-fromB','sv-fromL','sv-fromR','sv-fromL','sv-fromR'];
+    function revealDir(list){list.forEach(function(n,i){if(!n)return;n.classList.add('sv-dir', DIRS[i]||'sv-fromB');n.style.transitionDelay=Math.min(i,5)*180+'ms';
       n.addEventListener('transitionend',function te(e){if(e.propertyName!=='transform')return;n.removeEventListener('transitionend',te);n.style.transitionDelay='';n.style.setProperty('--fd',(i*0.5)+'s');n.classList.add('sv-float');});
       io.observe(n);});}
     // ページ最上部のタイトル(COMPANY / 会社概要)を、ページを開いた時の"最初の動き"として先に出す
@@ -2084,8 +2089,8 @@ $(document).ready(function() {
     // 企業理念・代表メッセージ（同一構造の .company-text1 を各カードごとに順次出現）
     document.querySelectorAll('.company-text1').forEach(function(card){
       reveal(Array.prototype.slice.call(card.querySelectorAll('.p1,.p2,.p4,.p5')));
-      // 企業理念の図（PCは1枚／SPは3枚）をおしゃれにポップ。SPは3つの円が順番に出現。
-      revealPop(Array.prototype.slice.call(card.querySelectorAll('.company-img img')));
+      // 企業理念の図（PCは1枚／SPは3枚）を左右それぞれの方向から1つずつスライドイン。
+      revealDir(Array.prototype.slice.call(card.querySelectorAll('.company-img img')));
     });
     // 代表メッセージ（トップと同じ top-texts をそのまま）：ロゴ→本文を順にフェードアップ
     document.querySelectorAll('.top-texts.sv-msg').forEach(function(m){
@@ -2105,5 +2110,5 @@ $(document).ready(function() {
   if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init);
 })();
 </script>
-<script>(function(){var T="/company";function m(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a&&(a.getAttribute("href")||"").indexOf(T)>-1)li.classList.add("-current");});}m();setTimeout(m,300);setTimeout(m,700);setTimeout(m,1200);window.addEventListener("load",m);})();</script>
+<script>(function(){var T="/company";function m(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a&&(a.getAttribute("href")||"").indexOf(T)>-1)li.classList.add("-current");});}m();setTimeout(m,300);setTimeout(m,700);window.addEventListener("load",m);})();</script>
 </body></html>
