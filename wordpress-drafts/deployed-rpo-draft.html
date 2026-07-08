@@ -1,3 +1,22 @@
+<!-- wp:html -->
+<style id="sv-fullpage">
+/* /service：テーマ標準ヘッダーを使用し他ページと完全一致させる。自作ヘッダーは撤去。フッター/ページタイトル/パンくずのみ無効化。 */
+#footer,.l-footer,.c-breadcrumb,.p-breadcrumb,.c-pageTitle,.p-pageHeader{display:none!important}
+.savior-draft>header{display:none!important}
+#content,.l-content{max-width:none!important;width:100%!important;margin:0!important;padding:0!important}
+#main_content,.l-mainContent,.l-article{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;border:0!important}
+.post_content{max-width:none!important;margin:0!important;padding:0!important}
+/* ヘッダー背景を半透明ネイビーに統一（全ページ共通の値） */
+:root{--color_header_bg:rgba(15,35,80,.95) !important}
+.l-header,.l-fixHeader{background:rgba(15,35,80,.95) !important}
+.l-header__bar,.l-fixHeader::before,.l-fixHeader:before{background:transparent !important}
+/* 他ページ(/contact等)とヘッダー構造は完全に同一(-body-solid / .l-fixHeader / scrollObserver)。
+   よってヘッダーの位置やfixHeaderの表示はテーマ標準のまま一切上書きしない。 */
+/* SWELLテーマが .post_content 内の見出しに付ける装飾（h2の濃紺バー・h3の下線・h4の左ボーダー等）を打ち消し、単体HTMLプレビューと同一表示にする */
+.savior-draft h1,.savior-draft h2,.savior-draft h3,.savior-draft h4,.savior-draft h5,.savior-draft h6{background:none!important;border:none!important;padding:0!important;margin-top:0;margin-bottom:0}
+.savior-draft h1::before,.savior-draft h1::after,.savior-draft h2::before,.savior-draft h2::after,.savior-draft h3::before,.savior-draft h3::after,.savior-draft h4::before,.savior-draft h4::after,.savior-draft h5::before,.savior-draft h6::before{content:none!important;display:none!important;border:none!important;background:none!important}
+</style>
+
 <style>@import url('https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;500;700&family=Montserrat:wght@500;600;700&display=swap');
 
 /* ============================================================
@@ -848,3 +867,5 @@
   window.addEventListener('scroll',upd,{passive:true});upd();
 })();
 </script>
+
+<!-- /wp:html -->
