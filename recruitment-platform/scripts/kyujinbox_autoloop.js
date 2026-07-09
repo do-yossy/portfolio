@@ -35,6 +35,8 @@ const { COMPANIES } = require(path.join(APP_DIR, 'db.js'));
 const args = process.argv.slice(2);
 const getArg = (name, def) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? args[i + 1] : def; };
 const APPLY = args.includes('--apply');
+const PUSH = args.includes('--push');            // 改善内容を求人ボックス掲載へ反映（既定はドライラン）
+const PUSH_SAVE = args.includes('--push-save');  // 反映時に実際に保存する（未指定＝入力＋スクショのみ）
 const COMPANY = getArg('--company', 'all');
 const LIMIT = parseInt(getArg('--limit', '20'), 10);
 
@@ -103,6 +105,7 @@ async function runCompany(pyCmd, id) {
 
   const { db } = require(path.join(APP_DIR, 'db.js'));
   let applied = 0, failed = 0;
+  const appliedJobs = [];
   for (const f of flags) {
     const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(f.jobId);
     if (!job) continue;
@@ -112,7 +115,12 @@ async function runCompany(pyCmd, id) {
       const improved = await optimizer.rewriteJob(job, f.diagnosis, f.reason);
       console.log(`    改善案: ${improved.note || '(タイトル/本文/タグを最適化)'}`);
       console.log(`      新タイトル: ${improved.title.slice(0, 48)}…`);
-      if (APPLY) { optimizer.applyImprovement(job.id, improved); applied++; console.log('    ✅ DBへ適用しました'); }
+      if (APPLY) {
+        optimizer.applyImprovement(job.id, improved); applied++;
+        console.log('    ✅ DBへ適用しました');
+        const jn = (job.kyujinbox_job_number || f.jobNumber || '').trim();
+        if (jn) appliedJobs.push({ jobNumber: jn, title: improved.title, description: improved.description, rewarding: improved.rewarding });
+      }
     } catch (e) {
       failed++;
       console.log(`    ❌ 改善生成に失敗: ${e.message}`);
@@ -120,8 +128,22 @@ async function runCompany(pyCmd, id) {
     }
   }
   console.log(`\n  完了: 検知${flags.length}件 / 適用${applied}件 / 失敗${failed}件`);
-  if (APPLY && applied > 0) {
-    console.log('  ℹ️ 自社サイトには即反映されます。求人ボックスの掲載にも反映するには、掲載更新（再掲載）を行ってください。');
+  if (APPLY && applied > 0) console.log('  ℹ️ 自社サイト(DB)へ反映済み');
+
+  // ── 求人ボックス掲載への反映（--push） ──
+  if (PUSH && appliedJobs.length > 0) {
+    console.log(`\n  📤 求人ボックス掲載へ反映${PUSH_SAVE ? '（保存する）' : '（ドライラン: 入力＋スクショのみ・保存しない）'}: ${appliedJobs.length}件`);
+    const reflectScript = path.join(__dirname, 'kyujinbox_reflect.py');
+    const rp = spawnSync(pyCmd[0], [...pyCmd.slice(1), reflectScript], {
+      env: { ...process.env, ...env, APPLY: PUSH_SAVE ? '1' : '0' },
+      cwd: APP_DIR, input: JSON.stringify(appliedJobs), encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024, timeout: 25 * 60 * 1000,
+    });
+    for (const line of (rp.stdout || '').split('\n')) {
+      try { const o = JSON.parse(line); if (o.type === 'progress') console.log('    ' + o.message); } catch { /* skip */ }
+    }
+  } else if (PUSH && appliedJobs.length === 0) {
+    console.log('  （反映対象なし。--push は --apply と併用し、求人番号が紐付いた求人が対象です）');
   }
 }
 
