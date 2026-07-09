@@ -28,8 +28,29 @@ if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
 
 const { Jobs, Logs, Reports, COMPANIES } = require('./db');
 const report = require('./lib/report');
+const { requireAuth, isAuthenticated, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
 
 const PORT = parseInt(process.env.PORT || '3200', 10);
+
+// ── ログイン画面（現システムと同じ ADMIN_USER / ADMIN_PASSWORD で認証）──
+function loginPage(errorMsg) {
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ログイン｜求人ボックス運用システム</title><style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Meiryo','Yu Gothic',sans-serif;background:#0F2A43;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:12px;padding:32px 30px;width:340px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+h1{font-size:17px;color:#0F2A43;margin-bottom:4px}.sub{color:#5A6B7B;font-size:12px;margin-bottom:20px}
+label{display:block;font-size:12px;color:#5A6B7B;margin:12px 0 4px}
+input{width:100%;padding:10px;border:1px solid #D5DCE3;border-radius:6px;font-size:14px}
+button{width:100%;margin-top:20px;padding:11px;background:#17A398;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer}
+.err{background:#f6e6e4;color:#c0433b;font-size:12px;padding:8px 10px;border-radius:6px;margin-top:12px}
+.tick{width:36px;height:6px;background:#17A398;border-radius:3px;margin-bottom:14px}
+</style></head><body><form class="card" method="POST" action="/login">
+<div class="tick"></div><h1>求人ボックス運用システム</h1><div class="sub">管理画面にログイン</div>
+<label>ユーザー名</label><input name="username" autocomplete="username" autofocus>
+<label>パスワード</label><input name="password" type="password" autocomplete="current-password">
+${errorMsg ? `<div class="err">${errorMsg}</div>` : ''}
+<button type="submit">ログイン</button></form></body></html>`;
+}
 
 // ── 会社名・認証解決（現システムと同一規則）──
 const companyFullName = (id) => (COMPANIES.find(c => c.id === id) || {}).name || (process.env.COMPANY_NAME || '株式会社SocialQuality');
@@ -107,6 +128,29 @@ const server = http.createServer(async (req, res) => {
   const method = req.method;
 
   try {
+    // ── ログイン（現システムと同じ ADMIN_USER / ADMIN_PASSWORD）──
+    if (pathname === '/login' && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(loginPage());
+    }
+    if (pathname === '/login' && method === 'POST') {
+      const raw = await new Promise(r => { let b = ''; req.on('data', d => b += d); req.on('end', () => r(b)); });
+      const params = new URLSearchParams(raw);
+      const token = login(params.get('username') || '', params.get('password') || '');
+      if (token) { res.writeHead(302, { 'Set-Cookie': sessionCookie(token), Location: '/' }); return res.end(); }
+      res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(loginPage('ユーザー名またはパスワードが正しくありません'));
+    }
+    if (pathname === '/logout') {
+      const cookies = parseCookies(req);
+      destroySession(cookies.get('admin_session') || '');
+      res.writeHead(302, { 'Set-Cookie': sessionCookie('', true), Location: '/login' }); return res.end();
+    }
+    // ── 認証ガード（/login・静的アセット以外は要ログイン）──
+    if (!isAuthenticated(req)) {
+      if (pathname.startsWith('/api/')) return sendJSON(res, 401, { error: '未ログインです。/login からログインしてください。' });
+      if (pathname === '/' || pathname.startsWith('/report')) { res.writeHead(302, { Location: '/login' }); return res.end(); }
+    }
+
     // 静的
     if (pathname === '/' && method === 'GET') return serveStatic(res, path.join(PUBLIC_DIR, 'index.html'));
     if (pathname.startsWith('/public/')) return serveStatic(res, path.join(PUBLIC_DIR, pathname.slice(8)));
@@ -331,8 +375,11 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n🟢 求人ボックス専用システム 起動: http://localhost:${PORT}`);
-  console.log(`   認証済みアカウント: ${kyujinboxConfiguredCompanies().map(companyFullName).join('・') || '(未設定)'}`);
+  console.log(`\n🟢 求人ボックス専用システム 起動`);
+  console.log(`   ログイン: http://localhost:${PORT}/login`);
+  console.log(`   管理画面: http://localhost:${PORT}/`);
+  console.log(`   ログイン認証: ${process.env.ADMIN_PASSWORD ? 'あり（ADMIN_USER/ADMIN_PASSWORD）' : '無し（ADMIN_PASSWORD未設定＝開放）'}`);
+  console.log(`   認証済み求人ボックスアカウント: ${kyujinboxConfiguredCompanies().map(companyFullName).join('・') || '(未設定)'}`);
   ensureMonthlyReports();
   // 毎日1回、前月分の月次レポートが無ければ自動生成（月替わり後の初回起動で前月分が作られる）
   setInterval(ensureMonthlyReports, 24 * 60 * 60 * 1000);
