@@ -98,8 +98,7 @@ h2{font-size:14px;color:${NAVY};border-left:4px solid ${TEAL};padding-left:8px;m
 <h2>職種別サマリー</h2>
 <table><tr><th>職種</th><th style="width:90px">求人数</th><th style="width:90px">閲覧</th><th style="width:90px">応募</th></tr>
 ${a.jobTypeStats.length ? a.jobTypeStats.map((t, i) => `<tr style="background:${i % 2 ? LIGHT : '#fff'}"><td style="padding:7px 8px;border:1px solid ${LINE}">${esc(t.job_type)}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${t.jobs}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${t.views}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center;color:${TEAL};font-weight:700">${t.applies}</td></tr>`).join('') : `<tr><td colspan="4" style="padding:12px;text-align:center;color:${GRAY}">データがありません</td></tr>`}</table>
-<p style="color:${GRAY};font-size:11px;margin-top:18px">※ 閲覧・応募は求人ボックス管理画面から取得した最新の成績スナップショットに基づきます。成績取得(kyujinbox_metrics)を実行すると数値が反映されます。</p>
-<p style="color:${GRAY};font-size:11px;margin-top:4px">生成日時：${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC</p>
+<p style="color:${GRAY};font-size:11px;margin-top:18px">生成日時：${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC</p>
 </body></html>`;
 }
 
