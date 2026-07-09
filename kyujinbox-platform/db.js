@@ -218,6 +218,7 @@ const Reports = {
   latest() { return db.prepare(`SELECT * FROM reports ORDER BY period DESC, created_at DESC LIMIT 1`).get(); },
   list(limit = 24) { return db.prepare(`SELECT id,period,company,summary,created_at FROM reports ORDER BY period DESC LIMIT ?`).all(limit); },
   has(period, company = 'all') { return !!db.prepare(`SELECT 1 FROM reports WHERE period=? AND company=?`).get(period, company); },
+  delete(period, company = 'all') { return db.prepare(`DELETE FROM reports WHERE period=? AND company=?`).run(period, company).changes; },
 };
 
 module.exports = { db, generateId, now, Jobs, Logs, Reports, COMPANIES, MEDIA, DATA_DIR, DB_PATH };

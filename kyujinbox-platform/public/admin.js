@@ -126,8 +126,16 @@ async function loadReports() {
     let s = {}; try { s = JSON.parse(r.summary || '{}'); } catch {}
     const coName = r.company === 'all' ? '全社' : (COMPANIES.find(c => c.id === r.company) || {}).name || r.company;
     return `<div class="repRow"><span><b>${r.period}</b> ／ ${coName}　<span class="muted">掲載${s.posted ?? '-'}・応募${s.totalApplies ?? '-'}・改善${s.optimized ?? '-'}</span></span>
-      <a href="/report/${r.period}/${r.company}" target="_blank">レポートを開く ↗</a></div>`;
+      <span><a href="/report/${r.period}/${r.company}" target="_blank">レポートを開く ↗</a>
+      <button class="ghost repDel" data-period="${r.period}" data-company="${r.company}" style="margin-left:8px;padding:3px 10px;font-size:12px">削除</button></span></div>`;
   }).join('');
+  $('reports').querySelectorAll('.repDel').forEach(b => b.onclick = () => deleteReport(b.dataset.period, b.dataset.company));
+}
+
+async function deleteReport(period, company) {
+  if (!confirm(`${period} のレポートを削除しますか？`)) return;
+  await api('/api/report/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ period, company }) });
+  await loadReports();
 }
 
 async function genReport() {
