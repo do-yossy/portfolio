@@ -48,7 +48,21 @@
       <label class="full">アクセス（<code>{勤務地}</code>可）<textarea id="b_transport" rows="2"></textarea></label>
       <label class="full">やりがい<textarea id="b_rewarding" rows="2"></textarea></label>
       <label class="full">応募方法<textarea id="b_apply" rows="2"></textarea></label>
-      <label class="full">勤務地リスト（1行に1件）<textarea id="b_locations" rows="6" placeholder="大阪府大阪市北区天満&#10;大阪府大阪市福島区大開&#10;大阪府大阪市此花区酉島"></textarea></label>
+      <label class="full">勤務地リスト（1行に1件・件数は無制限。全国でもOK）
+        <div style="display:flex;gap:6px;margin:4px 0 6px;flex-wrap:wrap;align-items:center">
+          <select id="b_preset" style="max-width:260px">
+            <option value="">＋ プリセットを挿入…</option>
+            <option value="zenkoku47">全国47都道府県（県庁所在地）</option>
+            <option value="seireishi">政令指定都市（主要20市）</option>
+            <option value="osaka24">大阪市24区</option>
+            <option value="tokyo23">東京23区</option>
+          </select>
+          <button type="button" id="b_presetBtn" class="ghost">挿入</button>
+          <button type="button" id="b_clearBtn" class="ghost">クリア</button>
+          <span id="b_count" class="muted">0件</span>
+        </div>
+        <textarea id="b_locations" rows="8" placeholder="大阪府大阪市北区天満&#10;大阪府大阪市福島区大開&#10;…（全国に広げる場合は上のプリセットで一括挿入できます）"></textarea>
+      </label>
     </div>
     <div class="row" style="margin-top:10px">
       <label>アカウント<select id="b_company"></select></label>
