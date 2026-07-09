@@ -25,6 +25,27 @@ async function loadCompanies() {
   $('b_company').innerHTML = opts;
 }
 
+const LOCATION_PRESETS = {
+  zenkoku47: ['北海道札幌市','青森県青森市','岩手県盛岡市','宮城県仙台市','秋田県秋田市','山形県山形市','福島県福島市','茨城県水戸市','栃木県宇都宮市','群馬県前橋市','埼玉県さいたま市','千葉県千葉市','東京都新宿区','神奈川県横浜市','新潟県新潟市','富山県富山市','石川県金沢市','福井県福井市','山梨県甲府市','長野県長野市','岐阜県岐阜市','静岡県静岡市','愛知県名古屋市','三重県津市','滋賀県大津市','京都府京都市','大阪府大阪市','兵庫県神戸市','奈良県奈良市','和歌山県和歌山市','鳥取県鳥取市','島根県松江市','岡山県岡山市','広島県広島市','山口県山口市','徳島県徳島市','香川県高松市','愛媛県松山市','高知県高知市','福岡県福岡市','佐賀県佐賀市','長崎県長崎市','熊本県熊本市','大分県大分市','宮崎県宮崎市','鹿児島県鹿児島市','沖縄県那覇市'],
+  seireishi: ['北海道札幌市','宮城県仙台市','埼玉県さいたま市','千葉県千葉市','神奈川県横浜市','神奈川県川崎市','神奈川県相模原市','新潟県新潟市','静岡県静岡市','静岡県浜松市','愛知県名古屋市','京都府京都市','大阪府大阪市','大阪府堺市','兵庫県神戸市','岡山県岡山市','広島県広島市','福岡県北九州市','福岡県福岡市','熊本県熊本市'],
+  osaka24: ['都島区','福島区','此花区','西区','港区','大正区','天王寺区','浪速区','西淀川区','淀川区','東淀川区','東成区','生野区','旭区','城東区','鶴見区','阿倍野区','住之江区','住吉区','東住吉区','平野区','西成区','北区','中央区'].map(k => '大阪府大阪市' + k),
+  tokyo23: ['千代田区','中央区','港区','新宿区','文京区','台東区','墨田区','江東区','品川区','目黒区','大田区','世田谷区','渋谷区','中野区','杉並区','豊島区','北区','荒川区','板橋区','練馬区','足立区','葛飾区','江戸川区'].map(k => '東京都' + k),
+};
+
+function updateLocCount() {
+  const n = ($('b_locations').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean)).length;
+  $('b_count').textContent = n + '件';
+}
+function insertPreset() {
+  const key = $('b_preset').value;
+  if (!key || !LOCATION_PRESETS[key]) return;
+  const ta = $('b_locations');
+  const cur = ta.value.trim();
+  ta.value = (cur ? cur + '\n' : '') + LOCATION_PRESETS[key].join('\n');
+  $('b_preset').value = '';
+  updateLocCount();
+}
+
 async function generateFromBase() {
   const btn = $('b_btn'), log = $('b_log'); log.innerHTML = '';
   const base = {
@@ -134,6 +155,9 @@ $('forceBtn').onclick = () => { if (confirm('投稿済みも含めて再投稿�
 $('genBtn').onclick = genReport;
 $('impBtn').onclick = importZip;
 $('b_btn').onclick = generateFromBase;
+$('b_presetBtn').onclick = insertPreset;
+$('b_clearBtn').onclick = () => { $('b_locations').value = ''; updateLocCount(); };
+$('b_locations').oninput = updateLocCount;
 $('jobCompany').onchange = loadJobs;
 
 (async function init() {
