@@ -431,20 +431,21 @@ const server = http.createServer(async (req, res) => {
     }
 
     // レポートHTMLを直接表示 /report/2026-06/all
+    // 開くたびに最新テンプレート・最新データで生成し直す（保存済みの古いHTMLは使わない）
     if (pathname.startsWith('/report/') && method === 'GET') {
       const parts = pathname.split('/').filter(Boolean); // ['report', period, company?]
       const period = parts[1], company = parts[2] || 'all';
-      let rec = Reports.get(period, company);
-      if (!rec) { const r = report.generate(period, company); rec = Reports.get(period, company) || { html: r.html }; }
+      const r = report.generate(period, company);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(rec.html);
+      return res.end(r.html);
     }
-    // 最新レポート
+    // 最新レポート（同じく最新テンプレートで生成し直す）
     if (pathname === '/report' && method === 'GET') {
       const rec = Reports.latest();
       if (!rec) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<p>まだレポートがありません。管理画面から生成してください。</p>'); }
+      const r = report.generate(rec.period, rec.company);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(rec.html);
+      return res.end(r.html);
     }
 
     res.writeHead(404); res.end('Not found');
