@@ -1772,6 +1772,11 @@ header img{
 .temple-btn::after{display:none !important} /* 線(シャフト)を消して▶だけに */
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定。他ページと統一） */
 .page-tops{background-attachment:fixed !important}
+/* フッターの住所ブロックを非表示（他ページと統一。共有フッター設定には触れない） */
+.footer-main .address{display:none !important}
+/* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示（トップと統一） */
+.p-spMenu a .sv-en{display:block;font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.14em;line-height:1.25}
+.p-spMenu a .sv-ja{display:block;font-size:.72em;letter-spacing:.06em;opacity:.68;margin-top:.3em}
 </style>
 
 
@@ -2012,4 +2017,15 @@ $(document).ready(function() {
 </script>
 <script>document.addEventListener('touchstart',function(){});</script>
 <script>(function(){var T="/contact";function m(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a&&(a.getAttribute("href")||"").indexOf(T)>-1)li.classList.add("-current");});}m();setTimeout(m,300);window.addEventListener("load",m);})();</script>
+<script id="sv-nav-relabel">
+(function(){
+  var PC=[['/service','SERVICE'],['/company','ABOUT'],['/contact','CONTACT']];
+  var SP=[['/service','SERVICE','事業内容'],['/company','ABOUT','会社概要'],['/contact','CONTACT','お問い合わせ'],['/policy','PRIVACY POLICY','プライバシーポリシー'],['/privacy','PRIVACY POLICY','プライバシーポリシー']];
+  function tail(a,path){var h=(a.getAttribute('href')||'').replace(/[#?].*$/,'').replace(/\/+$/,'');return h.slice(-path.length)===path;}
+  function applyPC(){document.querySelectorAll('.c-gnav a').forEach(function(a){for(var i=0;i<PC.length;i++){if(tail(a,PC[i][0])){var t=a.querySelector('.ttl')||a;if(t.textContent.trim()!==PC[i][1])t.textContent=PC[i][1];break;}}});}
+  function applySP(){document.querySelectorAll('.p-spMenu a').forEach(function(a){for(var i=0;i<SP.length;i++){if(tail(a,SP[i][0])){if(!a.querySelector('.sv-en')){a.innerHTML='<span class="sv-en">'+SP[i][1]+'</span><span class="sv-ja">'+SP[i][2]+'</span>';}break;}}});}
+  function apply(){applyPC();applySP();}
+  apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
+})();
+</script>
 </body></html>
