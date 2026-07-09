@@ -5,13 +5,15 @@ const api = async (url, opts) => (await fetch(url, opts)).json();
 let COMPANIES = [];
 
 async function loadStats() {
+  const el = $('stats');
+  if (!el) return; // 上部の集計タイルは非表示（要素が無ければ何もしない）
   const s = await api('/api/stats');
   const t = [
     ['総求人', s.total], ['公開中', s.published], ['求人ボックス', s.kyujinbox], ['投稿済み', s.posted],
   ].map(([l, n]) => `<div class="tile"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
   const co = Object.entries(s.perCompany).filter(([, v]) => v.total > 0 || v.configured)
     .map(([id, v]) => `<div class="tile"><div class="n">${v.posted}/${v.published}</div><div class="l">${v.name.slice(0, 10)} ${v.configured ? '<span class="badge ok">認証OK</span>' : '<span class="badge no">未設定</span>'}</div></div>`).join('');
-  $('stats').innerHTML = t + co;
+  el.innerHTML = t + co;
 }
 
 async function loadCompanies() {
