@@ -107,13 +107,14 @@ db.exec(`
 db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_period_co ON reports(period, company)`);
 
 // ── 会社マスタ（求人ボックスのアカウント＝会社）──
+// 一旦SQ（Social Quality）のみ。他社を使う場合は下に行を追加すれば各画面に反映される。
 const COMPANIES = [
   { id: 'sq', name: '株式会社SocialQuality', short: 'SQ', label: 'Social Quality' },
-  { id: 'bg', name: 'BigEyesコーポレーション株式会社', short: 'BG', label: 'Bigeyes' },
-  { id: 'pe', name: '合同会社ピープル',        short: 'PE', label: 'ピープル' },
-  { id: 'lt', name: '株式会社lifeTaylor',     short: 'LT', label: 'Life Tailor' },
-  { id: 'nc', name: '合同会社ニクール',        short: 'NC', label: 'ニクール' },
-  { id: 'nx', name: 'ネクサス株式会社',        short: 'NX', label: 'ネクサス' },
+  // { id: 'bg', name: 'BigEyesコーポレーション株式会社', short: 'BG', label: 'Bigeyes' },
+  // { id: 'pe', name: '合同会社ピープル',        short: 'PE', label: 'ピープル' },
+  // { id: 'lt', name: '株式会社lifeTaylor',     short: 'LT', label: 'Life Tailor' },
+  // { id: 'nc', name: '合同会社ニクール',        short: 'NC', label: 'ニクール' },
+  // { id: 'nx', name: 'ネクサス株式会社',        short: 'NX', label: 'ネクサス' },
 ];
 const MEDIA = [{ id: 'kyujinbox', name: '求人ボックス' }];
 
