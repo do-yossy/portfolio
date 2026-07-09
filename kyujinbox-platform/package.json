@@ -1,0 +1,12 @@
+{
+  "name": "kyujinbox-platform",
+  "version": "1.0.0",
+  "description": "求人ボックス専用 自動投稿・AI改善・月次レポートシステム（recruitment-platformとは独立）",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "report": "node scripts/monthly_report.js",
+    "autoloop": "node scripts/kyujinbox_autoloop.js"
+  },
+  "engines": { "node": ">=22" }
+}

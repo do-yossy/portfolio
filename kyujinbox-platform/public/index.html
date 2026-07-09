@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>求人ボックス運用システム</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="hd">
+  <div class="tick"></div>
+  <h1>求人ボックス運用システム</h1>
+  <span class="sub">RECRUITMENT AUTOMATION — 求人ボックス専用</span>
+</header>
+
+<main>
+  <section class="stats" id="stats"><div class="muted">読み込み中...</div></section>
+
+  <section class="card">
+    <h2>求人票を取り込む <span class="muted">（ZIP／PDF複数）</span></h2>
+    <p class="muted" style="margin-bottom:10px">既存の求人票PDFをまとめたZIPを選ぶと、AIが読み取り求人ボックス用に登録します（通常求人／人材紹介求人を選べます）。</p>
+    <div class="row">
+      <label>ZIPファイル<input id="zipFile" type="file" accept=".zip,application/zip"></label>
+      <label>アカウント<select id="impCompany"></select></label>
+      <label>区分
+        <select id="impKind"><option value="normal">通常求人</option><option value="agency">人材紹介求人</option></select>
+      </label>
+      <button id="impBtn" class="primary">取り込む</button>
+    </div>
+    <pre id="impLog" class="log"></pre>
+  </section>
+
+  <section class="card">
+    <h2>求人ボックスへ自動投稿</h2>
+    <div class="row">
+      <label>アカウント
+        <select id="company"><option value="all">すべて（認証済み全社）</option></select>
+      </label>
+      <label>件数（最大25）
+        <input id="limit" type="number" min="1" max="25" value="25">
+      </label>
+      <button id="postBtn" class="primary">投稿する</button>
+      <button id="forceBtn" class="ghost" title="投稿済みも含めて再投稿">強制再投稿</button>
+    </div>
+    <pre id="log" class="log"></pre>
+  </section>
+
+  <section class="card">
+    <h2>月次レポート <span class="muted">（毎月・前月分を自動生成）</span></h2>
+    <div class="row">
+      <label>対象月
+        <input id="period" type="month">
+      </label>
+      <label>アカウント
+        <select id="repCompany"><option value="all">すべて</option></select>
+      </label>
+      <button id="genBtn" class="primary">今すぐ生成</button>
+    </div>
+    <div id="reports" class="reports"><div class="muted">読み込み中...</div></div>
+  </section>
+
+  <section class="card">
+    <h2>求人一覧</h2>
+    <div class="row"><label>絞り込み
+      <select id="jobCompany"><option value="">すべて</option></select>
+    </label></div>
+    <div id="jobs" class="tablewrap"><div class="muted">読み込み中...</div></div>
+  </section>
+</main>
+
+<script src="/admin.js"></script>
+</body>
+</html>

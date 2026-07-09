@@ -1,0 +1,11 @@
+data/
+node_modules/
+.env
+*.db
+*.db-shm
+*.db-wal
+__pycache__/
+*.pyc
+logs/
+reports/*.html
+scripts/out/
