@@ -1770,6 +1770,8 @@ header img{
 /* SERVICEボタン(temple-btn)の矢印の先端を塗り三角(▶)に統一（線＋▶）。他の矢印(仕組み図/RPO/PILLAR)と統一。 */
 .temple-btn::before{width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;top:50% !important;transform:translateY(-50%) !important}
 .temple-btn::after{display:none !important} /* 線(シャフト)を消して▶だけに */
+/* 上部ヒーロー画像を固定（スクロールしても背景は固定。他ページと統一） */
+.page-tops{background-attachment:fixed !important}
 </style>
 
 
@@ -1876,87 +1878,6 @@ Saviorへのご依頼・お問い合わせは、<br>
 
 </div></div>
 
-
-
-<div class="top-service bg-gray pc">
-
-  <div class="image animated fadeIn delay-200ms">
-    <img decoding="async" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp" class="lazyload" ><noscript><img decoding="async" src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp"></noscript>
-  </div>
-
-  <div class="texts animated fadeIn delay-200ms">
-    <p class="p1">事業案内</p>
-    <p class="p2 mont">SERVICE</p>
-    <p class="p3"></p>
-    
-    <div class="sv-choose">
-      <a href="/service#jinzai" class="temple-btn">人材紹介事業</a>
-      <a href="/service#rpo" class="temple-btn">RPO事業</a>
-      <a href="/service#food" class="temple-btn">飲食店総合プロデュース事業</a>
-    </div>
-  </div>
-
-</div>
-
-
-
-<div class="top-service bg-gray sp">
-
-  <div class="texts animated fadeIn delay-500ms">
-    <p class="p1">事業案内</p>
-    <p class="p2 mont">SERVICE</p>
-    <p class="p3"></p>
-  </div>
-
-  <div class="image animated fadeIn delay-500ms">
-    <img decoding="async" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp" class="lazyload" ><noscript><img decoding="async" src="https://savior-corporation.com/wp-content/uploads/2024/02/service-2-jpeg.webp"></noscript>
-  </div>
-
-  
-  <div class="sv-choose animated fadeIn delay-500ms">
-    <a href="/service#jinzai" class="temple-btn">人材紹介事業</a>
-      <a href="/service#rpo" class="temple-btn">RPO事業</a>
-    <a href="/service#food" class="temple-btn">飲食店総合プロデュース事業</a>
-  </div>
-
-</div>
-
-
-
-<div class="top-company pc">
-
-  <div class="texts animated fadeIn delay-200ms">
-    <p class="p1">会社概要</p>
-    <p class="p2 mont">COMPANY</p>
-    <p class="p3"></p>
-    <p class="p4">若年層の可能性を信じ、<br>社会に貢献することを促進することに情熱を注いでいます。</p>
-    <a href="/company" class="temple-btn">私たちについて</a>
-  </div>
-
-  <div class="image animated fadeIn delay-200ms">
-    <img decoding="async" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp" class="lazyload" ><noscript><img decoding="async" src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp"></noscript>
-  </div>
-
-</div>
-
-
-
-<div class="top-company sp">
-
-  <div class="texts animated fadeIn delay-500ms">
-    <p class="p1">会社概要</p>
-    <p class="p2 mont">COMPANY</p>
-    <p class="p3"></p>
-  </div>
-
-  <div class="image animated fadeIn delay-500ms">
-    <img decoding="async" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp" class="lazyload" ><noscript><img decoding="async" src="https://savior-corporation.com/wp-content/uploads/2024/02/company-3-jpg.webp"></noscript>
-  </div>
-
-  <p class="p4 animated fadeIn delay-500ms">若年層の可能性を信じ、社会に貢献することを促進することに情熱を注いでいます。</p>
-  <a href="/company" class="temple-btn animated fadeIn delay-500ms">私たちについて</a>
-
-</div>
 
 
 <div class="p-blogParts post_content" data-partsID="706">
@@ -2089,24 +2010,6 @@ $(document).ready(function() {
     });
 });
 </script>
-<script>document.addEventListener('touchstart',function(){});</script><script>
-/* トップと同一のクリック挙動：SERVICE枠は事業名ボタン=各事業/それ以外=/service、COMPANY枠はどこでも/company。 */
-(function(){
-  document.querySelectorAll('.top-service').forEach(function(sec){
-    sec.style.cursor='pointer';
-    sec.addEventListener('click', function(e){
-      if(e.target.closest('a')) return; // 事業名ボタン等のリンクはそのまま
-      window.location.href='/service';
-    });
-  });
-  document.querySelectorAll('.top-company').forEach(function(sec){
-    sec.style.cursor='pointer';
-    sec.addEventListener('click', function(e){
-      if(e.target.closest('a')) return; // 「私たちについて」ボタン(=/company)はそのまま
-      window.location.href='/company';
-    });
-  });
-})();
-</script>
+<script>document.addEventListener('touchstart',function(){});</script>
 <script>(function(){var T="/contact";function m(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a&&(a.getAttribute("href")||"").indexOf(T)>-1)li.classList.add("-current");});}m();setTimeout(m,300);window.addEventListener("load",m);})();</script>
 </body></html>
