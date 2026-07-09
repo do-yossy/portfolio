@@ -63,6 +63,24 @@ ${errorMsg ? `<div class="err">${errorMsg}</div>` : ''}
 // ── 会社名・認証解決（現システムと同一規則）──
 const companyFullName = (id) => (COMPANIES.find(c => c.id === id) || {}).name || (process.env.COMPANY_NAME || '株式会社SocialQuality');
 
+// 人材紹介求人に自動付与する「人材紹介である旨」の記載（職業安定法の表示義務対応）
+// .env の AGENCY_NOTICE で全文上書き可。AGENCY_LICENSE_NO で許可番号を差し込み可。
+function agencyNotice(companyId) {
+  const custom = (process.env.AGENCY_NOTICE || '').trim();
+  if (custom) return custom;
+  const lic = (process.env.AGENCY_LICENSE_NO || '').trim();
+  const licPart = lic ? `（有料職業紹介事業許可番号：${lic}）` : '';
+  const co = companyFullName(companyId);
+  return `※本求人は${co}による人材紹介（有料職業紹介事業）です${licPart}。実際の雇用主・雇用形態・労働条件は紹介先企業によります。`;
+}
+// description に人材紹介の記載を付与（未記載のときのみ・末尾に追記）
+function withAgencyNotice(desc, companyId) {
+  const notice = agencyNotice(companyId);
+  const d = String(desc || '');
+  if (d.includes('人材紹介')) return d; // 既に記載があれば二重付与しない
+  return (d ? d + '\n\n' : '') + notice;
+}
+
 function kyujinboxEnvForCompany(id) {
   const co = String(id || 'sq').toUpperCase();
   const pick = base => (process.env[`${base}_${co}`] || '').trim() || (process.env[base] || '').trim();
@@ -314,10 +332,14 @@ const server = http.createServer(async (req, res) => {
             else if (obj.type === 'job' && obj.job) {
               try {
                 const j = obj.job;
+                const isAgency = kind === 'agency';
+                let tags = Array.isArray(j.tags) ? j.tags : [];
+                if (isAgency && !tags.includes('人材紹介')) tags = ['人材紹介', ...tags];
                 Jobs.create({
                   title: j.title || '(無題)', location: j.location || '', salary: j.salary || '',
                   jobType: j.jobType || '', employmentType: j.employmentType || '正社員',
-                  description: j.description || '', catchcopy: j.catchcopy || '', tags: j.tags || [],
+                  description: isAgency ? withAgencyNotice(j.description, co) : (j.description || ''),
+                  catchcopy: j.catchcopy || '', tags,
                   qualifications: j.qualifications || '', benefit: j.benefit || '',
                   worktimeHoliday: j.worktimeHoliday || '', transportation: j.transportation || '',
                   rewarding: j.rewarding || '', howToApply: j.howToApply || '',
@@ -365,17 +387,20 @@ const server = http.createServer(async (req, res) => {
       let tags = base.tags;
       if (typeof tags === 'string') tags = tags.split(/[,、]+/).map(t => t.trim()).filter(Boolean);
       tags = Array.isArray(tags) ? tags : [];
+      const isAgency = jobKind === 'agency';
+      if (isAgency && !tags.includes('人材紹介')) tags = ['人材紹介', ...tags];
 
       let created = 0;
       const createdTitles = [];
       for (const loc of locations) {
+        const filledDesc = fill(base.description, loc);
         const job = Jobs.create({
           title: fill(base.title, loc),
           location: loc,
           salary: base.salary || '',
           jobType: base.jobType || base.job_type || '',
           employmentType: base.employmentType || base.employment_type || '正社員',
-          description: fill(base.description, loc),
+          description: isAgency ? withAgencyNotice(filledDesc, company) : filledDesc,
           catchcopy: fill(base.catchcopy, loc),
           tags,
           qualifications: fill(base.qualifications, loc),
