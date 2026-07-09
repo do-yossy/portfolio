@@ -12,20 +12,22 @@ const { spawnSync } = require('child_process');
 
 const APP_DIR = path.join(__dirname, '..');
 
-// ── .env 読み込み（server.js と同じ方式）──
+// ── .env 読み込み（server.js と同じ方式。無い項目は現システムの.envを流用）──
 (function loadEnv() {
-  const envFile = fs.existsSync(path.join(process.cwd(), '.env'))
-    ? path.join(process.cwd(), '.env')
-    : path.join(APP_DIR, '.env');
-  if (!fs.existsSync(envFile)) return;
-  fs.readFileSync(envFile, 'utf8').split(/\r?\n/).forEach(line => {
-    line = line.trim();
-    if (!line || line.startsWith('#')) return;
-    const eq = line.indexOf('=');
-    if (eq < 0) return;
-    const key = line.slice(0, eq).trim(), val = line.slice(eq + 1).trim();
-    if (key && !(key in process.env)) process.env[key] = val;
-  });
+  const read = (file, skip) => {
+    if (!file || !fs.existsSync(file)) return;
+    fs.readFileSync(file, 'utf8').split(/\r?\n/).forEach(line => {
+      line = line.trim();
+      if (!line || line.startsWith('#')) return;
+      const eq = line.indexOf('=');
+      if (eq < 0) return;
+      const key = line.slice(0, eq).trim(), val = line.slice(eq + 1).trim();
+      if (key && !(skip && skip.includes(key)) && !(key in process.env)) process.env[key] = val;
+    });
+  };
+  const own = fs.existsSync(path.join(process.cwd(), '.env')) ? path.join(process.cwd(), '.env') : path.join(APP_DIR, '.env');
+  read(own);
+  read(path.join(APP_DIR, '..', 'recruitment-platform', '.env'), ['PORT']);
 })();
 
 const optimizer = require(path.join(APP_DIR, 'lib', 'optimizer.js'));

@@ -15,15 +15,23 @@ const LOGS_DIR = path.join(APP_DIR, 'logs');
 if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
 
 // ── .env 読み込み（最初の出現を採用）──
-(function loadEnv() {
-  const f = fs.existsSync(path.join(process.cwd(), '.env')) ? path.join(process.cwd(), '.env') : path.join(APP_DIR, '.env');
-  if (!fs.existsSync(f)) return;
-  fs.readFileSync(f, 'utf8').split(/\r?\n/).forEach(line => {
+// 1) 自分の .env を最優先で読む
+// 2) 無い項目は、隣の現システム(recruitment-platform)の .env を流用する（PORT は引き継がない）
+//    → 新システム用に .env を作らなくても、現システムの認証情報・APIキーをそのまま使える。
+//    現システムのファイルは読むだけで変更しない。
+function loadEnvFile(file, skipKeys) {
+  if (!file || !fs.existsSync(file)) return;
+  fs.readFileSync(file, 'utf8').split(/\r?\n/).forEach(line => {
     line = line.trim(); if (!line || line.startsWith('#')) return;
     const eq = line.indexOf('='); if (eq < 0) return;
     const k = line.slice(0, eq).trim(), v = line.slice(eq + 1).trim();
-    if (k && !(k in process.env)) process.env[k] = v;
+    if (k && !(skipKeys && skipKeys.includes(k)) && !(k in process.env)) process.env[k] = v;
   });
+}
+(function loadEnv() {
+  const own = fs.existsSync(path.join(process.cwd(), '.env')) ? path.join(process.cwd(), '.env') : path.join(APP_DIR, '.env');
+  loadEnvFile(own);                                                        // 自分の.envが最優先
+  loadEnvFile(path.join(APP_DIR, '..', 'recruitment-platform', '.env'), ['PORT']); // 現システムの.envを流用（PORTは除外）
 })();
 
 const { Jobs, Logs, Reports, COMPANIES } = require('./db');
