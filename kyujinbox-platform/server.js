@@ -156,7 +156,9 @@ const server = http.createServer(async (req, res) => {
     // ── 求人ボックス投稿（複数アカウント）──
     if (pathname === '/api/post/kyujinbox' && method === 'POST') {
       const body = await parseJSON(req);
-      const batchSize = Math.min(parseInt(body.limit || '25', 10), 25);
+      // 件数上限は固定しない。未指定なら全件（100件・300件・それ以上も可）。
+      const parsedLimit = parseInt(body.limit, 10);
+      const batchSize = (Number.isFinite(parsedLimit) && parsedLimit > 0) ? parsedLimit : 1000000;
       const kbCompany = body.company && body.company !== 'all' ? body.company : null;
       const forceRepost = body.forceRepost === true || body.forceRepost === 'true';
 

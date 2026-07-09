@@ -36,8 +36,8 @@
       <label>アカウント
         <select id="company"><option value="all">すべて（認証済み全社）</option></select>
       </label>
-      <label>件数（最大25）
-        <input id="limit" type="number" min="1" max="25" value="25">
+      <label>件数（空欄＝全件）
+        <input id="limit" type="number" min="1" placeholder="全件（100・300件も可）" style="width:150px">
       </label>
       <button id="postBtn" class="primary">投稿する</button>
       <button id="forceBtn" class="ghost" title="投稿済みも含めて再投稿">強制再投稿</button>
