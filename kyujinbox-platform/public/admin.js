@@ -21,6 +21,7 @@ async function loadCompanies() {
   COMPANIES = Object.entries(s.perCompany).map(([id, v]) => ({ id, name: v.name, configured: v.configured }));
   const opts = COMPANIES.map(c => `<option value="${c.id}">${c.name}${c.configured ? '' : '（未設定）'}</option>`).join('');
   $('company').innerHTML = '<option value="all">すべて（認証済み全社）</option>' + opts;
+  $('repCompany').innerHTML = '<option value="all">すべて</option>' + opts;
   $('jobCompany').innerHTML = '<option value="">すべて</option>' + opts;
   $('impCompany').innerHTML = opts;
   $('b_company').innerHTML = opts;
@@ -153,6 +154,7 @@ async function loadJobs() {
 
 $('postBtn').onclick = () => post(false);
 $('forceBtn').onclick = () => { if (confirm('投稿済みも含めて再投稿します。よろしいですか？')) post(true); };
+$('genBtn').onclick = genReport;
 $('impBtn').onclick = importZip;
 $('b_btn').onclick = generateFromBase;
 $('b_presetBtn').onclick = insertPreset;
@@ -162,5 +164,5 @@ $('jobCompany').onchange = loadJobs;
 
 (async function init() {
   await loadCompanies();
-  await Promise.all([loadStats(), loadJobs()]);
+  await Promise.all([loadStats(), loadReports(), loadJobs()]);
 })();
