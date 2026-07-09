@@ -18,6 +18,8 @@
 .temple-btn::after{display:none !important} /* 線(シャフト)を消して▶だけに */
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定。他ページと統一） */
 .page-tops{background-attachment:fixed !important}
+/* タッチ端末(スマホ/タブレット)では background-attachment:fixed が正しく描画されない(特にiOS)ため通常スクロール表示に戻す */
+@media (hover:none) and (pointer:coarse){.page-tops{background-attachment:scroll !important}}
 /* フッターの住所ブロックを非表示（他ページと統一。共有フッター設定には触れない） */
 .footer-main .address{display:none !important}
 /* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示（トップと統一） */
@@ -115,6 +117,53 @@ Saviorへのご依頼・お問い合わせは、<br>
     });
   }
   fix();setTimeout(fix,400);setTimeout(fix,1000);window.addEventListener('load',fix);
+})();
+</script>
+<!-- /wp:html -->
+
+<!-- wp:html -->
+<style id="sv-inquiry-css">
+/* お問い合わせ種別セレクトの見た目（フォームの他項目と統一） */
+.wpcf7-form select.sv-inquiry-select{width:100%;max-width:420px;padding:.6em .8em;font-size:1rem;border:1px solid #ccc;border-radius:4px;background:#fff;color:#333}
+</style>
+<script id="sv-form-inquiry-type">
+/* お問い合わせフォームに「お問い合わせ種別」項目を追加（CF7フォーム設定はAPIから更新できないため、
+   ページ側で項目を挿入。選択値は送信時にメッセージ本文の先頭へ付記し、通知メールにも反映させる。
+   付記はシリアライズ直後に元へ戻すので、画面上の本文入力欄は汚さない） */
+(function(){
+  var OPTS=['お仕事をお探しの方','人材採用をご検討の企業様','RPO（採用代行）をご検討の企業様','飲食店総合プロデュースのご相談','その他'];
+  function build(form){
+    if(form.querySelector('[name="your-inquiry-type"]')) return;
+    var table=form.querySelector('.CF7_table')||form.querySelector('table'); if(!table) return;
+    var sel=document.createElement('select');
+    sel.name='your-inquiry-type'; sel.required=true; sel.className='sv-inquiry-select';
+    var o0=document.createElement('option'); o0.value=''; o0.textContent='選択してください'; sel.appendChild(o0);
+    OPTS.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o);});
+    var tr=document.createElement('tr');
+    var th=document.createElement('th'); th.innerHTML='<span class="CF7_req">必須</span> お問い合わせ種別';
+    var td=document.createElement('td'); td.appendChild(sel);
+    tr.appendChild(th); tr.appendChild(td);
+    var tbody=table.tBodies[0]||table;
+    tbody.insertBefore(tr, tbody.firstChild);
+    // 送信時：未選択なら送信を止めて選択を促す（CF7がnovalidateでも必須を担保）。
+    // 選択済みなら選択値をメッセージ本文の先頭へ付記→シリアライズ直後に元へ戻す。
+    form.addEventListener('submit', function(e){
+      var s=form.querySelector('[name="your-inquiry-type"]');
+      var msg=form.querySelector('[name="your-message"]');
+      if(s && !s.value){
+        e.preventDefault(); e.stopImmediatePropagation();
+        if(s.reportValidity){s.reportValidity();} else {s.focus();}
+        return;
+      }
+      if(s && s.value && msg){
+        var orig=msg.value;
+        msg.value='【お問い合わせ種別】'+s.value+'\n\n'+orig;
+        setTimeout(function(){msg.value=orig;},0);
+      }
+    }, true);
+  }
+  function init(){document.querySelectorAll('form.wpcf7-form').forEach(build);}
+  init();setTimeout(init,500);setTimeout(init,1200);window.addEventListener('load',init);
 })();
 </script>
 <!-- /wp:html -->

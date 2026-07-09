@@ -1786,6 +1786,7 @@ header img{
 <style id="sv-pagehead">
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定） */
 .page-tops{background-attachment:fixed !important}
+@media (hover:none) and (pointer:coarse){.page-tops{background-attachment:scroll !important}}
 /* 企業情報カード：width:93vw+左右padding(5vw)が103vwとなりモバイルで横スクロールを生むためborder-box化 */
 .company-details .company-text2{box-sizing:border-box !important;max-width:100%}
 /* タイトル：事業内容ページのヒーローと統一（ラベル／大きな英字／キャッチの3段構成）。

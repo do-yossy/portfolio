@@ -820,6 +820,8 @@
 
 /* 事業内容ページ上部ヒーロー画像を固定 */
 .savior-draft .hero-lg .hero-media.has-img{background-attachment:fixed !important}
+/* タッチ端末(スマホ/タブレット)では background-attachment:fixed が正しく描画されない(特にiOS)ため通常スクロール表示に戻す */
+@media (hover:none) and (pointer:coarse){.savior-draft .hero-lg .hero-media.has-img{background-attachment:scroll !important}}
 
 </style>
 <script>

@@ -6,6 +6,8 @@
 .l-header__bar,.l-fixHeader::before,.l-fixHeader:before{background:transparent !important}
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定。他ページと統一） */
 .page-tops{background-attachment:fixed !important}
+/* タッチ端末(スマホ/タブレット)では background-attachment:fixed が正しく描画されない(特にiOS)ため通常スクロール表示に戻す */
+@media (hover:none) and (pointer:coarse){.page-tops{background-attachment:scroll !important}}
 /* フッターの住所ブロックを非表示（他ページと統一。共有フッター設定には触れない） */
 .footer-main .address{display:none !important}
 /* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示（トップと統一） */
