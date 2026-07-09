@@ -173,6 +173,76 @@ ${JSON.stringify(tags)}`;
   };
 }
 
+// ── 新規求人を「掲載実績の学び」で最適化（投稿前の先回り改善）─────
+// 既存の応募実績（勝ちパターン）を踏まえ、新規作成した求人のタイトル・訴求・
+// タグを最適化する。事実（職種・勤務地・給与レンジ・雇用形態）は保持。
+async function rewriteNewJob(job, insightsText, opts = {}) {
+  const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!apiKey || apiKey.startsWith('sk-ant-your')) {
+    throw new Error('ANTHROPIC_API_KEY が未設定です（.env に本物のAPIキーを設定してください）');
+  }
+  const model = (process.env.OPTIMIZER_MODEL || 'claude-sonnet-5').trim();
+  const tags = (() => { try { return JSON.parse(job.tags || '[]'); } catch { return []; } })();
+
+  const sys = `あなたは求人広告（求人ボックス掲載）のプロの求人コピーライターです。
+これから新規掲載する求人を、同じ運用アカウントの「実際の応募実績（勝ちパターン）」を踏まえて先回りで最適化します。
+制約（厳守）:
+- 職種・勤務地・給与レンジ・雇用形態などの「事実」は絶対に変えない。誇張・虚偽・実在しない条件の追加は禁止。
+- 改善するのは、タイトルのキーワード/語順、キャッチコピー、本文の訴求・構成、タグ、やりがい文のみ。
+- 応募実績で「応募につながっているキーワード/タグ」や「応募者の年代・経験・前職の傾向」に合わせ、その層に響く表現を優先する。
+- 応募が少ない群に偏っているタグには過度に頼らない。
+- 日本語。求人ボックスの掲載基準（虚偽・差別表現の禁止）を守る。年齢制限の表現は避け「年齢不問」「幅広い世代活躍」等で表現する。
+出力は次のJSONのみ（前後に説明文やコードフェンスを付けない）:
+{"title":"...","catchcopy":"...","description":"...","rewarding":"...","tags":["..."],"note":"実績を踏まえ何をどう変えたか1〜2文"}`;
+
+  const user = `# これまでの応募実績（学習データ）
+${insightsText}
+
+# 上記の学びを反映して最適化する新規求人
+職種: ${job.job_type}
+勤務地: ${job.location}
+給与: ${job.salary}
+雇用形態: ${job.employment_type}
+--- タイトル ---
+${job.title}
+--- キャッチコピー ---
+${job.catchcopy || ''}
+--- 仕事内容(description) ---
+${job.description || ''}
+--- やりがい(rewarding) ---
+${job.rewarding || ''}
+--- タグ ---
+${JSON.stringify(tags)}
+
+事実は保持し、応募実績の勝ちパターンに寄せて最適化したJSONを返してください。`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model, max_tokens: 3000, system: sys, messages: [{ role: 'user', content: user }] }),
+  });
+  if (!resp.ok) {
+    const t = await resp.text().catch(() => '');
+    throw new Error(`Claude API エラー ${resp.status}: ${t.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  const s = text.indexOf('{'), e = text.lastIndexOf('}');
+  if (s < 0 || e < 0) throw new Error('AI応答からJSONを抽出できませんでした');
+  let obj;
+  try { obj = JSON.parse(text.slice(s, e + 1)); }
+  catch (err) { throw new Error('AI応答のJSON解析に失敗: ' + err.message); }
+
+  return {
+    title: (obj.title || job.title).slice(0, 120),
+    catchcopy: (obj.catchcopy || job.catchcopy || '').slice(0, 300),
+    description: obj.description || job.description,
+    rewarding: (obj.rewarding || job.rewarding || '').slice(0, 500),
+    tags: Array.isArray(obj.tags) && obj.tags.length ? obj.tags.slice(0, 15).map(String) : tags,
+    note: (obj.note || '').slice(0, 200),
+  };
+}
+
 // ── 改善をDBへ適用（自社サイトへ即反映）──────────────────────
 function applyImprovement(jobId, improved) {
   const ts = nowIso();
@@ -183,4 +253,4 @@ function applyImprovement(jobId, improved) {
          JSON.stringify(improved.tags), ts, ts, jobId);
 }
 
-module.exports = { storeMetrics, latestMetrics, detectUnderperformers, rewriteJob, applyImprovement };
+module.exports = { storeMetrics, latestMetrics, detectUnderperformers, rewriteJob, rewriteNewJob, applyImprovement };
