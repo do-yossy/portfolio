@@ -22,6 +22,32 @@ async function loadCompanies() {
   $('repCompany').innerHTML = '<option value="all">すべて</option>' + opts;
   $('jobCompany').innerHTML = '<option value="">すべて</option>' + opts;
   $('impCompany').innerHTML = opts;
+  $('b_company').innerHTML = opts;
+}
+
+async function generateFromBase() {
+  const btn = $('b_btn'), log = $('b_log'); log.innerHTML = '';
+  const base = {
+    title: $('b_title').value, jobType: $('b_jobtype').value, salary: $('b_salary').value,
+    employmentType: $('b_emp').value, tags: $('b_tags').value, catchcopy: $('b_catch').value,
+    description: $('b_desc').value, qualifications: $('b_qual').value, benefit: $('b_benefit').value,
+    worktimeHoliday: $('b_worktime').value, transportation: $('b_transport').value,
+    rewarding: $('b_rewarding').value, howToApply: $('b_apply').value,
+  };
+  if (!base.title.trim()) { appendLog(log, [{ message: 'タイトルを入力してください', type: 'warn' }]); return; }
+  if (!$('b_locations').value.trim()) { appendLog(log, [{ message: '勤務地リストを入力してください（1行に1件）', type: 'warn' }]); return; }
+  btn.disabled = true;
+  try {
+    const r = await api('/api/generate-from-base', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base, locations: $('b_locations').value, company: $('b_company').value, jobKind: $('b_kind').value, publish: true }),
+    });
+    if (r.error) { appendLog(log, [{ message: r.error, type: 'warn' }]); btn.disabled = false; return; }
+    appendLog(log, [{ message: `✅ ${r.created}件を作成しました（公開状態）。求人一覧で確認し、投稿してください。`, type: 'success' }]);
+    (r.titles || []).forEach(t => appendLog(log, [{ message: '　・' + t.slice(0, 50), type: 'info' }]));
+    loadStats(); loadJobs();
+  } catch (e) { appendLog(log, [{ message: 'エラー: ' + e.message, type: 'error' }]); }
+  finally { btn.disabled = false; }
 }
 
 async function importZip() {
@@ -107,6 +133,7 @@ $('postBtn').onclick = () => post(false);
 $('forceBtn').onclick = () => { if (confirm('投稿済みも含めて再投稿します。よろしいですか？')) post(true); };
 $('genBtn').onclick = genReport;
 $('impBtn').onclick = importZip;
+$('b_btn').onclick = generateFromBase;
 $('jobCompany').onchange = loadJobs;
 
 (async function init() {

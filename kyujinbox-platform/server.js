@@ -346,6 +346,53 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── ベース求人から勤務地展開（1勤務地=1件を一括作成）──
+    if (pathname === '/api/generate-from-base' && method === 'POST') {
+      const body = await parseJSON(req);
+      const base = body.base || {};
+      const company = body.company || 'sq';
+      const jobKind = body.jobKind === 'agency' ? 'agency' : 'normal';
+      const publish = body.publish !== false && body.publish !== '0';
+      // 勤務地リスト（配列 or 改行/カンマ区切り文字列）
+      let locations = body.locations;
+      if (typeof locations === 'string') locations = locations.split(/[\r\n,]+/);
+      locations = (locations || []).map(s => String(s).trim()).filter(Boolean);
+      if (locations.length === 0) return sendJSON(res, 400, { error: '勤務地が1件も入力されていません' });
+      if (!base.title) return sendJSON(res, 400, { error: 'ベース求人のタイトルが空です' });
+
+      // {勤務地}{エリア}{地域}{area} を各勤務地で置換
+      const fill = (s, loc) => String(s || '').replace(/\{(勤務地|エリア|地域|area)\}/g, loc);
+      let tags = base.tags;
+      if (typeof tags === 'string') tags = tags.split(/[,、]+/).map(t => t.trim()).filter(Boolean);
+      tags = Array.isArray(tags) ? tags : [];
+
+      let created = 0;
+      const createdTitles = [];
+      for (const loc of locations) {
+        const job = Jobs.create({
+          title: fill(base.title, loc),
+          location: loc,
+          salary: base.salary || '',
+          jobType: base.jobType || base.job_type || '',
+          employmentType: base.employmentType || base.employment_type || '正社員',
+          description: fill(base.description, loc),
+          catchcopy: fill(base.catchcopy, loc),
+          tags,
+          qualifications: fill(base.qualifications, loc),
+          benefit: fill(base.benefit, loc),
+          worktimeHoliday: fill(base.worktimeHoliday || base.worktime_holiday, loc),
+          transportation: fill(base.transportation, loc),
+          rewarding: fill(base.rewarding, loc),
+          howToApply: fill(base.howToApply || base.how_to_apply, loc),
+          imageUrl: base.imageUrl || base.image_url || '',
+          company, jobKind, targetMedia: ['求人ボックス'], isPublished: publish,
+        });
+        created++; createdTitles.push(job.title);
+      }
+      Logs.create('generate_base', 'success', `ベース求人展開(${jobKind === 'agency' ? '人材紹介' : '通常'}): ${created}件`);
+      return sendJSON(res, 200, { ok: true, created, titles: createdTitles.slice(0, 30) });
+    }
+
     // ── 月次レポート ──
     if (pathname === '/api/reports' && method === 'GET') return sendJSON(res, 200, { reports: Reports.list(24) });
 

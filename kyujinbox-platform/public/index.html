@@ -32,6 +32,33 @@
   </section>
 
   <section class="card">
+    <h2>ベース求人から一括作成 <span class="muted">（勤務地だけ変えて展開）</span></h2>
+    <p class="muted" style="margin-bottom:10px">ベースとなる求人を1つ用意し、勤務地リストを貼り付けると、<b>1勤務地につき1件</b>を一括作成します。タイトル・仕事内容・アクセス等に <code>{勤務地}</code> と書くと、その部分が各勤務地に置き換わります。</p>
+    <div class="grid2">
+      <label class="full">タイトル（<code>{勤務地}</code>使用可）<input id="b_title" placeholder="【{勤務地}】ルート配送ドライバー正社員募集｜月給42万〜"></label>
+      <label>職種<input id="b_jobtype" placeholder="ルート配送ドライバー（企業配送）"></label>
+      <label>給与<input id="b_salary" placeholder="月給420,000円〜620,000円"></label>
+      <label>雇用形態<input id="b_emp" value="正社員"></label>
+      <label>タグ（カンマ区切り）<input id="b_tags" placeholder="未経験OK,高収入,正社員"></label>
+      <label class="full">キャッチコピー（<code>{勤務地}</code>可）<textarea id="b_catch" rows="2"></textarea></label>
+      <label class="full">仕事内容（<code>{勤務地}</code>可）<textarea id="b_desc" rows="6"></textarea></label>
+      <label class="full">応募資格<textarea id="b_qual" rows="2"></textarea></label>
+      <label class="full">待遇・給与補足<textarea id="b_benefit" rows="2"></textarea></label>
+      <label class="full">勤務時間・休日<input id="b_worktime"></label>
+      <label class="full">アクセス（<code>{勤務地}</code>可）<textarea id="b_transport" rows="2"></textarea></label>
+      <label class="full">やりがい<textarea id="b_rewarding" rows="2"></textarea></label>
+      <label class="full">応募方法<textarea id="b_apply" rows="2"></textarea></label>
+      <label class="full">勤務地リスト（1行に1件）<textarea id="b_locations" rows="6" placeholder="大阪府大阪市北区天満&#10;大阪府大阪市福島区大開&#10;大阪府大阪市此花区酉島"></textarea></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label>アカウント<select id="b_company"></select></label>
+      <label>区分<select id="b_kind"><option value="normal">通常求人</option><option value="agency">人材紹介求人</option></select></label>
+      <button id="b_btn" class="primary">一括作成する</button>
+    </div>
+    <pre id="b_log" class="log"></pre>
+  </section>
+
+  <section class="card">
     <h2>求人ボックスへ自動投稿</h2>
     <div class="row">
       <label>アカウント
