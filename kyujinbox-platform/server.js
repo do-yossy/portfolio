@@ -460,7 +460,5 @@ server.listen(PORT, () => {
   console.log(`   管理画面: http://localhost:${PORT}/`);
   console.log(`   ログイン認証: ${process.env.ADMIN_PASSWORD ? 'あり（ADMIN_USER/ADMIN_PASSWORD）' : '無し（ADMIN_PASSWORD未設定＝開放）'}`);
   console.log(`   認証済み求人ボックスアカウント: ${kyujinboxConfiguredCompanies().map(companyFullName).join('・') || '(未設定)'}`);
-  ensureMonthlyReports();
-  // 毎日1回、前月分の月次レポートが無ければ自動生成（月替わり後の初回起動で前月分が作られる）
-  setInterval(ensureMonthlyReports, 24 * 60 * 60 * 1000);
+  // 月次レポートは不要のため自動生成を停止（APIは残置。必要になれば再有効化できる）
 });
