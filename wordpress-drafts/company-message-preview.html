@@ -1788,8 +1788,8 @@ header img{
 .page-tops{background-attachment:fixed !important}
 /* 企業情報カード：width:93vw+左右padding(5vw)が103vwとなりモバイルで横スクロールを生むためborder-box化 */
 .company-details .company-text2{box-sizing:border-box !important;max-width:100%}
-/* タイトル：事業内容ページのヒーローと統一（ラベル／大きな英字／キャッチの3段構成） */
-.page-texts{position:relative;z-index:1;text-align:center}
+/* タイトル：事業内容ページのヒーローと統一（ラベル／大きな英字／キャッチの3段構成）。
+   位置はテーマ既定のまま（.page-textsは上部画像に絶対配置で重なる）。中身だけ差し替える。 */
 .page-texts .h3-label{font-family:"Montserrat",sans-serif;font-size:clamp(.62rem,1.8vw,.8rem);letter-spacing:.35em;color:#9fc0ff;margin:0 0 18px;text-transform:uppercase}
 .page-texts .h3-en{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3rem,11vw,6rem);line-height:1;letter-spacing:.03em;color:#fff;margin:0;text-shadow:0 2px 24px rgba(0,0,0,.45)}
 .page-texts .h3-catch{margin:24px 0 0;color:#fff;font-size:clamp(1.2rem,3.6vw,2rem);line-height:1.5;letter-spacing:.06em;font-weight:700;text-shadow:0 2px 18px rgba(0,0,0,.5)}
@@ -1800,6 +1800,10 @@ header img{
 .footer-contact .contact-btn::after{display:none !important}
 .footer-contact .contact-btn:hover::before{right:1.1em}
 @media(max-width:600px){.footer-contact .contact-btn{padding-left:1.6rem !important;padding-right:2.6rem !important;max-width:100% !important;box-sizing:border-box !important}}
+/* コピーライトの縦幅をトップ・事業内容ページ(.sv-copyright)と統一（テーマ既定のフッター末尾コピーライト帯を同じ高さ/文字サイズに） */
+.l-footer__foot{padding:26px 20px !important;background:#0f2350 !important}
+.l-footer__foot .l-container{padding:0 !important;max-width:none !important;margin:0 !important}
+.l-footer__foot .copyright{font-size:13px !important;line-height:1.7 !important;letter-spacing:.08em !important;margin:0 !important}
 </style>
 <div class="page-texts">
   <p class="h3-label">COMPANY</p>
