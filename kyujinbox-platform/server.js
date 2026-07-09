@@ -141,6 +141,7 @@ function ensureMonthlyReports() {
     if (Reports.has(period, 'all')) return;
     const cosWith = COMPANIES.map(c => c.id).filter(id =>
       require('./db').db.prepare(`SELECT 1 FROM jobs WHERE company=? LIMIT 1`).get(id));
+    if (cosWith.length === 0) return; // 求人が1件も無い月は空レポートを作らない
     for (const co of ['all', ...cosWith]) report.generate(period, co);
     Logs.create('report_generate', 'success', `月次レポート自動生成: ${period}（${['all', ...cosWith].length}件）`);
     console.log(`📄 月次レポートを自動生成しました: ${period}`);
@@ -420,6 +421,13 @@ const server = http.createServer(async (req, res) => {
 
     // ── 月次レポート ──
     if (pathname === '/api/reports' && method === 'GET') return sendJSON(res, 200, { reports: Reports.list(24) });
+
+    if (pathname === '/api/report/delete' && method === 'POST') {
+      const body = await parseJSON(req);
+      if (!body.period) return sendJSON(res, 400, { error: 'period が必要です' });
+      const n = Reports.delete(body.period, body.company || 'all');
+      return sendJSON(res, 200, { ok: true, deleted: n });
+    }
 
     if (pathname === '/api/report/generate' && method === 'POST') {
       const body = await parseJSON(req);
