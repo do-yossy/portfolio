@@ -137,6 +137,8 @@ a.sv-about__head:hover .sv-go,a.sv-kw-head:hover .sv-go{animation-play-state:pau
 /* このトップページのみ：会社概要ページと同じテーマフッターのコピーライトを再現（他ページ・テーマ設定には触れない） */
 .sv-copyright{background:#0f2350;color:#fff;text-align:center;margin:0;padding:26px 20px;font-size:13px;letter-spacing:.08em;line-height:1.7;width:100vw;margin-left:calc(50% - 50vw);box-sizing:border-box}
 .sv-copyright span[lang=en]{margin-right:.45em}
+/* 最下部コピーライト(.sv-copyright)の下に出るテーマ既定フッター帯を非表示にして余白を詰める（本ページのフッターは上部の共有ブロックで表示済み） */
+#footer.l-footer,.l-footer__foot{display:none !important}
 /* モバイル：フッターCONTACTボタンの左右パディング(5rem)が画面幅を超えて横スクロールを生むため縮小 */
 @media(max-width:600px){.footer-contact .contact-btn{padding-left:1.6rem !important;padding-right:2.6rem !important;max-width:100% !important;box-sizing:border-box !important}}
 /* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示 */

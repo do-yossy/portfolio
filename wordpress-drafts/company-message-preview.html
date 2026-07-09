@@ -1789,11 +1789,18 @@ header img{
 /* 企業情報カード：width:93vw+左右padding(5vw)が103vwとなりモバイルで横スクロールを生むためborder-box化 */
 .company-details .company-text2{box-sizing:border-box !important;max-width:100%}
 /* タイトル：事業内容ページのヒーローと統一（ラベル／大きな英字／キャッチの3段構成）。
-   位置はテーマ既定のまま（.page-textsは上部画像に絶対配置で重なる）。中身だけ差し替える。 */
+   位置はテーマ既定のまま（.page-textsは上部画像に絶対配置で重なる）。中身だけ差し替える。
+   事業内容ページと同様に、文字は左寄せ（幅min(92%,1080px)のコンテナに揃える）。 */
+.page-texts{align-items:stretch !important;text-align:left !important}
+.page-texts .h3-wrap{width:min(92%,1080px);margin:0 auto}
 .page-texts .h3-label{font-family:"Montserrat",sans-serif;font-size:clamp(.62rem,1.8vw,.8rem);letter-spacing:.35em;color:#9fc0ff;margin:0 0 18px;text-transform:uppercase}
 .page-texts .h3-en{font-family:"Montserrat",sans-serif;font-weight:700;font-size:clamp(3rem,11vw,6rem);line-height:1;letter-spacing:.03em;color:#fff;margin:0;text-shadow:0 2px 24px rgba(0,0,0,.45)}
 .page-texts .h3-catch{margin:24px 0 0;color:#fff;font-size:clamp(1.2rem,3.6vw,2rem);line-height:1.5;letter-spacing:.06em;font-weight:700;text-shadow:0 2px 18px rgba(0,0,0,.5)}
 .page-texts .h3-catch .hl{color:#8fb4ff}
+.sv-hero-scroll{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff;font:700 .72rem/1 "Montserrat",sans-serif;letter-spacing:.3em;pointer-events:none;text-shadow:0 2px 12px rgba(0,0,0,.85),0 0 4px rgba(0,0,0,.7)}
+.sv-hero-scroll::after{content:"";width:2px;height:46px;background:#fff;box-shadow:0 0 8px rgba(0,0,0,.6);transform-origin:top;animation:sv-cue 1.9s ease-in-out infinite}
+@keyframes sv-cue{0%{transform:scaleY(0);opacity:0}30%{opacity:1}100%{transform:scaleY(1);opacity:0}}
+@media(max-width:720px){.sv-hero-scroll{bottom:24px}.sv-hero-scroll::after{height:36px}}
 /* フッターをトップと統一：住所を非表示、CONTACTボタンの矢印を塗り三角▶に */
 .footer-main .address{display:none !important}
 .footer-contact .contact-btn::before{content:"" !important;position:absolute !important;top:50% !important;left:auto !important;right:1.6em;width:0 !important;height:0 !important;border-top:5px solid transparent !important;border-bottom:5px solid transparent !important;border-left:9px solid #fff !important;background:none !important;transform:translateY(-50%) !important;transition:right .3s}
@@ -1806,9 +1813,12 @@ header img{
 .l-footer__foot .copyright{font-size:13px !important;line-height:1.7 !important;letter-spacing:.08em !important;margin:0 !important}
 </style>
 <div class="page-texts">
-  <p class="h3-label">COMPANY</p>
-  <p class="h3-en">ABOUT</p>
-  <p class="h3-catch">人と企業の可能性を、<span class="hl">最大化</span>する。</p>
+  <div class="h3-wrap">
+    <p class="h3-label">COMPANY</p>
+    <p class="h3-en">ABOUT</p>
+    <p class="h3-catch">人と企業の可能性を、<span class="hl">最大化</span>する。</p>
+  </div>
+  <div class="sv-hero-scroll" aria-hidden="true">SCROLL</div>
 </div>
 
 

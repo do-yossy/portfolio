@@ -23,6 +23,10 @@
 /* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示（トップと統一） */
 .p-spMenu a .sv-en{display:block;font-family:"Montserrat",sans-serif;font-weight:600;letter-spacing:.14em;line-height:1.25}
 .p-spMenu a .sv-ja{display:block;font-size:.72em;letter-spacing:.06em;opacity:.68;margin-top:.3em}
+/* コピーライトの縦幅を全ページで統一（高さ74px／文字13px／ネイビー#0f2350） */
+.l-footer__foot{padding:26px 20px !important;background:#0f2350 !important}
+.l-footer__foot .l-container{padding:0 !important;max-width:none !important;margin:0 !important}
+.l-footer__foot .copyright{font-size:13px !important;line-height:1.7 !important;letter-spacing:.08em !important;margin:0 !important}
 </style>
 <!-- /wp:html -->
 
@@ -91,6 +95,26 @@ Saviorへのご依頼・お問い合わせは、<br>
   }
   function apply(){applyPC();applySP();}
   apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
+})();
+</script>
+<!-- /wp:html -->
+
+<!-- wp:html -->
+<script id="sv-form-relabel">
+/* お問い合わせフォームの「お名前」項目名を「お名前・会社名」に変更（CF7設定には触れず、表示ラベルのみ差し替え） */
+(function(){
+  function fix(){
+    document.querySelectorAll('th').forEach(function(th){
+      var w=document.createTreeWalker(th, NodeFilter.SHOW_TEXT, null);
+      var n;
+      while(n=w.nextNode()){
+        if(n.nodeValue.indexOf('お名前')>-1 && n.nodeValue.indexOf('会社名')===-1){
+          n.nodeValue=n.nodeValue.replace('お名前','お名前・会社名');
+        }
+      }
+    });
+  }
+  fix();setTimeout(fix,400);setTimeout(fix,1000);window.addEventListener('load',fix);
 })();
 </script>
 <!-- /wp:html -->
