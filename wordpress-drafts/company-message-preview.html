@@ -1908,6 +1908,8 @@ header img{
 .sv-greeting{text-align:left;max-width:940px;margin-left:auto;margin-right:auto;padding:0 6vw;box-sizing:border-box;overflow-x:clip}
 .sv-greeting .msg-en{font-family:"Montserrat",sans-serif;font-weight:800;font-size:clamp(2.6rem,11vw,5.6rem);line-height:1;letter-spacing:.02em;margin:0 0 .3em;color:transparent;-webkit-text-stroke:1.6px #0f2350;text-stroke:1.6px #0f2350}
 .sv-greeting .msg-label{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(.95rem,2.2vw,1.2rem);letter-spacing:.34em;color:#0247b3;margin:0 0 1.6em}
+/* MESSAGE見出しと代表挨拶ラベルを、MISSION見出しと同じ左位置に揃える（本文の位置は変更しない） */
+.sv-greeting .msg-en,.sv-greeting .msg-label{margin-left:-6vw}
 .sv-greeting .sv-msg-body{max-width:820px;margin:1.4em 0 0;text-align:left}
 .sv-greeting .sv-msg-body p{font-family:"Zen Old Mincho","游明朝",serif;font-size:clamp(1rem,2vw,1.14rem);line-height:2.35;letter-spacing:.03em;color:#3a3f4a;margin:0 0 1.7em}
 .sv-greeting .sv-msg-body p.em{color:#0f2350;font-weight:600;font-size:clamp(1.12rem,2.6vw,1.5rem);line-height:1.9;letter-spacing:.05em;margin:1.8em 0}
@@ -2190,9 +2192,7 @@ $(document).ready(function() {
     });
     // 企業情報（ラベル＋テーブル行）
     document.querySelectorAll('.company-text2').forEach(function(card){
-      var items=Array.prototype.slice.call(card.querySelectorAll('.p1,.p2'));
-      items=items.concat(Array.prototype.slice.call(card.querySelectorAll('table tr')));
-      reveal(items);
+      reveal([card.querySelector('.p1'), card.querySelector('.p2'), card.querySelector('table')]);
     });
     // SERVICE
     document.querySelectorAll('.top-service').forEach(function(sec){
