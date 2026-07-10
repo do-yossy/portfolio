@@ -57,8 +57,9 @@
 /* 企業情報テーブル：所在地など長い値が枠からはみ出さないよう、幅を100%固定＋セル内で折り返す。
    折り返した値が下線に重ならないよう、値セルにも上下パディングを付けて体裁を整える。 */
 .company-details table{width:100% !important;table-layout:fixed}
-.company-details table .td1{vertical-align:middle}
-.company-details table .td2{word-break:break-word;overflow-wrap:anywhere;padding:2rem .2em 2rem 0;line-height:1.9;vertical-align:middle}
+/* テーマ既定のセルpaddingに負けないよう !important で上下余白を確保し、折り返した値が下線に重ならないようにする */
+.company-details table td{padding-top:2.2rem !important;padding-bottom:2.2rem !important;vertical-align:middle !important}
+.company-details table .td2{word-break:break-word;overflow-wrap:anywhere;padding-right:.2em !important;line-height:1.9 !important}
 /* タイトル：事業内容ページのヒーローと統一（ラベル／大きな英字／キャッチの3段構成）。
    位置はテーマ既定のまま（.page-textsは上部画像に絶対配置で重なる）。中身だけ差し替える。
    事業内容ページと同様に、文字は左寄せ（幅min(92%,1080px)のコンテナに揃える）。 */
