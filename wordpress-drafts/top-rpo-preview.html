@@ -1807,12 +1807,14 @@ header img{
 /* heroテキストは画面に固定。スクロールでグラデーション状にフェードアウトし、上に戻ると再び現れる（JSでスクロール量に連動） */
 .sv-hero-copy{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:0 6vw;pointer-events:none;will-change:opacity,transform,filter}
 .sv-hero-copy h1{font-family:"Zen Old Mincho","游明朝",serif;font-weight:500;line-height:1.35;letter-spacing:.09em;font-size:clamp(1.75rem,4.4vw,3.2rem);margin:0;text-shadow:0 4px 34px rgba(0,0,0,.4)}
-.sv-hero-copy .sv-line{display:block;overflow:hidden;padding:.09em 0}
+.sv-hero-copy .sv-line{display:block;padding:.09em 0}
 .sv-hero-copy .sv-line+.sv-line{margin-top:.4em}
-/* エモい登場：マスクから、わずかに傾いて・ぼけて→シャープに立ち上がる（2行を時間差で） */
-.sv-hero-copy .sv-line>span{display:inline-block;transform:translateY(128%) rotate(2.5deg);opacity:0;filter:blur(7px)}
-.sv-hero-copy.sv-on .sv-line>span{transform:none;opacity:1;filter:blur(0);transition:transform 1.7s cubic-bezier(.16,.84,.28,1),opacity 1.7s ease,filter 1.7s ease}
-.sv-hero-copy.sv-on .sv-line:nth-child(2)>span{transition-delay:.3s}
+/* 初回表示のみ：1行目は左から・2行目は右からスライドインして登場（2行を時間差で） */
+.sv-hero-copy .sv-line>span{display:inline-block;opacity:0;filter:blur(6px);will-change:transform,opacity,filter}
+.sv-hero-copy .sv-line:nth-child(1)>span{transform:translateX(-72px)}
+.sv-hero-copy .sv-line:nth-child(2)>span{transform:translateX(72px)}
+.sv-hero-copy.sv-on .sv-line>span{transform:none;opacity:1;filter:blur(0);transition:transform 1.5s cubic-bezier(.16,.84,.28,1),opacity 1.3s ease,filter 1.3s ease}
+.sv-hero-copy.sv-on .sv-line:nth-child(2)>span{transition-delay:.28s}
 /* heroテキスト分のスクロール領域を確保する透明スペーサー（映像もテキストも固定、その上をこの空間がスクロール） */
 .sv-hero-spacer{position:relative;z-index:1;width:100%;height:100vh;height:100dvh}
 /* hero直下のメッセージ帯（リード＋We Believe）：背景は敷かず、固定した映像の上を文字だけがスクロールする */
