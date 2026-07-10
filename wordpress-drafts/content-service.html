@@ -822,6 +822,12 @@
 .savior-draft .hero-lg .hero-media.has-img{background-attachment:fixed !important}
 /* タッチ端末(スマホ/タブレット)では background-attachment:fixed が正しく描画されない(特にiOS)ため通常スクロール表示に戻す */
 @media (hover:none) and (pointer:coarse){.savior-draft .hero-lg .hero-media.has-img{background-attachment:scroll !important}}
+/* モバイル(タッチ端末)：上部ヒーロー画像を固定に見せる代替方式。画像レイヤー(.hero-media)を100vh化し、
+   スクロールに合わせて追従させてビューポートに固定（iOSでも動作）。PCはネイティブfixedのまま。 */
+@media (hover:none) and (pointer:coarse){
+  .savior-draft .hero-lg{overflow:hidden}
+  .savior-draft .hero-lg .hero-media.has-img{top:0;bottom:auto;height:100vh;will-change:transform}
+}
 
 </style>
 <script>
@@ -936,6 +942,28 @@
   }
   function apply(){applyPC();applySP();}
   apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
+})();
+</script>
+<!-- /wp:html -->
+
+<!-- wp:html -->
+<script id="sv-mobfix-service">
+/* モバイル(タッチ端末)のみ：上部ヒーロー画像(.hero-media)を固定に見せる代替方式。
+   画像レイヤーをスクロールに合わせて追従させ、.hero-lg内にクリップして固定を再現（iOSでも動作）。PCはネイティブfixedのまま。 */
+(function(){
+  try{ if(!window.matchMedia || !matchMedia('(hover:none) and (pointer:coarse)').matches) return; }catch(e){ return; }
+  function setup(){
+    var hero=document.querySelector('.savior-draft .hero-lg'); if(!hero) return;
+    var media=hero.querySelector('.hero-media.has-img'); if(!media) return;
+    var ticking=false;
+    function upd(){var r=hero.getBoundingClientRect();media.style.transform='translate3d(0,'+(-r.top).toFixed(1)+'px,0)';ticking=false;}
+    function onScroll(){if(!ticking){ticking=true;requestAnimationFrame(upd);}}
+    upd();
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.addEventListener('resize',function(){requestAnimationFrame(upd);});
+    window.addEventListener('orientationchange',function(){requestAnimationFrame(upd);});
+  }
+  if(document.readyState!=='loading')setup();else document.addEventListener('DOMContentLoaded',setup);
 })();
 </script>
 <!-- /wp:html -->

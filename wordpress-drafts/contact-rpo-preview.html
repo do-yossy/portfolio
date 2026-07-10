@@ -1773,6 +1773,11 @@ header img{
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定。他ページと統一） */
 .page-tops{background-attachment:fixed !important}
 @media (hover:none) and (pointer:coarse){.page-tops{background-attachment:scroll !important}}
+/* モバイル(タッチ端末)：上部ヒーロー画像を固定に見せる代替方式（iOSでも動作）。PCはネイティブfixedのまま。 */
+@media (hover:none) and (pointer:coarse){
+  .page-tops{position:relative;overflow:hidden}
+  .page-tops .sv-mfx{position:absolute;top:0;left:0;width:100%;height:100vh;background-image:inherit;background-size:cover;background-position:center;background-repeat:no-repeat;will-change:transform;z-index:0}
+}
 /* フッターの住所ブロックを非表示（他ページと統一。共有フッター設定には触れない） */
 .footer-main .address{display:none !important}
 /* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示（トップと統一） */
@@ -2032,6 +2037,25 @@ $(document).ready(function() {
   function applySP(){document.querySelectorAll('.p-spMenu a').forEach(function(a){for(var i=0;i<SP.length;i++){if(tail(a,SP[i][0])){if(!a.querySelector('.sv-en')){a.innerHTML='<span class="sv-en">'+SP[i][1]+'</span><span class="sv-ja">'+SP[i][2]+'</span>';}break;}}});}
   function apply(){applyPC();applySP();}
   apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
+})();
+</script>
+<script id="sv-mobfix">
+/* モバイル(タッチ端末)のみ：上部ヒーロー画像を固定に見せる代替方式。画像レイヤー(.sv-mfx)を挿入し追従させて固定を再現。 */
+(function(){
+  try{ if(!window.matchMedia || !matchMedia('(hover:none) and (pointer:coarse)').matches) return; }catch(e){ return; }
+  function setup(){
+    var hero=document.querySelector('.page-tops'); if(!hero || hero.querySelector('.sv-mfx')) return;
+    var layer=document.createElement('div'); layer.className='sv-mfx'; layer.setAttribute('aria-hidden','true');
+    hero.insertBefore(layer, hero.firstChild);
+    var ticking=false;
+    function upd(){var r=hero.getBoundingClientRect();layer.style.transform='translate3d(0,'+(-r.top).toFixed(1)+'px,0)';ticking=false;}
+    function onScroll(){if(!ticking){ticking=true;requestAnimationFrame(upd);}}
+    upd();
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.addEventListener('resize',function(){requestAnimationFrame(upd);});
+    window.addEventListener('orientationchange',function(){requestAnimationFrame(upd);});
+  }
+  if(document.readyState!=='loading')setup();else document.addEventListener('DOMContentLoaded',setup);
 })();
 </script>
 </body></html>
