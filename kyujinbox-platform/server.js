@@ -168,60 +168,88 @@ async function vpnConnect(targetAccount) {
     proc.on('error', e => resolve({ ok: false, error: e.message }));
   });
 }
-// IP範囲での接続確認（vpncmdが無い環境用フォールバック）
-function externalIpMatchesRanges() {
-  const ranges = (process.env.VPN_IP_RANGES || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (!ranges.length) return Promise.resolve(null); // 未設定
+// 現在の外部（グローバル）IPを取得。取得できなければ null。
+function fetchGlobalIp() {
   return new Promise(resolve => {
     const req = http.get('http://api.ipify.org', r => { let d = ''; r.on('data', c => d += c); r.on('end', () => {
       const ip = d.trim();
-      resolve(ranges.some(rg => ip.startsWith(rg.split('/')[0].split('.').slice(0, 3).join('.'))));
+      resolve(/^\d{1,3}(\.\d{1,3}){3}$/.test(ip) ? ip : null);
     }); });
-    req.setTimeout(5000, () => { req.destroy(); resolve(false); });
-    req.on('error', () => resolve(false));
+    req.setTimeout(5000, () => { req.destroy(); resolve(null); });
+    req.on('error', () => resolve(null));
   });
+}
+// IP範囲での接続確認（vpncmdが無い環境用フォールバック）
+async function externalIpMatchesRanges() {
+  const ranges = (process.env.VPN_IP_RANGES || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!ranges.length) return null; // 未設定
+  const ip = await fetchGlobalIp();
+  if (!ip) return false;
+  return ranges.some(rg => ip.startsWith(rg.split('/')[0].split('.').slice(0, 3).join('.')));
 }
 const vpnAccountForCompany = (id) => {
   const co = String(id || 'sq').toUpperCase();
   return (process.env[`VPNCMD_ACCOUNT_${co}`] || '').trim() || (process.env.VPNCMD_ACCOUNT || '').trim();
 };
-// アカウント毎: 専用VPNへ接続し、接続を確認する
-async function connectAndVerifyVPN(co, coName, pushLog) {
-  if (process.env.VPN_BYPASS === 'true') { pushLog(`ℹ️ ${coName}: VPNチェックをスキップ（VPN_BYPASS=true）`, 'info'); return true; }
+// アカウント毎: 専用VPNへ接続し、接続を確認する。
+// 戻り値 { ok, ip }。usedIps（この投稿処理で既に使ったIPの集合）が渡された場合、
+// IPが被っていたら再接続してIPを変える（アカウント毎に別IPを保証）。
+async function connectAndVerifyVPN(co, coName, pushLog, usedIps) {
+  if (process.env.VPN_BYPASS === 'true') { pushLog(`ℹ️ ${coName}: VPNチェックをスキップ（VPN_BYPASS=true）`, 'info'); return { ok: true, ip: null }; }
   const vpncmdPath = findVpncmd();
   if (!vpncmdPath) {
     const m = await externalIpMatchesRanges();
-    if (m === null) { pushLog(`❌ ${coName}: VPNクライアント(vpncmd)が見つかりません。VPNCMD_PATH か VPN_IP_RANGES を設定してください`, 'error'); return false; }
-    if (!m) { pushLog(`❌ ${coName}: VPN未接続（IPが許可範囲外）`, 'error'); return false; }
-    pushLog(`✅ ${coName}: VPN接続を確認（IP範囲）`, 'success'); return true;
+    if (m === null) { pushLog(`❌ ${coName}: VPNクライアント(vpncmd)が見つかりません。VPNCMD_PATH か VPN_IP_RANGES を設定してください`, 'error'); return { ok: false, ip: null }; }
+    if (!m) { pushLog(`❌ ${coName}: VPN未接続（IPが許可範囲外）`, 'error'); return { ok: false, ip: null }; }
+    const ip = await fetchGlobalIp();
+    pushLog(`✅ ${coName}: VPN接続を確認（IP範囲）${ip ? ` 現在IP: ${ip}` : ''}`, 'success'); return { ok: true, ip };
   }
   const acct = vpnAccountForCompany(co);
-  let out;
-  if (acct) {
-    // アカウント専用VPNへ「切り替え」：他のVPNを切断してから対象へ接続（IPを確実に分ける）
-    pushLog(`🔄 ${coName}: VPNを「${acct}」に切り替えます...`, 'info');
-    await vpnDisconnectOthers(vpncmdPath, acct);
-    await new Promise(r => setTimeout(r, 1200));
-    const r = await vpnConnect(acct);
-    if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return false; }
-    pushLog(`   接続先: ${r.name}`, 'info');
-  } else {
-    // 接続名の指定なし：既に接続済みならそのまま利用、未接続なら自動接続
-    out = await vpncmdAccountList(vpncmdPath);
-    if (isVpnConnectedFromOutput(out)) { pushLog(`✅ ${coName}: VPN接続を確認（接続済み）`, 'success'); return true; }
-    pushLog(`🔌 ${coName}: VPNへ自動接続します...`, 'info');
-    const r = await vpnConnect();
-    if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return false; }
-    pushLog(`   接続先: ${r.name}`, 'info');
-  }
-  // 接続確立を待って確認（最大~15秒）
-  for (let i = 0; i < 6; i++) {
-    out = await vpncmdAccountList(vpncmdPath);
-    if (isVpnConnectedFromOutput(out)) { pushLog(`✅ ${coName}: VPN接続を確認しました`, 'success'); return true; }
-    await new Promise(r => setTimeout(r, 2500));
+  // IP被り回避のため、必要なら数回まで接続し直す
+  const maxAttempts = (acct && usedIps) ? 3 : 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let out;
+    if (acct) {
+      // アカウント専用VPNへ「切り替え」：他のVPNを切断してから対象へ接続（IPを確実に分ける）
+      pushLog(`🔄 ${coName}: VPNを「${acct}」に切り替えます...${attempt > 1 ? `（IP変更のため再接続 ${attempt}回目）` : ''}`, 'info');
+      await vpnDisconnectOthers(vpncmdPath, acct);
+      if (attempt > 1) { await vpnRunCmd(vpncmdPath, ['AccountDisconnect', acct]); } // 再接続時は対象も一度切断
+      await new Promise(r => setTimeout(r, 1200));
+      const r = await vpnConnect(acct);
+      if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return { ok: false, ip: null }; }
+      pushLog(`   接続先: ${r.name}`, 'info');
+    } else {
+      // 接続名の指定なし：既に接続済みならそのまま利用、未接続なら自動接続
+      out = await vpncmdAccountList(vpncmdPath);
+      if (!isVpnConnectedFromOutput(out)) {
+        pushLog(`🔌 ${coName}: VPNへ自動接続します...`, 'info');
+        const r = await vpnConnect();
+        if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return { ok: false, ip: null }; }
+        pushLog(`   接続先: ${r.name}`, 'info');
+      }
+    }
+    // 接続確立を待って確認（最大~15秒）
+    let connected = false;
+    for (let i = 0; i < 6; i++) {
+      out = await vpncmdAccountList(vpncmdPath);
+      if (isVpnConnectedFromOutput(out)) { connected = true; break; }
+      await new Promise(r => setTimeout(r, 2500));
+    }
+    if (!connected) { pushLog(`❌ ${coName}: VPN接続が確認できませんでした`, 'error'); return { ok: false, ip: null }; }
+    // 実際の外部IPを取得して記録（毎回変わっても、この投稿でのIPが確認できる）
+    const ip = await fetchGlobalIp();
+    if (ip && usedIps && usedIps.has(ip) && attempt < maxAttempts) {
+      pushLog(`⚠️ ${coName}: 直前のアカウントとIPが同じ（${ip}）。IPを変えるため再接続します...`, 'warn');
+      continue;
+    }
+    if (ip && usedIps && usedIps.has(ip)) {
+      pushLog(`⚠️ ${coName}: IP(${ip})が他アカウントと重複しています。別のVPN接続設定（VPNCMD_ACCOUNT_${String(co).toUpperCase()}）を割り当ててください`, 'warn');
+    }
+    pushLog(`✅ ${coName}: VPN接続を確認しました${ip ? ` 投稿IP: ${ip}` : ''}`, 'success');
+    return { ok: true, ip };
   }
   pushLog(`❌ ${coName}: VPN接続が確認できませんでした`, 'error');
-  return false;
+  return { ok: false, ip: null };
 }
 
 // vpncmdコマンドを実行（結果は待つだけ）
@@ -392,13 +420,15 @@ const server = http.createServer(async (req, res) => {
         pushLog(`🐍 使用Python: ${PYTHON_CMD}`, 'info');
         if (perCompany.length > 1) pushLog(`🏢 複数アカウントへ順に投稿します（${perCompany.map(p => companyFullName(p.co)).join('・')}）`, 'info');
 
+        const usedIps = new Set(); // この投稿処理でアカウント毎に使ったIP（被り検知用）
         const runOne = async ({ co, jobs, already }) => {
           const { env: credEnv, hasCreds } = kyujinboxEnvForCompany(co);
           const coName = companyFullName(co);
           if (!hasCreds) { pushLog(`⚠️ ${coName}: 認証情報(.env)が未設定のためスキップ`, 'warn'); return true; }
-          // ── このアカウント専用のVPNへ接続し、確認してから投稿 ──
-          const vpnOk = await connectAndVerifyVPN(co, coName, pushLog);
-          if (!vpnOk) { pushLog(`⛔ ${coName}: VPN未接続のため投稿を中止しました`, 'error'); return false; }
+          // ── このアカウント専用のVPNへ接続し、確認してから投稿（IP被りは自動で再接続）──
+          const vpn = await connectAndVerifyVPN(co, coName, pushLog, usedIps);
+          if (!vpn.ok) { pushLog(`⛔ ${coName}: VPN未接続のため投稿を中止しました`, 'error'); return false; }
+          if (vpn.ip) usedIps.add(vpn.ip);
           if (already > 0 && !forceRepost) pushLog(`ℹ️ ${coName}: 投稿済み ${already}件をスキップ（未投稿 ${jobs.length}件を投稿）`, 'info');
           pushLog(`📋 ${coName}: 求人ボックス向け ${Math.min(batchSize, jobs.length)}件を投稿します...`, 'info');
           const jobIdMap = Object.fromEntries(jobs.map(j => [j.id, j]));
