@@ -1814,7 +1814,12 @@ header img{
   .page-texts .h3-en{animation:sv-hero-inUp .85s cubic-bezier(.16,.7,.3,1) both;animation-delay:.09s}
   .page-texts .h3-catch{animation:sv-hero-inUp .85s cubic-bezier(.16,.7,.3,1) both;animation-delay:.26s}
 }
-@media(max-width:720px){.page-texts{height:400px !important;padding-top:104px}.page-tops.page-top2{height:400px !important}.page-tops::after{height:400px !important}}
+@media(max-width:720px){
+  .page-tops.page-top2{display:none !important}
+  .page-texts{position:relative !important;height:auto !important;min-height:0 !important;padding:104px 0 116px !important;
+    background-image:linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.42)),url("https://savior-corporation.com/wp-content/uploads/2024/02/contact-top1-jpeg.webp");
+    background-size:cover;background-position:center;background-repeat:no-repeat}
+}
 .sv-hero-scroll{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff;font:700 .72rem/1 "Montserrat",sans-serif;letter-spacing:.3em;pointer-events:none;text-shadow:0 2px 12px rgba(0,0,0,.85),0 0 4px rgba(0,0,0,.7)}
 .sv-hero-scroll::after{content:"";width:2px;height:46px;background:#fff;box-shadow:0 0 8px rgba(0,0,0,.6);transform-origin:top;animation:sv-cue 1.9s ease-in-out infinite}
 @keyframes sv-cue{0%{transform:scaleY(0);opacity:0}30%{opacity:1}100%{transform:scaleY(1);opacity:0}}
