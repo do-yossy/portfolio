@@ -1781,11 +1781,13 @@ header img{
 
 
 
-<div class="page-tops page-top2 animated fadeIn delay-200ms">
+<div class="page-tops page-top2">
 </div>
 <style id="sv-pagehead">
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定） */
 .page-tops{background-attachment:fixed !important}
+/* ヒーロー画像はページを開いた瞬間から表示（fadeInの遅延で一瞬画像が消える問題を解消） */
+.page-tops.page-top2{opacity:1 !important;animation:none !important}
 @media (hover:none) and (pointer:coarse){.page-tops{background-attachment:scroll !important}}
 /* 企業情報カード：width:93vw+左右padding(5vw)が103vwとなりモバイルで横スクロールを生むためborder-box化 */
 .company-details .company-text2{box-sizing:border-box !important;max-width:100%}

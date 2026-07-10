@@ -47,6 +47,9 @@
 <style id="sv-pagehead">
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定） */
 .page-tops{background-attachment:fixed !important}
+/* ヒーロー画像はページを開いた瞬間から表示（fadeInの遅延で一瞬画像が消える問題を解消）。
+   タイトルのリベール/SCROLL等のギミックは.page-texts側で別途行うため影響しない。 */
+.page-tops.page-top2{opacity:1 !important;animation:none !important}
 /* タッチ端末(スマホ/タブレット)では background-attachment:fixed が正しく描画されない(特にiOS)ため通常スクロール表示に戻す */
 @media (hover:none) and (pointer:coarse){.page-tops{background-attachment:scroll !important}}
 /* 企業情報カード：width:93vw+左右padding(5vw)が103vwとなりモバイルで横スクロールを生むためborder-box化 */
@@ -77,7 +80,7 @@
 .l-footer__foot .l-container{padding:0 !important;max-width:none !important;margin:0 !important}
 .l-footer__foot .copyright{font-size:13px !important;line-height:1.7 !important;letter-spacing:.08em !important;margin:0 !important}
 </style>
-<div class="page-tops page-top2 animated fadeIn delay-200ms">
+<div class="page-tops page-top2">
 </div>
 <div class="page-texts">
   <div class="h3-wrap">
