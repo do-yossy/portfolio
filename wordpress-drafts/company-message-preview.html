@@ -1789,11 +1789,6 @@ header img{
 /* ヒーロー画像はページを開いた瞬間から表示（fadeInの遅延で一瞬画像が消える問題を解消） */
 .page-tops.page-top2{opacity:1 !important;animation:none !important}
 @media (hover:none) and (pointer:coarse){.page-tops{background-attachment:scroll !important}}
-/* モバイル(タッチ端末)：上部ヒーロー画像を固定に見せる代替方式（iOSでも動作）。PCはネイティブfixedのまま。 */
-@media (hover:none) and (pointer:coarse){
-  .page-tops{position:relative;overflow:hidden}
-  .page-tops .sv-mfx{position:absolute;top:0;left:0;width:100%;height:100vh;background-image:inherit;background-size:cover;background-position:center;background-repeat:no-repeat;will-change:transform;z-index:0}
-}
 /* 企業情報カード：width:93vw+左右padding(5vw)が103vwとなりモバイルで横スクロールを生むためborder-box化 */
 .company-details .company-text2{box-sizing:border-box !important;max-width:100%}
 /* タイトル：事業内容ページのヒーローと統一（ラベル／大きな英字／キャッチの3段構成）。
@@ -2125,6 +2120,9 @@ $(document).ready(function() {
   /* transition は表示側(.sv-in)にだけ付与。隠し状態(.sv-rv)は瞬時に適用され、スクロールで入った時のみフェードイン再生（初期表示域でも逆再生フェードアウトしない） */
   .sv-rv{opacity:0;transform:translateY(52px)}
   .sv-rv.sv-in{opacity:1;transform:none;transition:opacity 1s cubic-bezier(.16,.7,.3,1), transform 1.05s cubic-bezier(.16,.7,.3,1)}
+  /* 企業情報(DETAILS)だけ、より落ち着いた"ふわっ"とした登場に（移動量を小さく・ゆっくり柔らかいイージング） */
+  .company-details .sv-rv{transform:translateY(16px)}
+  .company-details .sv-rv.sv-in{transition:opacity 1.5s ease, transform 1.5s cubic-bezier(.22,.61,.36,1)}
   /* 企業理念の3つの図（誠意/熱意/創意）：左右それぞれの方向から大きく・ゆっくり1つずつスライドインし、その後ゆっくり浮遊 */
   /* 隠し状態は transition:none（テーマが画像に掛けるtransitionで初期オフセット適用時に勝手にスライドアウト＆早期発火するのを防止）。 */
   .sv-dir{opacity:0;transition:none !important}
@@ -2240,25 +2238,6 @@ $(document).ready(function() {
   }
   function apply(){applyPC();applySP();}
   apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
-})();
-</script>
-<script id="sv-mobfix">
-/* モバイル(タッチ端末)のみ：上部ヒーロー画像を固定に見せる代替方式。画像レイヤー(.sv-mfx)を挿入し追従させて固定を再現。 */
-(function(){
-  try{ if(!window.matchMedia || !matchMedia('(hover:none) and (pointer:coarse)').matches) return; }catch(e){ return; }
-  function setup(){
-    var hero=document.querySelector('.page-tops'); if(!hero || hero.querySelector('.sv-mfx')) return;
-    var layer=document.createElement('div'); layer.className='sv-mfx'; layer.setAttribute('aria-hidden','true');
-    hero.insertBefore(layer, hero.firstChild);
-    var ticking=false;
-    function upd(){var r=hero.getBoundingClientRect();layer.style.transform='translate3d(0,'+(-r.top).toFixed(1)+'px,0)';ticking=false;}
-    function onScroll(){if(!ticking){ticking=true;requestAnimationFrame(upd);}}
-    upd();
-    window.addEventListener('scroll',onScroll,{passive:true});
-    window.addEventListener('resize',function(){requestAnimationFrame(upd);});
-    window.addEventListener('orientationchange',function(){requestAnimationFrame(upd);});
-  }
-  if(document.readyState!=='loading')setup();else document.addEventListener('DOMContentLoaded',setup);
 })();
 </script>
 </body></html>

@@ -1809,11 +1809,9 @@ header img{
 .sv-hero-copy h1{font-family:"Zen Old Mincho","游明朝",serif;font-weight:500;line-height:1.35;letter-spacing:.09em;font-size:clamp(1.75rem,4.4vw,3.2rem);margin:0;text-shadow:0 4px 34px rgba(0,0,0,.4)}
 .sv-hero-copy .sv-line{display:block;padding:.09em 0}
 .sv-hero-copy .sv-line+.sv-line{margin-top:.4em}
-/* 初回表示のみ：1行目は左から・2行目は右からスライドインして登場（2行を時間差で） */
-.sv-hero-copy .sv-line>span{display:inline-block;opacity:0;filter:blur(6px);will-change:transform,opacity,filter}
-.sv-hero-copy .sv-line:nth-child(1)>span{transform:translateX(calc(max(150px,22vw) * -1))}
-.sv-hero-copy .sv-line:nth-child(2)>span{transform:translateX(max(150px,22vw))}
-.sv-hero-copy.sv-on .sv-line>span{transform:none;opacity:1;filter:blur(0);transition:transform 1.5s cubic-bezier(.16,.84,.28,1),opacity 1.3s ease,filter 1.3s ease}
+/* 初回表示のみ：2行をズームインして登場（小さい状態から拡大＋フェード、2行を時間差で） */
+.sv-hero-copy .sv-line>span{display:inline-block;opacity:0;transform:scale(.62);filter:blur(6px);will-change:transform,opacity,filter}
+.sv-hero-copy.sv-on .sv-line>span{transform:none;opacity:1;filter:blur(0);transition:transform 1.4s cubic-bezier(.16,.84,.28,1),opacity 1.2s ease,filter 1.2s ease}
 .sv-hero-copy.sv-on .sv-line:nth-child(2)>span{transition-delay:.28s}
 /* heroテキスト分のスクロール領域を確保する透明スペーサー（映像もテキストも固定、その上をこの空間がスクロール） */
 .sv-hero-spacer{position:relative;z-index:1;width:100%;height:100vh;height:100dvh}

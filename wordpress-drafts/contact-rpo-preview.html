@@ -1773,11 +1773,6 @@ header img{
 /* 上部ヒーロー画像を固定（スクロールしても背景は固定。他ページと統一） */
 .page-tops{background-attachment:fixed !important}
 @media (hover:none) and (pointer:coarse){.page-tops{background-attachment:scroll !important}}
-/* モバイル(タッチ端末)：上部ヒーロー画像を固定に見せる代替方式（iOSでも動作）。PCはネイティブfixedのまま。 */
-@media (hover:none) and (pointer:coarse){
-  .page-tops{position:relative;overflow:hidden}
-  .page-tops .sv-mfx{position:absolute;top:0;left:0;width:100%;height:100vh;background-image:inherit;background-size:cover;background-position:center;background-repeat:no-repeat;will-change:transform;z-index:0}
-}
 /* フッターの住所ブロックを非表示（他ページと統一。共有フッター設定には触れない） */
 .footer-main .address{display:none !important}
 /* モバイルのドロワーメニュー：英字＋日本語(サブ)の2段表示（トップと統一） */
@@ -1947,101 +1942,7 @@ Saviorへのご依頼・お問い合わせは、<br>
 </div>
 </div><!--/ #all_wrapp-->
 <div class="l-scrollObserver" aria-hidden="true"></div><script type="speculationrules">
-{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/swell_child/*","/wp-content/themes/swell/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
-</script>
-<style id="o-anim-hide-inline-css"> .animated:not(.o-anim-ready) {
-			visibility: hidden;
-			animation-play-state: paused;
-			animation: none !important;
-		 }</style>
-		 <noscript><style>.animated { visibility: visible; animation-play-state: running; }</style></noscript><script id="swell_script-js-extra">
-var swellVars = {"siteUrl":"https://savior-corporation.com/","restUrl":"https://savior-corporation.com/wp-json/wp/v2/","ajaxUrl":"https://savior-corporation.com/wp-admin/admin-ajax.php","ajaxNonce":"4495b05cd7","isLoggedIn":"","useAjaxAfterPost":"","useAjaxFooter":"","usePvCount":"1","isFixHeadSP":"1","tocListTag":"ol","tocTarget":"h3","tocPrevText":"\u524d\u306e\u30da\u30fc\u30b8\u3078","tocNextText":"\u6b21\u306e\u30da\u30fc\u30b8\u3078","tocCloseText":"\u6298\u308a\u305f\u305f\u3080","tocOpenText":"\u3082\u3063\u3068\u898b\u308b","tocOmitType":"ct","tocOmitNum":"15","tocMinnum":"2","tocAdPosition":"before","offSmoothScroll":""};
-//# sourceURL=swell_script-js-extra
-</script>
-<script id="swell_script-js" src="https://savior-corporation.com/wp-content/themes/swell/build/js/main.min.js?ver=2.7.6.2"></script>
-<script id="wp-hooks-js" src="https://savior-corporation.com/wp-includes/js/dist/hooks.min.js?ver=7496969728ca0f95732d"></script>
-<script id="wp-i18n-js" src="https://savior-corporation.com/wp-includes/js/dist/i18n.min.js?ver=781d11515ad3d91786ec"></script>
-<script id="wp-i18n-js-after">
-wp.i18n.setLocaleData( { 'text direction\u0004ltr': [ 'ltr' ] } );
-//# sourceURL=wp-i18n-js-after
-</script>
-<script id="swv-js" src="https://savior-corporation.com/wp-content/plugins/contact-form-7/includes/swv/js/index.js?ver=6.1.3"></script>
-<script id="contact-form-7-js-translations">
-( function( domain, translations ) {
-	var localeData = translations.locale_data[ domain ] || translations.locale_data.messages;
-	localeData[""].domain = domain;
-	wp.i18n.setLocaleData( localeData, domain );
-} )( "contact-form-7", {"translation-revision-date":"2025-10-29 09:23:50+0000","generator":"GlotPress\/4.0.3","domain":"messages","locale_data":{"messages":{"":{"domain":"messages","plural-forms":"nplurals=1; plural=0;","lang":"ja_JP"},"This contact form is placed in the wrong place.":["\u3053\u306e\u30b3\u30f3\u30bf\u30af\u30c8\u30d5\u30a9\u30fc\u30e0\u306f\u9593\u9055\u3063\u305f\u4f4d\u7f6e\u306b\u7f6e\u304b\u308c\u3066\u3044\u307e\u3059\u3002"],"Error:":["\u30a8\u30e9\u30fc:"]}},"comment":{"reference":"includes\/js\/index.js"}} );
-//# sourceURL=contact-form-7-js-translations
-</script>
-<script id="contact-form-7-js-before">
-var wpcf7 = {
-    "api": {
-        "root": "https:\/\/savior-corporation.com\/wp-json\/",
-        "namespace": "contact-form-7\/v1"
-    }
-};
-//# sourceURL=contact-form-7-js-before
-</script>
-<script id="contact-form-7-js" src="https://savior-corporation.com/wp-content/plugins/contact-form-7/includes/js/index.js?ver=6.1.3"></script>
-<script id="google-recaptcha-js" src="https://www.google.com/recaptcha/api.js?render=6Lf7UrQpAAAAAMwwy6UxoyojseE7ysECVJJVTmaM&#038;ver=3.0"></script>
-<script id="wp-polyfill-js" src="https://savior-corporation.com/wp-includes/js/dist/vendor/wp-polyfill.min.js?ver=3.15.0"></script>
-<script id="wpcf7-recaptcha-js-before">
-var wpcf7_recaptcha = {
-    "sitekey": "6Lf7UrQpAAAAAMwwy6UxoyojseE7ysECVJJVTmaM",
-    "actions": {
-        "homepage": "homepage",
-        "contactform": "contactform"
-    }
-};
-//# sourceURL=wpcf7-recaptcha-js-before
-</script>
-<script id="wpcf7-recaptcha-js" src="https://savior-corporation.com/wp-content/plugins/contact-form-7/modules/recaptcha/index.js?ver=6.1.3"></script>
-<script id="otter-animation-frontend-js" src="https://savior-corporation.com/wp-content/plugins/blocks-animation/build/animation/frontend.js?ver=85c87361b4be0dc88708"></script>
-<script id="swell_lazysizes-js" src="https://savior-corporation.com/wp-content/themes/swell/assets/js/plugins/lazysizes.min.js?ver=2.7.6.2"></script>
-<script id="swell_set_fix_header-js" src="https://savior-corporation.com/wp-content/themes/swell/build/js/front/set_fix_header.min.js?ver=2.7.6.2"></script>
-
-<!-- JSON-LD @SWELL -->
-<script type="application/ld+json">{"@context": "https://schema.org","@graph": [{"@type":"Organization","@id":"https:\/\/savior-corporation.com\/#organization","name":"株式会社Savior","url":"https:\/\/savior-corporation.com\/","logo":{"@type":"ImageObject","url":"https:\/\/savior-corporation.com\/wp-content\/uploads\/2024\/02\/logo-white.png","width":739,"height":739}},{"@type":"WebSite","@id":"https:\/\/savior-corporation.com\/#website","url":"https:\/\/savior-corporation.com\/","name":"株式会社Savior","description":"若年層を救世し、夢ある未来を創造する。"},{"@type":"WebPage","@id":"https:\/\/savior-corporation.com\/contact\/","url":"https:\/\/savior-corporation.com\/contact\/","name":"お問い合わせ","description":"CONTACT お問い合わせ Saviorへのご依頼・お問い合わせは、 下記フォームより承っております。 事業案内 SERVICE 人材紹介事業 飲食店総合プロデュース事業 事業案内 SERVICE 人材紹介事業 飲食店総合プロデュース事業 会社概要 COMPANY 若年層の可能性を信じ、社会に貢献することを促進することに情熱を注いでいます。 私たちについて 会社概要 COMPANY 若年層の可能性を信じ、社会に貢献することを促進することに情熱を注いでいます。 私たちについて","isPartOf":{"@id":"https:\/\/savior-corporation.com\/#website"}},{"@type":"Article","mainEntityOfPage":{"@type":"WebPage","@id":"https:\/\/savior-corporation.com\/contact\/"},"headline":"お問い合わせ","image":{"@type":"ImageObject","url":"https:\/\/savior-corporation.com\/wp-content\/uploads\/2024\/03\/technology-7111799_1280-jpg.webp"},"datePublished":"2024-02-13T14:05:34+0900","dateModified":"2026-07-03T20:34:44+0900","author":{"@type":"Person","@id":"https:\/\/savior-corporation.com\/contact\/#author","name":"admin","url":"https:\/\/savior-corporation.com\/"},"publisher":{"@id":"https:\/\/savior-corporation.com\/#organization"}}]}</script>
-<!-- / JSON-LD @SWELL -->
-<script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
-
-
-<script>
-
-
-$(document).ready(function() {
-    // 最初は要素を非表示にします
-    $(".sp-header-bar.sp").hide();
-
-    $(window).scroll(function() {
-        // 200px以上スクロールされたかをチェック
-        if ($(this).scrollTop() > 200) {
-            // 200px以上スクロールされたらフェードイン
-            $(".sp-header-bar.sp").fadeIn();
-        } else {
-            // 200px未満に戻ったらフェードアウト
-            $(".sp-header-bar.sp").fadeOut();
-        }
-    });
-});
-</script>
-<script>document.addEventListener('touchstart',function(){});</script>
-<script>(function(){var T="/contact";function m(){document.querySelectorAll(".c-gnav > li").forEach(function(li){var a=li.querySelector("a");if(a&&(a.getAttribute("href")||"").indexOf(T)>-1)li.classList.add("-current");});}m();setTimeout(m,300);window.addEventListener("load",m);})();</script>
-<script id="sv-nav-relabel">
-(function(){
-  var PC=[['/service','SERVICE'],['/company','ABOUT'],['/contact','CONTACT']];
-  var SP=[['/service','SERVICE','事業内容'],['/company','ABOUT','会社概要'],['/contact','CONTACT','お問い合わせ'],['/policy','PRIVACY POLICY','プライバシーポリシー'],['/privacy','PRIVACY POLICY','プライバシーポリシー']];
-  function tail(a,path){var h=(a.getAttribute('href')||'').replace(/[#?].*$/,'').replace(/\/+$/,'');return h.slice(-path.length)===path;}
-  function applyPC(){document.querySelectorAll('.c-gnav a').forEach(function(a){for(var i=0;i<PC.length;i++){if(tail(a,PC[i][0])){var t=a.querySelector('.ttl')||a;if(t.textContent.trim()!==PC[i][1])t.textContent=PC[i][1];break;}}});}
-  function applySP(){document.querySelectorAll('.p-spMenu a').forEach(function(a){for(var i=0;i<SP.length;i++){if(tail(a,SP[i][0])){if(!a.querySelector('.sv-en')){a.innerHTML='<span class="sv-en">'+SP[i][1]+'</span><span class="sv-ja">'+SP[i][2]+'</span>';}break;}}});}
-  function apply(){applyPC();applySP();}
-  apply();setTimeout(apply,300);setTimeout(apply,800);setTimeout(apply,1500);window.addEventListener('load',apply);
-})();
-</script>
-<script id="sv-mobfix">
-/* モバイル(タッチ端末)のみ：上部ヒーロー画像を固定に見せる代替方式。画像レイヤー(.sv-mfx)を挿入し追従させて固定を再現。 */
-(function(){
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"(function(){
   try{ if(!window.matchMedia || !matchMedia('(hover:none) and (pointer:coarse)').matches) return; }catch(e){ return; }
   function setup(){
     var hero=document.querySelector('.page-tops'); if(!hero || hero.querySelector('.sv-mfx')) return;
