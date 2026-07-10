@@ -195,14 +195,25 @@ async function connectAndVerifyVPN(co, coName, pushLog) {
     if (!m) { pushLog(`❌ ${coName}: VPN未接続（IPが許可範囲外）`, 'error'); return false; }
     pushLog(`✅ ${coName}: VPN接続を確認（IP範囲）`, 'success'); return true;
   }
-  // 既に接続済みならそのまま利用
-  let out = await vpncmdAccountList(vpncmdPath);
-  if (isVpnConnectedFromOutput(out)) { pushLog(`✅ ${coName}: VPN接続を確認（接続済み）`, 'success'); return true; }
-  // 未接続なら自動接続（接続名の指定は不要。VPNCMD_ACCOUNT があればそれ、無ければ検出した先頭アカウント）
-  pushLog(`🔌 ${coName}: VPNへ自動接続します...`, 'info');
-  const r = await vpnConnect(vpnAccountForCompany(co));
-  if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return false; }
-  pushLog(`   接続先: ${r.name}`, 'info');
+  const acct = vpnAccountForCompany(co);
+  let out;
+  if (acct) {
+    // アカウント専用VPNへ「切り替え」：他のVPNを切断してから対象へ接続（IPを確実に分ける）
+    pushLog(`🔄 ${coName}: VPNを「${acct}」に切り替えます...`, 'info');
+    await vpnDisconnectOthers(vpncmdPath, acct);
+    await new Promise(r => setTimeout(r, 1200));
+    const r = await vpnConnect(acct);
+    if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return false; }
+    pushLog(`   接続先: ${r.name}`, 'info');
+  } else {
+    // 接続名の指定なし：既に接続済みならそのまま利用、未接続なら自動接続
+    out = await vpncmdAccountList(vpncmdPath);
+    if (isVpnConnectedFromOutput(out)) { pushLog(`✅ ${coName}: VPN接続を確認（接続済み）`, 'success'); return true; }
+    pushLog(`🔌 ${coName}: VPNへ自動接続します...`, 'info');
+    const r = await vpnConnect();
+    if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return false; }
+    pushLog(`   接続先: ${r.name}`, 'info');
+  }
   // 接続確立を待って確認（最大~15秒）
   for (let i = 0; i < 6; i++) {
     out = await vpncmdAccountList(vpncmdPath);
@@ -211,6 +222,23 @@ async function connectAndVerifyVPN(co, coName, pushLog) {
   }
   pushLog(`❌ ${coName}: VPN接続が確認できませんでした`, 'error');
   return false;
+}
+
+// vpncmdコマンドを実行（結果は待つだけ）
+function vpnRunCmd(vpncmdPath, cmdArgs) {
+  return new Promise(resolve => {
+    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', ...cmdArgs], { shell: false });
+    proc.on('close', () => resolve()); proc.on('error', () => resolve());
+    setTimeout(() => { try { proc.kill(); } catch {} resolve(); }, 6000);
+  });
+}
+// 対象以外のVPNアカウントを切断（アカウント毎にIPを分けるための切替）
+async function vpnDisconnectOthers(vpncmdPath, keepName) {
+  const out = await vpncmdAccountList(vpncmdPath);
+  for (const n of parseAccountNames(out)) {
+    if (n === keepName) continue;
+    await vpnRunCmd(vpncmdPath, ['AccountDisconnect', n]);
+  }
 }
 
 // ── ポーリング用セッション ──
