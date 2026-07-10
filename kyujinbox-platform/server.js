@@ -112,6 +112,107 @@ const PYTHON_CMD = (function detectPython() {
   return 'python';
 })();
 
+// ── VPN（アカウント毎に接続・確認）──────────────────────────
+// 会社別のSoftEther接続名: VPNCMD_ACCOUNT_<CO>（例: VPNCMD_ACCOUNT_SQ）。無ければ VPNCMD_ACCOUNT。
+// VPN_BYPASS=true でチェック無効化（テスト用）。vpncmdが無い環境は VPN_IP_RANGES で判定。
+function findVpncmd() {
+  const candidates = [
+    process.env.VPNCMD_PATH,
+    'C:\\Program Files\\SoftEther VPN Client\\vpncmd.exe',
+    'C:\\Program Files (x86)\\SoftEther VPN Client\\vpncmd.exe',
+    'vpncmd',
+  ].filter(Boolean);
+  for (const p of candidates) { if (p === 'vpncmd' || fs.existsSync(p)) return p; }
+  return null;
+}
+function isVpnConnectedFromOutput(out) {
+  if (!out) return false;
+  if (/\bConnected\b/i.test(out)) return true;
+  return /接続完了|接続中|接続済み|接続済/.test(out);
+}
+function parseAccountNames(out) {
+  const names = [];
+  for (const line of out.split(/\r?\n/)) {
+    if (line.includes('接続設定名')) { const i = line.indexOf('|'); if (i >= 0 && line.slice(i + 1).trim()) names.push(line.slice(i + 1).trim()); continue; }
+    const m = line.match(/Account Name\s*\|\s*(.+)/i); if (m && m[1].trim()) names.push(m[1].trim());
+  }
+  return [...new Set(names)];
+}
+function vpncmdAccountList(vpncmdPath) {
+  return new Promise(resolve => {
+    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountList'], { shell: false });
+    const chunks = [];
+    proc.stdout.on('data', d => chunks.push(d)); proc.stderr.on('data', d => chunks.push(d));
+    proc.on('close', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    proc.on('error', () => resolve(''));
+    setTimeout(() => { try { proc.kill(); } catch {} resolve(''); }, 8000);
+  });
+}
+// 指定アカウントへ接続（未指定なら VPNCMD_ACCOUNT → 先頭アカウント）
+async function vpnConnect(targetAccount) {
+  const vpncmdPath = findVpncmd();
+  if (!vpncmdPath) return { ok: false, error: 'vpncmd.exe が見つかりません（VPNCMD_PATH を設定してください）' };
+  const out = await vpncmdAccountList(vpncmdPath);
+  const names = parseAccountNames(out);
+  const targetName = (targetAccount || '').trim() || (process.env.VPNCMD_ACCOUNT || '').trim() || names[0];
+  if (!targetName) return { ok: false, error: `接続先VPNアカウントが見つかりません\n${out.slice(0, 300)}` };
+  return await new Promise(resolve => {
+    const proc = spawn(vpncmdPath, ['localhost', '/CLIENT', '/CMD', 'AccountConnect', targetName], { shell: false });
+    const chunks = [];
+    proc.stdout.on('data', d => chunks.push(d)); proc.stderr.on('data', d => chunks.push(d));
+    proc.on('close', code => {
+      const r = Buffer.concat(chunks).toString('utf8');
+      if (code === 0 || /command completed/i.test(r) || r.includes('コマンドは正常に終了')) resolve({ ok: true, name: targetName });
+      else resolve({ ok: false, error: r.slice(0, 300) });
+    });
+    proc.on('error', e => resolve({ ok: false, error: e.message }));
+  });
+}
+// IP範囲での接続確認（vpncmdが無い環境用フォールバック）
+function externalIpMatchesRanges() {
+  const ranges = (process.env.VPN_IP_RANGES || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!ranges.length) return Promise.resolve(null); // 未設定
+  return new Promise(resolve => {
+    const req = http.get('http://api.ipify.org', r => { let d = ''; r.on('data', c => d += c); r.on('end', () => {
+      const ip = d.trim();
+      resolve(ranges.some(rg => ip.startsWith(rg.split('/')[0].split('.').slice(0, 3).join('.'))));
+    }); });
+    req.setTimeout(5000, () => { req.destroy(); resolve(false); });
+    req.on('error', () => resolve(false));
+  });
+}
+const vpnAccountForCompany = (id) => {
+  const co = String(id || 'sq').toUpperCase();
+  return (process.env[`VPNCMD_ACCOUNT_${co}`] || '').trim() || (process.env.VPNCMD_ACCOUNT || '').trim();
+};
+// アカウント毎: 専用VPNへ接続し、接続を確認する
+async function connectAndVerifyVPN(co, coName, pushLog) {
+  if (process.env.VPN_BYPASS === 'true') { pushLog(`ℹ️ ${coName}: VPNチェックをスキップ（VPN_BYPASS=true）`, 'info'); return true; }
+  const vpncmdPath = findVpncmd();
+  const acct = vpnAccountForCompany(co);
+  if (!vpncmdPath) {
+    const m = await externalIpMatchesRanges();
+    if (m === null) { pushLog(`❌ ${coName}: VPNクライアント(vpncmd)が見つかりません。VPNCMD_PATH か VPN_IP_RANGES を設定してください`, 'error'); return false; }
+    if (!m) { pushLog(`❌ ${coName}: VPN未接続（IPが許可範囲外）`, 'error'); return false; }
+    pushLog(`✅ ${coName}: VPN接続を確認（IP範囲）`, 'success'); return true;
+  }
+  if (acct) {
+    pushLog(`🔌 ${coName}: 専用VPN「${acct}」へ接続します...`, 'info');
+    const r = await vpnConnect(acct);
+    if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return false; }
+  } else {
+    pushLog(`⚠️ ${coName}: VPN接続名(VPNCMD_ACCOUNT_${String(co).toUpperCase()})が未設定。現在の接続状態で確認します`, 'warn');
+  }
+  // 接続確立を待って確認（最大~15秒）
+  for (let i = 0; i < 6; i++) {
+    const out = await vpncmdAccountList(vpncmdPath);
+    if (isVpnConnectedFromOutput(out)) { pushLog(`✅ ${coName}: VPN接続を確認しました`, 'success'); return true; }
+    await new Promise(r => setTimeout(r, 2500));
+  }
+  pushLog(`❌ ${coName}: VPN接続が確認できませんでした`, 'error');
+  return false;
+}
+
 // ── ポーリング用セッション ──
 const sessions = new Map();
 function createSession() {
@@ -263,34 +364,39 @@ const server = http.createServer(async (req, res) => {
         pushLog(`🐍 使用Python: ${PYTHON_CMD}`, 'info');
         if (perCompany.length > 1) pushLog(`🏢 複数アカウントへ順に投稿します（${perCompany.map(p => companyFullName(p.co)).join('・')}）`, 'info');
 
-        const runOne = ({ co, jobs, already }) => new Promise(resolve => {
+        const runOne = async ({ co, jobs, already }) => {
           const { env: credEnv, hasCreds } = kyujinboxEnvForCompany(co);
           const coName = companyFullName(co);
-          if (!hasCreds) { pushLog(`⚠️ ${coName}: 認証情報(.env)が未設定のためスキップ`, 'warn'); return resolve(true); }
+          if (!hasCreds) { pushLog(`⚠️ ${coName}: 認証情報(.env)が未設定のためスキップ`, 'warn'); return true; }
+          // ── このアカウント専用のVPNへ接続し、確認してから投稿 ──
+          const vpnOk = await connectAndVerifyVPN(co, coName, pushLog);
+          if (!vpnOk) { pushLog(`⛔ ${coName}: VPN未接続のため投稿を中止しました`, 'error'); return false; }
           if (already > 0 && !forceRepost) pushLog(`ℹ️ ${coName}: 投稿済み ${already}件をスキップ（未投稿 ${jobs.length}件を投稿）`, 'info');
           pushLog(`📋 ${coName}: 求人ボックス向け ${Math.min(batchSize, jobs.length)}件を投稿します...`, 'info');
           const jobIdMap = Object.fromEntries(jobs.map(j => [j.id, j]));
-          const proc = spawn(PYTHON_CMD, [scriptPath], { env: { ...process.env, ...credEnv, KYUJINBOX_BATCH_SIZE: String(batchSize) } });
-          proc.stdin.write(JSON.stringify(jobs.slice(0, batchSize))); proc.stdin.end();
-          proc.stdout.on('data', data => {
-            for (const line of data.toString().split('\n').filter(l => l.trim())) {
-              try {
-                const obj = JSON.parse(line);
-                if (obj.type === 'posted' && obj.jobId && jobIdMap[obj.jobId]) {
-                  Jobs.update(obj.jobId, { kyujinbox_posted_at: new Date().toISOString() });
-                  pushLog(`📌 投稿済みとしてマーク: ${jobIdMap[obj.jobId].title}`, 'info');
-                } else pushLog(obj.message, obj.level || 'info');
-              } catch { pushLog(line, 'info'); }
-            }
+          return await new Promise(resolve => {
+            const proc = spawn(PYTHON_CMD, [scriptPath], { env: { ...process.env, ...credEnv, KYUJINBOX_BATCH_SIZE: String(batchSize) } });
+            proc.stdin.write(JSON.stringify(jobs.slice(0, batchSize))); proc.stdin.end();
+            proc.stdout.on('data', data => {
+              for (const line of data.toString().split('\n').filter(l => l.trim())) {
+                try {
+                  const obj = JSON.parse(line);
+                  if (obj.type === 'posted' && obj.jobId && jobIdMap[obj.jobId]) {
+                    Jobs.update(obj.jobId, { kyujinbox_posted_at: new Date().toISOString() });
+                    pushLog(`📌 投稿済みとしてマーク: ${jobIdMap[obj.jobId].title}`, 'info');
+                  } else pushLog(obj.message, obj.level || 'info');
+                } catch { pushLog(line, 'info'); }
+              }
+            });
+            proc.stderr.on('data', d => { const t = d.toString().trim(); if (t) pushLog(`⚠️ ${t}`, 'warn'); });
+            proc.on('error', err => { pushLog(`❌ ${coName}: プロセス起動失敗: ${err.message}`, 'error'); resolve(false); });
+            proc.on('close', code => {
+              const ok = code === 0;
+              pushLog(ok ? `✅ ${coName}: 投稿が完了しました` : `❌ ${coName}: 投稿が失敗しました（コード: ${code}）`, ok ? 'success' : 'error');
+              resolve(ok);
+            });
           });
-          proc.stderr.on('data', d => { const t = d.toString().trim(); if (t) pushLog(`⚠️ ${t}`, 'warn'); });
-          proc.on('error', err => { pushLog(`❌ ${coName}: プロセス起動失敗: ${err.message}`, 'error'); resolve(false); });
-          proc.on('close', code => {
-            const ok = code === 0;
-            pushLog(ok ? `✅ ${coName}: 投稿が完了しました` : `❌ ${coName}: 投稿が失敗しました（コード: ${code}）`, ok ? 'success' : 'error');
-            resolve(ok);
-          });
-        });
+        };
 
         let allOk = true;
         for (const entry of perCompany) { if (!await runOne(entry)) allOk = false; }
