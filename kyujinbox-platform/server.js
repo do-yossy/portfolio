@@ -189,23 +189,23 @@ const vpnAccountForCompany = (id) => {
 async function connectAndVerifyVPN(co, coName, pushLog) {
   if (process.env.VPN_BYPASS === 'true') { pushLog(`ℹ️ ${coName}: VPNチェックをスキップ（VPN_BYPASS=true）`, 'info'); return true; }
   const vpncmdPath = findVpncmd();
-  const acct = vpnAccountForCompany(co);
   if (!vpncmdPath) {
     const m = await externalIpMatchesRanges();
     if (m === null) { pushLog(`❌ ${coName}: VPNクライアント(vpncmd)が見つかりません。VPNCMD_PATH か VPN_IP_RANGES を設定してください`, 'error'); return false; }
     if (!m) { pushLog(`❌ ${coName}: VPN未接続（IPが許可範囲外）`, 'error'); return false; }
     pushLog(`✅ ${coName}: VPN接続を確認（IP範囲）`, 'success'); return true;
   }
-  if (acct) {
-    pushLog(`🔌 ${coName}: 専用VPN「${acct}」へ接続します...`, 'info');
-    const r = await vpnConnect(acct);
-    if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return false; }
-  } else {
-    pushLog(`⚠️ ${coName}: VPN接続名(VPNCMD_ACCOUNT_${String(co).toUpperCase()})が未設定。現在の接続状態で確認します`, 'warn');
-  }
+  // 既に接続済みならそのまま利用
+  let out = await vpncmdAccountList(vpncmdPath);
+  if (isVpnConnectedFromOutput(out)) { pushLog(`✅ ${coName}: VPN接続を確認（接続済み）`, 'success'); return true; }
+  // 未接続なら自動接続（接続名の指定は不要。VPNCMD_ACCOUNT があればそれ、無ければ検出した先頭アカウント）
+  pushLog(`🔌 ${coName}: VPNへ自動接続します...`, 'info');
+  const r = await vpnConnect(vpnAccountForCompany(co));
+  if (!r.ok) { pushLog(`❌ ${coName}: VPN接続に失敗: ${r.error || ''}`, 'error'); return false; }
+  pushLog(`   接続先: ${r.name}`, 'info');
   // 接続確立を待って確認（最大~15秒）
   for (let i = 0; i < 6; i++) {
-    const out = await vpncmdAccountList(vpncmdPath);
+    out = await vpncmdAccountList(vpncmdPath);
     if (isVpnConnectedFromOutput(out)) { pushLog(`✅ ${coName}: VPN接続を確認しました`, 'success'); return true; }
     await new Promise(r => setTimeout(r, 2500));
   }
