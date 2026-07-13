@@ -36,6 +36,7 @@ function loadEnvFile(file, skipKeys) {
 
 const { Jobs, Logs, Reports, COMPANIES } = require('./db');
 const report = require('./lib/report');
+const { refreshStaleJobs } = require('./lib/refresh');
 const { requireAuth, isAuthenticated, login, destroySession, sessionCookie, parseCookies } = require('./lib/auth');
 
 const PORT = parseInt(process.env.PORT || '3200', 10);
@@ -303,6 +304,19 @@ function ensureMonthlyReports() {
     Logs.create('report_generate', 'success', `月次レポート自動生成: ${period}（${['all', ...cosWith].length}件）`);
     console.log(`📄 月次レポートを自動生成しました: ${period}`);
   } catch (e) { console.log('月次レポート自動生成エラー:', e.message); }
+}
+
+// ── 古い求人の自動修正（リフレッシュ）──
+// 更新が古い/期限切れ間近の公開求人を検知し、期限延長・更新日更新・再掲載キュー戻し。
+function autoRefreshOldJobs() {
+  if (String(process.env.REFRESH_AUTORUN || 'true') === 'false') return;
+  try {
+    const r = refreshStaleJobs();
+    if (r.refreshed > 0) {
+      Logs.create('refresh_old', 'success', `古い求人を自動修正: ${r.refreshed}件（再掲載キューへ ${r.requeued}件）`);
+      console.log(`🔄 古い求人を自動修正しました: ${r.refreshed}件（次回投稿で再掲載）`);
+    }
+  } catch (e) { console.log('古い求人の自動修正エラー:', e.message); }
 }
 
 // ── ルーティング ──
@@ -583,6 +597,15 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true, created, titles: createdTitles.slice(0, 30) });
     }
 
+    // ── 古い求人の自動修正（手動実行）──
+    if (pathname === '/api/refresh-old' && method === 'POST') {
+      const body = await parseJSON(req).catch(() => ({}));
+      const r = refreshStaleJobs({ company: body.company || null });
+      Logs.create('refresh_old', 'success', `古い求人を修正（手動）: ${r.refreshed}件（再掲載キューへ ${r.requeued}件）`);
+      return sendJSON(res, 200, { ok: true, refreshed: r.refreshed, requeued: r.requeued,
+        titles: r.jobs.slice(0, 30).map(j => j.title) });
+    }
+
     // ── 月次レポート ──
     if (pathname === '/api/reports' && method === 'GET') return sendJSON(res, 200, { reports: Reports.list(24) });
 
@@ -636,4 +659,7 @@ server.listen(PORT, () => {
   ensureMonthlyReports();
   // 毎日1回、前月分の月次レポートが無ければ自動生成（月替わり後の初回起動で前月分が作られる）
   setInterval(ensureMonthlyReports, 24 * 60 * 60 * 1000);
+  // 起動時＋毎日1回、古い求人を自動修正（期限延長・更新日更新・再掲載キュー戻し）
+  autoRefreshOldJobs();
+  setInterval(autoRefreshOldJobs, 24 * 60 * 60 * 1000);
 });
