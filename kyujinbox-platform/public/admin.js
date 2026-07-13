@@ -162,6 +162,23 @@ async function loadJobs() {
 
 $('postBtn').onclick = () => post(false);
 $('forceBtn').onclick = () => { if (confirm('投稿済みも含めて再投稿します。よろしいですか？')) post(true); };
+$('refreshOldBtn').onclick = refreshOld;
+
+async function refreshOld() {
+  const btn = $('refreshOldBtn'); const log = $('log'); log.innerHTML = '';
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '修正中...';
+  try {
+    const r = await api('/api/refresh-old', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: $('company').value }) });
+    if (r.error) { appendLog(log, [{ message: r.error, type: 'warn' }]); return; }
+    if (!r.refreshed) { appendLog(log, [{ message: '✅ 修正が必要な古い求人はありませんでした。', type: 'success' }]); }
+    else {
+      appendLog(log, [{ message: `🔄 古い求人を ${r.refreshed}件修正しました（再掲載キューへ ${r.requeued}件）。「投稿する」で再掲載されます。`, type: 'success' }]);
+      (r.titles || []).forEach(t => appendLog(log, [{ message: '　・' + t.slice(0, 50), type: 'info' }]));
+    }
+    loadStats(); loadJobs();
+  } catch (e) { appendLog(log, [{ message: 'エラー: ' + e.message, type: 'error' }]); }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
 $('genBtn').onclick = genReport;
 $('impBtn').onclick = importZip;
 $('b_btn').onclick = generateFromBase;
