@@ -98,19 +98,55 @@ async function rewriteJob(job, diagnosis, reason, opts = {}) {
   const model = (process.env.OPTIMIZER_MODEL || 'claude-sonnet-5').trim();
   const tags = (() => { try { return JSON.parse(job.tags || '[]'); } catch { return []; } })();
 
-  const guide = diagnosis === 'exposure'
-    ? `【診断: 露出不足】検索で見つかりにくい状態です。求職者が実際に検索する語（例: 未経験歓迎/正社員/日勤/土日休み/高収入/シニア歓迎/普通免許OK 等、この求人に当てはまるもの）をタイトル前半と本文に自然に増やしてください。`
-    : `【診断: 中身の問題】閲覧はあるが応募がありません。応募ハードルを下げ、不安を先に解消し、給与や条件の見せ方・訴求を魅力的にしてください（誇張・虚偽は不可）。`;
+  // 人材紹介求人（agency）は、実在他社の求人条件を扱うため本文の書き換えは虚偽リスクが高い。
+  // → タイトル・キャッチコピー（訴求）・タグのみ最適化し、仕事内容/やりがいは一切変更しない。
+  const isAgency = (job.job_kind === 'agency');
 
-  const sys = `あなたは求人広告（求人ボックス掲載）の改善を担うプロの求人コピーライターです。
+  let sys, user;
+  if (isAgency) {
+    const guide = diagnosis === 'exposure'
+      ? `【診断: 露出不足】検索で見つかりにくい状態です。求職者が実際に検索する語（例: 未経験歓迎/正社員/日勤/土日休み/シニア歓迎/普通免許OK 等、この求人に「実際に当てはまるものだけ」）を、タイトルとキャッチコピーに自然に反映してください。求人票に無い条件は追加しないでください。`
+      : `【診断: 中身の問題】閲覧はあるが応募がありません。タイトルとキャッチコピーの言い回し・語順・訴求だけを魅力的にしてください（事実の追加・誇張は不可）。`;
+    sys = `あなたは人材紹介求人（求人ボックス掲載）のコピーライターです。これは実在する他社の求人であり、条件を偽ると法令違反（虚偽求人・職業安定法）になります。
+制約（絶対厳守）:
+- 変更してよいのは「タイトル」「キャッチコピー（訴求）」「タグ」の3つ「だけ」。
+- 仕事内容(description)・やりがい(rewarding)・職種・勤務地・給与・雇用形態は「絶対に変更しない・出力もしない」。
+- 求人票に書かれていない条件・待遇・数値を一切追加しない。表現（語順・言い回し・強調）だけを整える。
+- 「人材紹介である旨」の記載は保持前提（本文は触らない）。日本語。
+出力は次のJSONのみ（説明文やコードフェンスを付けない）:
+{"title":"...","catchcopy":"...","tags":["..."],"note":"表現をどう変えたか1〜2文"}`;
+    user = `${guide}
+
+以下は人材紹介求人です。事実は一切変えず、タイトル・キャッチコピー・タグの「表現だけ」改善したJSONを返してください。
+
+# 現状の指標
+${reason}
+
+# 現在の求人（事実として保持すべき情報。変更禁止）
+職種: ${job.job_type}
+勤務地: ${job.location}
+給与: ${job.salary}
+雇用形態: ${job.employment_type}
+--- 仕事内容(参考・変更禁止) ---
+${(job.description || '').slice(0, 1500)}
+--- 改善対象: タイトル ---
+${job.title}
+--- 改善対象: キャッチコピー ---
+${job.catchcopy || ''}
+--- 改善対象: タグ ---
+${JSON.stringify(tags)}`;
+  } else {
+    const guide = diagnosis === 'exposure'
+      ? `【診断: 露出不足】検索で見つかりにくい状態です。求職者が実際に検索する語（例: 未経験歓迎/正社員/日勤/土日休み/高収入/シニア歓迎/普通免許OK 等、この求人に当てはまるもの）をタイトル前半と本文に自然に増やしてください。`
+      : `【診断: 中身の問題】閲覧はあるが応募がありません。応募ハードルを下げ、不安を先に解消し、給与や条件の見せ方・訴求を魅力的にしてください（誇張・虚偽は不可）。`;
+    sys = `あなたは求人広告（求人ボックス掲載）の改善を担うプロの求人コピーライターです。
 制約（厳守）:
 - 職種・勤務地・給与レンジ・雇用形態などの「事実」は絶対に変えない。誇張・虚偽・実在しない条件の追加は禁止。
 - 改善するのは、タイトルのキーワード/語順、キャッチコピー、本文の訴求・構成、タグ、やりがい文のみ。
 - 日本語。求人ボックスの掲載基準（虚偽・差別表現の禁止）を守る。
 出力は次のJSONのみ（前後に説明文やコードフェンスを付けない）:
 {"title":"...","catchcopy":"...","description":"...","rewarding":"...","tags":["..."],"note":"何をどう変えたか1〜2文"}`;
-
-  const user = `${guide}
+    user = `${guide}
 
 以下の求人を改善してください。事実は保持し、上記の観点だけ改善したJSONを返してください。
 
@@ -132,6 +168,7 @@ ${job.description || ''}
 ${job.rewarding || ''}
 --- タグ ---
 ${JSON.stringify(tags)}`;
+  }
 
   const body = {
     model,
@@ -163,11 +200,13 @@ ${JSON.stringify(tags)}`;
   catch (err) { throw new Error('AI応答のJSON解析に失敗: ' + err.message); }
 
   // 安全策: 給与レンジや職種の改ざんを防ぐため、これらは元の値を維持
+  // 人材紹介(agency)は、仕事内容(description)・やりがい(rewarding)を「絶対に」元のまま保持し、
+  // タイトル・キャッチコピー・タグの表現だけを差し替える（虚偽求人の防止）。
   return {
     title: (obj.title || job.title).slice(0, 120),
     catchcopy: (obj.catchcopy || job.catchcopy || '').slice(0, 300),
-    description: obj.description || job.description,
-    rewarding: (obj.rewarding || job.rewarding || '').slice(0, 500),
+    description: isAgency ? job.description : (obj.description || job.description),
+    rewarding: isAgency ? job.rewarding : (obj.rewarding || job.rewarding || '').slice(0, 500),
     tags: Array.isArray(obj.tags) && obj.tags.length ? obj.tags.slice(0, 15).map(String) : tags,
     note: (obj.note || '').slice(0, 200),
   };
