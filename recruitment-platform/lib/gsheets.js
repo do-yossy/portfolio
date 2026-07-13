@@ -260,6 +260,40 @@ async function setDropdowns(tabSheetId, validations) {
   await api(`/${sheetId()}:batchUpdate`, { method: 'POST', body: { requests } });
 }
 
+// 行の高さを一律に固定する（長文セルで行が伸びるのを防ぐ）。
+//   startRowIndex/endRowIndex は0始まり・endは排他。pixelSizeは既定21px（Sheets標準）。
+async function setRowHeights(tabSheetId, startRowIndex, endRowIndex, pixelSize = 21) {
+  if (endRowIndex <= startRowIndex) return;
+  await api(`/${sheetId()}:batchUpdate`, {
+    method: 'POST',
+    body: {
+      requests: [{
+        updateDimensionProperties: {
+          range: { sheetId: tabSheetId, dimension: 'ROWS', startIndex: startRowIndex, endIndex: endRowIndex },
+          properties: { pixelSize },
+          fields: 'pixelSize',
+        },
+      }],
+    },
+  });
+}
+
+// 指定列範囲のセルの折り返しを「はみ出し(クリップ)」にして、行の高さが伸びないようにする
+async function setClipWrap(tabSheetId, startColIndex, endColIndex, startRowIndex = 1) {
+  await api(`/${sheetId()}:batchUpdate`, {
+    method: 'POST',
+    body: {
+      requests: [{
+        repeatCell: {
+          range: { sheetId: tabSheetId, startRowIndex, startColumnIndex: startColIndex, endColumnIndex: endColIndex + 1 },
+          cell: { userEnteredFormat: { wrapStrategy: 'CLIP' } },
+          fields: 'userEnteredFormat.wrapStrategy',
+        },
+      }],
+    },
+  });
+}
+
 // ヘッダ行の書式（太字・背景色）を設定
 async function styleHeader(tabSheetId, numCols) {
   await api(`/${sheetId()}:batchUpdate`, {
@@ -444,4 +478,5 @@ module.exports = {
   getMeta, ensureTab, readValues, writeValues, appendValues, writeColumnFormulas,
   setDropdowns, styleHeader, styleSectionRows, colLetter, setStatusConditionalFormats,
   clearDataValidations, setColumnBackground, clearColumnDataBackground, writeSingleCell,
+  setRowHeights, setClipWrap,
 };
