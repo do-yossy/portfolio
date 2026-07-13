@@ -77,10 +77,10 @@ function aggregate(period, company) {
   const totalApplies = live.reduce((s, r) => s + (r.applies || 0), 0);
   const cvr = totalViews ? +(totalApplies / totalViews * 100).toFixed(2) : 0;
 
-  const topApplies = [...live].sort((a, b) => (b.applies - a.applies) || (b.views - a.views)).slice(0, 8);
-  const topViews = [...live].sort((a, b) => (b.views - a.views)).slice(0, 8);
+  const topApplies = [...live].sort((a, b) => (b.applies - a.applies) || (b.views - a.views)).slice(0, 15);
+  const topViews = [...live].sort((a, b) => (b.views - a.views)).slice(0, 10);
 
-  // 職種別
+  // 職種別（どの職種の求人を何件出して何件応募が来たか）
   const byType = new Map();
   for (const r of live) {
     const k = r.job_type || '(不明)';
@@ -89,11 +89,23 @@ function aggregate(period, company) {
     byType.set(k, g);
   }
   const jobTypeStats = [...byType.entries()].map(([job_type, g]) => ({ job_type, ...g }))
-    .sort((a, b) => b.applies - a.applies || b.views - a.views).slice(0, 8);
+    .sort((a, b) => b.applies - a.applies || b.views - a.views).slice(0, 20);
+
+  // エリア別（都道府県で集計：どのエリアの求人を何件出して何件応募が来たか）
+  const prefOf = (loc) => { const m = String(loc || '').match(/^(.+?[都道府県])/); return m ? m[1] : (loc || '(不明)'); };
+  const byArea = new Map();
+  for (const r of live) {
+    const k = prefOf(r.location);
+    const g = byArea.get(k) || { jobs: 0, views: 0, applies: 0 };
+    g.jobs++; g.views += r.views || 0; g.applies += r.applies || 0;
+    byArea.set(k, g);
+  }
+  const areaStats = [...byArea.entries()].map(([area, g]) => ({ area, ...g }))
+    .sort((a, b) => b.applies - a.applies || b.views - a.views).slice(0, 20);
 
   return { period, company: company || 'all', posted, created, optimized,
     liveCount: live.length, totalViews, totalApplies, cvr,
-    topApplies, topViews, jobTypeStats };
+    topApplies, topViews, jobTypeStats, areaStats };
 }
 
 // HTMLレポート生成
@@ -127,6 +139,14 @@ function renderHtml(a, prev) {
         <td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${r.views || 0}</td>
         <td style="padding:7px 8px;border:1px solid ${LINE};text-align:center;color:${TEAL};font-weight:700">${r.applies || 0}</td></tr>`).join('')
     : `<tr><td colspan="3" style="padding:12px;text-align:center;color:${GRAY}">データがありません（成績取得後に反映されます）</td></tr>`;
+  // 掲載数×閲覧×応募のサマリー表（職種別・エリア別で共用）
+  const sumTable = (list, keyName) => `<table><tr><th>${keyName}</th><th style="width:90px">掲載求人数</th><th style="width:90px">閲覧</th><th style="width:90px">応募</th></tr>${
+    list && list.length ? list.map((t, i) => `<tr style="background:${i % 2 ? LIGHT : '#fff'}">
+      <td style="padding:7px 8px;border:1px solid ${LINE}">${esc(t.label)}</td>
+      <td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${t.jobs}</td>
+      <td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${t.views}</td>
+      <td style="padding:7px 8px;border:1px solid ${LINE};text-align:center;color:${TEAL};font-weight:700">${t.applies}</td></tr>`).join('')
+    : `<tr><td colspan="4" style="padding:12px;text-align:center;color:${GRAY}">データがありません</td></tr>`}</table>`;
 
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>月次レポート ${esc(a.period)} ${esc(coLabel)}</title>
 <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Meiryo','Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;color:${DGRAY};background:#fff;padding:24px;max-width:900px;margin:0 auto}
@@ -153,9 +173,10 @@ h2{font-size:14px;color:${NAVY};border-left:4px solid ${TEAL};padding-left:8px;m
 <table><tr><th>求人タイトル</th><th style="width:80px">閲覧</th><th style="width:80px">応募</th></tr>${rows(a.topApplies)}</table>
 <h2>閲覧が多い求人 TOP</h2>
 <table><tr><th>求人タイトル</th><th style="width:80px">閲覧</th><th style="width:80px">応募</th></tr>${rows(a.topViews)}</table>
-<h2>職種別サマリー</h2>
-<table><tr><th>職種</th><th style="width:90px">求人数</th><th style="width:90px">閲覧</th><th style="width:90px">応募</th></tr>
-${a.jobTypeStats.length ? a.jobTypeStats.map((t, i) => `<tr style="background:${i % 2 ? LIGHT : '#fff'}"><td style="padding:7px 8px;border:1px solid ${LINE}">${esc(t.job_type)}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${t.jobs}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${t.views}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center;color:${TEAL};font-weight:700">${t.applies}</td></tr>`).join('') : `<tr><td colspan="4" style="padding:12px;text-align:center;color:${GRAY}">データがありません</td></tr>`}</table>
+<h2>職種別サマリー（どの職種を何件出して何件応募が来たか）</h2>
+${sumTable((a.jobTypeStats || []).map(t => ({ label: t.job_type, jobs: t.jobs, views: t.views, applies: t.applies })), '職種')}
+<h2>エリア別サマリー（都道府県別の掲載数・応募数）</h2>
+${sumTable((a.areaStats || []).map(t => ({ label: t.area, jobs: t.jobs, views: t.views, applies: t.applies })), 'エリア（都道府県）')}
 <div style="margin-top:22px;padding-top:10px;border-top:1px solid ${LINE};display:flex;justify-content:space-between;font-size:11px;color:${GRAY}">
   <span>本レポートは求人ボックスの運用実績をまとめたものです。</span>
   <span>作成：${esc(provider)}　／　発行日：${esc(jstDateStr())}</span>
