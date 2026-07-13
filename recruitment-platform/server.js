@@ -134,8 +134,19 @@ function parseSeniorjobApplicant(raw) {
     jobTitle = l; break;
   }
   let currentJob = ''; const cj = text.match(/職種[:：]\s*(.+)/); if (cj) currentJob = cj[1].trim();
+  // 電話番号（1次面接用に本人が媒体メッセージで返信した番号が貼り付けに含まれる場合、自動抽出）
+  // 携帯(070/080/090)優先→0始まり10〜11桁の一般番号
+  let phone = '';
+  const mobile = text.match(/0[789]0[-\s]?\d{4}[-\s]?\d{4}/);
+  if (mobile) phone = mobile[0].trim();
+  else {
+    for (const c of (text.match(/0\d{1,3}[-\s]?\d{1,4}[-\s]?\d{3,4}/g) || [])) {
+      const digits = c.replace(/\D/g, '');
+      if (digits.length === 10 || digits.length === 11) { phone = c.trim(); break; }
+    }
+  }
   return {
-    name, age, furigana,
+    name, age, furigana, phone,
     sid: after('求職者ID'),
     gender: after('性別'),
     address: after('現住所'),
@@ -152,8 +163,10 @@ function parseSeniorjobApplicant(raw) {
   };
 }
 
-// 解析結果 → Applicants.create() 用レコード（媒体=シニアジョブ・会社=SQ・連絡先なし）
-function buildSeniorjobApplicantRecord(p, company) {
+// 解析結果 → Applicants.create() 用レコード（媒体=シニアジョブ・会社=SQ）
+// phone: 1次面接の電話用に、本人が媒体メッセージで返信した番号（あれば架電リストに載せる）
+function buildSeniorjobApplicantRecord(p, company, phone) {
+  const tel = (phone || p.phone || '').trim();
   const notes = [
     p.sid ? `求職者ID:${p.sid}` : '',
     p.stage ? `選考状況:${p.stage}` : '',
@@ -162,7 +175,8 @@ function buildSeniorjobApplicantRecord(p, company) {
     p.empType ? `希望雇用形態:${p.empType}` : '',
     p.wantJob ? `希望職種:${p.wantJob.replace(/\n/g, ' ')}` : '',
     p.wantPay ? `希望給与:${p.wantPay}` : '',
-    '※シニアジョブ応募（電話/メール非公開・連絡は媒体内メッセージ）',
+    tel ? '※シニアジョブ応募（1次面接の電話用に本人から受領した番号・連絡は原則媒体内メッセージ）'
+        : '※シニアジョブ応募（電話/メール非公開・連絡は媒体内メッセージ）',
   ].filter(Boolean).join('\n');
   return {
     name: p.name,
@@ -176,7 +190,7 @@ function buildSeniorjobApplicantRecord(p, company) {
     job_title: p.jobTitle || '',
     work_location: p.wantLocation || '',
     notes,
-    phone: '', email: '',            // シニアジョブは連絡先非公開（NOT NULL回避のため空文字。後でスプレッドシートで手入力）
+    phone: tel, email: '',           // 1次面接用に本人が返信した番号があれば登録（Applicants.createが正規化）
     company: company || 'sq',
     media: 'seniorjob',              // 媒体クロス集計の「シニアジョブ」列に計上
     sourceMedia: 'シニアジョブ',
@@ -2102,6 +2116,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const body = await parseJSON(req);
     const company = seniorjobCompany(body.company);
     const parsed = parseSeniorjobApplicant(body.text || '');
+    const phone = (body.phone || '').trim() || parsed.phone || '';
     if (!parsed.name) {
       sendError(res, 400, '氏名を検出できませんでした。シニアジョブの応募者詳細（氏名・年齢が含まれる範囲）をコピーして貼り付けてください。');
       return;
@@ -2114,9 +2129,9 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         if (dup) { sendJSON(res, 200, { ok: true, duplicate: true, name: parsed.name, sid: parsed.sid, id: dup.id }); return; }
       } catch {}
     }
-    const created = await Applicants.create(buildSeniorjobApplicantRecord(parsed, company));
-    await Logs.create('seniorjob_applicant', 'success', `シニアジョブ応募者取込: ${parsed.name}（${company}/求職者ID:${parsed.sid || '-'}）`);
-    sendJSON(res, 201, { ok: true, id: created.id, name: parsed.name, sid: parsed.sid, stage: parsed.stage, jobTitle: parsed.jobTitle, company });
+    const created = await Applicants.create(buildSeniorjobApplicantRecord(parsed, company, phone));
+    await Logs.create('seniorjob_applicant', 'success', `シニアジョブ応募者取込: ${parsed.name}（${company}/求職者ID:${parsed.sid || '-'}${phone ? '/電話あり' : ''}）`);
+    sendJSON(res, 201, { ok: true, id: created.id, name: parsed.name, sid: parsed.sid, stage: parsed.stage, jobTitle: parsed.jobTitle, phone, company });
     return;
   }
   // ── API: シニアジョブ 記録リセット（会社別） ──
