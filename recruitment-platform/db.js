@@ -648,6 +648,7 @@ const COMPANIES = [
   { id: 'lt', name: '株式会社lifeTaylor',     short: 'LT', label: 'Life Tailor' },
   { id: 'nc', name: '合同会社ニクール',        short: 'NC', label: 'ニクール' },
   { id: 'nx', name: 'ネクサス株式会社',        short: 'NX', label: 'ネクサス' },
+  { id: 'st', name: '有限会社Style501',        short: 'ST', label: 'Style501' },
 ];
 const MEDIA = [
   { id: 'indeed',   name: 'Indeed' },
