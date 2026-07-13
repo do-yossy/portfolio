@@ -17,6 +17,38 @@ function thisMonth(baseIso) {
   const d = baseIso ? new Date(baseIso) : new Date();
   return d.toISOString().slice(0, 7);
 }
+// 'YYYY-MM' の前月 'YYYY-MM'
+function prevPeriod(period) {
+  const [y, m] = String(period).split('-').map(Number);
+  const d = new Date(Date.UTC(y || 2000, (m || 1) - 1, 1));
+  d.setUTCMonth(d.getUTCMonth() - 1);
+  return d.toISOString().slice(0, 7);
+}
+// 日本時間の発行日（例: 2026年7月1日）
+function jstDateStr() {
+  const d = new Date(Date.now() + 9 * 3600 * 1000);
+  return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日`;
+}
+// 期間ラベル（例: 2026年6月）
+function periodLabel(period) {
+  const [y, m] = String(period).split('-');
+  return `${y}年${Number(m)}月`;
+}
+// 自動生成の総評コメント（数値ベース・決定的）
+function summaryComment(a, prev) {
+  const nf = (n) => Number(n || 0).toLocaleString('en-US');
+  const parts = [];
+  parts.push(`${periodLabel(a.period)}は求人ボックスへ${a.posted}件を掲載し、公開中${a.liveCount}件から累計${nf(a.totalViews)}回の閲覧・${a.totalApplies}件のご応募を獲得しました（応募率${a.cvr}%）。`);
+  if (a.optimized > 0) parts.push(`応募状況を踏まえたAIによる求人内容の改善を${a.optimized}回実施しています。`);
+  if (a.jobTypeStats && a.jobTypeStats.length && a.jobTypeStats[0].applies > 0)
+    parts.push(`職種別では「${a.jobTypeStats[0].job_type}」が応募${a.jobTypeStats[0].applies}件で最も好調でした。`);
+  if (prev && (prev.totalApplies || prev.totalViews || prev.posted)) {
+    const dA = a.totalApplies - prev.totalApplies;
+    const trend = dA > 0 ? `${dA}件増加` : dA < 0 ? `${Math.abs(dA)}件減少` : '横ばい';
+    parts.push(`前月（${periodLabel(prev.period)}）比では、応募数が${trend}しました。`);
+  }
+  return parts.join('');
+}
 
 // 期間・会社の集計
 function aggregate(period, company) {
@@ -65,13 +97,30 @@ function aggregate(period, company) {
 }
 
 // HTMLレポート生成
-function renderHtml(a) {
+function renderHtml(a, prev) {
   const NAVY = '#0F2A43', TEAL = '#17A398', LIGHT = '#F2F5F8', LINE = '#D5DCE3', GRAY = '#5A6B7B', DGRAY = '#33414E';
   const coLabel = a.company === 'all' ? '全アカウント' : coName(a.company);
-  const tile = (label, val, unit = '') =>
+  const provider = (process.env.REPORT_PROVIDER || '株式会社SocialQuality').trim();
+  // 宛先（提出先の人材会社）: REPORT_CLIENT_<CO> で明示指定可。
+  //   未指定でも、アカウントの会社名が提供元と異なれば「◯◯ 御中」を表示（自分宛は出さない）。
+  const clientEnv = a.company && a.company !== 'all'
+    ? (process.env[`REPORT_CLIENT_${String(a.company).toUpperCase()}`] || '').trim() : '';
+  let addressee = '';
+  if (clientEnv) addressee = `${clientEnv}　御中`;
+  else if (a.company !== 'all' && coName(a.company) !== provider) addressee = `${coName(a.company)}　御中`;
+  // 前月比の差分表示
+  const delta = (cur, prev0, unit = '') => {
+    if (!prev || prev0 == null) return '';
+    const d = +(Number(cur) - Number(prev0)).toFixed(2);
+    if (d === 0) return `<span style="color:${GRAY};font-size:11px">前月比 ±0${unit}</span>`;
+    const col = d > 0 ? TEAL : '#C0392B';
+    return `<span style="color:${col};font-size:11px">前月比 ${d > 0 ? '+' : ''}${d}${unit}</span>`;
+  };
+  const tile = (label, val, unit = '', deltaHtml = '') =>
     `<div style="flex:1;background:#fff;border:1px solid ${LINE};border-radius:10px;padding:14px 10px;text-align:center">
       <div style="color:${GRAY};font-size:12px">${esc(label)}</div>
-      <div style="color:${NAVY};font-size:28px;font-weight:800">${esc(val)}<span style="font-size:13px;color:${GRAY}">${esc(unit)}</span></div></div>`;
+      <div style="color:${NAVY};font-size:28px;font-weight:800">${esc(val)}<span style="font-size:13px;color:${GRAY}">${esc(unit)}</span></div>
+      ${deltaHtml ? `<div style="margin-top:2px">${deltaHtml}</div>` : ''}</div>`;
   const rows = (list) => list.length
     ? list.map((r, i) => `<tr style="background:${i % 2 ? LIGHT : '#fff'}">
         <td style="padding:7px 8px;border:1px solid ${LINE}">${esc((r.title || '').slice(0, 44))}</td>
@@ -83,13 +132,22 @@ function renderHtml(a) {
 <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Meiryo','Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;color:${DGRAY};background:#fff;padding:24px;max-width:900px;margin:0 auto}
 h1{font-size:22px;color:#fff}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}th{background:${NAVY};color:#fff;padding:8px;border:1px solid ${LINE}}
 .hd{background:${NAVY};border-radius:8px;padding:16px 20px;position:relative;overflow:hidden}.hd:before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px;background:${TEAL}}
-h2{font-size:14px;color:${NAVY};border-left:4px solid ${TEAL};padding-left:8px;margin:20px 0 4px}@media print{body{padding:0}}</style></head><body>
-<div class="hd"><h1>求人ボックス 月次レポート</h1><div style="color:#B9C6D3;font-size:13px;margin-top:4px">対象期間：${esc(a.period)}　／　${esc(coLabel)}</div></div>
+h2{font-size:14px;color:${NAVY};border-left:4px solid ${TEAL};padding-left:8px;margin:20px 0 4px}@media print{body{padding:0}}
+.mt{margin-top:16px}</style></head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px">
+  <div style="font-size:16px;font-weight:700;color:${NAVY}">${esc(addressee)}</div>
+  <div style="text-align:right;font-size:12px;color:${GRAY};line-height:1.6">発行日：${esc(jstDateStr())}<br>作成：${esc(provider)}</div>
+</div>
+<div class="hd"><h1>求人ボックス 月次運用レポート</h1><div style="color:#B9C6D3;font-size:13px;margin-top:4px">対象期間：${esc(periodLabel(a.period))}　／　${esc(coLabel)}</div></div>
+<div style="background:${LIGHT};border:1px solid ${LINE};border-left:4px solid ${TEAL};border-radius:8px;padding:12px 14px;margin-top:14px;font-size:13px;line-height:1.8;color:${DGRAY}">
+  <div style="font-weight:700;color:${NAVY};margin-bottom:2px">■ 今月の総評</div>
+  ${esc(summaryComment(a, prev))}
+</div>
 <div style="display:flex;gap:10px;margin-top:16px">
-  ${tile('掲載した求人', a.posted, '件')}${tile('公開中', a.liveCount, '件')}${tile('累計閲覧', a.totalViews, '')}${tile('累計応募', a.totalApplies, '件')}${tile('AI改善', a.optimized, '回')}
+  ${tile('掲載した求人', a.posted, '件', delta(a.posted, prev && prev.posted, '件'))}${tile('公開中', a.liveCount, '件')}${tile('累計閲覧', a.totalViews, '', delta(a.totalViews, prev && prev.totalViews))}${tile('累計応募', a.totalApplies, '件', delta(a.totalApplies, prev && prev.totalApplies, '件'))}${tile('AI改善', a.optimized, '回')}
 </div>
 <div style="display:flex;gap:10px;margin-top:10px">
-  ${tile('応募率(CVR)', a.cvr, '%')}${tile('新規作成', a.created, '件')}
+  ${tile('応募率(CVR)', a.cvr, '%', delta(a.cvr, prev && prev.cvr, '%'))}${tile('新規作成', a.created, '件')}
 </div>
 <h2>応募が多い求人 TOP</h2>
 <table><tr><th>求人タイトル</th><th style="width:80px">閲覧</th><th style="width:80px">応募</th></tr>${rows(a.topApplies)}</table>
@@ -98,14 +156,19 @@ h2{font-size:14px;color:${NAVY};border-left:4px solid ${TEAL};padding-left:8px;m
 <h2>職種別サマリー</h2>
 <table><tr><th>職種</th><th style="width:90px">求人数</th><th style="width:90px">閲覧</th><th style="width:90px">応募</th></tr>
 ${a.jobTypeStats.length ? a.jobTypeStats.map((t, i) => `<tr style="background:${i % 2 ? LIGHT : '#fff'}"><td style="padding:7px 8px;border:1px solid ${LINE}">${esc(t.job_type)}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${t.jobs}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center">${t.views}</td><td style="padding:7px 8px;border:1px solid ${LINE};text-align:center;color:${TEAL};font-weight:700">${t.applies}</td></tr>`).join('') : `<tr><td colspan="4" style="padding:12px;text-align:center;color:${GRAY}">データがありません</td></tr>`}</table>
-<p style="color:${GRAY};font-size:11px;margin-top:18px">生成日時：${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC</p>
+<div style="margin-top:22px;padding-top:10px;border-top:1px solid ${LINE};display:flex;justify-content:space-between;font-size:11px;color:${GRAY}">
+  <span>本レポートは求人ボックスの運用実績をまとめたものです。</span>
+  <span>作成：${esc(provider)}　／　発行日：${esc(jstDateStr())}</span>
+</div>
 </body></html>`;
 }
 
 // 生成してDBへ保存し {period, company, summary, html, id} を返す
 function generate(period, company = 'all') {
   const a = aggregate(period, company);
-  const html = renderHtml(a);
+  let prev = null;
+  try { prev = aggregate(prevPeriod(period), company); } catch { prev = null; }
+  const html = renderHtml(a, prev);
   const summary = { posted: a.posted, created: a.created, optimized: a.optimized,
     liveCount: a.liveCount, totalViews: a.totalViews, totalApplies: a.totalApplies, cvr: a.cvr };
   const id = Reports.upsert(period, company, html, summary);
