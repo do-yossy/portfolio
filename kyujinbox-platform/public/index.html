@@ -85,6 +85,17 @@
     </div>
     <p class="muted" style="margin:4px 0 0;font-size:12px">※ 古い求人の修正は起動時と毎日自動でも実行されます（期限延長・更新日更新・再掲載キューへ）。修正後に「投稿する」で再掲載されます。</p>
     <pre id="log" class="log"></pre>
+
+    <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:600"><input type="checkbox" id="schEnabled"> 毎晩この時刻に自動で投稿する</label>
+        <label>時刻 <input id="schTime" type="time" value="02:00" style="padding:4px"></label>
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="schForce"> 投稿済みも再投稿</label>
+        <button id="schSave" class="ghost">保存</button>
+        <span id="schMsg" class="muted" style="font-size:12px"></span>
+      </div>
+      <p class="muted" style="margin:6px 0 0;font-size:12px">※ ONにすると、指定時刻に上の「アカウント」対象で自動投稿します（PCが起動中・スリープでない状態が必要）。投稿前にVPN接続・古い求人の修正は通常どおり動作します。</p>
+    </div>
   </section>
 
   <section class="card">
