@@ -86,22 +86,52 @@ async function getAccessToken() {
   return data.access_token;
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// 直前の書き込みリクエスト時刻（連発を軽く間引いて 60回/分 の上限に当たりにくくする）
+let _lastWriteAt = 0;
+const MIN_WRITE_GAP_MS = Number(process.env.SHEETS_WRITE_GAP_MS || 350);
+const MAX_RETRIES = Number(process.env.SHEETS_MAX_RETRIES || 6);
+
 async function api(path, { method = 'GET', body } = {}) {
-  const token = await getAccessToken();
-  const res = await fetch(SHEETS_BASE + path, {
-    method,
-    headers: {
-      Authorization: 'Bearer ' + token,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  let data; try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
-  if (!res.ok) {
+  const isWrite = method !== 'GET';
+  // 書き込みは最小間隔を空ける（クォータ超過の予防）
+  if (isWrite) {
+    const wait = _lastWriteAt + MIN_WRITE_GAP_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+  }
+
+  let lastErr;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const token = await getAccessToken();
+    const res = await fetch(SHEETS_BASE + path, {
+      method,
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (isWrite) _lastWriteAt = Date.now();
+    const text = await res.text();
+    let data; try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    if (res.ok) return data;
+
+    // 429（クォータ超過）や一時的な 500/503 はバックオフして再試行
+    if ((res.status === 429 || res.status === 500 || res.status === 503) && attempt < MAX_RETRIES) {
+      const retryAfter = Number(res.headers.get('retry-after'));
+      // Retry-After（秒）優先。無ければ 指数バックオフ + ジッター（最大~40秒）
+      const backoff = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : Math.min(40000, 1000 * Math.pow(2, attempt)) + Math.floor(Math.random() * 500);
+      lastErr = new Error(`Sheets API エラー (${res.status}): ${data.error?.message || text || ''}`);
+      await sleep(backoff);
+      if (isWrite) _lastWriteAt = Date.now();
+      continue;
+    }
     throw new Error(`Sheets API エラー (${res.status}): ${data.error?.message || text || ''}`);
   }
-  return data;
+  throw lastErr || new Error('Sheets API エラー: リトライ上限に達しました');
 }
 
 // 操作対象スプレッドシートIDの一時上書き（過去応募者用など別シートに出力する際に使用）
