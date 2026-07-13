@@ -196,6 +196,22 @@ function now() {
   return new Date().toISOString();
 }
 
+// JST基準の「N日前の日の 00:00(JST)」を UTC ISO文字列で返す。
+// applied_at は UTC ISO で保存されるため、当日/今週の判定はこのUTC時刻と比較する
+// （JST日付文字列と直接比較すると、日本の0:00〜8:59に当日分が漏れるバグになる）。
+function jstDayStartUtcISO(daysAgo = 0) {
+  const j = new Date(Date.now() + 9 * 60 * 60 * 1000); // JSTにずらした現在
+  const y = j.getUTCFullYear(), m = j.getUTCMonth(), d = j.getUTCDate() - daysAgo;
+  // その日のJST 00:00 = UTCでは (y,m,d) の 00:00 から 9時間戻した時刻
+  return new Date(Date.UTC(y, m, d, -9, 0, 0)).toISOString();
+}
+// JST基準の「今週の月曜 00:00(JST)」を UTC ISO文字列で返す
+function jstWeekStartUtcISO() {
+  const j = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const back = (j.getUTCDay() + 6) % 7; // 月曜=0 になるオフセット
+  return jstDayStartUtcISO(back);
+}
+
 // --- Jobs ---
 const Jobs = {
   findAll({ onlyPublished = false, company = null } = {}) {
@@ -751,7 +767,7 @@ const Ops = {
     const conds = ['is_archived = 0'];
     const vals = [];
     if (activeOnly) conds.push(`status IN (${ACTIVE_CALL_STATUSES.map(() => '?').join(',')})`), vals.push(...ACTIVE_CALL_STATUSES);
-    if (todayOnly) { conds.push('applied_at >= ?'); vals.push(new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)); } // JST基準
+    if (todayOnly) { conds.push('applied_at >= ?'); vals.push(jstDayStartUtcISO(0)); } // JST当日0:00をUTCで比較
     let q = 'SELECT company, media, COUNT(*) as c FROM applicants';
     if (conds.length) q += ' WHERE ' + conds.join(' AND ');
     q += ' GROUP BY company, media';
@@ -864,5 +880,6 @@ const MediaPosts = {
 module.exports = {
   db, Jobs, Applicants, Applications, Logs, Analytics, generateId,
   Ops, MediaPosts, COMPANIES, MEDIA, CALL_STATUSES, ACTIVE_CALL_STATUSES,
+  jstDayStartUtcISO, jstWeekStartUtcISO,
   findDuplicateInfo: (nPhone, nEmail) => Applicants.findDuplicateInfo(nPhone, nEmail),
 };

@@ -592,11 +592,11 @@ function kyujinboxConfiguredCompanies() {
 
 // 新規応募者タブ統計
 async function opsNewStats() {
-  const { db } = require('./db');
-  // 日付はJST（UTC+9）基準。UTC基準だと日本の0:00〜8:59に前日扱いになる
-  const JST = 9 * 60 * 60 * 1000;
-  const today = new Date(Date.now() + JST).toISOString().slice(0, 10);
-  const monday = (() => { const d = new Date(Date.now() + JST); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); })();
+  const { db, jstDayStartUtcISO, jstWeekStartUtcISO } = require('./db');
+  // applied_at は UTC ISO で保存されるため、JST当日/今週の0:00に相当するUTC時刻で比較する。
+  // （JST日付文字列と直接比較すると、日本の0:00〜8:59に当日分が漏れる）
+  const today = jstDayStartUtcISO(0);
+  const monday = jstWeekStartUtcISO();
   // 「本日の新規応募」は applied_at（応募日）基準でカウント。
   // バックログ取込は applied_at が過去日付になるため自動的に除外される。
   const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(today).c;

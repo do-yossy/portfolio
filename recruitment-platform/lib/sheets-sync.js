@@ -264,6 +264,14 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
       if (sectionRowIdx.length && gsheets.styleSectionRows) {
         await gsheets.styleSectionRows(props.sheetId, sectionRowIdx, SHEET_HEADERS.length);
       }
+      // 経験(O列)・職歴(W列)など長文セルで行の高さが伸びるのを防ぐ:
+      //   O列以降(index14〜)ははみ出し(クリップ)にし、データ行の高さを一律21pxに固定
+      if (rows.length > 1 && gsheets.setClipWrap) {
+        await gsheets.setClipWrap(props.sheetId, 14, SHEET_HEADERS.length - 1, 1);
+      }
+      if (rows.length > 1 && gsheets.setRowHeights) {
+        await gsheets.setRowHeights(props.sheetId, 1, rows.length, 21);
+      }
     } catch (e) {
       warnings.push(`${title}: 書式/プルダウン設定に失敗 (${e.message || e})`);
     }
