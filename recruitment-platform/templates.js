@@ -2180,9 +2180,10 @@ function seniorjobCallPanel(co = 'sq') {
   return `
     <section class="card" id="sj-app-panel" style="margin-top:24px">
       <h2>🚃 シニアジョブ 応募者の取込（コピペ）</h2>
-      <p class="muted" style="margin-top:4px">シニアジョブは応募者の一括ダウンロードが無いため1人ずつ取り込みます。<b>会社</b>を選び、選考管理の<b>応募者詳細</b>を選択コピーして貼り付け → 「取込」。選んだ会社・媒体=シニアジョブで登録され、この架電リスト／新規応募に表示されます。<br>※電話番号・メールは媒体仕様で取得できません（後でスプレッドシートで手入力できます）。</p>
+      <p class="muted" style="margin-top:4px">シニアジョブは応募者の一括ダウンロードが無いため1人ずつ取り込みます。<b>会社</b>を選び、選考管理の<b>応募者詳細</b>を選択コピーして貼り付け → 「取込」。氏名・年齢・現住所・経歴・希望条件などスプレッドシートの項目に合う内容を自動抽出します。選んだ会社・媒体=シニアジョブで登録され、この架電リスト／新規応募に表示されます。<br>※<b>1次面接の電話用に本人が返信した番号</b>は、下の「電話番号」欄に入力すると架電リストに載ります（貼り付けテキストに番号が含まれていれば自動で拾います）。</p>
       <div style="margin-bottom:10px"><label>会社<br><select id="sj-app-co" style="padding:8px;border:1px solid #ccc;border-radius:6px">${seniorjobCompanyOptions(coSel)}</select></label></div>
       <textarea id="sj-app-text" rows="6" placeholder="応募者詳細を貼り付け（氏名・年齢〜希望勤務地のあたり）" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:13px"></textarea>
+      <div style="margin-top:10px"><label>電話番号（1次面接用・本人が返信した番号／任意）<br><input id="sj-app-phone" type="tel" placeholder="例）090-1234-5678" style="width:260px;padding:8px;border:1px solid #ccc;border-radius:6px"></label></div>
       <div style="display:flex;gap:12px;align-items:center;margin-top:10px">
         <button class="btn btn-primary" id="sj-app-import">➕ 応募者を取込</button>
         <button class="btn btn-ghost" id="sj-app-clear">クリア</button>
@@ -2191,8 +2192,8 @@ function seniorjobCallPanel(co = 'sq') {
     </section>
     <script>
     (function(){var amsg=document.getElementById('sj-app-msg');
-      document.getElementById('sj-app-clear').onclick=function(){document.getElementById('sj-app-text').value='';amsg.textContent='';};
-      document.getElementById('sj-app-import').onclick=async function(){var t=document.getElementById('sj-app-text').value||'';var co=document.getElementById('sj-app-co').value||'sq';if(!t.trim()){amsg.style.color='#b91c1c';amsg.textContent='応募者の内容を貼り付けてください';return;}amsg.style.color='';amsg.textContent='取込中…';try{var r=await fetch('/api/seniorjob/applicant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,company:co})});var j=await r.json();if(!r.ok){amsg.style.color='#b91c1c';amsg.textContent='エラー: '+(j.error||r.status);return;}if(j.duplicate){amsg.style.color='#b45309';amsg.textContent='既に取込済み: '+j.name+'（求職者ID:'+(j.sid||'-')+'）';return;}amsg.style.color='#16a34a';amsg.textContent='取込みました: '+j.name+'（'+(j.jobTitle||'')+' / '+(j.stage||'')+'）。一覧を更新します…';document.getElementById('sj-app-text').value='';setTimeout(function(){location.reload();},1200);}catch(e){amsg.style.color='#b91c1c';amsg.textContent='エラー: '+e.message;}};
+      document.getElementById('sj-app-clear').onclick=function(){document.getElementById('sj-app-text').value='';var ph=document.getElementById('sj-app-phone');if(ph)ph.value='';amsg.textContent='';};
+      document.getElementById('sj-app-import').onclick=async function(){var t=document.getElementById('sj-app-text').value||'';var co=document.getElementById('sj-app-co').value||'sq';var phone=(document.getElementById('sj-app-phone')||{}).value||'';if(!t.trim()){amsg.style.color='#b91c1c';amsg.textContent='応募者の内容を貼り付けてください';return;}amsg.style.color='';amsg.textContent='取込中…';try{var r=await fetch('/api/seniorjob/applicant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,company:co,phone:phone})});var j=await r.json();if(!r.ok){amsg.style.color='#b91c1c';amsg.textContent='エラー: '+(j.error||r.status);return;}if(j.duplicate){amsg.style.color='#b45309';amsg.textContent='既に取込済み: '+j.name+'（求職者ID:'+(j.sid||'-')+'）';return;}amsg.style.color='#16a34a';amsg.textContent='取込みました: '+j.name+'（'+(j.jobTitle||'')+' / '+(j.stage||'')+'）'+(j.phone?'／電話:'+j.phone:'')+'。一覧を更新します…';document.getElementById('sj-app-text').value='';var ph=document.getElementById('sj-app-phone');if(ph)ph.value='';setTimeout(function(){location.reload();},1200);}catch(e){amsg.style.color='#b91c1c';amsg.textContent='エラー: '+e.message;}};
     })();
     </script>`;
 }
