@@ -160,6 +160,27 @@ async function loadJobs() {
   $('jobs').innerHTML = `<table><tr><th>タイトル</th><th>勤務地</th><th>会社</th><th>状態</th><th>投稿</th><th>改善</th></tr>${rows}</table>`;
 }
 
+async function loadSchedule() {
+  if (!$('schEnabled')) return;
+  try {
+    const s = await api('/api/schedule');
+    $('schEnabled').checked = !!s.enabled;
+    if (s.time) $('schTime').value = s.time;
+    $('schForce').checked = !!s.forceRepost;
+    $('schMsg').textContent = s.enabled ? `毎晩 ${s.time} に自動投稿します` : '自動投稿はOFFです';
+  } catch {}
+}
+async function saveSchedule() {
+  const btn = $('schSave'); btn.disabled = true;
+  try {
+    const body = { enabled: $('schEnabled').checked, time: $('schTime').value, company: $('company').value, forceRepost: $('schForce').checked };
+    const r = await api('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    $('schMsg').textContent = r.enabled ? `✅ 保存しました（毎晩 ${r.time} に自動投稿）` : '✅ 保存しました（自動投稿OFF）';
+  } catch (e) { $('schMsg').textContent = 'エラー: ' + e.message; }
+  finally { btn.disabled = false; }
+}
+if ($('schSave')) $('schSave').onclick = saveSchedule;
+
 $('postBtn').onclick = () => post(false);
 $('forceBtn').onclick = () => { if (confirm('投稿済みも含めて再投稿します。よろしいですか？')) post(true); };
 $('refreshOldBtn').onclick = refreshOld;
@@ -189,5 +210,5 @@ $('jobCompany').onchange = loadJobs;
 
 (async function init() {
   await loadCompanies();
-  await Promise.all([loadStats(), loadReports(), loadJobs()]);
+  await Promise.all([loadStats(), loadReports(), loadJobs(), loadSchedule()]);
 })();

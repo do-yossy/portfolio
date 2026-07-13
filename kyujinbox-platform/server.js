@@ -319,6 +319,118 @@ function autoRefreshOldJobs() {
   } catch (e) { console.log('古い求人の自動修正エラー:', e.message); }
 }
 
+// ── 求人ボックス投稿の実行（手動API・夜間スケジューラで共用）──
+// pushLog(message, type) でログを出す。戻り値 { ok, allOk, error, totalPosted }
+async function executePosting({ company, limit, forceRepost, pushLog }) {
+  const parsedLimit = parseInt(limit, 10);
+  const batchSize = (Number.isFinite(parsedLimit) && parsedLimit > 0) ? parsedLimit : 1000000;
+  const kbCompany = company && company !== 'all' ? company : null;
+  let targetCompanies = kbCompany ? [kbCompany] : kyujinboxConfiguredCompanies();
+  if (targetCompanies.length === 0) targetCompanies = ['sq'];
+
+  const perCompany = []; let totalPosted = 0;
+  for (const co of targetCompanies) {
+    const allJobs = Jobs.findAll({ onlyPublished: true, company: co });
+    let kbJobs = allJobs.filter(j => { try { return JSON.parse(j.target_media || '[]').some(m => /求人ボックス|kyujinbox/.test(m)); } catch { return false; } });
+    if (kbJobs.length === 0 && targetCompanies.length === 1) kbJobs = allJobs;
+    const already = kbJobs.filter(j => j.kyujinbox_posted_at).length;
+    totalPosted += already;
+    if (!forceRepost) kbJobs = kbJobs.filter(j => !j.kyujinbox_posted_at);
+    if (kbJobs.length > 0) perCompany.push({ co, jobs: kbJobs, already });
+  }
+  if (perCompany.length === 0) {
+    const msg = totalPosted > 0
+      ? `未投稿の求人がありません（${totalPosted}件は投稿済み）`
+      : '公開中の求人がありません';
+    return { ok: false, error: msg, allPosted: totalPosted > 0 };
+  }
+
+  const scriptPath = path.join(SCRIPTS_DIR, 'kyujinbox_poster.py');
+  if (!fs.existsSync(scriptPath)) { pushLog('⚠️ 投稿スクリプトが見つかりません（scripts/kyujinbox_poster.py）', 'warn'); return { ok: false, error: 'poster script missing' }; }
+  pushLog(`🐍 使用Python: ${PYTHON_CMD}`, 'info');
+  if (perCompany.length > 1) pushLog(`🏢 複数アカウントへ順に投稿します（${perCompany.map(p => companyFullName(p.co)).join('・')}）`, 'info');
+
+  const usedIps = new Set();
+  const runOne = async ({ co, jobs, already }) => {
+    const { env: credEnv, hasCreds } = kyujinboxEnvForCompany(co);
+    const coName = companyFullName(co);
+    if (!hasCreds) { pushLog(`⚠️ ${coName}: 認証情報(.env)が未設定のためスキップ`, 'warn'); return true; }
+    const vpn = await connectAndVerifyVPN(co, coName, pushLog, usedIps);
+    if (!vpn.ok) { pushLog(`⛔ ${coName}: VPN未接続のため投稿を中止しました`, 'error'); return false; }
+    if (vpn.ip) usedIps.add(vpn.ip);
+    if (already > 0 && !forceRepost) pushLog(`ℹ️ ${coName}: 投稿済み ${already}件をスキップ（未投稿 ${jobs.length}件を投稿）`, 'info');
+    pushLog(`📋 ${coName}: 求人ボックス向け ${Math.min(batchSize, jobs.length)}件を投稿します...`, 'info');
+    const jobIdMap = Object.fromEntries(jobs.map(j => [j.id, j]));
+    return await new Promise(resolve => {
+      const proc = spawn(PYTHON_CMD, [scriptPath], { env: { ...process.env, ...credEnv, KYUJINBOX_BATCH_SIZE: String(batchSize) } });
+      proc.stdin.write(JSON.stringify(jobs.slice(0, batchSize))); proc.stdin.end();
+      proc.stdout.on('data', data => {
+        for (const line of data.toString().split('\n').filter(l => l.trim())) {
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'posted' && obj.jobId && jobIdMap[obj.jobId]) {
+              Jobs.update(obj.jobId, { kyujinbox_posted_at: new Date().toISOString() });
+              pushLog(`📌 投稿済みとしてマーク: ${jobIdMap[obj.jobId].title}`, 'info');
+            } else pushLog(obj.message, obj.level || 'info');
+          } catch { pushLog(line, 'info'); }
+        }
+      });
+      proc.stderr.on('data', d => { const t = d.toString().trim(); if (t) pushLog(`⚠️ ${t}`, 'warn'); });
+      proc.on('error', err => { pushLog(`❌ ${coName}: プロセス起動失敗: ${err.message}`, 'error'); resolve(false); });
+      proc.on('close', code => {
+        const ok = code === 0;
+        pushLog(ok ? `✅ ${coName}: 投稿が完了しました` : `❌ ${coName}: 投稿が失敗しました（コード: ${code}）`, ok ? 'success' : 'error');
+        resolve(ok);
+      });
+    });
+  };
+
+  let allOk = true;
+  for (const entry of perCompany) { if (!await runOne(entry)) allOk = false; }
+  Logs.create('kyujinbox_post', allOk ? 'success' : 'error', allOk ? '✅ 求人ボックス投稿完了' : '❌ 一部失敗');
+  pushLog(allOk ? '✅ すべての投稿が完了しました' : '⚠️ 一部のアカウントで投稿に失敗しました', allOk ? 'success' : 'error');
+  return { ok: true, allOk, totalPosted };
+}
+
+// ── 毎晩の自動投稿スケジュール（logs/schedule.json に保存）──
+const SCHEDULE_FILE = path.join(LOGS_DIR, 'schedule.json');
+function loadSchedule() {
+  try {
+    const s = JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf8'));
+    return { enabled: !!s.enabled, time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : '02:00',
+             company: s.company || 'all', forceRepost: !!s.forceRepost, lastRunDate: s.lastRunDate || '' };
+  } catch { return { enabled: false, time: '02:00', company: 'all', forceRepost: false, lastRunDate: '' }; }
+}
+function saveSchedule(s) { try { fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(s, null, 2)); } catch (e) { console.log('スケジュール保存エラー:', e.message); } }
+
+let _scheduleRunning = false;
+async function tickSchedule() {
+  const cfg = loadSchedule();
+  if (!cfg.enabled || _scheduleRunning) return;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const nowHM = `${hh}:${mm}`;
+  const today = now.toISOString().slice(0, 10);
+  if (nowHM !== cfg.time) return;          // 指定時刻の分に一致したときだけ
+  if (cfg.lastRunDate === today) return;    // 同じ日に二重実行しない
+  // 実行
+  cfg.lastRunDate = today; saveSchedule(cfg);   // 先に記録して二重発火を防止
+  _scheduleRunning = true;
+  Logs.create('kyujinbox_post', 'info', `⏰ 毎晩の自動投稿を開始（${cfg.time}）`);
+  console.log(`⏰ 毎晩の自動投稿を開始します（${cfg.time} / 会社:${cfg.company}）`);
+  try {
+    const r = await executePosting({
+      company: cfg.company, limit: undefined, forceRepost: cfg.forceRepost,
+      pushLog: (m, t) => console.log(`  [自動投稿] ${m}`),
+    });
+    if (!r.ok) console.log(`  [自動投稿] 実行なし: ${r.error || ''}`);
+  } catch (e) {
+    console.log('自動投稿エラー:', e.message);
+    Logs.create('kyujinbox_post', 'error', `自動投稿エラー: ${e.message}`);
+  } finally { _scheduleRunning = false; }
+}
+
 // ── ルーティング ──
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${PORT}`);
@@ -398,85 +510,37 @@ const server = http.createServer(async (req, res) => {
     // ── 求人ボックス投稿（複数アカウント）──
     if (pathname === '/api/post/kyujinbox' && method === 'POST') {
       const body = await parseJSON(req);
-      // 件数上限は固定しない。未指定なら全件（100件・300件・それ以上も可）。
-      const parsedLimit = parseInt(body.limit, 10);
-      const batchSize = (Number.isFinite(parsedLimit) && parsedLimit > 0) ? parsedLimit : 1000000;
-      const kbCompany = body.company && body.company !== 'all' ? body.company : null;
       const forceRepost = body.forceRepost === true || body.forceRepost === 'true';
-
-      let targetCompanies = kbCompany ? [kbCompany] : kyujinboxConfiguredCompanies();
-      if (targetCompanies.length === 0) targetCompanies = ['sq'];
-
-      const perCompany = []; let totalPosted = 0;
-      for (const co of targetCompanies) {
-        const allJobs = Jobs.findAll({ onlyPublished: true, company: co });
-        let kbJobs = allJobs.filter(j => { try { return JSON.parse(j.target_media || '[]').some(m => /求人ボックス|kyujinbox/.test(m)); } catch { return false; } });
-        if (kbJobs.length === 0 && targetCompanies.length === 1) kbJobs = allJobs;
-        const already = kbJobs.filter(j => j.kyujinbox_posted_at).length;
-        totalPosted += already;
-        if (!forceRepost) kbJobs = kbJobs.filter(j => !j.kyujinbox_posted_at);
-        if (kbJobs.length > 0) perCompany.push({ co, jobs: kbJobs, already });
-      }
-      if (perCompany.length === 0) {
-        const msg = totalPosted > 0
-          ? `⚠️ 未投稿の求人がありません（${totalPosted}件は投稿済み）。再投稿は「強制再投稿」を使ってください。`
-          : '⚠️ 公開中の求人がありません';
-        return sendJSON(res, 400, { error: msg, allPosted: totalPosted > 0 });
-      }
-
       const { id, session } = createSession();
       const pushLog = (message, type = 'info') => session.logs.push({ message: String(message ?? ''), type });
       sendJSON(res, 200, { ok: true, sessionId: id });
-
-      (async () => {
-        const scriptPath = path.join(SCRIPTS_DIR, 'kyujinbox_poster.py');
-        if (!fs.existsSync(scriptPath)) { pushLog('⚠️ 投稿スクリプトが見つかりません（scripts/kyujinbox_poster.py）', 'warn'); session.done = true; session.success = false; return; }
-        pushLog(`🐍 使用Python: ${PYTHON_CMD}`, 'info');
-        if (perCompany.length > 1) pushLog(`🏢 複数アカウントへ順に投稿します（${perCompany.map(p => companyFullName(p.co)).join('・')}）`, 'info');
-
-        const usedIps = new Set(); // この投稿処理でアカウント毎に使ったIP（被り検知用）
-        const runOne = async ({ co, jobs, already }) => {
-          const { env: credEnv, hasCreds } = kyujinboxEnvForCompany(co);
-          const coName = companyFullName(co);
-          if (!hasCreds) { pushLog(`⚠️ ${coName}: 認証情報(.env)が未設定のためスキップ`, 'warn'); return true; }
-          // ── このアカウント専用のVPNへ接続し、確認してから投稿（IP被りは自動で再接続）──
-          const vpn = await connectAndVerifyVPN(co, coName, pushLog, usedIps);
-          if (!vpn.ok) { pushLog(`⛔ ${coName}: VPN未接続のため投稿を中止しました`, 'error'); return false; }
-          if (vpn.ip) usedIps.add(vpn.ip);
-          if (already > 0 && !forceRepost) pushLog(`ℹ️ ${coName}: 投稿済み ${already}件をスキップ（未投稿 ${jobs.length}件を投稿）`, 'info');
-          pushLog(`📋 ${coName}: 求人ボックス向け ${Math.min(batchSize, jobs.length)}件を投稿します...`, 'info');
-          const jobIdMap = Object.fromEntries(jobs.map(j => [j.id, j]));
-          return await new Promise(resolve => {
-            const proc = spawn(PYTHON_CMD, [scriptPath], { env: { ...process.env, ...credEnv, KYUJINBOX_BATCH_SIZE: String(batchSize) } });
-            proc.stdin.write(JSON.stringify(jobs.slice(0, batchSize))); proc.stdin.end();
-            proc.stdout.on('data', data => {
-              for (const line of data.toString().split('\n').filter(l => l.trim())) {
-                try {
-                  const obj = JSON.parse(line);
-                  if (obj.type === 'posted' && obj.jobId && jobIdMap[obj.jobId]) {
-                    Jobs.update(obj.jobId, { kyujinbox_posted_at: new Date().toISOString() });
-                    pushLog(`📌 投稿済みとしてマーク: ${jobIdMap[obj.jobId].title}`, 'info');
-                  } else pushLog(obj.message, obj.level || 'info');
-                } catch { pushLog(line, 'info'); }
-              }
-            });
-            proc.stderr.on('data', d => { const t = d.toString().trim(); if (t) pushLog(`⚠️ ${t}`, 'warn'); });
-            proc.on('error', err => { pushLog(`❌ ${coName}: プロセス起動失敗: ${err.message}`, 'error'); resolve(false); });
-            proc.on('close', code => {
-              const ok = code === 0;
-              pushLog(ok ? `✅ ${coName}: 投稿が完了しました` : `❌ ${coName}: 投稿が失敗しました（コード: ${code}）`, ok ? 'success' : 'error');
-              resolve(ok);
-            });
-          });
-        };
-
-        let allOk = true;
-        for (const entry of perCompany) { if (!await runOne(entry)) allOk = false; }
-        Logs.create('kyujinbox_post', allOk ? 'success' : 'error', allOk ? '✅ 求人ボックス投稿完了' : '❌ 一部失敗');
-        pushLog(allOk ? '✅ すべての投稿が完了しました' : '⚠️ 一部のアカウントで投稿に失敗しました', allOk ? 'success' : 'error');
-        session.done = true; session.success = allOk;
-      })().catch(err => { pushLog(`❌ 内部エラー: ${err.message}`, 'error'); session.done = true; session.success = false; });
+      executePosting({ company: body.company, limit: body.limit, forceRepost, pushLog })
+        .then(r => {
+          if (!r.ok && r.error) pushLog(`⚠️ ${r.error}${r.allPosted ? '（再投稿は「強制再投稿」を使ってください）' : ''}`, 'warn');
+          session.done = true; session.success = !!r.allOk;
+        })
+        .catch(err => { pushLog(`❌ 内部エラー: ${err.message}`, 'error'); session.done = true; session.success = false; });
       return;
+    }
+
+    // ── 毎晩の自動投稿スケジュール（取得・更新）──
+    if (pathname === '/api/schedule' && method === 'GET') {
+      const c = loadSchedule();
+      return sendJSON(res, 200, { enabled: c.enabled, time: c.time, company: c.company, forceRepost: c.forceRepost, lastRunDate: c.lastRunDate });
+    }
+    if (pathname === '/api/schedule' && method === 'POST') {
+      const body = await parseJSON(req);
+      const cur = loadSchedule();
+      const next = {
+        enabled: body.enabled === true || body.enabled === 'true',
+        time: /^\d{2}:\d{2}$/.test(body.time) ? body.time : cur.time,
+        company: body.company || cur.company || 'all',
+        forceRepost: body.forceRepost === true || body.forceRepost === 'true',
+        lastRunDate: cur.lastRunDate || '',
+      };
+      saveSchedule(next);
+      Logs.create('schedule', 'success', `毎晩の自動投稿: ${next.enabled ? 'ON' : 'OFF'}（${next.time}／会社:${next.company}）`);
+      return sendJSON(res, 200, { ok: true, ...next });
     }
 
     // ── 求人票ZIP(PDF)取り込み → 求人ボックス用に登録 ──
@@ -662,4 +726,8 @@ server.listen(PORT, () => {
   // 起動時＋毎日1回、古い求人を自動修正（期限延長・更新日更新・再掲載キュー戻し）
   autoRefreshOldJobs();
   setInterval(autoRefreshOldJobs, 24 * 60 * 60 * 1000);
+  // 毎晩の自動投稿：毎分、指定時刻になったら1回だけ投稿を実行（ON時のみ）
+  const sc = loadSchedule();
+  console.log(`   毎晩の自動投稿: ${sc.enabled ? `ON（${sc.time}）` : 'OFF'}`);
+  setInterval(tickSchedule, 60 * 1000);
 });
