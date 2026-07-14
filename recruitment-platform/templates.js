@@ -2428,8 +2428,19 @@ function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
           <button id="btn-publish-kyujinbox-drafts" class="btn btn-ghost btn-sm" onclick="startPublishKyujinboxDrafts()" title="求人ボックス側に残っている下書きを巡回して公開（写真も後付け）">📤 下書きを公開＋写真添付</button>
         </div>
         <div class="text-sm text-muted" style="margin-top:4px">1度投稿した求人は次回スキップ（スキップしたくない場合は強制再投稿 or フラグリセット）。<br>「下書きを公開＋写真添付」は、求人ボックスに下書きのまま残った求人を巡回して公開し、写真も後付けします。</div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0">
+          <div class="media-op-label">🤖 AIによる求人改善 <span class="text-muted text-sm">（成績を分析しタイトル・訴求を自動改善／ANTHROPIC_API_KEY必須）</span></div>
+          <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px">
+            <button id="btn-optimize" class="btn btn-primary btn-sm" onclick="startOptimizeNow('${co}')">🤖 今すぐAI改善</button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="opt-auto"> 毎日この時刻に自動でAI改善</label>
+            <input id="opt-time" type="time" value="03:00" style="padding:4px">
+            <button class="btn btn-ghost btn-sm" onclick="saveOptimizeSchedule('${co}')">保存</button>
+          </div>
+          <div class="text-sm text-muted" style="margin-top:4px">人材紹介求人は事実（本文）を変えず、タイトル・訴求の表現のみ改善します。ログは上の枠に表示されます。</div>
+        </div>
         <div id="progress-kyujinbox-wrap" class="progress-wrap hidden"><div id="progress-kyujinbox" class="progress-box"></div></div>
       </div>
+      <script>if (window.loadOptimizeSchedule) loadOptimizeSchedule();</script>
 
       <div class="media-op-section mt-14">
         <div class="media-op-label">スタンバイ <span class="text-muted text-sm">（スクレイピング投稿・VPN必須）</span></div>

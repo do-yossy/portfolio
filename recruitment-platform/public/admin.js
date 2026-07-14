@@ -385,6 +385,46 @@ function startPublishKyujinboxDrafts() {
   );
 }
 
+// ── AIで求人を今すぐ改善（autoloopを起動しログをポーリング表示）──
+function startOptimizeNow(co) {
+  const box = openProgress('progress-kyujinbox');
+  const btn = document.getElementById('btn-optimize');
+  if (btn) { btn.disabled = true; btn.dataset.origText = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> AI改善中...'; }
+  appendLog(box, 'AIによる求人改善を開始しています...', 'info');
+  fetch('/api/optimize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: co }) })
+    .then(r => r.json()).then(d => {
+      if (!d.ok) { appendLog(box, d.error || 'サーバーエラーが発生しました', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; } return; }
+      let fromIdx = 0;
+      const timer = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/post/kyujinbox/poll?id=${d.sessionId}&from=${fromIdx}`);
+          if (!r.ok) return;
+          const s = await r.json();
+          for (const e of s.logs) appendLog(box, e.message, e.type || 'info');
+          fromIdx = s.total;
+          if (s.done) { clearInterval(timer); if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; } toast(s.success ? 'AI改善が完了しました' : 'AI改善が失敗しました', s.success ? 'success' : 'error'); }
+        } catch { /* ignore transient errors */ }
+      }, 2000);
+    }).catch(e => { appendLog(box, 'サーバーへの接続に失敗しました: ' + e.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; } });
+}
+
+async function saveOptimizeSchedule(co) {
+  const enabled = document.getElementById('opt-auto') ? document.getElementById('opt-auto').checked : false;
+  const time = (document.getElementById('opt-time') || {}).value || '03:00';
+  try {
+    const r = await fetch('/api/optimize-schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled, time, company: co || 'all' }) });
+    const d = await r.json();
+    toast(d.enabled ? `毎日 ${d.time} にAI改善を自動実行します` : 'AI自動改善をOFFにしました', 'success');
+  } catch (e) { toast('保存に失敗しました: ' + e.message, 'error'); }
+}
+async function loadOptimizeSchedule() {
+  try {
+    const d = await (await fetch('/api/optimize-schedule')).json();
+    const a = document.getElementById('opt-auto'); if (a) a.checked = !!d.enabled;
+    const t = document.getElementById('opt-time'); if (t && d.time) t.value = d.time;
+  } catch { /* ignore */ }
+}
+
 async function resetKyujinboxPosted(co) {
   if (!confirm('求人ボックス「投稿済み」フラグをすべてリセットします。\n次回投稿時に全求人が再投稿対象になります。\nよろしいですか？')) return;
   try {
