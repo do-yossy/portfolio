@@ -1079,6 +1079,58 @@ function createSession() {
   return { id, session };
 }
 
+// ── AI求人改善（autoloopを起動して --apply で反映）＋日次自動実行 ──
+const OPT_SCHEDULE_FILE = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'optimize-schedule.json');
+function loadOptSchedule() {
+  let s = {};
+  try { s = JSON.parse(fs.readFileSync(OPT_SCHEDULE_FILE, 'utf8')); } catch {}
+  const envOn = String(process.env.OPTIMIZE_AUTORUN || '') === 'true';
+  const envTime = /^\d{2}:\d{2}$/.test(process.env.OPTIMIZE_TIME || '') ? process.env.OPTIMIZE_TIME : '';
+  return {
+    // 設定ファイルがあればそれを優先。無ければ .env（OPTIMIZE_AUTORUN/OPTIMIZE_TIME/OPTIMIZE_COMPANY）で有効化可
+    enabled: s.enabled !== undefined ? !!s.enabled : envOn,
+    time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : (envTime || '03:00'),
+    company: s.company || process.env.OPTIMIZE_COMPANY || 'all',
+    lastRunDate: s.lastRunDate || '',
+  };
+}
+function saveOptSchedule(s) { try { fs.writeFileSync(OPT_SCHEDULE_FILE, JSON.stringify(s, null, 2)); } catch (e) { console.error('optimize schedule save error:', e.message); } }
+
+function executeOptimize({ company, pushLog }) {
+  return new Promise(resolve => {
+    const script = path.join(SCRIPTS_DIR, 'kyujinbox_autoloop.js');
+    if (!fs.existsSync(script)) { pushLog('⚠️ 改善スクリプトが見つかりません（scripts/kyujinbox_autoloop.js）', 'warn'); return resolve({ ok: false }); }
+    pushLog(`🤖 AIによる求人改善を開始します（会社:${company || 'all'}）...`, 'info');
+    const proc = spawn(process.execPath, ['--experimental-sqlite', script, '--company', company || 'all', '--apply'], { cwd: __dirname, env: { ...process.env } });
+    proc.stdout.on('data', d => { for (const line of d.toString().split('\n')) { const t = line.replace(/\s+$/, ''); if (t.trim()) pushLog(t, 'info'); } });
+    proc.stderr.on('data', d => { const t = d.toString().trim(); if (t) pushLog(`⚠️ ${t}`, 'warn'); });
+    proc.on('error', e => { pushLog(`❌ AI改善の起動に失敗: ${e.message}`, 'error'); resolve({ ok: false }); });
+    proc.on('close', code => {
+      const ok = code === 0;
+      pushLog(ok ? '✅ AI改善が完了しました' : `❌ AI改善が失敗しました（コード: ${code}）`, ok ? 'success' : 'error');
+      resolve({ ok });
+    });
+  });
+}
+let _optRunning = false;
+async function tickOptimize() {
+  const cfg = loadOptSchedule();
+  if (!cfg.enabled || _optRunning) return;
+  const now = new Date();
+  const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const today = now.toISOString().slice(0, 10);
+  if (hm !== cfg.time || cfg.lastRunDate === today) return;
+  cfg.lastRunDate = today; saveOptSchedule(cfg);
+  _optRunning = true;
+  try {
+    Logs.create('optimize', 'info', `⏰ 日次AI改善を開始（${cfg.time}／会社:${cfg.company}）`);
+    console.log(`🤖 日次AI改善を開始します（${cfg.time} / 会社:${cfg.company}）`);
+    const r = await executeOptimize({ company: cfg.company, pushLog: (m) => console.log(`  [AI改善] ${m}`) });
+    Logs.create('optimize', r.ok ? 'success' : 'error', r.ok ? '✅ 日次AI改善完了' : '❌ 日次AI改善失敗');
+  } catch (e) { console.error('AI改善エラー:', e.message); Logs.create('optimize', 'error', `AI改善エラー: ${e.message}`); }
+  finally { _optRunning = false; }
+}
+
 // ── Router ─────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -2395,6 +2447,35 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── API: Kyujinbox Post (Polling: POST to start, GET poll) ──
   // Replaced SSE which drops through Cloudflare Tunnel at ~75 s
+  // ── AIで求人を今すぐ改善（手動実行）──
+  if (pathname === '/api/optimize' && method === 'POST') {
+    const body = await parseJSON(req).catch(() => ({}));
+    const { id, session } = createSession();
+    const pushLog = (message, type = 'info') => session.logs.push({ message: String(message ?? ''), type });
+    sendJSON(res, 200, { ok: true, sessionId: id });
+    executeOptimize({ company: body.company, pushLog })
+      .then(() => { session.done = true; session.success = true; })
+      .catch(err => { pushLog(`❌ 内部エラー: ${err.message}`, 'error'); session.done = true; session.success = false; });
+    return;
+  }
+  // ── 日次AI自動改善スケジュール（取得・更新）──
+  if (pathname === '/api/optimize-schedule' && method === 'GET') {
+    return sendJSON(res, 200, loadOptSchedule());
+  }
+  if (pathname === '/api/optimize-schedule' && method === 'POST') {
+    const body = await parseJSON(req).catch(() => ({}));
+    const cur = loadOptSchedule();
+    const next = {
+      enabled: body.enabled === true || body.enabled === 'true',
+      time: /^\d{2}:\d{2}$/.test(body.time) ? body.time : cur.time,
+      company: body.company || cur.company || 'all',
+      lastRunDate: cur.lastRunDate || '',
+    };
+    saveOptSchedule(next);
+    await Logs.create('optimize', 'success', `日次AI改善: ${next.enabled ? 'ON' : 'OFF'}（${next.time}／会社:${next.company}）`);
+    return sendJSON(res, 200, { ok: true, ...next });
+  }
+
   if (pathname === '/api/post/kyujinbox' && method === 'POST') {
     const vpnOk = await checkVPN();
     if (!vpnOk) {
@@ -2975,6 +3056,11 @@ server.listen(PORT, () => {
       }
     } catch (e) { console.error('[google-expire] interval error:', e.message); }
   }, 60 * 60 * 1000);
+
+  // 日次AI改善：毎分チェックし、設定時刻になったら1日1回だけ実行（ON時のみ）
+  const _optCfg = loadOptSchedule();
+  console.log(`   日次AI改善: ${_optCfg.enabled ? `ON（${_optCfg.time}）` : 'OFF'}`);
+  setInterval(tickOptimize, 60 * 1000);
 });
 
 server.on('error', err => {
