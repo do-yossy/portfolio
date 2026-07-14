@@ -398,10 +398,30 @@ function loadSchedule() {
   try {
     const s = JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf8'));
     return { enabled: !!s.enabled, time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : '02:00',
-             company: s.company || 'all', forceRepost: !!s.forceRepost, lastRunDate: s.lastRunDate || '' };
-  } catch { return { enabled: false, time: '02:00', company: 'all', forceRepost: false, lastRunDate: '' }; }
+             company: s.company || 'all', forceRepost: !!s.forceRepost, lastRunDate: s.lastRunDate || '',
+             optimize: !!s.optimize };
+  } catch { return { enabled: false, time: '02:00', company: 'all', forceRepost: false, lastRunDate: '', optimize: false }; }
 }
 function saveSchedule(s) { try { fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(s, null, 2)); } catch (e) { console.log('スケジュール保存エラー:', e.message); } }
+
+// AIによる求人改善を実行（autoloopを起動して --apply で反映）。pushLog(message,type)でログ。
+function executeOptimize({ company, pushLog }) {
+  return new Promise(resolve => {
+    const script = path.join(SCRIPTS_DIR, 'kyujinbox_autoloop.js');
+    if (!fs.existsSync(script)) { pushLog('⚠️ 改善スクリプトが見つかりません（scripts/kyujinbox_autoloop.js）', 'warn'); return resolve({ ok: false }); }
+    pushLog(`🤖 AIによる求人改善を開始します（会社:${company || 'all'}）...`, 'info');
+    const proc = spawn(process.execPath, [script, '--company', company || 'all', '--apply'], { cwd: APP_DIR, env: { ...process.env } });
+    proc.stdout.on('data', d => { for (const line of d.toString().split('\n')) { const t = line.replace(/\s+$/, ''); if (t.trim()) pushLog(t, 'info'); } });
+    proc.stderr.on('data', d => { const t = d.toString().trim(); if (t) pushLog(`⚠️ ${t}`, 'warn'); });
+    proc.on('error', e => { pushLog(`❌ AI改善の起動に失敗: ${e.message}`, 'error'); resolve({ ok: false }); });
+    proc.on('close', code => {
+      const ok = code === 0;
+      pushLog(ok ? '✅ AI改善が完了しました' : `❌ AI改善が失敗しました（コード: ${code}）`, ok ? 'success' : 'error');
+      Logs.create('optimize', ok ? 'success' : 'error', ok ? '✅ AI改善完了' : `❌ AI改善失敗（コード: ${code}）`);
+      resolve({ ok });
+    });
+  });
+}
 
 let _scheduleRunning = false;
 async function tickSchedule() {
@@ -425,9 +445,14 @@ async function tickSchedule() {
       pushLog: (m, t) => console.log(`  [自動投稿] ${m}`),
     });
     if (!r.ok) console.log(`  [自動投稿] 実行なし: ${r.error || ''}`);
+    // 投稿後にAI改善も自動実行（設定ON時）。投稿と順次実行して競合を避ける。
+    if (cfg.optimize) {
+      console.log(`🤖 毎晩のAI改善を開始します（会社:${cfg.company}）`);
+      await executeOptimize({ company: cfg.company, pushLog: (m) => console.log(`  [AI改善] ${m}`) });
+    }
   } catch (e) {
-    console.log('自動投稿エラー:', e.message);
-    Logs.create('kyujinbox_post', 'error', `自動投稿エラー: ${e.message}`);
+    console.log('自動処理エラー:', e.message);
+    Logs.create('kyujinbox_post', 'error', `自動処理エラー: ${e.message}`);
   } finally { _scheduleRunning = false; }
 }
 
@@ -523,10 +548,22 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── AIで求人を今すぐ改善（手動実行）──
+    if (pathname === '/api/optimize' && method === 'POST') {
+      const body = await parseJSON(req).catch(() => ({}));
+      const { id, session } = createSession();
+      const pushLog = (message, type = 'info') => session.logs.push({ message: String(message ?? ''), type });
+      sendJSON(res, 200, { ok: true, sessionId: id });
+      executeOptimize({ company: body.company, pushLog })
+        .then(() => { session.done = true; session.success = true; })
+        .catch(err => { pushLog(`❌ 内部エラー: ${err.message}`, 'error'); session.done = true; session.success = false; });
+      return;
+    }
+
     // ── 毎晩の自動投稿スケジュール（取得・更新）──
     if (pathname === '/api/schedule' && method === 'GET') {
       const c = loadSchedule();
-      return sendJSON(res, 200, { enabled: c.enabled, time: c.time, company: c.company, forceRepost: c.forceRepost, lastRunDate: c.lastRunDate });
+      return sendJSON(res, 200, { enabled: c.enabled, time: c.time, company: c.company, forceRepost: c.forceRepost, optimize: c.optimize, lastRunDate: c.lastRunDate });
     }
     if (pathname === '/api/schedule' && method === 'POST') {
       const body = await parseJSON(req);
@@ -536,10 +573,11 @@ const server = http.createServer(async (req, res) => {
         time: /^\d{2}:\d{2}$/.test(body.time) ? body.time : cur.time,
         company: body.company || cur.company || 'all',
         forceRepost: body.forceRepost === true || body.forceRepost === 'true',
+        optimize: body.optimize === true || body.optimize === 'true',
         lastRunDate: cur.lastRunDate || '',
       };
       saveSchedule(next);
-      Logs.create('schedule', 'success', `毎晩の自動投稿: ${next.enabled ? 'ON' : 'OFF'}（${next.time}／会社:${next.company}）`);
+      Logs.create('schedule', 'success', `毎晩の自動処理: 投稿${next.enabled ? 'ON' : 'OFF'}／AI改善${next.optimize ? 'ON' : 'OFF'}（${next.time}／会社:${next.company}）`);
       return sendJSON(res, 200, { ok: true, ...next });
     }
 
