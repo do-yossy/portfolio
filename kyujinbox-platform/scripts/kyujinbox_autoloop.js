@@ -98,6 +98,7 @@ async function runCompany(pyCmd, id) {
 
   const flags = optimizer.detectUnderperformers(id, {
     minAgeDays: parseInt(process.env.OPT_MIN_AGE_DAYS || '3', 10),
+    maxAgeDays: parseInt(process.env.OPT_MAX_AGE_DAYS || '0', 10), // 0=上限なし。例:21で掲載3週間以内のみ
     viewFloor: parseInt(process.env.OPT_VIEW_FLOOR || '30', 10),
     cooldownDays: parseInt(process.env.OPT_COOLDOWN_DAYS || '5', 10),
     maxOptimize: parseInt(process.env.OPT_MAX_COUNT || '3', 10),
