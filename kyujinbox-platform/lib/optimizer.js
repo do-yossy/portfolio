@@ -59,13 +59,14 @@ function latestMetrics(company) {
 // ── 低調求人の検知（露出不足 or 中身の問題） ──────────────────
 // opts: { minAgeDays=3, viewFloor=30, cooldownDays=5, maxOptimize=3, limit=20 }
 function detectUnderperformers(company, opts = {}) {
-  const { minAgeDays = 3, viewFloor = 30, cooldownDays = 5, maxOptimize = 3, limit = 20 } = opts;
+  const { minAgeDays = 3, maxAgeDays = 0, viewFloor = 30, cooldownDays = 5, maxOptimize = 3, limit = 20 } = opts;
   const rows = latestMetrics(company);
   const flagged = [];
   for (const m of rows) {
     if (!isLiveStatus(m.status)) continue;                 // 公開中のみ判定
     const age = daysSince(m.published_at || m.updated_at);
     if (age < minAgeDays) continue;                        // 掲載直後は判定しない
+    if (maxAgeDays > 0 && age > maxAgeDays) continue;      // 掲載◯日を超えた古い求人は対象外（0=上限なし）
     if ((m.optimize_count || 0) >= maxOptimize) continue;  // 改善回数の上限
     if (m.last_optimized_at && daysSince(m.last_optimized_at) < cooldownDays) continue; // クールダウン
 
