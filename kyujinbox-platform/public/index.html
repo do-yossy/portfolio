@@ -91,10 +91,12 @@
         <label style="display:flex;align-items:center;gap:6px;font-weight:600"><input type="checkbox" id="schEnabled"> 毎晩この時刻に自動で投稿する</label>
         <label>時刻 <input id="schTime" type="time" value="02:00" style="padding:4px"></label>
         <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="schForce"> 投稿済みも再投稿</label>
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="schOptimize"> AIで求人も自動改善する</label>
         <button id="schSave" class="ghost">保存</button>
+        <button id="optimizeBtn" class="ghost" title="AIが成績を分析し、タイトル・訴求などを改善します">今すぐAI改善</button>
         <span id="schMsg" class="muted" style="font-size:12px"></span>
       </div>
-      <p class="muted" style="margin:6px 0 0;font-size:12px">※ ONにすると、指定時刻に上の「アカウント」対象で自動投稿します（PCが起動中・スリープでない状態が必要）。投稿前にVPN接続・古い求人の修正は通常どおり動作します。</p>
+      <p class="muted" style="margin:6px 0 0;font-size:12px">※ ONにすると、指定時刻に上の「アカウント」対象で自動投稿します（PCが起動中・スリープでない状態が必要）。投稿前にVPN接続・古い求人の修正は通常どおり動作します。「AIで求人も自動改善する」をONにすると、投稿後にAIが成績を分析して求人内容を自動改善します（ANTHROPIC_API_KEYの設定が必要）。</p>
     </div>
   </section>
 

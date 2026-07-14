@@ -167,19 +167,42 @@ async function loadSchedule() {
     $('schEnabled').checked = !!s.enabled;
     if (s.time) $('schTime').value = s.time;
     $('schForce').checked = !!s.forceRepost;
-    $('schMsg').textContent = s.enabled ? `毎晩 ${s.time} に自動投稿します` : '自動投稿はOFFです';
+    if ($('schOptimize')) $('schOptimize').checked = !!s.optimize;
+    const parts = [];
+    if (s.enabled) parts.push(`毎晩 ${s.time} に自動投稿`);
+    if (s.optimize) parts.push('AI改善も自動実行');
+    $('schMsg').textContent = parts.length ? '✅ ' + parts.join('・') : '自動処理はOFFです';
   } catch {}
 }
 async function saveSchedule() {
   const btn = $('schSave'); btn.disabled = true;
   try {
-    const body = { enabled: $('schEnabled').checked, time: $('schTime').value, company: $('company').value, forceRepost: $('schForce').checked };
+    const body = { enabled: $('schEnabled').checked, time: $('schTime').value, company: $('company').value, forceRepost: $('schForce').checked, optimize: $('schOptimize') ? $('schOptimize').checked : false };
     const r = await api('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    $('schMsg').textContent = r.enabled ? `✅ 保存しました（毎晩 ${r.time} に自動投稿）` : '✅ 保存しました（自動投稿OFF）';
+    const parts = [];
+    if (r.enabled) parts.push(`毎晩 ${r.time} に自動投稿`);
+    if (r.optimize) parts.push('AI改善も自動実行');
+    $('schMsg').textContent = '✅ 保存しました' + (parts.length ? '（' + parts.join('・') + '）' : '（自動処理OFF）');
   } catch (e) { $('schMsg').textContent = 'エラー: ' + e.message; }
   finally { btn.disabled = false; }
 }
 if ($('schSave')) $('schSave').onclick = saveSchedule;
+
+async function optimizeNow() {
+  const btn = $('optimizeBtn'), log = $('log'); log.innerHTML = '';
+  btn.disabled = true; const old = btn.textContent; btn.textContent = 'AI改善中...';
+  try {
+    const r = await api('/api/optimize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: $('company').value }) });
+    if (r.error) { appendLog(log, [{ message: r.error, type: 'warn' }]); btn.disabled = false; btn.textContent = old; return; }
+    const sid = r.sessionId;
+    const poll = setInterval(async () => {
+      const s = await api('/api/session/' + sid);
+      appendLog(log, s.logs || []);
+      if (s.done) { clearInterval(poll); btn.disabled = false; btn.textContent = old; loadStats(); loadJobs(); }
+    }, 1000);
+  } catch (e) { appendLog(log, [{ message: 'エラー: ' + e.message, type: 'error' }]); btn.disabled = false; btn.textContent = old; }
+}
+if ($('optimizeBtn')) $('optimizeBtn').onclick = optimizeNow;
 
 $('postBtn').onclick = () => post(false);
 $('forceBtn').onclick = () => { if (confirm('投稿済みも含めて再投稿します。よろしいですか？')) post(true); };
