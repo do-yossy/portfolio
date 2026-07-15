@@ -2662,6 +2662,11 @@ def main():
 
     jobs = parsed if isinstance(parsed, list) else []
 
+    # 求人ボックスはタイトルに記号★を使えないため・へ置換（BG/ST等の★入りタイトル対策）
+    for job in jobs:
+        if isinstance(job, dict) and job.get('title'):
+            job['title'] = str(job['title']).replace('★', '・')
+
     if not jobs:
         progress("⚠️ 投稿する求人データがありません", "warn")
         sys.exit(0)
