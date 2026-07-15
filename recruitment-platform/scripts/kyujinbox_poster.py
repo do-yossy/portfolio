@@ -251,6 +251,14 @@ def upload_job_image(page, job):
     まずボタンを押してからファイルをセットする。画像欄が無い／画像が見つからない場合は
     スキップして処理を続行する（既存フローは壊さない）。"""
     img_path = resolve_job_image(job)
+    # 指定画像（image_url）が見つからず代替画像に切り替わった場合は、配置すべきファイル名を警告
+    _iu = (job.get("imageUrl") or job.get("image_url") or "").strip()
+    if _iu and not _iu.lower().startswith(("http://", "https://")) and img_path:
+        import pathlib as _pl
+        _want = _pl.Path(_iu.lstrip("/")).name
+        _got = _pl.Path(img_path).name
+        if _want and _pl.Path(_want).stem.lower() != _pl.Path(_got).stem.lower():
+            progress(f"  ⚠️ 指定の求人写真が見つからず代替画像を使用します。public/images/{_want} を配置してください", "warn")
     if not img_path:
         progress("  🖼️ 画像ファイルが見つからないためスキップ", "warn")
         return False
