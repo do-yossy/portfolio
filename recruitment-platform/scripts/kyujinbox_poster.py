@@ -183,6 +183,13 @@ def resolve_job_image(job):
             p = repo_dir / f"{stem}.{ext}"
             if p.exists():
                 return str(p)
+        # Windows二重拡張子救済: "cosme-seizou.jpg" 指定で実ファイルが
+        # "cosme-seizou.jpg.jpeg"（拡張子表示OFFで.jpegが付いた）でも解決する
+        name = pathlib.Path(rel).name
+        for ext in raster_exts:
+            p = repo_dir / f"{name}.{ext}"
+            if p.exists() and not p.suffix.lower() == ".svg":
+                return str(p)
 
     # 3) OneDrive 共有（汎用フォールバック）
     onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer") or ""
