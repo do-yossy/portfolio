@@ -1492,8 +1492,9 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     if (!requireAuth(req, res)) return;
   }
 
-  // Company context: ?co=sq|bg|pe|lt（デフォルト sq）
-  const co = ['sq', 'bg', 'pe', 'lt'].includes(query.co) ? query.co : 'sq';
+  // Company context: 会社マスタ(OPS_COMPANIES)に存在するIDならそれを使用（デフォルト sq）
+  // ※固定リストにすると新会社(st等)のタブが切り替わらないため、マスタで判定する
+  const co = OPS_COMPANIES.find(c => c.id === query.co) ? query.co : 'sq';
 
   // ── Admin: Dashboard ──
   if (pathname === '/admin' && method === 'GET') {
