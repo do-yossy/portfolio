@@ -55,5 +55,41 @@ console.log(`\n--- 応募数トップ10 ---`);
 jobs.sort((a, b) => (Number(b.applies) || 0) - (Number(a.applies) || 0)).slice(0, 10)
   .forEach((r, i) => console.log(`${i + 1}. applies=${r.applies || 0} views=${r.views || 0}  ${String(r.title || '').slice(0, 40)}  [${r.location || ''}]`));
 
-console.log(`\n※ applies は「取得時点までの累計」です。月間見込みに直すには取得期間の長さで割ります。`);
-console.log(`  この出力をそのまま共有してもらえれば、全国ブルーカラー無料掲載の月間応募見込みを実数から逆算します。`);
+// ── 差分（実測の増加ペース）で月間見込みを逆算 ──
+// 各求人の「最古スナップショット→最新スナップショット」でapplies/viewsの増加分を測り、
+// 観測期間（全体の最古〜最新）で割って1日あたり→月間(×30)へ換算する。実測ベース。
+const byKey = new Map();
+for (const r of rows) {
+  if (r.job_number === '9999-0000-0001') continue;
+  const key = r.job_id || `num:${r.job_number}`;
+  if (!byKey.has(key)) byKey.set(key, []);
+  byKey.get(key).push(r);
+}
+let deltaApplies = 0, deltaViews = 0, multiSnap = 0;
+for (const arr of byKey.values()) {
+  arr.sort((a, b) => String(a.collected_at) < String(b.collected_at) ? -1 : 1);
+  const first = arr[0], last = arr[arr.length - 1];
+  if (arr.length < 2 || first.collected_at === last.collected_at) continue;
+  multiSnap++;
+  deltaApplies += Math.max(0, (Number(last.applies) || 0) - (Number(first.applies) || 0));
+  deltaViews   += Math.max(0, (Number(last.views)   || 0) - (Number(first.views)   || 0));
+}
+const allDates = rows.map(r => String(r.collected_at)).filter(Boolean).sort();
+const t0 = allDates[0] ? new Date(allDates[0]).getTime() : 0;
+const t1 = allDates[allDates.length - 1] ? new Date(allDates[allDates.length - 1]).getTime() : 0;
+const windowDays = t0 && t1 ? (t1 - t0) / 86400000 : 0;
+
+console.log(`\n===== 実測ペース（スナップショット差分）=====`);
+console.log(`観測期間: ${fmt(windowDays, 2)} 日（複数回取得された求人 ${multiSnap} 件で測定）`);
+if (windowDays > 0 && multiSnap > 0) {
+  const applyPerDay = deltaApplies / windowDays;
+  const viewPerDay  = deltaViews / windowDays;
+  console.log(`観測期間中に増えた 応募: ${deltaApplies} 件 / 表示: ${deltaViews}`);
+  console.log(`1日あたり 実測: 応募 ${fmt(applyPerDay, 2)} 件 / 表示 ${fmt(viewPerDay, 1)}`);
+  console.log(`→ 月間換算(×30): 応募 約 ${Math.round(applyPerDay * 30)} 件 / 表示 約 ${Math.round(viewPerDay * 30)}（現在の掲載規模 ${n} 件ベース）`);
+  console.log(`→ 1求人あたり 月間応募: 約 ${fmt(applyPerDay * 30 / (n || 1), 2)} 件`);
+} else {
+  console.log(`※ 同一求人の複数回スナップショットが不足しており、増加ペースを測れません。`);
+  console.log(`  実績取得（views/applies スクレイプ）を数日おきに複数回まわすと、実測の月間ペースが出せます。`);
+}
+console.log(`\n※ applies(上部)は掲載開始からの累計。月間見込みは上の「実測ペース」を参照してください。`);
