@@ -762,7 +762,7 @@ const Ops = {
   },
 
   // 会社×媒体クロス集計（新規応募者タブ・掲載管理タブ用）
-  crossTab({ activeOnly = false, todayOnly = false } = {}) {
+  crossTab({ activeOnly = false, todayOnly = false, applyOverride = false } = {}) {
     // 過去応募者（is_archived=1）のみ除外。CSV取込データも含めて集計する。
     const conds = ['is_archived = 0'];
     const vals = [];
@@ -777,6 +777,17 @@ const Ops = {
     for (const c of COMPANIES) { table[c.id] = {}; for (const m of MEDIA) table[c.id][m.id] = 0; }
     for (const r of rows) {
       if (table[r.company] && r.media) table[r.company][r.media] = r.c;
+    }
+    // 一時的な「表示だけ」上書き（実データは変更しない・後で戻せる）。
+    // .env に  OPS_NEW_OVERRIDE=sq:seniorjob=4  のように指定するとその会社×媒体セルを上書き表示。
+    // 複数指定は「,」区切り（例: sq:seniorjob=4,bg:indeed=2）。行き先が空/未指定なら通常どおり実数を表示。
+    if (applyOverride && process.env.OPS_NEW_OVERRIDE) {
+      for (const part of String(process.env.OPS_NEW_OVERRIDE).split(',')) {
+        const m = part.trim().match(/^([a-z0-9]+):([a-z0-9]+)=(\d+)$/i);
+        if (m && table[m[1]] && table[m[1]][m[2]] !== undefined) {
+          table[m[1]][m[2]] = parseInt(m[3], 10);
+        }
+      }
     }
     return table;
   },

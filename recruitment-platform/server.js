@@ -1534,7 +1534,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       data.siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
       try { data.indeedRepostCount = (await computeDashboardStats(co)).indeedRepostCount || 0; } catch { data.indeedRepostCount = 0; }
     } else if (tab === 'new') {
-      data.applicantsCross = await Ops.crossTab({ todayOnly: true });
+      data.applicantsCross = await Ops.crossTab({ todayOnly: true, applyOverride: true });
       data.todayTargets = await Ops.todayCallTargets();
       data.stats = await opsNewStats();
     } else if (tab === 'past') {
