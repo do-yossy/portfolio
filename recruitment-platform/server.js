@@ -591,7 +591,7 @@ function kyujinboxConfiguredCompanies() {
 }
 
 // 新規応募者タブ統計
-async function opsNewStats() {
+async function opsNewStats({ applyOverride = false } = {}) {
   const { db, jstDayStartUtcISO, jstWeekStartUtcISO } = require('./db');
   // applied_at は UTC ISO で保存されるため、JST当日/今週の0:00に相当するUTC時刻で比較する。
   // （JST日付文字列と直接比較すると、日本の0:00〜8:59に当日分が漏れる）
@@ -599,9 +599,22 @@ async function opsNewStats() {
   const monday = jstWeekStartUtcISO();
   // 「本日の新規応募」は applied_at（応募日）基準でカウント。
   // バックログ取込は applied_at が過去日付になるため自動的に除外される。
-  const todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(today).c;
+  let todayNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(today).c;
   const weekNew = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ?`).get(monday).c;
   const activeTotal = db.prepare(`SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND status IN ('新規','架電済(不通)','対応中')`).get().c;
+  // 表示上書き(OPS_NEW_OVERRIDE)の増減分を「本日の新規応募」合計にも反映する（実データは不変）。
+  // 上書きはセルを「置き換え」なので、増減分 = 上書き値 − そのセルの本日実数 を合計へ加算する。
+  if (applyOverride && process.env.OPS_NEW_OVERRIDE) {
+    for (const part of String(process.env.OPS_NEW_OVERRIDE).split(',')) {
+      const m = part.trim().match(/^([a-z0-9]+):([a-z0-9]+)=(\d+)$/i);
+      if (!m) continue;
+      const real = db.prepare(
+        `SELECT COUNT(*) c FROM applicants WHERE is_archived = 0 AND applied_at >= ? AND company = ? AND media = ?`
+      ).get(today, m[1], m[2]).c;
+      todayNew += (parseInt(m[3], 10) - real);
+    }
+    if (todayNew < 0) todayNew = 0;
+  }
   return { todayNew, weekNew, activeTotal };
 }
 
@@ -1536,7 +1549,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     } else if (tab === 'new') {
       data.applicantsCross = await Ops.crossTab({ todayOnly: true, applyOverride: true });
       data.todayTargets = await Ops.todayCallTargets();
-      data.stats = await opsNewStats();
+      data.stats = await opsNewStats({ applyOverride: true });
     } else if (tab === 'past') {
       // 絞り込みはクライアント側で即時に行うため、ここでは全件を渡す。
       // URLパラメータはプルダウンの初期選択（ディープリンク）に使う。
@@ -1699,7 +1712,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
   }
 
   if (pathname === '/api/ops/stats' && method === 'GET') {
-    sendJSON(res, 200, await opsNewStats());
+    sendJSON(res, 200, await opsNewStats({ applyOverride: true }));
     return;
   }
 
