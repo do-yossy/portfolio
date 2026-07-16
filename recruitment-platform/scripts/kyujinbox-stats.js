@@ -92,4 +92,36 @@ if (windowDays > 0 && multiSnap > 0) {
   console.log(`※ 同一求人の複数回スナップショットが不足しており、増加ペースを測れません。`);
   console.log(`  実績取得（views/applies スクレイプ）を数日おきに複数回まわすと、実測の月間ペースが出せます。`);
 }
-console.log(`\n※ applies(上部)は掲載開始からの累計。月間見込みは上の「実測ペース」を参照してください。`);
+// ── 運用期間（最古の掲載日〜）と生涯平均の月間応募 ──
+// jobs テーブルの published_at（無ければ created_at）から求人ボックス掲載の開始時期を割り出し、
+// 累計応募(applies) ÷ 運用月数 で「生涯平均の月間応募」を出す。記憶に頼らず実データから算出。
+const jobWhere = company
+  ? `WHERE company = ? AND is_published = 1 AND target_media LIKE '%求人ボックス%'`
+  : `WHERE is_published = 1 AND target_media LIKE '%求人ボックス%'`;
+const jobArgs = company ? [company] : [];
+const pubDates = db.prepare(
+  `SELECT COALESCE(NULLIF(published_at,''), created_at) AS d FROM jobs ${jobWhere}`
+).all(...jobArgs).map(r => String(r.d || '')).filter(Boolean).sort();
+
+console.log(`\n===== 運用期間・生涯平均 =====`);
+if (pubDates.length) {
+  const startISO = pubDates[0];
+  const endISO = allDates[allDates.length - 1] || new Date().toISOString(); // 累計は実績最新取得時点の値
+  const startT = new Date(startISO).getTime();
+  const endT = new Date(endISO).getTime();
+  const opDays = endT > startT ? (endT - startT) / 86400000 : 0;
+  const opMonths = opDays / 30;
+  console.log(`求人ボックス掲載の最古: ${startISO.slice(0, 10)}`);
+  console.log(`実績カウント時点(最新): ${String(endISO).slice(0, 10)}`);
+  console.log(`運用期間: ${fmt(opDays, 1)} 日（約 ${fmt(opMonths, 2)} ヶ月）／対象掲載 ${pubDates.length} 件`);
+  if (opMonths > 0) {
+    console.log(`生涯平均の月間応募（累計 ${applies} ÷ ${fmt(opMonths, 2)} ヶ月）: 約 ${Math.round(applies / opMonths)} 件/月`);
+  } else {
+    console.log(`※ 運用期間が0日と算出されました（掲載日が実績取得日と同日等）。数日運用後に再計測してください。`);
+  }
+} else {
+  console.log(`※ 求人ボックス掲載の求人(published_at)が見つからず、運用期間を算出できません。`);
+}
+
+console.log(`\n※ 「生涯平均」＝全期間ならしの月間応募。「実測ペース」＝直近の増加速度。両方を見て判断してください。`);
+console.log(`※ applies(上部)は掲載開始からの累計。`);
