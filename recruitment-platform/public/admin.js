@@ -391,7 +391,14 @@ function startOptimizeNow(co) {
   const btn = document.getElementById('btn-optimize');
   if (btn) { btn.disabled = true; btn.dataset.origText = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> AI改善中...'; }
   appendLog(box, 'AIによる求人改善を開始しています...', 'info');
-  fetch('/api/optimize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: co }) })
+  var reflect = document.getElementById('opt-reflect') ? document.getElementById('opt-reflect').checked : false;
+  var reflectSave = document.getElementById('opt-reflect-save') ? document.getElementById('opt-reflect-save').checked : false;
+  if (reflect && reflectSave && !confirm('求人ボックスの掲載中求人を、AI改善後の内容で実際に上書き保存します。\n（対象は求人番号が紐づく掲載中求人のみ）\nよろしいですか？')) {
+    if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+    appendLog(box, 'キャンセルしました', 'info');
+    return;
+  }
+  fetch('/api/optimize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: co, reflect: reflect, reflectSave: reflectSave }) })
     .then(r => r.json()).then(d => {
       if (!d.ok) { appendLog(box, d.error || 'サーバーエラーが発生しました', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; } return; }
       let fromIdx = 0;
