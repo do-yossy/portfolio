@@ -359,7 +359,7 @@ def verify_photo_text(jobs):
         img_path = resolve_job_image(job)
         if not img_path or img_path.lower().endswith(".svg"):
             ok_jobs.append(job); continue
-        key = (pathlib.Path(img_path).name, str(job.get("salary", "")), str(job.get("jobType") or job.get("job_type", "")))
+        key = pathlib.Path(img_path).name  # 同一テンプレ(=同一画像)は1度だけ照合し結果を再利用
         verdict = cache[key] if key in cache else cache.setdefault(key, _claude_photo_text_match(api_key, model, img_path, job))
         if verdict is None or verdict.get("match", True):
             ok_jobs.append(job)
