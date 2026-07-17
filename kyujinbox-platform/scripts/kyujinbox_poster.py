@@ -290,6 +290,83 @@ def verify_job_images(jobs):
             skipped.append((job, want, got))
     return ok_jobs, skipped
 
+def _claude_photo_text_match(api_key, model, img_path, job):
+    """Claudeの画像認識で、写真バナーの記載と求人票の内容が矛盾しないか1件照合する。
+    戻り値: {"match": bool, "reason": str} ／ 判定不能・エラー時は None（＝投稿を止めない）。"""
+    import urllib.request, base64, pathlib
+    try:
+        raw = pathlib.Path(img_path).read_bytes()
+        ext = pathlib.Path(img_path).suffix.lower().lstrip(".")
+        media = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
+        b64 = base64.b64encode(raw).decode("ascii")
+        facts = (
+            f"タイトル: {job.get('title','')}\n"
+            f"職種: {job.get('jobType') or job.get('job_type','')}\n"
+            f"雇用形態: {job.get('employmentType') or job.get('employment_type','')}\n"
+            f"給与: {job.get('salary','')}\n"
+            f"勤務時間/休日: {job.get('worktimeHoliday') or job.get('worktime_holiday','')}\n"
+            f"仕事内容(抜粋): {str(job.get('description',''))[:400]}"
+        )
+        prompt = (
+            "この画像は求人広告バナーです。バナーに書かれている具体的な条件"
+            "（給与額・職種・雇用形態・勤務形態・休日など、数値や明確な文言）が、"
+            "次の求人票の内容と『矛盾していないか』だけを判定してください。\n"
+            "・矛盾＝バナーの給与額と求人票の給与が食い違う／職種が別物、等の明確な不一致。\n"
+            "・『高収入』『安定』などの曖昧な表現や、バナーに記載の無い項目は無視（矛盾としない）。\n"
+            "・返答は必ず次のJSONのみ: {\"match\": true/false, \"reason\": \"日本語で簡潔に\"}\n\n"
+            f"【求人票】\n{facts}"
+        )
+        payload = {
+            "model": model, "max_tokens": 200,
+            "messages": [{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": media, "data": b64}},
+                {"type": "text", "text": prompt},
+            ]}],
+        }
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"content-type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+            method="POST")
+        with urllib.request.urlopen(req, timeout=40) as r:
+            resp = json.loads(r.read().decode("utf-8"))
+        text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
+        m = re.search(r'\{.*\}', text, re.S)
+        if not m:
+            return None
+        v = json.loads(m.group(0))
+        return {"match": bool(v.get("match", True)), "reason": str(v.get("reason", ""))}
+    except Exception as e:
+        progress(f"  ⚠️ 写真テキスト照合の判定に失敗（投稿は継続）: {str(e)[:80]}", "warn")
+        return None
+
+def verify_photo_text(jobs):
+    """写真バナーの記載（給与・職種・条件など）と求人文章が矛盾しないかをClaude画像認識で照合。
+    矛盾する求人はスキップする。※ APIコスト/時間がかかるため PHOTO_TEXT_CHECK=1 の時だけ実行（既定OFF）。
+    同一(画像×給与×職種)は判定を再利用してコスト削減。判定不能時は投稿を止めない(fail-open)。"""
+    if os.environ.get("PHOTO_TEXT_CHECK", "").strip().lower() not in ("1", "true", "yes"):
+        return jobs, []
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key or api_key.startswith("sk-ant-your"):
+        progress("  ⚠️ PHOTO_TEXT_CHECK有効ですが ANTHROPIC_API_KEY 未設定のため写真テキスト照合をスキップ", "warn")
+        return jobs, []
+    import pathlib
+    model = (os.environ.get("OPTIMIZER_MODEL") or "claude-sonnet-5").strip()
+    ok_jobs, skipped, cache = [], [], {}
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        img_path = resolve_job_image(job)
+        if not img_path or img_path.lower().endswith(".svg"):
+            ok_jobs.append(job); continue
+        key = (pathlib.Path(img_path).name, str(job.get("salary", "")), str(job.get("jobType") or job.get("job_type", "")))
+        verdict = cache[key] if key in cache else cache.setdefault(key, _claude_photo_text_match(api_key, model, img_path, job))
+        if verdict is None or verdict.get("match", True):
+            ok_jobs.append(job)
+        else:
+            skipped.append((job, verdict.get("reason", "写真の記載と求人内容に相違")))
+    return ok_jobs, skipped
+
 def upload_job_image(page, job):
     """掲載フォームの画像欄(input[type=file])へ画像をアップロードする。
     求人ボックスの写真欄は「写真を追加する」ボタンで input[type=file] を出現させる構造のため、
@@ -2729,6 +2806,13 @@ def main():
             f"　→ 正しい写真を配置してから再投稿してください", "warn")
     if _photo_skipped:
         progress(f"🖼️ 写真相違で {len(_photo_skipped)}件スキップ／投稿対象 {len(jobs)}件", "info")
+
+    # 写真バナーの記載と求人文章の照合（PHOTO_TEXT_CHECK=1 の時のみ・Claude画像認識）
+    jobs, _phototext_skipped = verify_photo_text(jobs)
+    for _job, _reason in _phototext_skipped:
+        progress(f"⚠️ 写真の記載と求人内容が相違するため投稿をスキップ:「{str(_job.get('title', ''))[:40]}」　理由: {_reason}", "warn")
+    if _phototext_skipped:
+        progress(f"🖼️ 写真の記載相違で {len(_phototext_skipped)}件スキップ／投稿対象 {len(jobs)}件", "info")
 
     if not jobs:
         progress("⚠️ 投稿する求人データがありません（写真相違でのスキップを含む）", "warn")
