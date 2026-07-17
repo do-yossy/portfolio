@@ -671,7 +671,14 @@ function kyujinboxSalaryType(type) {
 // XML generator
 function generateKyujinboxXML(jobs) {
   const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
-  const company = process.env.COMPANY_NAME || '採用企業';
+  // 会社名は求人の company から解決（会社別フィードで社名が混ざらないように）。
+  // COMPANY_NAME_<CO> 環境変数があれば優先 → 会社マスタ名 → COMPANY_NAME の順。
+  const coName = (id) => {
+    const CO = String(id || '').toUpperCase();
+    return (process.env[`COMPANY_NAME_${CO}`] || '').trim()
+      || ((OPS_COMPANIES.find(c => c.id === id) || {}).name)
+      || process.env.COMPANY_NAME || '採用企業';
+  };
   const today   = new Date().toISOString().slice(0, 10);
 
   const items = jobs.map(j => {
@@ -686,7 +693,7 @@ function generateKyujinboxXML(jobs) {
     <job-title><![CDATA[${j.title}]]></job-title>
     <job-catch><![CDATA[${catch_}]]></job-catch>
     <job-url>${siteUrl}/jobs/${j.id}</job-url>
-    <company-name><![CDATA[${company}]]></company-name>
+    <company-name><![CDATA[${coName(j.company)}]]></company-name>
     <job-category><![CDATA[${j.job_type}]]></job-category>
     <job-type><![CDATA[${j.employment_type}]]></job-type>
     <salary-type>${salType}</salary-type>
@@ -1162,6 +1169,25 @@ const server = http.createServer(async (req, res) => {
   query = parsed.query;
   try { pathname = decodeURIComponent(parsed.pathname); }
   catch { pathname = parsed.pathname || '/'; }  // 不正な%エンコードでも落とさない
+
+  // ── 公開(読み取り専用)モード ──
+  // 公開ホスティングでは PUBLIC_MODE=1 で起動する。求人ページ・フィード・画像のみを配信し、
+  // 管理画面・応募者データ・各種API・書込み(POST/PUT/DELETE)はすべて404にして遮断する。
+  // （ローカル運用＝管理画面ありは PUBLIC_MODE 未設定でOK）
+  if (process.env.PUBLIC_MODE === '1' || String(process.env.PUBLIC_MODE || '').toLowerCase() === 'true') {
+    const p = pathname;
+    const publicAllowed = method === 'GET' && (
+      p === '/' ||
+      p === '/privacy' ||
+      p === '/jobs' || /^\/jobs\/[^/]+$/.test(p) ||
+      p === '/preview/top' || p === '/preview/jobs' || /^\/preview\/jobs\/[^/]+$/.test(p) ||
+      p === '/sitemap.xml' || p === '/robots.txt' ||
+      p === '/styles.css' || p === '/admin.js' ||
+      p.startsWith('/images/') ||
+      p.startsWith('/api/feed/')
+    );
+    if (!publicAllowed) { send(res, 404, 'Not Found'); return; }
+  }
 
   // ── Static files ──
   if (pathname.startsWith('/images/') && method === 'GET') {
@@ -2155,10 +2181,13 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── API: XML Feed ──
   if (pathname === '/api/feed/kyujinbox' && method === 'GET') {
-    const jobs = await Jobs.findAll(true);
+    // ?company=sq/bg/st で会社別フィード（未指定は全社）。公開中の求人のみを対象。
+    const co = OPS_COMPANIES.find(c => c.id === query.company) ? query.company : null;
+    const jobs = await Jobs.findAll({ onlyPublished: true, company: co });
     const xml = generateKyujinboxXML(jobs);
-    await Logs.create('xml_generate', 'success', `求人ボックスXML生成: ${jobs.length}件`);
-    res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': 'attachment; filename="kyujinbox-feed.xml"' });
+    await Logs.create('xml_generate', 'success', `求人ボックスXML生成: ${jobs.length}件${co ? `（${co}）` : '（全社）'}`);
+    const fname = co ? `kyujinbox-feed-${co}.xml` : 'kyujinbox-feed.xml';
+    res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': `attachment; filename="${fname}"` });
     res.end(xml);
     return;
   }
