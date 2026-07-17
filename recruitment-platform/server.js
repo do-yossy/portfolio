@@ -688,11 +688,14 @@ function generateKyujinboxXML(jobs) {
     const catch_ = j.catchcopy || JSON.parse(j.tags || '[]').slice(0, 2).join('・') || j.employment_type;
     const pubDate = (j.published_at || j.created_at || today).slice(0, 10);
     const endDate = j.expires_at ? j.expires_at.slice(0, 10) : '';
+    // 掲載写真の絶対URL（image_url が /images/xxx.jpg 形式なら siteUrl を前置）。SVGは求人ボックス非対応のため除外。
+    const imgUrl = (j.image_url && !/\.svg$/i.test(j.image_url))
+      ? (/^https?:\/\//.test(j.image_url) ? j.image_url : siteUrl + j.image_url) : '';
     return `  <job>
     <job-id><![CDATA[${j.id}]]></job-id>
     <job-title><![CDATA[${j.title}]]></job-title>
     <job-catch><![CDATA[${catch_}]]></job-catch>
-    <job-url>${siteUrl}/jobs/${j.id}</job-url>
+    <job-url>${siteUrl}/jobs/${j.id}</job-url>${imgUrl ? `\n    <job-image>${imgUrl}</job-image>` : ''}
     <company-name><![CDATA[${coName(j.company)}]]></company-name>
     <job-category><![CDATA[${j.job_type}]]></job-category>
     <job-type><![CDATA[${j.employment_type}]]></job-type>
