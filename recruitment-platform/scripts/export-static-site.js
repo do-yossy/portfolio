@@ -10,13 +10,15 @@ const { spawn } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const APP = path.join(__dirname, '..');
 const OUT = path.resolve(process.argv[2] || path.join(APP, 'dist'));
 const SITE_URL = (process.env.SITE_URL || 'https://jobs.social-quality.com').replace(/\/$/, '');
 const PORT = parseInt(process.env.EXPORT_PORT || '3912', 10);
-const TMP = path.join(APP, '.static-export-tmp');
+// 一時フォルダはOSのtempに毎回別名で作る（アプリフォルダの権限/ロックによるEPERMを回避）
+const TMP = path.join(os.tmpdir(), 'rp-static-export-' + Date.now());
 
 function get(p) {
   return new Promise((resolve, reject) => {
@@ -39,7 +41,7 @@ async function waitUp(tries = 40) {
   // 1) 求人だけの一時DBを作る（応募者等の個人情報を除外）
   const srcDb = process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'recruitment.db') : path.join(APP, 'data', 'recruitment.db');
   if (!fs.existsSync(srcDb)) { console.error('元DBが見つかりません:', srcDb); process.exit(1); }
-  fs.rmSync(TMP, { recursive: true, force: true }); fs.mkdirSync(TMP, { recursive: true });
+  fs.mkdirSync(TMP, { recursive: true });
   const tmpDb = path.join(TMP, 'recruitment.db');
   { const s = new DatabaseSync(srcDb); s.exec(`VACUUM INTO '${tmpDb.replace(/'/g, "''")}'`); try { s.close(); } catch {} }
   { const d = new DatabaseSync(tmpDb);
@@ -54,7 +56,8 @@ async function waitUp(tries = 40) {
   if (!await waitUp()) { console.error('ローカルサーバーの起動に失敗しました'); srv.kill('SIGKILL'); process.exit(1); }
 
   // 3) 静的ファイルとして書き出し
-  fs.rmSync(OUT, { recursive: true, force: true });
+  try { fs.rmSync(OUT, { recursive: true, force: true }); }
+  catch (e) { console.error(`⚠️ 出力先(${OUT})を消せませんでした（開いているエクスプローラ/エディタを閉じてください）: ${e.code || e.message}`); }
   fs.mkdirSync(path.join(OUT, 'jobs'), { recursive: true });
   fs.mkdirSync(path.join(OUT, 'feed'), { recursive: true });
 
@@ -80,7 +83,7 @@ async function waitUp(tries = 40) {
   if (fs.existsSync(imgSrc)) { const dst = path.join(OUT, 'images'); fs.mkdirSync(dst, { recursive: true }); for (const f of fs.readdirSync(imgSrc)) { try { fs.copyFileSync(path.join(imgSrc, f), path.join(dst, f)); } catch {} } }
 
   srv.kill('SIGKILL');
-  fs.rmSync(TMP, { recursive: true, force: true });
+  try { fs.rmSync(TMP, { recursive: true, force: true }); } catch { /* 一時フォルダの後始末失敗は無視 */ }
 
   console.log(`\n✅ 静的サイトを書き出しました: ${OUT}`);
   console.log(`   求人ページ: ${n}件 ／ フィード: feed/kyujinbox.xml, feed/kyujinbox-sq.xml など`);
