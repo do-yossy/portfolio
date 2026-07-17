@@ -252,6 +252,44 @@ def confirm_crop_if_open(page, max_attempts=8):
     return closed
 
 
+def _img_key(name):
+    """画像ファイル名から比較用キーを作る。raster拡張子を繰り返し除去し、
+    Windows二重拡張子(cosme.jpg.jpeg)でも同一画像として一致判定できるようにする。"""
+    n = (name or "").lower()
+    while True:
+        base, ext = os.path.splitext(n)
+        if ext in ('.jpg', '.jpeg', '.png', '.webp') and base:
+            n = base
+        else:
+            break
+    return n
+
+def verify_job_images(jobs):
+    """投稿文（求人ごとの image_url ＝ 内容に対応した写真）と、実際に添付される写真を照合する。
+    指定写真が見つからず代替画像に落ちる求人は「写真と内容が相違」した状態なので、投稿対象から除外する。
+    ※ KYUJINBOX_JOB_IMAGE（全社共通画像を明示指定）がある場合は意図的な設定として照合しない。
+    戻り値: (投稿してよい求人リスト, [(除外求人, 期待キー, 実キー), ...])"""
+    import pathlib as _pl
+    if os.environ.get("KYUJINBOX_JOB_IMAGE", "").strip():
+        return jobs, []
+    ok_jobs, skipped = [], []
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        iu = (job.get("imageUrl") or job.get("image_url") or "").strip()
+        # 写真の指定が無い／URL指定の求人は照合対象外（既定画像で投稿）
+        if not iu or iu.lower().startswith(("http://", "https://")):
+            ok_jobs.append(job)
+            continue
+        want = _img_key(_pl.Path(iu.lstrip("/")).name)
+        gp = resolve_job_image(job)
+        got = _img_key(_pl.Path(gp).name) if gp else ""
+        if want and got and want == got:
+            ok_jobs.append(job)
+        else:
+            skipped.append((job, want, got))
+    return ok_jobs, skipped
+
 def upload_job_image(page, job):
     """掲載フォームの画像欄(input[type=file])へ画像をアップロードする。
     求人ボックスの写真欄は「写真を追加する」ボタンで input[type=file] を出現させる構造のため、
@@ -2682,8 +2720,18 @@ def main():
         if isinstance(job, dict) and job.get('title'):
             job['title'] = str(job['title']).replace('★', '・')
 
+    # 投稿文と写真の照合: 指定写真と実際に添付される写真が相違する求人は投稿しない
+    jobs, _photo_skipped = verify_job_images(jobs)
+    for _job, _want, _got in _photo_skipped:
+        progress(
+            f"⚠️ 写真と内容が相違するため投稿をスキップ:「{str(_job.get('title', ''))[:40]}」"
+            f"　指定=public/images/{_want}.jpg　実際={_got or '見つからず(代替)'}"
+            f"　→ 正しい写真を配置してから再投稿してください", "warn")
+    if _photo_skipped:
+        progress(f"🖼️ 写真相違で {len(_photo_skipped)}件スキップ／投稿対象 {len(jobs)}件", "info")
+
     if not jobs:
-        progress("⚠️ 投稿する求人データがありません", "warn")
+        progress("⚠️ 投稿する求人データがありません（写真相違でのスキップを含む）", "warn")
         sys.exit(0)
 
     email        = os.environ.get("KYUJINBOX_EMAIL", "")
