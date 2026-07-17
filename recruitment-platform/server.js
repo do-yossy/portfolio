@@ -671,7 +671,14 @@ function kyujinboxSalaryType(type) {
 // XML generator
 function generateKyujinboxXML(jobs) {
   const siteUrl = process.env.SITE_URL || `http://localhost:${PORT}`;
-  const company = process.env.COMPANY_NAME || '採用企業';
+  // 会社名は求人の company から解決（会社別フィードで社名が混ざらないように）。
+  // COMPANY_NAME_<CO> 環境変数があれば優先 → 会社マスタ名 → COMPANY_NAME の順。
+  const coName = (id) => {
+    const CO = String(id || '').toUpperCase();
+    return (process.env[`COMPANY_NAME_${CO}`] || '').trim()
+      || ((OPS_COMPANIES.find(c => c.id === id) || {}).name)
+      || process.env.COMPANY_NAME || '採用企業';
+  };
   const today   = new Date().toISOString().slice(0, 10);
 
   const items = jobs.map(j => {
@@ -686,7 +693,7 @@ function generateKyujinboxXML(jobs) {
     <job-title><![CDATA[${j.title}]]></job-title>
     <job-catch><![CDATA[${catch_}]]></job-catch>
     <job-url>${siteUrl}/jobs/${j.id}</job-url>
-    <company-name><![CDATA[${company}]]></company-name>
+    <company-name><![CDATA[${coName(j.company)}]]></company-name>
     <job-category><![CDATA[${j.job_type}]]></job-category>
     <job-type><![CDATA[${j.employment_type}]]></job-type>
     <salary-type>${salType}</salary-type>
@@ -2155,10 +2162,13 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
 
   // ── API: XML Feed ──
   if (pathname === '/api/feed/kyujinbox' && method === 'GET') {
-    const jobs = await Jobs.findAll(true);
+    // ?company=sq/bg/st で会社別フィード（未指定は全社）。公開中の求人のみを対象。
+    const co = OPS_COMPANIES.find(c => c.id === query.company) ? query.company : null;
+    const jobs = await Jobs.findAll({ onlyPublished: true, company: co });
     const xml = generateKyujinboxXML(jobs);
-    await Logs.create('xml_generate', 'success', `求人ボックスXML生成: ${jobs.length}件`);
-    res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': 'attachment; filename="kyujinbox-feed.xml"' });
+    await Logs.create('xml_generate', 'success', `求人ボックスXML生成: ${jobs.length}件${co ? `（${co}）` : '（全社）'}`);
+    const fname = co ? `kyujinbox-feed-${co}.xml` : 'kyujinbox-feed.xml';
+    res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': `attachment; filename="${fname}"` });
     res.end(xml);
     return;
   }
