@@ -1170,6 +1170,25 @@ const server = http.createServer(async (req, res) => {
   try { pathname = decodeURIComponent(parsed.pathname); }
   catch { pathname = parsed.pathname || '/'; }  // 不正な%エンコードでも落とさない
 
+  // ── 公開(読み取り専用)モード ──
+  // 公開ホスティングでは PUBLIC_MODE=1 で起動する。求人ページ・フィード・画像のみを配信し、
+  // 管理画面・応募者データ・各種API・書込み(POST/PUT/DELETE)はすべて404にして遮断する。
+  // （ローカル運用＝管理画面ありは PUBLIC_MODE 未設定でOK）
+  if (process.env.PUBLIC_MODE === '1' || String(process.env.PUBLIC_MODE || '').toLowerCase() === 'true') {
+    const p = pathname;
+    const publicAllowed = method === 'GET' && (
+      p === '/' ||
+      p === '/privacy' ||
+      p === '/jobs' || /^\/jobs\/[^/]+$/.test(p) ||
+      p === '/preview/top' || p === '/preview/jobs' || /^\/preview\/jobs\/[^/]+$/.test(p) ||
+      p === '/sitemap.xml' || p === '/robots.txt' ||
+      p === '/styles.css' || p === '/admin.js' ||
+      p.startsWith('/images/') ||
+      p.startsWith('/api/feed/')
+    );
+    if (!publicAllowed) { send(res, 404, 'Not Found'); return; }
+  }
+
   // ── Static files ──
   if (pathname.startsWith('/images/') && method === 'GET') {
     const fp = path.join(PUBLIC_DIR, path.normalize(pathname));
