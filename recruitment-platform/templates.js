@@ -2436,7 +2436,11 @@ function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
             <input id="opt-time" type="time" value="03:00" style="padding:4px">
             <button class="btn btn-ghost btn-sm" onclick="saveOptimizeSchedule('${co}')">保存</button>
           </div>
-          <div class="text-sm text-muted" style="margin-top:4px">人材紹介求人は事実（本文）を変えず、タイトル・訴求の表現のみ改善します。ログは上の枠に表示されます。</div>
+          <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:12px;margin-top:6px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="opt-reflect" checked> 求人ボックス掲載にも反映する</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="opt-reflect-save"> 実際に保存する（OFF＝ドライラン：スクショ確認のみ）</label>
+          </div>
+          <div class="text-sm text-muted" style="margin-top:4px">人材紹介求人は事実（本文）を変えず、タイトル・訴求の表現のみ改善します。「反映する」をONにすると求人ボックスの掲載中求人（求人番号が紐づくもの）も編集更新します。<b>まずは「実際に保存する」をOFF（ドライラン）でスクショ確認 → 問題なければONで保存</b>を推奨。ログは上の枠に表示されます。</div>
         </div>
         <div id="progress-kyujinbox-wrap" class="progress-wrap hidden"><div id="progress-kyujinbox" class="progress-box"></div></div>
       </div>

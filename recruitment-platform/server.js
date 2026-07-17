@@ -1109,12 +1109,19 @@ function loadOptSchedule() {
 }
 function saveOptSchedule(s) { try { fs.writeFileSync(OPT_SCHEDULE_FILE, JSON.stringify(s, null, 2)); } catch (e) { console.error('optimize schedule save error:', e.message); } }
 
-function executeOptimize({ company, pushLog }) {
+function executeOptimize({ company, pushLog, reflect = false, reflectSave = false }) {
   return new Promise(resolve => {
     const script = path.join(SCRIPTS_DIR, 'kyujinbox_autoloop.js');
     if (!fs.existsSync(script)) { pushLog('⚠️ 改善スクリプトが見つかりません（scripts/kyujinbox_autoloop.js）', 'warn'); return resolve({ ok: false }); }
     pushLog(`🤖 AIによる求人改善を開始します（会社:${company || 'all'}）...`, 'info');
-    const proc = spawn(process.execPath, ['--experimental-sqlite', script, '--company', company || 'all', '--apply'], { cwd: __dirname, env: { ...process.env } });
+    if (reflect) pushLog(reflectSave
+      ? '📤 改善後、求人ボックス掲載にも反映します（保存する）'
+      : '📤 改善後、求人ボックス掲載に反映します（ドライラン：入力＋スクショのみ・保存しない）', 'info');
+    // --apply=DBへ反映。reflect時は --push（掲載反映）、reflectSave時は --push-save（実際に保存）を追加。
+    const optArgs = ['--experimental-sqlite', script, '--company', company || 'all', '--apply'];
+    if (reflect) optArgs.push('--push');
+    if (reflect && reflectSave) optArgs.push('--push-save');
+    const proc = spawn(process.execPath, optArgs, { cwd: __dirname, env: { ...process.env } });
     proc.stdout.on('data', d => { for (const line of d.toString().split('\n')) { const t = line.replace(/\s+$/, ''); if (t.trim()) pushLog(t, 'info'); } });
     proc.stderr.on('data', d => { const t = d.toString().trim(); if (t) pushLog(`⚠️ ${t}`, 'warn'); });
     proc.on('error', e => { pushLog(`❌ AI改善の起動に失敗: ${e.message}`, 'error'); resolve({ ok: false }); });
@@ -2467,7 +2474,12 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const { id, session } = createSession();
     const pushLog = (message, type = 'info') => session.logs.push({ message: String(message ?? ''), type });
     sendJSON(res, 200, { ok: true, sessionId: id });
-    executeOptimize({ company: body.company, pushLog })
+    executeOptimize({
+      company: body.company,
+      pushLog,
+      reflect: body.reflect === true || body.reflect === 'true',
+      reflectSave: body.reflectSave === true || body.reflectSave === 'true',
+    })
       .then(() => { session.done = true; session.success = true; })
       .catch(err => { pushLog(`❌ 内部エラー: ${err.message}`, 'error'); session.done = true; session.success = false; });
     return;
