@@ -17,7 +17,7 @@ const db = new DatabaseSync(DB_PATH);
 const COMPANY = 'st';
 const IMAGE_URL = '/images/st-soutei-driver.jpg';
 const JOB_TYPE = '送迎ドライバー';
-const TITLE_TAIL = '【事業拡大につき増員募集】送迎ドライバー★未経験歓迎★普通免許OK★福利厚生充実';
+const TITLE_TAIL = '【事業拡大につき増員募集】送迎ドライバー|未経験歓迎|普通免許OK|福利厚生充実';
 const SALARY_DETAIL = '月給390,000円〜440,000円';
 
 // 東京都内10エリア第4弾（Style501 送迎ドライバー・既存分と被りなし）

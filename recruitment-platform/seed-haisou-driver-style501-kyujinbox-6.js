@@ -17,7 +17,7 @@ const db = new DatabaseSync(DB_PATH);
 const COMPANY = 'st';
 const IMAGE_URL = '/images/st-haisou-driver.jpg';
 const JOB_TYPE = '配送ドライバー';
-const TITLE_TAIL = '【事業拡大につき事業継承】配送ドライバー★未経験歓迎★資産形成OK★月給39万円以上';
+const TITLE_TAIL = '【事業拡大につき事業継承】配送ドライバー|未経験歓迎|資産形成OK|月給39万円以上';
 const SALARY_DETAIL = '月給390,000円〜440,000円';
 
 // 東京都内15エリア第4弾（Style501 配送ドライバー・既存分と被りなし）

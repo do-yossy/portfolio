@@ -2792,10 +2792,16 @@ def main():
 
     jobs = parsed if isinstance(parsed, list) else []
 
-    # 求人ボックスはタイトルに記号★を使えないため・へ置換（BG/ST等の★入りタイトル対策）
+    # 求人ボックスはタイトルの記号★・絵文字を弾くため、タイトルを整える（★→・、絵文字は除去）
+    _EMOJI_RE = re.compile(
+        "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF"
+        "\U0001F1E6-\U0001F1FF\U00002190-\U000021FF\U00002300-\U000023FF️⃣]")
     for job in jobs:
         if isinstance(job, dict) and job.get('title'):
-            job['title'] = str(job['title']).replace('★', '・')
+            t = str(job['title']).replace('★', '・')
+            t = _EMOJI_RE.sub('', t)               # 絵文字を除去
+            t = re.sub(r'\s{2,}', ' ', t).strip()  # 絵文字除去で空いた空白を整理
+            job['title'] = t
 
     # 投稿文と写真の照合: 指定写真と実際に添付される写真が相違する求人は投稿しない
     jobs, _photo_skipped = verify_job_images(jobs)

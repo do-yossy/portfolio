@@ -18,7 +18,7 @@ const db = new DatabaseSync(DB_PATH);
 const COMPANY = 'bg';
 const IMAGE_URL = '/images/cosme-haisou.jpg';
 const JOB_TYPE = 'コスメ配送ドライバー';
-const TITLE_TAIL = '未経験歓迎★コスメ業界を支えるルート配送★月給39万円以上★会社車両完備';
+const TITLE_TAIL = '未経験歓迎／コスメ業界を支えるルート配送／月給39万円以上／会社車両完備';
 const SALARY_DETAIL = '月給390,000円〜450,000円';
 
 // 東京エリア（Bigeyes）

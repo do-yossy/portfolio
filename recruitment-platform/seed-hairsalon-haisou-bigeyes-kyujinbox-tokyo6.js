@@ -17,7 +17,7 @@ const db = new DatabaseSync(DB_PATH);
 const COMPANY = 'bg';
 const IMAGE_URL = '/images/hairsalon-haisou.jpg';
 const JOB_TYPE = 'ヘアサロン向け配送スタッフ';
-const TITLE_TAIL = '未経験歓迎★ヘアサロン向け配送スタッフ★月給39万円以上★普通免許OK★完全週休二日制';
+const TITLE_TAIL = '未経験歓迎／ヘアサロン向け配送スタッフ／月給39万円以上／普通免許OK／完全週休二日制';
 const SALARY_DETAIL = '月給390,000円〜450,000円';
 
 // 東京エリア（Bigeyes）

@@ -17,7 +17,7 @@ const db = new DatabaseSync(DB_PATH);
 const COMPANY = 'bg';
 const IMAGE_URL = '/images/biyoukiki-driver.jpg';
 const JOB_TYPE = '美容機器運搬ドライバー';
-const TITLE_TAIL = '未経験歓迎★美容業界を支える運搬ドライバー★月給39万円以上★会社車両完備';
+const TITLE_TAIL = '未経験歓迎／美容業界を支える運搬ドライバー／月給39万円以上／会社車両完備';
 const SALARY_DETAIL = '月給390,000円〜450,000円';
 
 // 東京エリア（Bigeyes）

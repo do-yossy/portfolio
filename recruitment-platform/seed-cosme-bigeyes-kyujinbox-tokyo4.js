@@ -17,7 +17,7 @@ const db = new DatabaseSync(DB_PATH);
 const COMPANY = 'bg';
 const IMAGE_URL = '/images/cosme-seizou.jpg';
 const JOB_TYPE = 'コスメ製造スタッフ';
-const TITLE_TAIL = '未経験歓迎★コスメ製造スタッフ★土日休み★年間休日123日★月給25万円以上';
+const TITLE_TAIL = '未経験歓迎／コスメ製造スタッフ／土日休み／年間休日123日／月給25万円以上';
 const SALARY_DETAIL = '月給250,000円〜320,000円';
 
 // 東京エリア（Bigeyes コスメ製造＝機械オペレーター 追加分）
