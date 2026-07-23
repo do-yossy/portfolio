@@ -7,6 +7,7 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const crypto = require('crypto');
+const vary = require('./scripts/lib/kyujinbox-vary-bgst');
 
 const DB_PATH = process.env.DATA_DIR
   ? path.join(process.env.DATA_DIR, 'recruitment.db')
@@ -117,9 +118,10 @@ let created = 0;
 for (let i = 0; i < AREAS.length; i++) {
   const j = AREAS[i];
   const areaLabel = `${j.city}・${j.district}`;
+  const _v = vary.build('st_soutei', areaLabel);
   const id = crypto.randomBytes(10).toString('hex');
-  const title = `【${areaLabel}】${TITLE_TAIL}`;
-  const catchcopy = `未経験歓迎★普通免許OK（AT限定可）★福利厚生充実の送迎ドライバー★月給39万円〜44万円（年収500万円以上も可能）。ブランク・シニアも歓迎。残業ほぼなし・日勤メインで正社員として安定して働けます。`;
+  const title = _v.title;
+  const catchcopy = _v.catchcopy;
 
   const tags = JSON.stringify([
     '未経験OK', '正社員', 'AT限定OK', 'シニア歓迎',
@@ -129,7 +131,7 @@ for (let i = 0; i < AREAS.length; i++) {
 
   stmt.run(
     id, title, `${j.pref}${j.city}${j.district}`, SALARY_DETAIL, JOB_TYPE, '正社員',
-    DESCRIPTION, tags, catchcopy, IMAGE_URL,
+    _v.description, tags, catchcopy, IMAGE_URL,
     JSON.stringify(['求人ボックス']),
     now, expires, now, now, COMPANY,
     REWARDING, WORKTIME, TRANSPORTATION, HOW_TO_APPLY, QUALIFICATIONS, BENEFIT,
