@@ -85,6 +85,18 @@ function runSeniorjob(argsArr) {
   });
 }
 
+// ── シニアジョブ 20件プラン: ジェネレーターを実行（seniorjob_plan_export.js・SQ固定） ──
+function runSeniorjobPlan(argsArr) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(process.execPath, [path.join(SCRIPTS_DIR, 'seniorjob_plan_export.js'), ...argsArr], { cwd: __dirname });
+    let out = '', err = '';
+    p.stdout.on('data', d => out += d);
+    p.stderr.on('data', d => err += d);
+    p.on('error', reject);
+    p.on('close', code => code === 0 ? resolve(out) : reject(new Error(err || out || ('exit ' + code))));
+  });
+}
+
 // ── シニアジョブ 応募者: 選考管理画面のコピペテキストを解析 ──
 // シニアジョブは応募者の一括CSV出力が無いため、応募者詳細をコピペして1件ずつ取り込む。
 // 「ラベル行の次行が値」という画面構造を利用してフィールドを抽出する。
@@ -2267,6 +2279,28 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     let buf;
     try { buf = fs.readFileSync(file); } catch { sendError(res, 500, '生成ファイルの読み込みに失敗しました'); return; }
     await Logs.create('seniorjob_csv', 'success', `シニアジョブCSV生成: ${count}件 (${path.basename(file)})`);
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=Shift_JIS',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(file))}"`
+    });
+    res.end(buf);
+    return;
+  }
+
+  // ── API: シニアジョブ 20件プラン CSV（曜日別／SQ固定） ──
+  if (pathname === '/api/seniorjob/plan-csv' && method === 'GET') {
+    const group = String(query.group || 'A').toUpperCase();
+    if (!['A', 'B', 'C', 'D', 'E', 'ALL'].includes(group)) { sendError(res, 400, 'group は A〜E または ALL を指定してください'); return; }
+    const cliArgs = group === 'ALL' ? ['--all'] : ['--group', group];
+    let stdout;
+    try { stdout = await runSeniorjobPlan(cliArgs); }
+    catch (e) { sendError(res, 500, '20件プランCSVの生成に失敗しました: ' + (e.message || e)); return; }
+    const m = stdout.match(/→\s*(.+\.csv)/);
+    if (!m) { sendError(res, 409, (stdout || '').trim() || '出力できる行がありません（営業・企画は雛形 templates/営業.json・企画.json の作成後に出力されます）'); return; }
+    const file = m[1].trim();
+    let buf;
+    try { buf = fs.readFileSync(file); } catch { sendError(res, 500, '生成ファイルの読み込みに失敗しました'); return; }
+    await Logs.create('seniorjob_plan_csv', 'success', `シニアジョブ20件プランCSV: ${group} (${path.basename(file)})`);
     res.writeHead(200, {
       'Content-Type': 'text/csv; charset=Shift_JIS',
       'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(file))}"`
