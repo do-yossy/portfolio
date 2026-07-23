@@ -18,6 +18,10 @@ const SHEET_HEADERS = [
 ];
 const SHEET_COL = { id: 0, dupInfo: 1, furigana: 5, callCount: 18, status: 19, lastCalled: 20, notes: 21, workHistory: 22 };
 
+// 取込(pull)・反映(push)で一切触らない保護シート。
+// これらのタブは架電リストの読み書き対象から常に除外する（ユーザーが独自に管理するシート）。
+const PROTECTED_SHEETS = new Set(['求職者管理', '推薦管理', '案件精査', '面談依頼']);
+
 // notesフィールドから【職歴N】/【勤務先N】セクションを抽出してW列用テキストを生成する
 function extractWorkHistory(notes) {
   if (!notes) return '';
@@ -74,6 +78,8 @@ async function pushToSheets({ gsheets, Ops, Logs, companies, statuses, mediaList
     const { db } = require('../db');
     const list = (await Ops.listCalls({ company: co.id, archived }));
     const title = co.short || co.name || co.id;
+    // 保護シート（求職者管理など）には反映しない（会社タブ名が万一衝突しても書き込まない）
+    if (PROTECTED_SHEETS.has(title)) continue;
     const props = await gsheets.ensureTab(title);
 
     // 既存シートから手入力済みの架電結果（ID→{callCount,status,notes,furigana}）を退避。
@@ -309,6 +315,8 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
 
   for (const sh of (meta.sheets || [])) {
     const title = sh.properties.title;
+    // 保護シート（求職者管理など）は取込対象から常に除外
+    if (PROTECTED_SHEETS.has(title)) { skippedTabs.push(title); continue; }
     if (!companyTabs.has(title)) { skippedTabs.push(title); continue; }
     const coObj = tabToCompany[title];
     const companyId = coObj ? coObj.id : 'sq';
