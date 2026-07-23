@@ -80,6 +80,16 @@ const KANNI_MAP = {
   'ルート配送': 'ルート配送ドライバー', '企画営業・販促企画': '企画営業', '提案営業(企画)': '提案営業',
 };
 const kanniName = d => KANNI_MAP[d] || d;
+// 職種(153列の「(必須)職種」)を職種詳細ごとに細分化。営業系/企画系の中で内容に合わせて分ける。
+// ※シニアジョブの職種一覧の正式名称に合わせる必要があるため、初回取込で弾かれた場合は要調整。
+const CATEGORY_MAP = {
+  'ルート営業': 'ルートセールス・ラウンダー',
+  '反響営業': '反響営業・カウンターセールス',
+  'カウンター営業': 'カウンターセールス・受付',
+  '企画営業・販促企画': '営業企画・販促企画',
+  '提案営業(企画)': '提案営業・企画',
+  '企画営業': '企画・マーケティング',
+};
 function contentText(detail, area, eki) {
   const f = CONTENT_MAP[detail];
   if (!f) return null;
@@ -147,6 +157,7 @@ function buildRow(ref, p, st, photoIdx) {
   // 差別化
   if (p.title) set('(必須)求人タイトル', p.title);
   set('(必須)簡易職種名', kanniName(p.detail));
+  if (CATEGORY_MAP[p.detail]) set('(必須)職種', CATEGORY_MAP[p.detail]); // 営業系/企画系を内容に合わせ細分化
   const body = contentText(p.detail, p.area, ekiName);
   if (body) set('(必須)仕事内容', body);
   // 写真プール（任意・区ごとにローテ）
