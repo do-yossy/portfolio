@@ -2135,6 +2135,12 @@ function seniorjobCompanyOptions(selected) {
 }
 function seniorjobPostPanel(co = 'sq') {
   const coSel = COMPANIES[co] ? co : 'sq';
+  // プランの曜日別件数を plan.csv から集計（件数を変えても自動反映）
+  const _pc = { A: 0, B: 0, C: 0, D: 0, E: 0 }; let _ptot = 0;
+  try {
+    const _rows = require('fs').readFileSync(require('path').join(__dirname, 'scripts', 'seniorjob', 'plan.csv'), 'utf8').trim().split('\n').slice(1);
+    for (const _l of _rows) { if (!_l.trim()) continue; const _g = (_l.split(',')[1] || '').charAt(0); if (_pc[_g] !== undefined) _pc[_g]++; _ptot++; }
+  } catch {}
   return `
     <section class="card" id="sj-post-panel" style="margin-top:24px">
       <h2>🚃 シニアジョブ 求人掲載（CSVダウンロード）</h2>
@@ -2155,16 +2161,16 @@ function seniorjobPostPanel(co = 'sq') {
         <button class="btn btn-ghost" id="sj-reset">記録をリセット</button>
       </div>
       <div style="margin-top:18px;padding-top:14px;border-top:1px dashed #ddd">
-        <h3 style="margin:0 0 4px;font-size:15px">🗓 17件プラン（曜日別ダウンロード・SQ固定）</h3>
-        <p class="muted" style="font-size:12px;margin:0 0 10px">営業/企画/送迎/配送の17件を、平日1日3〜4件・週1巡で更新するためのCSV。曜日ボタンで当日分をダウンロード → シニアジョブに取込してください。営業・企画は雛形（templates/営業.json・企画.json）を作成すると出力されます（未作成の間は送迎/配送のみ）。</p>
+        <h3 style="margin:0 0 4px;font-size:15px">🗓 ${_ptot}件プラン（曜日別ダウンロード・SQ固定）</h3>
+        <p class="muted" style="font-size:12px;margin:0 0 10px">営業/企画/送迎/配送の${_ptot}件を、平日に分けて（月〜金・各ボタンの件数）週1巡で更新するためのCSV。曜日ボタンで当日分をダウンロード → シニアジョブに取込してください。初回は「全${_ptot}件」で一括、以降は曜日ボタンで運用できます。</p>
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-bottom:10px"><input type="checkbox" id="sj-plan-update"> 更新モード（求人ID付き・既存を上書き／重複なし）</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-primary sj-plan" data-g="A">月(A)</button>
-          <button class="btn btn-primary sj-plan" data-g="B">火(B)</button>
-          <button class="btn btn-primary sj-plan" data-g="C">水(C)</button>
-          <button class="btn btn-primary sj-plan" data-g="D">木(D)</button>
-          <button class="btn btn-primary sj-plan" data-g="E">金(E)</button>
-          <button class="btn btn-ghost sj-plan" data-g="ALL">全17件</button>
+          <button class="btn btn-primary sj-plan" data-g="A">月(A)・${_pc.A}件</button>
+          <button class="btn btn-primary sj-plan" data-g="B">火(B)・${_pc.B}件</button>
+          <button class="btn btn-primary sj-plan" data-g="C">水(C)・${_pc.C}件</button>
+          <button class="btn btn-primary sj-plan" data-g="D">木(D)・${_pc.D}件</button>
+          <button class="btn btn-primary sj-plan" data-g="E">金(E)・${_pc.E}件</button>
+          <button class="btn btn-ghost sj-plan" data-g="ALL">全${_ptot}件（初回一括）</button>
           <button class="btn btn-ghost" id="sj-plan-advance" title="仕事内容/写真を次のバージョンに切替（週の頭に押すと新着更新になります）">🔄 内容を次に進める</button>
         </div>
         <p class="muted" style="font-size:11px;margin:8px 0 0">※更新モードは、初回投稿後に plan_ids.json へ各求人IDを登録してから使います（未登録の求人はスキップ＝重複しません）。</p>
