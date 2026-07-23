@@ -91,6 +91,8 @@ const CATEGORY_MAP = {
   '提案営業(企画)': '提案営業・企画',
   '企画営業': '企画・マーケティング',
 };
+// 「そのまま」職種：雛形(ref_job=ロケ同行ドライバー)の内容をそのまま使い、勤務地だけ差し替える。
+const AS_IS = new Set(['送迎']);
 function contentVariants(stem) {
   const re = new RegExp('^' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(-\\d+)?\\.txt$');
   try { return fs.readdirSync(CONTENTS).filter(f => re.test(f)).sort(); } catch { return []; }
@@ -172,12 +174,15 @@ function buildRow(ref, p, st, photoIdx) {
   set('勤務地1詳細住所', st.address || '');
   const ekiName = st.nearest ? st.nearest.replace(/\s*徒歩.*$/, '') : (st.station + '駅');
   set('勤務地1最寄駅', st.code ? `${ekiName}(コード:${st.code}) 徒歩5分` : '');
-  // 差別化
-  if (p.title) set('(必須)求人タイトル', p.title);
-  set('(必須)簡易職種名', kanniName(p.detail));
-  if (CATEGORY_MAP[p.detail]) set('(必須)職種', CATEGORY_MAP[p.detail]); // 営業系/企画系を内容に合わせ細分化
-  const body = contentText(p.detail, p.area, ekiName, CYCLE);
-  if (body) set('(必須)仕事内容', body);
+  // 差別化（送迎=ロケ同行はタイトル/職種/仕事内容をそのまま使い、勤務地のみ差し替え）
+  const asIs = AS_IS.has(p.kei);
+  if (!asIs) {
+    if (p.title) set('(必須)求人タイトル', p.title);
+    set('(必須)簡易職種名', kanniName(p.detail));
+    if (CATEGORY_MAP[p.detail]) set('(必須)職種', CATEGORY_MAP[p.detail]); // 営業系/企画系を内容に合わせ細分化
+    const body = contentText(p.detail, p.area, ekiName, CYCLE);
+    if (body) set('(必須)仕事内容', body);
+  }
   // 写真プール（任意・区＋サイクルでローテ）
   const pool = PHOTOS[p.kei];
   if (Array.isArray(pool) && pool.length) set('(必須)写真ID1', String(pool[(photoIdx + CYCLE) % pool.length]));
