@@ -2154,6 +2154,18 @@ function seniorjobPostPanel(co = 'sq') {
         <button class="btn btn-primary" id="sj-download">⬇ 求人掲載（CSVダウンロード）</button>
         <button class="btn btn-ghost" id="sj-reset">記録をリセット</button>
       </div>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px dashed #ddd">
+        <h3 style="margin:0 0 4px;font-size:15px">🗓 20件プラン（曜日別ダウンロード・SQ固定）</h3>
+        <p class="muted" style="font-size:12px;margin:0 0 10px">営業/企画/送迎/配送の20件を、平日1日4件・週1巡で更新するためのCSV。曜日ボタンで当日分をダウンロード → シニアジョブに取込してください。営業・企画は雛形（templates/営業.json・企画.json）を作成すると出力されます（未作成の間は送迎/配送のみ）。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary sj-plan" data-g="A">月(A)</button>
+          <button class="btn btn-primary sj-plan" data-g="B">火(B)</button>
+          <button class="btn btn-primary sj-plan" data-g="C">水(C)</button>
+          <button class="btn btn-primary sj-plan" data-g="D">木(D)</button>
+          <button class="btn btn-primary sj-plan" data-g="E">金(E)</button>
+          <button class="btn btn-ghost sj-plan" data-g="ALL">全20件</button>
+        </div>
+      </div>
       <p class="muted" id="sj-msg" style="margin-top:12px;font-size:13px"></p>
     </section>
     <script>
@@ -2172,6 +2184,7 @@ function seniorjobPostPanel(co = 'sq') {
       coSel.onchange=refresh;
       dlBtn.onclick=async function(){var n=document.getElementById('sj-count').value||10;var c=document.getElementById('sj-content').value;msg.style.color='';msg.textContent='CSVを生成中…';try{var url='/api/seniorjob/csv?company='+encodeURIComponent(co())+'&count='+encodeURIComponent(n)+(c?'&content='+encodeURIComponent(c):'');var r=await fetch(url);if(!r.ok){msg.style.color='#b91c1c';msg.textContent='エラー: '+(await r.text());return;}var blob=await r.blob();var cd=r.headers.get('Content-Disposition')||'';var m=cd.match(/filename="?([^"]+)"?/);var fn=m?decodeURIComponent(m[1]):'seniorjob.csv';var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();msg.style.color='#16a34a';msg.textContent='ダウンロードしました: '+fn+'（シニアジョブに取込してください）';refresh();}catch(e){msg.style.color='#b91c1c';msg.textContent='エラー: '+e.message;}};
       document.getElementById('sj-reset').onclick=async function(){if(!confirm('この会社の掲載済み記録をリセットして最初の駅から出力しますか？'))return;await fetch('/api/seniorjob/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:co()})});msg.style.color='';msg.textContent='記録をリセットしました';refresh();};
+      Array.prototype.forEach.call(document.querySelectorAll('.sj-plan'),function(b){b.onclick=async function(){var g=b.getAttribute('data-g');msg.style.color='';msg.textContent='20件プランCSVを生成中…('+g+')';try{var r=await fetch('/api/seniorjob/plan-csv?group='+encodeURIComponent(g));if(!r.ok){msg.style.color='#b91c1c';msg.textContent='エラー: '+(await r.text());return;}var blob=await r.blob();var cd=r.headers.get('Content-Disposition')||'';var m=cd.match(/filename="?([^"]+)"?/);var fn=m?decodeURIComponent(m[1]):'seniorjob-plan.csv';var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();msg.style.color='#16a34a';msg.textContent='ダウンロードしました: '+fn+'（シニアジョブに取込してください）';}catch(e){msg.style.color='#b91c1c';msg.textContent='エラー: '+e.message;}};});
       refresh();
     })();
     </script>`;
