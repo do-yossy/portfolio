@@ -24,6 +24,7 @@ const fs   = require('fs');
 })();
 
 const { Jobs } = require('../db-factory');
+const vary = require('./lib/kyujinbox-vary');
 
 const COMPANY      = 'sq';
 const NOW          = new Date().toISOString();
@@ -131,54 +132,11 @@ function makeFaq({ area, jobLabel, industry }) {
 }
 
 function makeJob(item) {
-  const { area, city, shift, salaryMin, salaryMax, jobLabel, note, industry } = item;
-  const min = parseInt(salaryMin);
-  const max = parseInt(salaryMax);
-  const salaryStr = `月給${(min/10000).toFixed(0)}万円〜${(max/10000).toFixed(0)}万円（各種手当込・試用期間3ヶ月／同条件）`;
   return {
-    title:     `【${area}】${jobLabel}｜正社員｜未経験歓迎｜月収28万円以上`,
-    location:  city,
-    salary:    salaryStr,
+    ...vary.buildKikai(item, 'op28'),
+    location:  item.city,
+    salary:    `月給${(parseInt(item.salaryMin)/10000).toFixed(0)}万円〜${(parseInt(item.salaryMax)/10000).toFixed(0)}万円（各種手当込・試用期間3ヶ月／同条件）`,
     jobType:   JOB_TYPE,
-    catchcopy: `${industry}スタッフ正社員募集｜月収28万円以上｜各種社会保険完備`,
-    description: `${city}（${area}）で${jobLabel}の正社員を募集します。${note}
-
-【仕事内容】
-製造ラインの機械操作・監視・メンテナンス補助業務全般をお任せします。
-手順書・マニュアルに沿って作業を進めるため、未経験の方でも安心してスタートできます。
-
-【こんな方に向いています】
-・コツコツ丁寧に作業することが得意な方
-・安定した正社員雇用を求めている方
-・ものづくりに興味がある方
-・転職回数が多くても前向きに働きたい方
-
-【労働時間】
-${shift}（実働8時間）
-残業：月平均10時間以内（繁忙期除く）
-
-【休日・休暇】
-週休2日制（シフト制）
-年間休日105日以上
-有給休暇10日〜（勤続年数に応じて増加）
-
-【給与内訳】
-基本給 ${(min/10000).toFixed(0)}万円
-＋皆勤手当 5,000円
-＋技能手当 5,000円〜（スキル・経験に応じて）
-試用期間3ヶ月（期間中も給与・待遇は同条件）
-
-【福利厚生】
-社会保険完備（健康・厚生年金・雇用・労災）
-交通費支給（規定内）
-制服・安全靴貸与
-資格取得支援制度（フォークリフト・危険物等）
-昇給あり（年1回査定）
-
-【入社後の流れ】
-1週目：社内ルール・安全研修・設備説明
-2〜4週目：先輩オペレーターによるOJT
-5週目以降：担当ラインを独立して操作開始`,
     tags: [
       '未経験歓迎',
       '正社員',
