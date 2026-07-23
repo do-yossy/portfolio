@@ -49,9 +49,13 @@ function toSjis(str) {
 }
 
 // ── 職種系 → 雛形ファイル ──
+// 職種専用の雛形(templates/<職種>.json)があれば優先。無い場合、送迎/配送は
+// 既存のロケ同行ドライバー雛形(ref_job.json)へフォールバックする。
 function templatePath(kei) {
+  const specific = path.join(TEMPLATES, `${kei}.json`);
+  if (fs.existsSync(specific)) return specific;
   if (kei === '送迎' || kei === '配送') return REF_DRIVER;
-  return path.join(TEMPLATES, `${kei}.json`);
+  return specific; // 営業/企画で未作成の場合はこのパス（存在せず→自動スキップ）
 }
 const _refCache = {};
 function loadRef(kei) {
