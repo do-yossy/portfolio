@@ -2292,20 +2292,31 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const group = String(query.group || 'A').toUpperCase();
     if (!['A', 'B', 'C', 'D', 'E', 'ALL'].includes(group)) { sendError(res, 400, 'group は A〜E または ALL を指定してください'); return; }
     const cliArgs = group === 'ALL' ? ['--all'] : ['--group', group];
+    if (String(query.mode) === 'update') cliArgs.push('--update'); // 更新モード（求人ID付与・重複なし）
     let stdout;
     try { stdout = await runSeniorjobPlan(cliArgs); }
     catch (e) { sendError(res, 500, '20件プランCSVの生成に失敗しました: ' + (e.message || e)); return; }
     const m = stdout.match(/→\s*(.+\.csv)/);
-    if (!m) { sendError(res, 409, (stdout || '').trim() || '出力できる行がありません（営業・企画は雛形 templates/営業.json・企画.json の作成後に出力されます）'); return; }
+    if (!m) { sendError(res, 409, (stdout || '').trim() || '出力できる行がありません（新規は営業・企画の雛形、更新は plan_ids.json の求人ID登録が必要です）'); return; }
     const file = m[1].trim();
     let buf;
     try { buf = fs.readFileSync(file); } catch { sendError(res, 500, '生成ファイルの読み込みに失敗しました'); return; }
-    await Logs.create('seniorjob_plan_csv', 'success', `シニアジョブ20件プランCSV: ${group} (${path.basename(file)})`);
+    await Logs.create('seniorjob_plan_csv', 'success', `シニアジョブ20件プランCSV: ${group}${query.mode === 'update' ? '(更新)' : ''} (${path.basename(file)})`);
     res.writeHead(200, {
       'Content-Type': 'text/csv; charset=Shift_JIS',
       'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(file))}"`
     });
     res.end(buf);
+    return;
+  }
+
+  // ── API: シニアジョブ 20件プラン 内容サイクルを進める（週次更新で新着に） ──
+  if (pathname === '/api/seniorjob/plan-advance' && method === 'POST') {
+    let stdout;
+    try { stdout = await runSeniorjobPlan(['--advance']); }
+    catch (e) { sendError(res, 500, 'サイクル更新に失敗しました: ' + (e.message || e)); return; }
+    await Logs.create('seniorjob_plan_advance', 'success', (stdout || '').trim());
+    sendJSON(res, 200, { ok: true, message: (stdout || '').trim() });
     return;
   }
 

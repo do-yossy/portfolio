@@ -70,11 +70,12 @@ function loadRef(kei) {
   return ref;
 }
 
-// ── 職種詳細 → 仕事内容テンプレ / 簡易職種名 ──
+// ── 職種詳細 → 仕事内容テンプレ(stem) / 簡易職種名 ──
+// 仕事内容は <stem>.txt を基本に、<stem>-2.txt 等があれば週次サイクル(CYCLE)でローテ（新着更新用）。
 const CONTENT_MAP = {
-  'ルート営業': '営業-ルート.txt', '反響営業': '営業-反響.txt', 'カウンター営業': '営業-カウンター.txt',
-  '企画営業・販促企画': '企画.txt', '提案営業(企画)': '企画.txt', '企画営業': '企画.txt',
-  '送迎ドライバー': '送迎.txt', 'ルート配送': '配送.txt',
+  'ルート営業': '営業-ルート', '反響営業': '営業-反響', 'カウンター営業': '営業-カウンター',
+  '企画営業・販促企画': '企画', '提案営業(企画)': '企画', '企画営業': '企画',
+  '送迎ドライバー': '送迎', 'ルート配送': '配送',
 };
 const KANNI_MAP = {
   'ルート配送': 'ルート配送ドライバー', '企画営業・販促企画': '企画営業', '提案営業(企画)': '提案営業',
@@ -90,9 +91,16 @@ const CATEGORY_MAP = {
   '提案営業(企画)': '提案営業・企画',
   '企画営業': '企画・マーケティング',
 };
-function contentText(detail, area, eki) {
-  const f = CONTENT_MAP[detail];
-  if (!f) return null;
+function contentVariants(stem) {
+  const re = new RegExp('^' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(-\\d+)?\\.txt$');
+  try { return fs.readdirSync(CONTENTS).filter(f => re.test(f)).sort(); } catch { return []; }
+}
+function contentText(detail, area, eki, cycle) {
+  const stem = CONTENT_MAP[detail];
+  if (!stem) return null;
+  const vs = contentVariants(stem);
+  if (!vs.length) return null;
+  const f = vs[(cycle || 0) % vs.length];
   try {
     return fs.readFileSync(path.join(CONTENTS, f), 'utf8')
       .replace(/\r\n/g, '\n').replace(/\s+$/, '')
@@ -103,6 +111,16 @@ function contentText(detail, area, eki) {
 // ── 写真プール（任意） ──
 let PHOTOS = {};
 try { PHOTOS = JSON.parse(fs.readFileSync(PHOTOS_FILE, 'utf8')) || {}; } catch { PHOTOS = {}; }
+
+// ── 更新モード：求人ID（plan_ids.json）＋ 内容ローテのサイクル状態 ──
+const IDS_FILE = path.join(DIR, 'plan_ids.json');
+let PLAN_IDS = {};
+try { PLAN_IDS = JSON.parse(fs.readFileSync(IDS_FILE, 'utf8')) || {}; } catch { PLAN_IDS = {}; }
+const CYCLE_FILE = path.join(OUT_DIR, 'seniorjob_plan_cycle.json');
+function readCycle() { try { return parseInt(JSON.parse(fs.readFileSync(CYCLE_FILE, 'utf8')).cycle, 10) || 0; } catch { return 0; } }
+function writeCycle(n) { fs.mkdirSync(OUT_DIR, { recursive: true }); fs.writeFileSync(CYCLE_FILE, JSON.stringify({ cycle: n })); }
+const UPDATE = has('--update');
+const CYCLE = (val('--cycle', null) != null) ? (parseInt(val('--cycle', '0'), 10) || 0) : readCycle();
 
 // ── plan.csv 読み込み（簡易CSVパーサ：ダブルクオート対応） ──
 function parseCsv(text) {
@@ -145,7 +163,7 @@ function buildRow(ref, p, st, photoIdx) {
   const H = ref.headers; const idx = n => H.indexOf(n);
   const row = ref.ref.slice();
   const set = (name, v) => { const i = idx(name); if (i >= 0) row[i] = v; };
-  set('求人ID', ''); // 空=新規
+  set('求人ID', UPDATE ? String(PLAN_IDS[String(p.no)] || '') : ''); // 更新時は求人IDを付与（空=新規）
   // 勤務地1
   set('(必須)勤務地1分類', '市区町村');
   set('勤務地1郵便番号', st.postal || '');
@@ -158,11 +176,11 @@ function buildRow(ref, p, st, photoIdx) {
   if (p.title) set('(必須)求人タイトル', p.title);
   set('(必須)簡易職種名', kanniName(p.detail));
   if (CATEGORY_MAP[p.detail]) set('(必須)職種', CATEGORY_MAP[p.detail]); // 営業系/企画系を内容に合わせ細分化
-  const body = contentText(p.detail, p.area, ekiName);
+  const body = contentText(p.detail, p.area, ekiName, CYCLE);
   if (body) set('(必須)仕事内容', body);
-  // 写真プール（任意・区ごとにローテ）
+  // 写真プール（任意・区＋サイクルでローテ）
   const pool = PHOTOS[p.kei];
-  if (Array.isArray(pool) && pool.length) set('(必須)写真ID1', String(pool[photoIdx % pool.length]));
+  if (Array.isArray(pool) && pool.length) set('(必須)写真ID1', String(pool[(photoIdx + CYCLE) % pool.length]));
   return { line: row.map(q).join(','), header: H };
 }
 
@@ -176,6 +194,13 @@ function selectRows() {
   return rows;
 }
 
+if (has('--advance')) {
+  const n = readCycle() + 1;
+  writeCycle(n);
+  console.log(`内容ローテのサイクルを ${n} に進めました（次回の更新から新しい仕事内容/写真バージョンになります）`);
+  process.exit(0);
+}
+
 if (has('--status')) {
   const byKei = {};
   for (const r of planRows) (byKei[r.kei] = byKei[r.kei] || []).push(r);
@@ -187,6 +212,9 @@ if (has('--status')) {
   }
   const g = {}; for (const r of planRows) g[r.group] = (g[r.group] || 0) + 1;
   console.log('■ 更新グループ:', Object.keys(g).sort().map(k => `${k}=${g[k]}`).join(' / '));
+  const idN = planRows.filter(r => PLAN_IDS[String(r.no)]).length;
+  console.log('■ 更新モード:', `求人ID登録 ${idN}/${planRows.length}件` + (idN < planRows.length ? '（未登録分は --update で除外＝重複防止）' : ''));
+  console.log('■ 内容サイクル(CYCLE):', CYCLE, '（--advance で+1／週次で進めると新着更新）');
   console.log('■ 写真プール:', Object.keys(PHOTOS).length ? JSON.stringify(PHOTOS) : '未設定(雛形の写真を使用)');
   process.exit(0);
 }
@@ -202,6 +230,7 @@ let made = 0; const skipped = {}; const perKei = {};
 rows.forEach((p, i) => {
   const ref = loadRef(p.kei);
   if (!ref) { skipped[p.kei] = (skipped[p.kei] || 0) + 1; return; }
+  if (UPDATE && !PLAN_IDS[String(p.no)]) { skipped['(ID未登録)'] = (skipped['(ID未登録)'] || 0) + 1; return; } // 重複防止：IDが無い行は更新対象外
   const st = findStation(p.area, used);
   if (!st) { skipped['(駅なし)' + p.area] = 1; return; }
   used.add(st.station);
@@ -220,12 +249,13 @@ if (!made) {
 
 const csv = [headerArr.map(q).join(','), ...outLines].join('\r\n') + '\r\n';
 const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-const gLabel = (val('--group', '') || (val('--jobtype', '') ? val('--jobtype', '') : 'ALL')).toUpperCase();
+const gLabel = ((val('--group', '') || (val('--jobtype', '') || 'ALL')) + (UPDATE ? '-UPD' : '-NEW') + '-c' + CYCLE).toUpperCase();
 let n = 1, file;
 do { file = path.join(OUT_DIR, `seniorjob-plan-sq-${stamp}-${gLabel}-${String(n).padStart(2, '0')}.csv`); n++; } while (fs.existsSync(file));
 fs.writeFileSync(file, toSjis(csv));
 
 console.log(`出力: ${made}件 → ${file}`);
+console.log('  モード:', UPDATE ? '更新（求人ID付与＝既存を上書き・重複なし）' : '新規（求人ID空）', '／内容サイクル:', CYCLE);
 console.log('  職種別:', Object.entries(perKei).map(([k, v]) => `${k}=${v}`).join(' / '));
-if (Object.keys(skipped).length) console.log('  スキップ(雛形未作成など):', JSON.stringify(skipped));
-console.log('  （Shift-JIS形式。シニアジョブの一括登録にそのまま取込できます）');
+if (Object.keys(skipped).length) console.log('  スキップ:', JSON.stringify(skipped));
+console.log('  （Shift-JIS形式。シニアジョブの一括登録／一括編集にそのまま取込できます）');
