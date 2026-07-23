@@ -1,17 +1,17 @@
 'use strict';
-// シニアジョブ 50件プラン展開（営業/企画/送迎/配送 × 大阪30分圏50区市）
+// シニアジョブ 求人プラン展開（営業/企画/送迎/配送 × 大阪）
 //
 // 職種ごとに「実在の掲載済み求人」を雛形(153列)として複製し、
-// 大阪50区市へ 勤務地・求人タイトル・簡易職種名・仕事内容・写真 を差別化して展開する。
+// 大阪の各区市へ 勤務地・求人タイトル・簡易職種名・仕事内容・写真 を差別化して展開する。
 //   - 送迎/配送 : 既存の ref_job.json（ロケ同行ドライバー）を雛形に流用
 //   - 営業/企画 : seniorjob/templates/営業.json ・ 企画.json（後から作成／無ければ自動スキップ）
 //
-// 掲載順位(新着順)維持のため、平日1日10件・週1巡で更新する運用を想定。
-// plan.csv の「更新グループ」A(月)〜E(金) が各10件。--group A で当日分だけ出力する。
+// 掲載順位(新着順)維持のため、平日に分けて週1巡で更新する運用を想定。
+// plan.csv の「更新グループ」A(月)〜E(金)。--group A で当日分だけ出力する。
 //
 // 使い方:
-//   node scripts/seniorjob_plan_export.js --group A     # 月曜分(10件)をCSV出力
-//   node scripts/seniorjob_plan_export.js --all         # 50件まとめて出力
+//   node scripts/seniorjob_plan_export.js --group A     # 当日分(グループA)をCSV出力
+//   node scripts/seniorjob_plan_export.js --all         # 全件まとめて出力
 //   node scripts/seniorjob_plan_export.js --jobtype 送迎 # 職種を絞って出力
 //   node scripts/seniorjob_plan_export.js --status      # 割付・雛形の有無を表示
 //
