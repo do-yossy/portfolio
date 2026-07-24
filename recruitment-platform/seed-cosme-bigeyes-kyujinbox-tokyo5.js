@@ -7,6 +7,7 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const crypto = require('crypto');
+const vary = require('./scripts/lib/kyujinbox-vary-bgst');
 
 const DB_PATH = process.env.DATA_DIR
   ? path.join(process.env.DATA_DIR, 'recruitment.db')
@@ -122,9 +123,10 @@ let created = 0;
 for (let i = 0; i < AREAS.length; i++) {
   const j = AREAS[i];
   const areaLabel = `${j.city}・${j.district}`;
+  const _v = vary.build('bg_cosme', areaLabel);
   const id = crypto.randomBytes(10).toString('hex');
-  const title = `【${areaLabel}】${TITLE_TAIL}`;
-  const catchcopy = `未経験から始める、キレイをつくるお仕事♪化粧品や美容関連商品の製造・検品・梱包。月給25万円以上・土日休み・年間休日123日・空調完備の快適な職場環境で正社員として安定して働けます。`;
+  const title = _v.title;
+  const catchcopy = _v.catchcopy;
 
   const tags = JSON.stringify([
     '未経験OK', '正社員', '土日休み', '年間休日123日',
@@ -134,7 +136,7 @@ for (let i = 0; i < AREAS.length; i++) {
 
   stmt.run(
     id, title, `${j.pref}${j.city}${j.district}`, SALARY_DETAIL, JOB_TYPE, '正社員',
-    DESCRIPTION, tags, catchcopy, IMAGE_URL,
+    _v.description, tags, catchcopy, IMAGE_URL,
     JSON.stringify(['求人ボックス']),
     now, expires, now, now, COMPANY,
     REWARDING, WORKTIME, TRANSPORTATION, HOW_TO_APPLY, QUALIFICATIONS, BENEFIT,
