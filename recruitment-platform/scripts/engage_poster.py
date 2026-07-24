@@ -50,6 +50,9 @@ JOB_NEW_URL = os.environ.get("ENGAGE_JOB_NEW_URL", "").strip() or (
     "https://en-gage.net/company/job/regist/form/")
 HEADLESS = os.environ.get("ENGAGE_HEADLESS", "").strip() in ("1", "true", "yes")
 PUBLISH = os.environ.get("ENGAGE_PUBLISH", "").strip() in ("1", "true", "yes")
+# CDP接続先（例: http://localhost:9222）。指定すると、あなたが起動した“普通のChrome”に
+# 接続して操作する。engageは自動起動ブラウザのログインを弾くため、こちらを推奨。
+CDP_URL = os.environ.get("ENGAGE_CDP_URL", "").strip()
 
 PREF_MAP = {
     "北海道": "11", "青森県": "12", "岩手県": "13", "宮城県": "14", "秋田県": "15",
@@ -286,21 +289,34 @@ def main():
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
     with sync_playwright() as p:
-        launch_kwargs = dict(
-            user_data_dir=PROFILE_DIR,
-            headless=HEADLESS,
-            locale="ja-JP",
-            timezone_id="Asia/Tokyo",
-            viewport={"width": 1440, "height": 900},
-        )
-        # 実Chromeを優先（bot検知回避）。無ければ同梱Chromiumにフォールバック。
-        try:
-            ctx = p.chromium.launch_persistent_context(channel="chrome", **launch_kwargs)
-        except Exception:
-            log("実Chromeが見つからないため同梱Chromiumで起動します（bot検知で弾かれる場合あり）", "warn")
-            ctx = p.chromium.launch_persistent_context(**launch_kwargs)
-
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        using_cdp = bool(CDP_URL)
+        browser = None
+        if using_cdp:
+            # あなたが起動した“普通のChrome”に接続（bot検知回避）。
+            log(f"起動済みChromeに接続します: {CDP_URL}", "info")
+            try:
+                browser = p.chromium.connect_over_cdp(CDP_URL)
+            except Exception as e:
+                log(f"Chromeへの接続に失敗しました（{e}）。"
+                    "Chromeを --remote-debugging-port=9222 付きで起動しているか確認してください。", "error")
+                sys.exit(1)
+            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        else:
+            launch_kwargs = dict(
+                user_data_dir=PROFILE_DIR,
+                headless=HEADLESS,
+                locale="ja-JP",
+                timezone_id="Asia/Tokyo",
+                viewport={"width": 1440, "height": 900},
+            )
+            # 実Chromeを優先（bot検知回避）。無ければ同梱Chromiumにフォールバック。
+            try:
+                ctx = p.chromium.launch_persistent_context(channel="chrome", **launch_kwargs)
+            except Exception:
+                log("実Chromeが見つからないため同梱Chromiumで起動します（bot検知で弾かれる場合あり）", "warn")
+                ctx = p.chromium.launch_persistent_context(**launch_kwargs)
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         log(f"求人作成フォームを開きます: {JOB_NEW_URL}", "info")
         try:
@@ -310,14 +326,27 @@ def main():
             pass
         time.sleep(2)
 
+        def _cleanup():
+            try:
+                if using_cdp and browser is not None:
+                    browser.close()   # CDP接続を切断（起動済みChromeは閉じない）
+                else:
+                    ctx.close()
+            except Exception:
+                pass
+
         if not is_logged_in(page):
-            if HEADLESS:
+            if HEADLESS and not using_cdp:
                 log("未ログインです。ヘッドレスでは手動ログインできません。"
                     "一度 ENGAGE_HEADLESS=0 で起動し、engageにログインしてください。", "error")
-                ctx.close()
+                _cleanup()
                 sys.exit(1)
-            log("engageにログインしてください（このブラウザで手動ログイン）。"
-                "ログイン後、自動的に続行します…", "warn")
+            if using_cdp:
+                log("engageに未ログインです。接続中のChromeで engage にログインしてください"
+                    "（普通のChromeなのでログインできます）。ログイン後、自動的に続行します…", "warn")
+            else:
+                log("engageにログインしてください（このブラウザで手動ログイン）。"
+                    "ログイン後、自動的に続行します…", "warn")
             # ログイン完了をポーリング（最大5分）
             for _ in range(150):
                 time.sleep(2)
@@ -332,7 +361,7 @@ def main():
                         pass
             if not is_logged_in(page):
                 log("ログインが確認できませんでした。中断します。", "error")
-                ctx.close()
+                _cleanup()
                 sys.exit(1)
         log("✅ ログイン確認。投稿を開始します。", "success")
 
@@ -367,7 +396,7 @@ def main():
                 log(f"  ❌ 失敗: {title[:40]} — {e}", "error")
 
         log(f"完了: {done}/{len(jobs)} 件を下書き保存しました。engage上で内容を確認して公開してください。", "success")
-        ctx.close()
+        _cleanup()
 
 
 if __name__ == "__main__":

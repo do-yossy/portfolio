@@ -2684,7 +2684,8 @@ function callImportModalHtml(co, media) {
 }
 
 // 運用テンプレ用のヘルパ定数
-const COMPANIES_ORDER = ['sq', 'bg', 'pe', 'lt', 'nc', 'nx', 'st'];
+// 会社の並び順は COMPANIES の定義順から自動生成（会社追加時に追従漏れを防ぐ）
+const COMPANIES_ORDER = Object.keys(COMPANIES);
 const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
 function mediaName(id) { if (id === 'all') return 'すべての媒体'; const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
