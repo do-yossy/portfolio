@@ -2450,6 +2450,11 @@ function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
           <button class="btn btn-ghost btn-sm" onclick="resetKyujinboxPosted('${co}')" title="投稿済みフラグをリセット">♻️ フラグリセット</button>
           <button id="btn-publish-kyujinbox-drafts" class="btn btn-ghost btn-sm" onclick="startPublishKyujinboxDrafts()" title="求人ボックス側に残っている下書きを巡回して公開（写真も後付け）">📤 下書きを公開＋写真添付</button>
         </div>
+        <div style="margin-top:8px;padding:8px 12px;background:#fffbea;border:1px solid #f6c445;border-radius:6px;font-size:13px;color:#7a5b00;line-height:1.6">
+          📅 <b>掲載ルール：各アカウントで「月・水・金」に25件ずつ掲載</b>（毎日ではなく週3回）。<br>
+          1回あたりの新規掲載は25件まで。「短期的に投稿を繰り返す掲載主」と判定されないよう、毎日の連投は避けます。<br>
+          掲載する25件は<b>内容が重複しない求人</b>を選んでください（重複＝「既に投稿された求人と実質的に同じ」はランキング低下・露出制限の原因になります）。
+        </div>
         <div class="text-sm text-muted" style="margin-top:4px">1度投稿した求人は次回スキップ（スキップしたくない場合は強制再投稿 or フラグリセット）。<br>「下書きを公開＋写真添付」は、求人ボックスに下書きのまま残った求人を巡回して公開し、写真も後付けします。</div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0">
           <div class="media-op-label">🤖 AIによる求人改善 <span class="text-muted text-sm">（成績を分析しタイトル・訴求を自動改善／ANTHROPIC_API_KEY必須）</span></div>
