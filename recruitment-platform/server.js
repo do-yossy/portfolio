@@ -603,25 +603,32 @@ function kyujinboxConfiguredCompanies() {
 }
 
 // 会社ごとの engage（エンゲージ）認証情報を解決する。
-// ENGAGE_EMAIL_<CO>（例: ENGAGE_EMAIL_NL）を優先し、無ければ無印(ENGAGE_EMAIL)にフォールバック。
-// ※ engage自動投稿本体(engage_poster.py)は、engageのフォーム構造ダンプ後に実装予定。
-//    現状は認証情報の会社別登録と、engage_form_dump.py への受け渡しに使用する。
+// ENGAGE_PK_<CO>（例: ENGAGE_PK_NL）を優先し、無ければ無印にフォールバック。
+// engageはbot検知があるため自動投稿(engage_poster.py)は実Chromeプロファイルを使う。
+// 会社別に別プロファイル(engage-profile-<co>)を割り当て、一度手動ログインした
+// セッションを再利用する。ENGAGE_PK（フォームURLの企業PK）は投稿に必須。
 function engageEnvForCompany(id) {
   const co = String(id || 'sq').toUpperCase();
+  const coLower = String(id || 'sq').toLowerCase();
   const pick = base => (process.env[`${base}_${co}`] || '').trim() || (process.env[base] || '').trim();
   const email      = pick('ENGAGE_EMAIL');
   const password   = pick('ENGAGE_PASSWORD');
+  const pk         = pick('ENGAGE_PK');
   const loginUrl   = pick('ENGAGE_LOGIN_URL');
   const jobNewUrl  = pick('ENGAGE_JOB_NEW_URL');
-  const env = { COMPANY_NAME: companyFullName(id), ENGAGE_CO: co };
+  const profileDir = pick('ENGAGE_PROFILE_DIR')
+    || path.join(__dirname, `engage-profile-${coLower}`);
+  const env = { COMPANY_NAME: companyFullName(id), ENGAGE_CO: co, ENGAGE_PROFILE_DIR: profileDir };
   if (email)     env.ENGAGE_EMAIL = email;
   if (password)  env.ENGAGE_PASSWORD = password;
+  if (pk)        env.ENGAGE_PK = pk;
   if (loginUrl)  env.ENGAGE_LOGIN_URL = loginUrl;
   if (jobNewUrl) env.ENGAGE_JOB_NEW_URL = jobNewUrl;
-  return { env, hasCreds: !!(email && password) };
+  // 投稿に必要なのは PK（フォームURL）。メール/パスワードは記録用・任意。
+  return { env, hasCreds: !!(pk || jobNewUrl) };
 }
 
-// engage認証情報が設定済みの会社ID一覧
+// engage投稿設定(PK)が済んでいる会社ID一覧
 function engageConfiguredCompanies() {
   return OPS_COMPANIES.map(c => c.id).filter(id => engageEnvForCompany(id).hasCreds);
 }
