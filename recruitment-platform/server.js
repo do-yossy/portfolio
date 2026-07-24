@@ -602,6 +602,30 @@ function kyujinboxConfiguredCompanies() {
   return OPS_COMPANIES.map(c => c.id).filter(id => kyujinboxEnvForCompany(id).hasCreds);
 }
 
+// 会社ごとの engage（エンゲージ）認証情報を解決する。
+// ENGAGE_EMAIL_<CO>（例: ENGAGE_EMAIL_NL）を優先し、無ければ無印(ENGAGE_EMAIL)にフォールバック。
+// ※ engage自動投稿本体(engage_poster.py)は、engageのフォーム構造ダンプ後に実装予定。
+//    現状は認証情報の会社別登録と、engage_form_dump.py への受け渡しに使用する。
+function engageEnvForCompany(id) {
+  const co = String(id || 'sq').toUpperCase();
+  const pick = base => (process.env[`${base}_${co}`] || '').trim() || (process.env[base] || '').trim();
+  const email      = pick('ENGAGE_EMAIL');
+  const password   = pick('ENGAGE_PASSWORD');
+  const loginUrl   = pick('ENGAGE_LOGIN_URL');
+  const jobNewUrl  = pick('ENGAGE_JOB_NEW_URL');
+  const env = { COMPANY_NAME: companyFullName(id), ENGAGE_CO: co };
+  if (email)     env.ENGAGE_EMAIL = email;
+  if (password)  env.ENGAGE_PASSWORD = password;
+  if (loginUrl)  env.ENGAGE_LOGIN_URL = loginUrl;
+  if (jobNewUrl) env.ENGAGE_JOB_NEW_URL = jobNewUrl;
+  return { env, hasCreds: !!(email && password) };
+}
+
+// engage認証情報が設定済みの会社ID一覧
+function engageConfiguredCompanies() {
+  return OPS_COMPANIES.map(c => c.id).filter(id => engageEnvForCompany(id).hasCreds);
+}
+
 // 新規応募者タブ統計
 async function opsNewStats({ applyOverride = false } = {}) {
   const { db, jstDayStartUtcISO, jstWeekStartUtcISO } = require('./db');
