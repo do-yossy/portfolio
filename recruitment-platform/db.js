@@ -665,6 +665,8 @@ const COMPANIES = [
   { id: 'nc', name: '合同会社ニクール',        short: 'NC', label: 'ニクール' },
   { id: 'nx', name: 'ネクサス株式会社',        short: 'NX', label: 'ネクサス' },
   { id: 'st', name: '有限会社Style501',        short: 'ST', label: 'Style501' },
+  { id: 'bi', name: 'Brand ideaL合同会社',     short: 'BI', label: 'Brand ideaL' },
+  { id: 'nl', name: '株式会社NOWLIVE',         short: 'NL', label: 'NOWLIVE' },
 ];
 const MEDIA = [
   { id: 'indeed',   name: 'Indeed' },
