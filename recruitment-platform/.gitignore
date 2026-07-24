@@ -13,3 +13,8 @@ scripts/out/
 google-key.json
 *service-account*.json
 *.iam.gserviceaccount.com.json
+
+# engage 自動投稿用 Chromeプロファイル（セッション・cookie。コミットしない）
+engage-profile-*/
+engage-profile/
+logs/
