@@ -36,7 +36,7 @@ const TARGET_MEDIA = ['kyujinbox'];
 const JOB_TYPE     = '送迎・配送ドライバー';
 const EMP_TYPE     = '正社員';
 const SALARY       = '月給360,000円〜460,000円（経験・能力を考慮）';
-const IMAGE_URL    = '/images/ec-haisou-driver.jpg';
+const IMAGE_URL    = '/images/nl-movingsales.jpg';
 
 // 大阪の掲載エリア（都心＋近郊 10か所）
 const AREAS = [
@@ -135,21 +135,24 @@ const JOBS = AREAS.map(a => ({
 }));
 
 async function main() {
-  console.log(`\n🚚 NOWLIVE 移動販売車の送迎ドライバー求人（求人ボックス）${JOBS.length}件 を登録します...\n`);
+  console.log(`\n🚚 NOWLIVE 移動販売車の送迎ドライバー求人（求人ボックス）${JOBS.length}件 を登録/更新します...\n`);
   const existing = await Jobs.findAll();
-  const existingTitles = new Set(existing.map(j => j.title));
-  let added = 0, skipped = 0;
+  const byTitle = new Map(existing.filter(j => j.company === COMPANY).map(j => [j.title, j]));
+  let added = 0, updated = 0;
   for (const job of JOBS) {
-    if (existingTitles.has(job.title)) {
-      console.log(`  ⏭️  スキップ（既存）: ${job.title}`);
-      skipped++;
-      continue;
+    const ex = byTitle.get(job.title);
+    if (ex) {
+      // 既存は画像・内容を更新（再実行で新しい画像を反映）
+      await Jobs.update(ex.id, job);
+      console.log(`  ♻️  更新（画像・内容）: ${job.title}`);
+      updated++;
+    } else {
+      await Jobs.create(job);
+      console.log(`  ✅ 登録完了: ${job.title}`);
+      added++;
     }
-    await Jobs.create(job);
-    console.log(`  ✅ 登録完了: ${job.title}`);
-    added++;
   }
-  console.log(`\n📊 結果: 登録 ${added}件 / スキップ ${skipped}件 / 合計 ${JOBS.length}件`);
+  console.log(`\n📊 結果: 新規 ${added}件 / 更新 ${updated}件 / 合計 ${JOBS.length}件`);
   console.log('→ 掲載管理の NOWLIVE タブ →「🚀 求人ボックスに投稿する」で投稿できます。\n');
 }
 
