@@ -59,6 +59,9 @@ PASSWORD = _pick("ENGAGE_PASSWORD")
 LOGIN_URL = _pick("ENGAGE_LOGIN_URL") or "https://en-gage.net/company_login/login/"
 # 求人作成フォームURL（判明していれば直接遷移。未設定なら手動で進む）
 JOB_NEW_URL = _pick("ENGAGE_JOB_NEW_URL")
+# 自動ログインは既定でOFF（推奨: ブラウザで普段どおり手動ログイン）。
+# 自動入力を試したい場合のみ .env に ENGAGE_AUTO_LOGIN=1 を設定。
+AUTO_LOGIN = _pick("ENGAGE_AUTO_LOGIN").lower() in ("1", "true", "yes")
 
 # フォーム構造を抽出するJS（求人ボックスのダンプと同じロジック）
 DUMP_JS = r"""() => {
@@ -157,6 +160,10 @@ def try_login(page):
         print(f"（ログインページ遷移で例外: {e}）")
     time.sleep(2)
 
+    if not AUTO_LOGIN:
+        print("ℹ️ 手動ログインモードです。表示されたブラウザで、いつもの手順でengageにログインしてください。")
+        print("   （自動入力を試したい場合のみ .env に ENGAGE_AUTO_LOGIN=1 を設定）")
+        return
     if not EMAIL or not PASSWORD:
         print("ℹ️ ENGAGE_EMAIL / ENGAGE_PASSWORD 未設定。ブラウザで手動ログインしてください。")
         return
