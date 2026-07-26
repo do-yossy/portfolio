@@ -215,7 +215,6 @@ def check_radio(page, name, value):
 def fill_job(page, job):
     """1件分をフォームに入力（下書き相当）。"""
     title = jget(job, "catchcopy", "title")
-    occ = jget(job, "jobType", "job_type", default=jget(job, "title"))
     desc = jget(job, "description")
     salary = jget(job, "salary")
     worktime = jget(job, "worktime_holiday", "worktimeHoliday", "office_hours")
