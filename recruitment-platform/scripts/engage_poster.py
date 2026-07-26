@@ -145,6 +145,25 @@ def holiday_type_from_text(text):
     return ""
 
 
+# 職種欄は「求人検索エンジン連携用」で、記号・スペース・アピール文言・勤務地を含めると
+# 連携されない。括弧内(勤務地/補足)や ｜以降(訴求)を落とし、記号・空白を除去して整形する。
+_OCC_STRIP_CHARS = "・･｜|/／\\　 \t★☆♪◆◇■□●○◎＊*！!？?＜＞<>「」『』、。，．,.：:；;〜～#＃@＠&＆＋+＝=％%…‥"
+
+
+def clean_occupation(text, limit=50):
+    import re
+    s = text or ""
+    # ｜ | / ／ 以降（キャッチ・給与などの訴求）は職種名に含めない
+    s = re.split(r"[｜|/／\\]", s)[0]
+    # 【…】〔…〕［…］（…）(…) 等の括弧とその中身（勤務地・補足）を除去
+    s = re.sub(r"[【〔［\[（(][^】〕］\])）]*[】〕］\])）]", "", s)
+    # 残った記号・空白を除去（長音符ーや日本語・英数字は残す）
+    for ch in _OCC_STRIP_CHARS:
+        s = s.replace(ch, "")
+    s = s.strip()
+    return s[:limit]
+
+
 # ---- Playwright ページ操作ヘルパー ----
 def fill_name(page, name, value):
     if value is None or value == "":
@@ -208,9 +227,14 @@ def fill_job(page, job):
 
     # 雇用形態: 中途採用（正社員）
     check_radio(page, "employment_status", "1")
-    # 職種名・タイトル・仕事内容
-    fill_name(page, "official_occupation_name", occ)
-    fill_name(page, "occupation_name", title)
+    # 職種名・表示用職種名・仕事内容
+    #   職種欄は検索エンジン連携用のため、記号・スペース・アピール文言・勤務地を除去する。
+    #   表示用職種名は50文字以内。どちらの制約でも通るよう両方を整形して入れる。
+    occ_core = jget(job, "jobType", "job_type")
+    official = clean_occupation(occ_core or title, limit=50)
+    display = clean_occupation(title or occ_core, limit=50) or official
+    fill_name(page, "official_occupation_name", official)  # 職種（記号・スペースNG）
+    fill_name(page, "occupation_name", display)            # 表示用職種名（50文字以内）
     fill_name(page, "work_contents", desc)
 
     # 勤務地
@@ -273,6 +297,83 @@ def save_draft(page):
     return False
 
 
+def open_new_form(page, tries=3):
+    """求人作成フォームを開く。engageはnetworkidleに到達しないため domcontentloaded＋
+    フォーム項目(職種名/雇用形態)の出現で待機する。ERR_ABORTED等の一時失敗は数回リトライ。"""
+    for attempt in range(tries):
+        try:
+            page.goto(JOB_NEW_URL, timeout=40000, wait_until="domcontentloaded")
+        except Exception as e:
+            if attempt >= tries - 1:
+                log(f"  （フォームを開けませんでした: {str(e)[:80]}）", "warn")
+                return False
+            time.sleep(2.0)
+            continue
+        try:
+            page.wait_for_selector(
+                'input[name="official_occupation_name"], input[name="employment_status"]',
+                timeout=15000, state="attached")
+            time.sleep(0.8)
+            return True
+        except Exception:
+            if attempt >= tries - 1:
+                time.sleep(1.0)
+                return True  # フィールド確認できなくても入力を試みる
+            time.sleep(1.5)
+    return False
+
+
+def _agree_guideline(page):
+    """「掲載ガイドラインに同意する」等の必須チェックを入れる（内容確認ボタン有効化に必要）。"""
+    for sel in ['input[name="submitCheck"]',
+                'input[type="checkbox"][name*="agree"]',
+                'input[type="checkbox"][name*="guideline"]']:
+        try:
+            cb = page.locator(sel).first
+            if cb.count() > 0 and not cb.is_checked():
+                cb.check(force=True, timeout=3000)
+                return True
+        except Exception:
+            continue
+    try:
+        lab = page.locator('label:has-text("掲載ガイドライン"), label:has-text("同意")').first
+        if lab.count() > 0:
+            lab.click(timeout=3000)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _shot(page, name):
+    try:
+        os.makedirs("logs", exist_ok=True)
+        page.screenshot(path=f"logs/engage_{name}.png", full_page=False)
+    except Exception:
+        pass
+
+
+def _log_visible_buttons(page, tag=""):
+    """表示中のボタン/リンク文言を列挙してログ出力（掲載フローの実ボタン名を把握するため）。"""
+    try:
+        texts, loc = [], page.locator('button, a[role="button"], input[type="submit"], input[type="button"]')
+        n = min(loc.count(), 40)
+        for i in range(n):
+            el = loc.nth(i)
+            try:
+                if not el.is_visible():
+                    continue
+                t = (el.inner_text(timeout=400) or el.get_attribute("value") or "").strip().replace("\n", " ")
+            except Exception:
+                t = ""
+            if t and t not in texts:
+                texts.append(t[:24])
+        if texts:
+            log(f"  （{tag}の表示ボタン: {' / '.join(texts[:15])}）", "info")
+    except Exception:
+        pass
+
+
 def _click_by_labels(page, labels):
     """候補ラベルの中から表示中のボタン/リンクを1つクリックして、当たったラベルを返す。"""
     for lb in labels:
@@ -289,57 +390,61 @@ def _click_by_labels(page, labels):
     return None
 
 
-def publish(page):
-    """求人を「掲載（公開）」まで進める（engageの2段階フロー）。
-      ① フォーム下部「求人プレビューへ進む」→ プレビュー画面
-      ② プレビュー画面「編集を完了する」→ 掲載（公開）完了
+def publish(page, idx=0):
+    """求人を「掲載（公開）」まで進める（engageの多段フロー）。
+      ① フォーム：掲載ガイドライン同意 →「内容を確認する」→ プレビュー画面
+      ② プレビュー：「編集を完了する」→ 掲載方法の選択
+      ③ 掲載方法の選択：有料は使わず「今は利用しない」等で無料掲載を確定
+    各段でスクショと表示ボタン一覧を残し、想定外のボタン名でも原因を追える。
     """
-    # 掲載ガイドライン同意（通常は既定でON）
+    _agree_guideline(page)
+
+    # ① フォーム → 確認/プレビュー（実フォームのボタンは「内容を確認する」）
+    STEP1 = ['内容を確認する', '入力内容を確認する', '入力内容を確認', '確認画面へ進む',
+             '確認画面に進む', '確認する', '求人プレビューへ進む', 'プレビューへ進む']
+    step1 = _click_by_labels(page, STEP1)
+    if not step1:
+        log("  （フォームの『内容を確認する』ボタンが見つかりませんでした）", "warn")
+        _log_visible_buttons(page, "フォーム")
+        return None
+    time.sleep(2.5)
     try:
-        cb = page.locator('input[name="submitCheck"]').first
-        if cb.count() > 0 and not cb.is_checked():
-            cb.check(force=True, timeout=3000)
+        page.wait_for_load_state("domcontentloaded", timeout=10000)
     except Exception:
         pass
+    _shot(page, f"preview_{idx}")
+    _log_visible_buttons(page, "確認/プレビュー画面")
 
-    PREVIEW  = ['求人プレビューへ進む', 'プレビューへ進む', 'プレビューを確認する',
-                'プレビューを確認', 'プレビュー']
-    COMPLETE = ['編集を完了する', '掲載を完了する', 'この内容で掲載する', '掲載する', '公開する']
-    CONFIRM  = ['はい', 'OK', '編集を完了する', '掲載する', 'この内容で掲載する']
+    # ② プレビュー → 掲載方法の選択（「編集を完了する」）
+    STEP2 = ['編集を完了する', '掲載を完了する', 'この内容で掲載する', 'この内容で公開する',
+             '入力を完了する', '完了する']
+    step2 = _click_by_labels(page, STEP2)
+    if not step2:
+        log("  （確認画面の『編集を完了する』ボタンが見つかりませんでした）", "warn")
+        _log_visible_buttons(page, "確認/プレビュー画面")
+        return None
+    time.sleep(2)
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=10000)
+    except Exception:
+        pass
+    # 確認ダイアログ（はい/OK のみ）。有料誘導ボタンを踏まないよう候補は最小限にする。
+    _click_by_labels(page, ['はい', 'OK'])
+    time.sleep(1.5)
+    _shot(page, f"method_{idx}")
+    _log_visible_buttons(page, "掲載方法の選択")
 
-    # ① フォーム → プレビュー
-    step1 = _click_by_labels(page, PREVIEW)
-    if step1:
-        time.sleep(2.5)
-        try:
-            page.wait_for_load_state("networkidle", timeout=10000)
-        except Exception:
-            pass
-    else:
-        log("  （『求人プレビューへ進む』が見つかりませんでした。ボタン名をご確認ください）", "warn")
-
-    # ② プレビュー → 編集を完了する（＝掲載完了）
-    step2 = _click_by_labels(page, COMPLETE)
-    if step2:
-        time.sleep(2)
-        try:
-            page.wait_for_load_state("networkidle", timeout=10000)
-        except Exception:
-            pass
-        # 確認ダイアログが出る場合に備えて
-        _click_by_labels(page, CONFIRM)
-        # ③ 完了後：エンゲージプレミアム（有料オプション）の案内は「今は利用しない」で閉じる。
-        #    ※「追加する」「詳しく見る」など有料側は絶対に押さない。
-        time.sleep(1.5)
-        try:
-            page.wait_for_load_state("networkidle", timeout=8000)
-        except Exception:
-            pass
-        skipped = _click_by_labels(page, ['今は利用しない', '利用しない', 'あとで利用する', 'あとで', 'スキップ', '閉じる'])
-        if skipped:
-            log("  （エンゲージプレミアムの案内は「今は利用しない」で閉じました）", "info")
-        return step2
-    return None
+    # ③ 掲載方法の選択：有料オプション（エンゲージプレミアム）は絶対に押さず、
+    #    無料掲載を確定する。「今は利用しない」＝無料掲載の確定。
+    #    ※「追加する」「申し込む」「詳しく見る」「掲載する」等は有料の可能性があるため候補に入れない。
+    FREE = ['今は利用しない', '無料で掲載する', '無料のまま掲載する', '無料掲載', 'あとで利用する',
+            'あとで', 'スキップ']
+    step3 = _click_by_labels(page, FREE)
+    if step3:
+        log(f"  （掲載方法の選択で「{step3}」を選択＝無料掲載を確定）", "info")
+    time.sleep(1.5)
+    _shot(page, f"done_{idx}")
+    return step2
 
 
 def is_logged_in(page):
@@ -447,12 +552,8 @@ def main():
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         log(f"求人作成フォームを開きます: {JOB_NEW_URL}", "info")
-        try:
-            page.goto(JOB_NEW_URL, timeout=40000)
-            page.wait_for_load_state("networkidle", timeout=20000)
-        except Exception:
-            pass
-        time.sleep(2)
+        open_new_form(page)
+        time.sleep(1.5)
 
         def _cleanup():
             try:
@@ -475,12 +576,8 @@ def main():
                 input("\n>> ログインが済んだら Enter を押す ... ")
             except EOFError:
                 pass
-            try:
-                page.goto(JOB_NEW_URL, timeout=40000)
-                page.wait_for_load_state("networkidle", timeout=20000)
-            except Exception:
-                pass
-            time.sleep(1.5)
+            open_new_form(page)
+            time.sleep(1.0)
             if not is_logged_in(page):
                 log("求人作成フォームを開けませんでした（未ログインの可能性）。"
                     "engageにログインできているか確認して、もう一度実行してください。", "error")
@@ -522,13 +619,9 @@ def main():
                     sys.exit(1)
             # ログイン済みタブを作業用ページとして採用し、フォームを確実に開く
             page = logged_page
-            try:
-                if "company/job/regist/form" not in page.url.lower():
-                    page.goto(JOB_NEW_URL, timeout=40000)
-                    page.wait_for_load_state("networkidle", timeout=20000)
-                    time.sleep(1.5)
-            except Exception:
-                pass
+            if "company/job/regist/form" not in page.url.lower():
+                open_new_form(page)
+                time.sleep(1.0)
         log("✅ ログイン確認。自動入力を開始します。", "success")
 
         done = 0
@@ -537,9 +630,9 @@ def main():
             title = jget(job, "title", "catchcopy", default=f"job#{i+1}")
             try:
                 if i > 0:
-                    page.goto(JOB_NEW_URL, timeout=40000)
-                    page.wait_for_load_state("networkidle", timeout=20000)
-                    time.sleep(1.5)
+                    if not open_new_form(page):
+                        raise Exception("求人作成フォームを開けませんでした（再試行後も失敗）")
+                    time.sleep(1.0)
                 log(f"📝 [{i+1}/{len(jobs)}] 入力中: {title[:40]}", "info")
                 fill_job(page, job)
                 time.sleep(0.5)
@@ -559,7 +652,7 @@ def main():
                         log(f"  ⚠️ 「入力内容を保存」ボタンが見つかりませんでした: {title[:40]}", "warn")
                 else:
                     # 掲載（公開）まで実行
-                    r = publish(page)
+                    r = publish(page, i + 1)
                     time.sleep(2)
                     try:
                         page.screenshot(path=f"logs/engage_published_{i+1}.png", full_page=False)
