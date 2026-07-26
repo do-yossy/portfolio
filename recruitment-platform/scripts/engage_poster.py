@@ -149,7 +149,9 @@ def holiday_type_from_text(text):
 # 職種欄は「求人検索エンジン連携用」で、記号・スペース・アピール文言・勤務地を含めると
 # 連携されない。括弧内(勤務地/補足)や ｜以降(訴求)を落とし、許可文字以外(記号/空白/ダッシュ/
 # NBSP/※/矢印等すべて)を除去する。許可＝ひらがな・カタカナ(長音符ー含む)・漢字・英数字のみ。
-_OCC_ALLOWED = re.compile(r"[^0-9A-Za-z぀-ゟ゠-ヿ㐀-鿿豈-﫿]")
+_OCC_ALLOWED = re.compile(
+    "[^0-9A-Za-z\u3005-\u3007\u3040-\u309F\u30A0-\u30FF"
+    "\u3400-\u9FFF\uF900-\uFAFF\U00020000-\U0002FA1F]")
 
 
 def clean_occupation(text, limit=50):
@@ -377,8 +379,20 @@ _CONTENT_OPTION_KW = re.compile(
 )
 
 
+# 掲載前の「確認・同意」チェックだと積極的に判定するための語（＝これを含む場合のみON）。
+# 待遇/感染症対策/職業紹介該当/正社員登用 等の内容系オプションはこれらを含まないため、
+# 「確認語を含む」ことを必須にすれば内容系を誤ってONにしない。
+_CONFIRM_KW = re.compile(
+    "虚偽|誇大|事実と相違|相違ありません|偽り|事実です|同意し|同意する|同意の上|承諾|"
+    "遵守|順守|法令|関係法令|ガイドライン|規約|反社|暴力団|反社会的|ありません|いたしません|"
+    "確認しました|確認いたし|理解しました|承知しました|間違いありません|差別的|禁止事項|"
+    "掲載基準|掲載ルール|正確|責任を負い"
+)
+
+
 def _collect_checkboxes(page):
-    """ページ内の全checkboxを {i,label,checked,disabled} でJS一括取得する（高速・確実）。"""
+    """ページ内の全checkboxを {i,label,context,checked,disabled} でJS一括取得する。
+    label=直接のラベル、context=近傍行のinnerText（確認文を拾うため）。切り詰めはしない。"""
     try:
         return page.evaluate(
             """
@@ -395,8 +409,12 @@ def _collect_checkboxes(page):
                 } catch (e) {}
                 if (!label) { const anc = cb.closest('label'); if (anc) label = anc.innerText; }
                 if (!label) label = cb.getAttribute('aria-label') || '';
-                if (!label) { const row = cb.closest('tr,li,dd,dt,p,div'); if (row) label = row.innerText || ''; }
-                return { i: i, label: (label || '').replace(/\\s+/g, ' ').trim().slice(0, 40),
+                let ctx = '';
+                const row = cb.closest('tr,li,dd,dt,p,div,section,fieldset');
+                if (row) ctx = row.innerText || '';
+                return { i: i,
+                         label: (label || '').replace(/\\s+/g, ' ').trim().slice(0, 80),
+                         context: (ctx || '').replace(/\\s+/g, ' ').trim().slice(0, 180),
                          checked: !!cb.checked, disabled: !!cb.disabled };
               });
             }
@@ -408,31 +426,31 @@ def _collect_checkboxes(page):
 
 def _check_confirmation_boxes(page):
     """送信前の確認チェック（engageでは最大7項目程度の『はい』）を安全にまとめてON。
-    安全設計: 内容系オプション（待遇/感染症対策/職業紹介該当/正社員登用等）は
-    (1) キーワードで除外し、かつ (2) それらより下（DOM後方）にある確認欄のみを対象にする。
-    → 上部・中部の内容チェックは二重に保護し、絶対に触らない。"""
+    安全設計（誤チェック防止）:
+      ・ONにするのは「確認・同意文（虚偽/相違/同意/遵守/ガイドライン等）を含む」checkboxのみ。
+      ・内容系オプション（待遇/感染症/職業紹介該当/正社員登用等）は積極除外も併用。
+      → 確認語を含まない内容系は決してONにしない。判定はラベル＋近傍行の全文で行う。"""
     info = _collect_checkboxes(page)
     if not info:
         return 0
-    # 内容系オプションの最後尾インデックス。確認欄はこれより後方にあるはず。
-    content_idxs = [it["i"] for it in info if _CONTENT_OPTION_KW.search(it.get("label", "") or "")]
-    boundary = max(content_idxs) if content_idxs else -1
     loc = page.locator('input[type="checkbox"]')
     checked, labels, dump = 0, [], []
     for it in info:
-        lab = it.get("label", "") or ""
+        lab = (it.get("label", "") or "").strip()
+        ctx = (it.get("context", "") or "").strip()
+        text = (lab + " " + ctx).strip()
         if not it.get("disabled"):
-            dump.append(("[x]" if it.get("checked") else "[ ]") + (lab[:14] or "無名"))
+            dump.append(("[x]" if it.get("checked") else "[ ]") + ((lab or ctx)[:14] or "無名"))
         if it.get("checked") or it.get("disabled"):
             continue
-        if _CONTENT_OPTION_KW.search(lab):
-            continue          # 内容系オプションは触らない
-        if it["i"] <= boundary:
-            continue          # 内容チェックより前方は対象外（誤チェック防止）
+        if not _CONFIRM_KW.search(text):
+            continue          # 確認・同意文でなければ触らない（＝内容系は対象外）
+        if _CONTENT_OPTION_KW.search(text):
+            continue          # 念のため内容系語を含むものも除外
         try:
             loc.nth(it["i"]).check(force=True, timeout=2000)
             checked += 1
-            labels.append(lab[:18] or "(無名)")
+            labels.append((lab or ctx)[:24] or "(無名)")
         except Exception:
             continue
     if checked:
