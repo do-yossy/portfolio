@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 """
-engage（エンゲージ）自動投稿スクリプト（v1・下書き保存）
+engage（エンゲージ）半自動投稿スクリプト（下書き保存）
 ------------------------------------------------------------
-標準入力から求人JSON配列を受け取り、engageの求人作成フォームに入力して
-「一時保存（下書き）」する。engageは自動操作ブラウザのログインを弾くため、
-実Chromeプロファイル（persistent context / channel=chrome）を使い、
-一度手動ログインしたセッションを再利用する。
+求人JSON配列を受け取り、engageの求人作成フォームに入力して「一時保存（下書き）」する。
+engageは自動操作を検知して認証（CAPTCHA等）を出すため、この認証は突破しない。
+方針は「ログイン＝手動 / 入力＝自動」の半自動：
+  ・あなたがブラウザで engage にログイン（認証があれば自分で操作）
+  ・Enter を押すと、フォーム入力〜下書き保存だけを自動化する
+
+■ 半自動の使い方（推奨：求人JSONはファイルで渡す＝標準入力を空けてEnter待ちを可能にする）
+  1) 普通のChromeをデバッグ起動: chrome.exe --remote-debugging-port=9222 --user-data-dir=...
+  2) set ENGAGE_PK=<PK> ＆ set ENGAGE_CDP_URL=http://localhost:9222
+  3) python scripts/engage_poster.py test-engage.json
+     → ブラウザで engage にログイン → コンソールで Enter → 自動入力→下書き保存
+
+補足：JSONを標準入力パイプ（type x.json | ...）で渡す従来モードも可（その場合はログインを自動ポーリング）。
+engageが入力操作中も認証を出す場合は自動化を許可していないため、engageは手動掲載が現実的。
 
 安全のため v1 は「下書き保存」まで。engage上で内容を確認してから公開する運用。
 
@@ -14,7 +24,7 @@ engage（エンゲージ）自動投稿スクリプト（v1・下書き保存）
   ENGAGE_PROFILE_DIR   … Chromeプロファイル保存先（既定: ./engage-profile）
   ENGAGE_JOB_NEW_URL   … 求人作成フォームURL（未設定なら ENGAGE_PK から生成）
   ENGAGE_HEADLESS      … 1 でヘッドレス（既定: 表示）
-  ENGAGE_PUBLISH       … 1 で公開まで試行（既定: 下書き保存のみ）
+  ENGAGE_DRAFT         … 1 で下書き保存のみ（既定: 掲載＝公開まで実行）
 
 ■ 進捗出力
   標準出力に1行JSON: {"type":"posted","jobId":...} / {"message":...,"level":...}
@@ -49,7 +59,8 @@ JOB_NEW_URL = os.environ.get("ENGAGE_JOB_NEW_URL", "").strip() or (
     f"https://en-gage.net/company/job/regist/form/?PK={PK}" if PK else
     "https://en-gage.net/company/job/regist/form/")
 HEADLESS = os.environ.get("ENGAGE_HEADLESS", "").strip() in ("1", "true", "yes")
-PUBLISH = os.environ.get("ENGAGE_PUBLISH", "").strip() in ("1", "true", "yes")
+# 既定で「掲載（公開）」まで実行する。下書き保存だけにしたい場合は ENGAGE_DRAFT=1 を設定。
+DRAFT_ONLY = os.environ.get("ENGAGE_DRAFT", "").strip() in ("1", "true", "yes")
 # CDP接続先（例: http://localhost:9222）。指定すると、あなたが起動した“普通のChrome”に
 # 接続して操作する。engageは自動起動ブラウザのログインを弾くため、こちらを推奨。
 CDP_URL = os.environ.get("ENGAGE_CDP_URL", "").strip()
@@ -262,15 +273,94 @@ def save_draft(page):
     return False
 
 
+def _click_by_labels(page, labels):
+    """候補ラベルの中から表示中のボタン/リンクを1つクリックして、当たったラベルを返す。"""
+    for lb in labels:
+        for sel in [f'button:has-text("{lb}")', f'a:has-text("{lb}")',
+                    f'input[type="submit"][value*="{lb}"]', f'input[type="button"][value*="{lb}"]']:
+            try:
+                loc = page.locator(sel).first
+                if loc.count() > 0 and loc.is_visible():
+                    loc.scroll_into_view_if_needed(timeout=3000)
+                    loc.click(timeout=6000)
+                    return lb
+            except Exception:
+                continue
+    return None
+
+
+def publish(page):
+    """求人を「掲載（公開）」まで進める（engageの2段階フロー）。
+      ① フォーム下部「求人プレビューへ進む」→ プレビュー画面
+      ② プレビュー画面「編集を完了する」→ 掲載（公開）完了
+    """
+    # 掲載ガイドライン同意（通常は既定でON）
+    try:
+        cb = page.locator('input[name="submitCheck"]').first
+        if cb.count() > 0 and not cb.is_checked():
+            cb.check(force=True, timeout=3000)
+    except Exception:
+        pass
+
+    PREVIEW  = ['求人プレビューへ進む', 'プレビューへ進む', 'プレビューを確認する',
+                'プレビューを確認', 'プレビュー']
+    COMPLETE = ['編集を完了する', '掲載を完了する', 'この内容で掲載する', '掲載する', '公開する']
+    CONFIRM  = ['はい', 'OK', '編集を完了する', '掲載する', 'この内容で掲載する']
+
+    # ① フォーム → プレビュー
+    step1 = _click_by_labels(page, PREVIEW)
+    if step1:
+        time.sleep(2.5)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
+    else:
+        log("  （『求人プレビューへ進む』が見つかりませんでした。ボタン名をご確認ください）", "warn")
+
+    # ② プレビュー → 編集を完了する（＝掲載完了）
+    step2 = _click_by_labels(page, COMPLETE)
+    if step2:
+        time.sleep(2)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
+        # 確認ダイアログが出る場合に備えて
+        _click_by_labels(page, CONFIRM)
+        # ③ 完了後：エンゲージプレミアム（有料オプション）の案内は「今は利用しない」で閉じる。
+        #    ※「追加する」「詳しく見る」など有料側は絶対に押さない。
+        time.sleep(1.5)
+        try:
+            page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            pass
+        skipped = _click_by_labels(page, ['今は利用しない', '利用しない', 'あとで利用する', 'あとで', 'スキップ', '閉じる'])
+        if skipped:
+            log("  （エンゲージプレミアムの案内は「今は利用しない」で閉じました）", "info")
+        return step2
+    return None
+
+
 def is_logged_in(page):
     url = page.url.lower()
     return "login" not in url and "company/job/regist/form" in url
 
 
 def main():
-    raw = sys.stdin.read()
+    # 求人JSONは「引数のファイル（推奨）」→ 無ければ「標準入力」から読む。
+    # 半自動（ログイン後にEnter）を使うには、標準入力を空けるためファイル渡しが必要。
+    #   例) python scripts/engage_poster.py test-engage.json
+    jobs_from_file = False
+    jobs_path = next((a for a in sys.argv[1:] if a.lower().endswith('.json')), '')
     try:
-        jobs = json.loads(raw) if raw.strip() else []
+        if jobs_path and os.path.exists(jobs_path):
+            with open(jobs_path, encoding='utf-8') as f:
+                jobs = json.load(f)
+            jobs_from_file = True
+        else:
+            raw = sys.stdin.read()
+            jobs = json.loads(raw) if raw.strip() else []
     except Exception as e:
         log(f"入力JSONの解析に失敗: {e}", "error")
         sys.exit(1)
@@ -335,35 +425,53 @@ def main():
             except Exception:
                 pass
 
-        if not is_logged_in(page):
-            if HEADLESS and not using_cdp:
-                log("未ログインです。ヘッドレスでは手動ログインできません。"
-                    "一度 ENGAGE_HEADLESS=0 で起動し、engageにログインしてください。", "error")
-                _cleanup()
-                sys.exit(1)
-            if using_cdp:
-                log("engageに未ログインです。接続中のChromeで engage にログインしてください"
-                    "（普通のChromeなのでログインできます）。ログイン後、自動的に続行します…", "warn")
-            else:
-                log("engageにログインしてください（このブラウザで手動ログイン）。"
-                    "ログイン後、自動的に続行します…", "warn")
-            # ログイン完了をポーリング（最大5分）
-            for _ in range(150):
-                time.sleep(2)
-                if is_logged_in(page):
-                    break
-                # フォームに戻す
-                if "login" not in page.url.lower():
-                    try:
-                        page.goto(JOB_NEW_URL, timeout=30000)
-                        page.wait_for_load_state("networkidle", timeout=15000)
-                    except Exception:
-                        pass
+        if jobs_from_file:
+            # ── 半自動モード（ログインだけ手動）──
+            # 認証(CAPTCHA等)は突破しない。あなたが手でログインし、Enter後に入力だけ自動化する。
+            print("\n＝＝ engage 半自動投稿（ログインだけ手動） ＝＝", flush=True)
+            print("1) 表示中のブラウザで engage にログインしてください", flush=True)
+            print("   （「私はロボットではありません」等の認証が出たら、ご自身で操作してください）", flush=True)
+            print("2) ログインできたら、このウィンドウに戻って Enter を押してください", flush=True)
+            print("   → 求人作成フォームを開いて自動入力し、下書き保存します", flush=True)
+            try:
+                input("\n>> ログインが済んだら Enter を押す ... ")
+            except EOFError:
+                pass
+            try:
+                page.goto(JOB_NEW_URL, timeout=40000)
+                page.wait_for_load_state("networkidle", timeout=20000)
+            except Exception:
+                pass
+            time.sleep(1.5)
             if not is_logged_in(page):
-                log("ログインが確認できませんでした。中断します。", "error")
+                log("求人作成フォームを開けませんでした（未ログインの可能性）。"
+                    "engageにログインできているか確認して、もう一度実行してください。", "error")
                 _cleanup()
                 sys.exit(1)
-        log("✅ ログイン確認。投稿を開始します。", "success")
+        else:
+            # ── 従来モード（標準入力パイプ）：ログイン完了を自動ポーリング ──
+            if not is_logged_in(page):
+                if HEADLESS and not using_cdp:
+                    log("未ログインです。ヘッドレスでは手動ログインできません。"
+                        "一度 ENGAGE_HEADLESS=0 で起動し、engageにログインしてください。", "error")
+                    _cleanup()
+                    sys.exit(1)
+                log("engageにログインしてください（手動ログイン）。ログイン後、自動的に続行します…", "warn")
+                for _ in range(150):
+                    time.sleep(2)
+                    if is_logged_in(page):
+                        break
+                    if "login" not in page.url.lower():
+                        try:
+                            page.goto(JOB_NEW_URL, timeout=30000)
+                            page.wait_for_load_state("networkidle", timeout=15000)
+                        except Exception:
+                            pass
+                if not is_logged_in(page):
+                    log("ログインが確認できませんでした。中断します。", "error")
+                    _cleanup()
+                    sys.exit(1)
+        log("✅ ログイン確認。自動入力を開始します。", "success")
 
         done = 0
         for i, job in enumerate(jobs):
@@ -377,25 +485,46 @@ def main():
                 log(f"📝 [{i+1}/{len(jobs)}] 入力中: {title[:40]}", "info")
                 fill_job(page, job)
                 time.sleep(0.5)
-                if PUBLISH:
-                    log("  （公開モードは未対応のため下書き保存します）", "warn")
-                if save_draft(page):
-                    time.sleep(2.5)
-                    os.makedirs("logs", exist_ok=True)
+                os.makedirs("logs", exist_ok=True)
+                if DRAFT_ONLY:
+                    if save_draft(page):
+                        time.sleep(2.5)
+                        try:
+                            page.screenshot(path=f"logs/engage_saved_{i+1}.png", full_page=False)
+                        except Exception:
+                            pass
+                        log(f"  ✅ 下書き保存: {title[:40]}", "success")
+                        if jid:
+                            posted(jid)
+                        done += 1
+                    else:
+                        log(f"  ⚠️ 「入力内容を保存」ボタンが見つかりませんでした: {title[:40]}", "warn")
+                else:
+                    # 掲載（公開）まで実行
+                    r = publish(page)
+                    time.sleep(2)
                     try:
-                        page.screenshot(path=f"logs/engage_saved_{i+1}.png", full_page=False)
+                        page.screenshot(path=f"logs/engage_published_{i+1}.png", full_page=False)
                     except Exception:
                         pass
-                    log(f"  ✅ 下書き保存: {title[:40]}", "success")
-                    if jid:
-                        posted(jid)
-                    done += 1
-                else:
-                    log(f"  ⚠️ 「入力内容を保存」ボタンが見つかりませんでした: {title[:40]}", "warn")
+                    if r:
+                        log(f"  ✅ 掲載（公開）完了: {title[:40]}  … ボタン『{r}』", "success")
+                        if jid:
+                            posted(jid)
+                        done += 1
+                    else:
+                        # 掲載ボタンが見つからない場合は、入力内容を失わないよう下書き保存
+                        saved = save_draft(page)
+                        log(f"  ⚠️ 掲載ボタンが見つかりませんでした: {title[:40]}"
+                            + ("（下書き保存済み）" if saved else "")
+                            + " ※engageの掲載ボタン名を教えていただければ対応します", "warn")
             except Exception as e:
                 log(f"  ❌ 失敗: {title[:40]} — {e}", "error")
 
-        log(f"完了: {done}/{len(jobs)} 件を下書き保存しました。engage上で内容を確認して公開してください。", "success")
+        if DRAFT_ONLY:
+            log(f"完了: {done}/{len(jobs)} 件を下書き保存しました。engage上で確認して公開してください。", "success")
+        else:
+            log(f"完了: {done}/{len(jobs)} 件を掲載（公開）しました。engage上でご確認ください。", "success")
         _cleanup()
 
 
