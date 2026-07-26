@@ -381,6 +381,18 @@ function dashboardPage({ stats, lastPost, banRisk = {}, mediaBreakdown = [], tod
           <div id="progress-indeed-post" class="progress-box"></div>
         </div>
       </div>
+
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">engage（エンゲージ） <span class="text-muted text-sm">（半自動・ログインのみ手動／掲載まで自動）</span></div>
+        <div class="text-sm text-muted" style="line-height:1.8;margin-top:4px">
+          engageは自動操作を検知して認証を出すため、<b>ログインだけ手動</b>で行い、入力〜掲載（公開）を自動化します。<br>
+          <b>① Chromeをデバッグ起動して engage にログイン</b>（PowerShellは先頭に <code>&amp;</code>）：
+          <div style="background:#0f172a;color:#e2e8f0;padding:8px 10px;border-radius:6px;margin:4px 0;font-family:monospace;font-size:12px;overflow-x:auto">"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\\engage-chrome"</div>
+          <b>② 求人JSONを書き出して投稿</b>（NOWLIVE例）：
+          <div style="background:#0f172a;color:#e2e8f0;padding:8px 10px;border-radius:6px;margin:4px 0;font-family:monospace;font-size:12px;overflow-x:auto">node scripts\\export-engage-nl.js<br>set ENGAGE_PK=（会社のPK）<br>set ENGAGE_CDP_URL=http://localhost:9222<br>python scripts\\engage_poster.py engage-nl.json</div>
+          → ①でengageにログイン後、②のコンソールで <b>Enter</b> → 自動入力 →「求人プレビューへ進む」→「編集を完了する」→「今は利用しない」で<b>掲載完了</b>。
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2483,6 +2495,18 @@ function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
         </div>
         <div class="text-sm text-muted" style="margin-top:4px">ボタン1回で1日分（16件）を一括投稿します。</div>
         <div id="progress-stanby-wrap" class="progress-wrap hidden"><div id="progress-stanby" class="progress-box"></div></div>
+      </div>
+
+      <div class="media-op-section mt-14">
+        <div class="media-op-label">engage（エンゲージ） <span class="text-muted text-sm">（半自動・ログインのみ手動／掲載まで自動）</span></div>
+        <div class="text-sm text-muted" style="line-height:1.8;margin-top:4px">
+          engageは自動操作を検知して認証を出すため、<b>ログインだけ手動</b>で行い、入力〜掲載（公開）を自動化します。<br>
+          <b>① Chromeをデバッグ起動して engage にログイン</b>（PowerShellは先頭に <code>&amp;</code>）：
+          <div style="background:#0f172a;color:#e2e8f0;padding:8px 10px;border-radius:6px;margin:4px 0;font-family:monospace;font-size:12px;overflow-x:auto">"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\\engage-chrome"</div>
+          <b>② 求人JSONを書き出して投稿</b>（NOWLIVE例）：
+          <div style="background:#0f172a;color:#e2e8f0;padding:8px 10px;border-radius:6px;margin:4px 0;font-family:monospace;font-size:12px;overflow-x:auto">node scripts\\export-engage-nl.js<br>set ENGAGE_PK=（会社のPK）<br>set ENGAGE_CDP_URL=http://localhost:9222<br>python scripts\\engage_poster.py engage-nl.json</div>
+          → ①でengageにログイン後、②のコンソールで <b>Enter</b> → 自動入力 →「求人プレビューへ進む」→「編集を完了する」→「今は利用しない」で<b>掲載完了</b>。
+        </div>
       </div>
     </div>
   </section>`;
