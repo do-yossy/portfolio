@@ -323,10 +323,16 @@ def open_new_form(page, tries=3):
 
 
 def _agree_guideline(page):
-    """「掲載ガイドラインに同意する」等の必須チェックを入れる（内容確認ボタン有効化に必要）。"""
+    """「求人掲載ガイドラインに同意する」等の必須チェックを入れる（内容確認ボタン有効化に必要）。
+    ※「職業紹介に該当する」等の別チェックは絶対に触らない。"""
+    import re
+    # 1) 既知のname属性
     for sel in ['input[name="submitCheck"]',
                 'input[type="checkbox"][name*="agree"]',
-                'input[type="checkbox"][name*="guideline"]']:
+                'input[type="checkbox"][name*="guideline"]',
+                'input[type="checkbox"][name*="consent"]',
+                'input[type="checkbox"][id*="agree"]',
+                'input[type="checkbox"][id*="guideline"]']:
         try:
             cb = page.locator(sel).first
             if cb.count() > 0 and not cb.is_checked():
@@ -334,14 +340,41 @@ def _agree_guideline(page):
                 return True
         except Exception:
             continue
+    # 2) アクセシブル名（ラベル）が「ガイドライン/掲載に同意」を含むcheckbox
     try:
-        lab = page.locator('label:has-text("掲載ガイドライン"), label:has-text("同意")').first
-        if lab.count() > 0:
-            lab.click(timeout=3000)
+        cb = page.get_by_role("checkbox", name=re.compile("ガイドライン|掲載.*同意|同意.*掲載"))
+        if cb.count() > 0 and not cb.first.is_checked():
+            cb.first.check(force=True, timeout=3000)
             return True
     except Exception:
         pass
+    # 3) 「掲載ガイドラインに同意」ラベル文言をクリック（labelクリックでcheckboxがONになる）
+    for kw in ["求人掲載ガイドラインに同意", "掲載ガイドラインに同意", "ガイドラインに同意"]:
+        try:
+            node = page.get_by_text(kw, exact=False).first
+            if node.count() > 0:
+                node.scroll_into_view_if_needed(timeout=3000)
+                node.click(timeout=2500)
+                return True
+        except Exception:
+            continue
     return False
+
+
+def _handle_guideline_modal(page):
+    """クリック後に「求人掲載ガイドライン」モーダルが出た場合、同意して進むボタンを押す。
+    モーダル内は最下部までスクロールしないと同意ボタンが押せないことがある。"""
+    AGREE = ['同意して掲載する', '同意して進む', 'ガイドラインに同意する', '上記に同意する',
+             '同意のうえ掲載する', '同意して次へ', '同意する', '同意']
+    # モーダルらしき領域を最下部までスクロール（同意ボタン活性化のため）
+    for _ in range(3):
+        try:
+            page.mouse.wheel(0, 1500)
+        except Exception:
+            pass
+        time.sleep(0.4)
+    hit = _click_by_labels(page, AGREE)
+    return hit
 
 
 def _shot(page, name):
@@ -353,31 +386,49 @@ def _shot(page, name):
 
 
 def _log_visible_buttons(page, tag=""):
-    """表示中のボタン/リンク文言を列挙してログ出力（掲載フローの実ボタン名を把握するため）。"""
+    """表示中の操作要素（button/a/div等）の文言を列挙してログ出力。engageの実ボタン名把握用。"""
     try:
-        texts, loc = [], page.locator('button, a[role="button"], input[type="submit"], input[type="button"]')
-        n = min(loc.count(), 40)
+        texts = []
+        loc = page.locator('button, a, [role="button"], input[type="submit"], input[type="button"], '
+                           '[class*="btn"], [class*="Btn"], [class*="button"], [onclick]')
+        n = min(loc.count(), 80)
         for i in range(n):
             el = loc.nth(i)
             try:
                 if not el.is_visible():
                     continue
-                t = (el.inner_text(timeout=400) or el.get_attribute("value") or "").strip().replace("\n", " ")
+                t = (el.inner_text(timeout=300) or el.get_attribute("value") or "").strip().replace("\n", " ")
             except Exception:
                 t = ""
-            if t and t not in texts:
-                texts.append(t[:24])
+            t = " ".join(t.split())
+            if t and 1 <= len(t) <= 20 and t not in texts:
+                texts.append(t)
         if texts:
-            log(f"  （{tag}の表示ボタン: {' / '.join(texts[:15])}）", "info")
+            log(f"  （{tag}の操作要素: {' / '.join(texts[:22])}）", "info")
     except Exception:
         pass
 
 
 def _click_by_labels(page, labels):
-    """候補ラベルの中から表示中のボタン/リンクを1つクリックして、当たったラベルを返す。"""
+    """候補ラベルの操作要素を1つクリックして、当たったラベルを返す。
+    engageのボタンは <a>/<div> 等でも作られるため、role/完全一致テキストまで幅広く探す。"""
     for lb in labels:
-        for sel in [f'button:has-text("{lb}")', f'a:has-text("{lb}")',
-                    f'input[type="submit"][value*="{lb}"]', f'input[type="button"][value*="{lb}"]']:
+        # 1) アクセシブルなボタン/リンク（完全一致）
+        for getter in (
+            lambda: page.get_by_role("button", name=lb, exact=True),
+            lambda: page.get_by_role("link", name=lb, exact=True),
+        ):
+            try:
+                loc = getter().first
+                if loc.count() > 0 and loc.is_visible():
+                    loc.scroll_into_view_if_needed(timeout=3000)
+                    loc.click(timeout=6000)
+                    return lb
+            except Exception:
+                pass
+        # 2) submit/button の value、button/a の部分一致
+        for sel in [f'input[type="submit"][value="{lb}"]', f'input[type="button"][value="{lb}"]',
+                    f'button:has-text("{lb}")', f'a:has-text("{lb}")']:
             try:
                 loc = page.locator(sel).first
                 if loc.count() > 0 and loc.is_visible():
@@ -386,6 +437,15 @@ def _click_by_labels(page, labels):
                     return lb
             except Exception:
                 continue
+        # 3) 汎用要素の完全一致テキスト（div/span等のボタン化要素。exact=Trueで最小要素を選択）
+        try:
+            loc = page.get_by_text(lb, exact=True).first
+            if loc.count() > 0 and loc.is_visible():
+                loc.scroll_into_view_if_needed(timeout=3000)
+                loc.click(timeout=6000)
+                return lb
+        except Exception:
+            pass
     return None
 
 
@@ -396,17 +456,39 @@ def publish(page, idx=0):
       ③ 掲載方法の選択：有料は使わず「今は利用しない」等で無料掲載を確定
     各段でスクショと表示ボタン一覧を残し、想定外のボタン名でも原因を追える。
     """
-    _agree_guideline(page)
+    # フォーム最下部までスクロール（送信ボタン・同意欄を可視化）してから同意チェック
+    try:
+        page.mouse.wheel(0, 4000)
+        time.sleep(0.4)
+    except Exception:
+        pass
+    agreed = _agree_guideline(page)
+    log(f"  （掲載ガイドライン同意チェック: {'ON' if agreed else '見つからず'}）", "info")
+    _shot(page, f"form_{idx}")
 
-    # ① フォーム → 確認/プレビュー（実フォームのボタンは「内容を確認する」）
+    # ① フォーム → 確認/プレビュー（実フォームのボタンは「内容を確認する」または「プレビュー」）
     STEP1 = ['内容を確認する', '入力内容を確認する', '入力内容を確認', '確認画面へ進む',
-             '確認画面に進む', '確認する', '求人プレビューへ進む', 'プレビューへ進む']
+             '確認画面に進む', '内容を確認', '確認する', '求人プレビューへ進む', 'プレビューへ進む', 'プレビュー']
     step1 = _click_by_labels(page, STEP1)
+    time.sleep(2)
+    # クリック後に「求人掲載ガイドライン」モーダルが出たら同意して進む → 必要ならSTEP1再クリック
+    modal = _handle_guideline_modal(page)
+    if modal:
+        log(f"  （掲載ガイドラインのモーダルで「{modal}」を押しました）", "info")
+        time.sleep(2)
+        if not step1:
+            step1 = _click_by_labels(page, STEP1)
+            time.sleep(2)
+    if not step1 and not modal:
+        # もう一度、同意を入れてから再挑戦
+        _agree_guideline(page)
+        step1 = _click_by_labels(page, STEP1)
+        time.sleep(2)
     if not step1:
-        log("  （フォームの『内容を確認する』ボタンが見つかりませんでした）", "warn")
+        log("  （フォームの『内容を確認する／プレビュー』ボタンが見つかりませんでした）", "warn")
         _log_visible_buttons(page, "フォーム")
+        _shot(page, f"form_stuck_{idx}")
         return None
-    time.sleep(2.5)
     try:
         page.wait_for_load_state("domcontentloaded", timeout=10000)
     except Exception:
