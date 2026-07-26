@@ -633,6 +633,21 @@ function engageConfiguredCompanies() {
   return OPS_COMPANIES.map(c => c.id).filter(id => engageEnvForCompany(id).hasCreds);
 }
 
+// Chrome実行ファイルのパスを解決（Windows想定）。engageは自動起動ブラウザを弾くため、
+// 実Chromeを --remote-debugging-port 付きで起動し、posterはCDP接続で操作する。
+function findChromePath() {
+  const cands = [
+    process.env.CHROME_PATH,
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe') : null,
+  ].filter(Boolean);
+  for (const c of cands) {
+    try { if (fs.existsSync(c)) return c; } catch { /* ignore */ }
+  }
+  return 'chrome'; // PATH 上にある場合のフォールバック
+}
+
 // 新規応募者タブ統計
 async function opsNewStats({ applyOverride = false } = {}) {
   const { db, jstDayStartUtcISO, jstWeekStartUtcISO } = require('./db');
@@ -2844,6 +2859,93 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       Jobs.update(j.id, { kyujinbox_posted_at: null });
     }
     return sendJSON(res, 200, { ok: true, reset: posted.length });
+  }
+
+  // ── engage 半自動投稿（ボタン1回：実Chromeを起動→ログイン画面→CDP接続で自動掲載）──
+  // engageは自動起動ブラウザ(Playwright)のログインを弾くため、実Chromeを
+  // --remote-debugging-port 付きで起動し、engage_poster.py が CDP接続で操作する。
+  // ユーザーは開いたChromeで手動ログインするだけ。以降（入力〜掲載）は自動。
+  if (pathname === '/api/post/engage' && method === 'POST') {
+    const body = await parseJSON(req);
+    const co = (body.company && body.company !== 'all') ? body.company : 'sq';
+    const { env: engEnv } = engageEnvForCompany(co);
+    if (!engEnv.ENGAGE_PK && !engEnv.ENGAGE_JOB_NEW_URL) {
+      return sendJSON(res, 400, { error: `❌ ${companyFullName(co)} の ENGAGE_PK が未設定です（.env に ENGAGE_PK_${co.toUpperCase()} を設定してください）` });
+    }
+    // 公開中の求人を収集（engage指定があればそれ、無ければ公開中の全件）
+    const allJobs = await Jobs.findAll({ onlyPublished: true, company: co });
+    let jobs = allJobs.filter(j => {
+      const m = JSON.parse(j.target_media || '[]');
+      return m.includes('engage');
+    });
+    if (jobs.length === 0) jobs = allJobs;
+    if (jobs.length === 0) return sendJSON(res, 400, { error: '⚠️ 公開中の求人がありません' });
+    const batch = Math.min(parseInt(body.limit || '5', 10) || 5, 20);
+    jobs = jobs.slice(0, batch);
+
+    const { id, session } = createSession();
+    const pushLog = (m, t = 'info') => session.logs.push({ message: String(m ?? ''), type: t });
+    sendJSON(res, 200, { ok: true, sessionId: id });
+
+    (async () => {
+      const scriptPath = path.join(SCRIPTS_DIR, 'engage_poster.py');
+      if (!fs.existsSync(scriptPath)) {
+        pushLog('⚠️ engage_poster.py が見つかりません', 'warn');
+        session.done = true; session.success = false; return;
+      }
+      const port = parseInt(process.env.ENGAGE_CDP_PORT || '9222', 10);
+      const profileDir = engEnv.ENGAGE_PROFILE_DIR || path.join(__dirname, `engage-profile-${co}`);
+      const loginUrl = engEnv.ENGAGE_LOGIN_URL || 'https://en-gage.net/company_login/login/';
+
+      // 1) 実Chromeをデバッグ起動（engageログイン画面を開く）
+      const chrome = findChromePath();
+      pushLog('🌐 Chromeを起動して engage のログイン画面を開きます…', 'info');
+      pushLog('　→ 開いたウィンドウで engage にログインしてください（認証があればご自身で操作）。ログイン後、自動で続行します。', 'info');
+      try {
+        const ch = spawn(chrome, [`--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`, loginUrl],
+          { detached: true, stdio: 'ignore', windowsHide: false });
+        ch.on('error', e => pushLog(`⚠️ Chrome起動に失敗: ${e.message}（手動で起動してください）`, 'warn'));
+        ch.unref();
+      } catch (e) {
+        pushLog(`⚠️ Chrome起動に失敗: ${e.message}`, 'warn');
+      }
+      await new Promise(r => setTimeout(r, 4000));
+
+      // 2) engage_poster.py を CDP接続で起動（ログイン完了を自動ポーリング→入力〜掲載）
+      pushLog(`📋 ${companyFullName(co)}: 求人 ${jobs.length}件 を掲載します（ログイン後に自動開始）`, 'info');
+      const proc = spawn(PYTHON_CMD, [scriptPath], {
+        env: { ...process.env, ...engEnv, ENGAGE_CDP_URL: `http://localhost:${port}`, ENGAGE_HEADLESS: '0' }
+      });
+      try { proc.stdin.write(JSON.stringify(jobs)); proc.stdin.end(); } catch { /* ignore */ }
+      proc.stdout.on('data', d => {
+        for (const line of d.toString().split('\n')) {
+          const t = line.trim();
+          if (!t) continue;
+          try {
+            const o = JSON.parse(t);
+            if (o.type === 'posted') { pushLog('📌 掲載済みとして記録', 'info'); }
+            else pushLog(o.message, o.level || 'info');
+          } catch { pushLog(t, 'info'); }
+        }
+      });
+      proc.stderr.on('data', d => { const t = d.toString().trim(); if (t) pushLog(`⚠️ ${t}`, 'warn'); });
+      proc.on('error', e => { pushLog(`❌ posterの起動に失敗: ${e.message}`, 'error'); session.done = true; session.success = false; });
+      proc.on('close', code => {
+        pushLog(code === 0 ? '✅ engage処理が完了しました' : `⚠️ engage処理が終了しました（コード:${code}）`, code === 0 ? 'success' : 'warn');
+        session.done = true; session.success = (code === 0);
+      });
+    })();
+    return;
+  }
+
+  if (pathname === '/api/post/engage/poll' && method === 'GET') {
+    const session = postSessions.get(query.id);
+    if (!session) return sendJSON(res, 404, { error: 'session not found' });
+    const from = parseInt(query.from || '0', 10);
+    return sendJSON(res, 200, {
+      logs: session.logs.slice(from), total: session.logs.length,
+      done: session.done, success: session.success,
+    });
   }
 
   // Googleしごと検索 7日経過求人を手動除外
