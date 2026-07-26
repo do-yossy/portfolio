@@ -318,7 +318,7 @@ def publish(page):
     else:
         log("  （『求人プレビューへ進む』が見つかりませんでした。ボタン名をご確認ください）", "warn")
 
-    # ② プレビュー → 編集を完了する（＝掲載）
+    # ② プレビュー → 編集を完了する（＝掲載完了）
     step2 = _click_by_labels(page, COMPLETE)
     if step2:
         time.sleep(2)
@@ -328,6 +328,16 @@ def publish(page):
             pass
         # 確認ダイアログが出る場合に備えて
         _click_by_labels(page, CONFIRM)
+        # ③ 完了後：エンゲージプレミアム（有料オプション）の案内は「今は利用しない」で閉じる。
+        #    ※「追加する」「詳しく見る」など有料側は絶対に押さない。
+        time.sleep(1.5)
+        try:
+            page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            pass
+        skipped = _click_by_labels(page, ['今は利用しない', '利用しない', 'あとで利用する', 'あとで', 'スキップ', '閉じる'])
+        if skipped:
+            log("  （エンゲージプレミアムの案内は「今は利用しない」で閉じました）", "info")
         return step2
     return None
 
