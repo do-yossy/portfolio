@@ -37,6 +37,7 @@ import sys
 import io
 import json
 import time
+import re
 
 sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -146,25 +147,26 @@ def holiday_type_from_text(text):
 
 
 # 職種欄は「求人検索エンジン連携用」で、記号・スペース・アピール文言・勤務地を含めると
-# 連携されない。括弧内(勤務地/補足)や ｜以降(訴求)を落とし、記号・空白を除去して整形する。
-# ハイフン/ダッシュ類・アンダースコア・チルダ・波ダッシュ・各種括弧も対象（長音符ーは残す）。
-_OCC_STRIP_CHARS = ("・･｜|/／\\　 \t★☆♪◆◇■□●○◎＊*！!？?＜＞<>「」『』、。，．,.：:；;"
-                    "〜～#＃@＠&＆＋+＝=％%…‥"
-                    "-－−—–‐_~｛｝{}［］[]（）()【】〔〕")
+# 連携されない。括弧内(勤務地/補足)や ｜以降(訴求)を落とし、許可文字以外(記号/空白/ダッシュ/
+# NBSP/※/矢印等すべて)を除去する。許可＝ひらがな・カタカナ(長音符ー含む)・漢字・英数字のみ。
+_OCC_ALLOWED = re.compile(
+    "[^0-9A-Za-z\u3005-\u3007\u3040-\u309F\u30A0-\u30FF"
+    "\u3400-\u9FFF\uF900-\uFAFF\U00020000-\U0002FA1F]")
 
 
 def clean_occupation(text, limit=50):
-    import re
-    s = text or ""
+    import unicodedata
+    # 全角英数→半角、半角カナ→全角カナ等に正規化（表記ゆれ・半角カナ対策）
+    s = unicodedata.normalize("NFKC", text or "")
     # ｜ | （縦棒）以降＝キャッチ/給与などの訴求は除去。/ 等は区切りではなく記号として後で除去し、
     # 「総務/経理」のような複合職種名を落とさない（→「総務経理」）。
     s = re.split(r"[｜|]", s)[0]
     # 【…】〔…〕［…］（…）(…) 等の括弧とその中身（勤務地・補足）を除去
     s = re.sub(r"[【〔［\[（(][^】〕］\])）]*[】〕］\])）]", "", s)
-    # 残った記号・空白・対になっていない括弧を除去（長音符ーや日本語・英数字は残す）
-    for ch in _OCC_STRIP_CHARS:
-        s = s.replace(ch, "")
-    s = s.strip()
+    # 許可文字（かな/カナ/漢字/英数字/長音符ー）以外をすべて除去（記号・空白類は全滅）
+    s = _OCC_ALLOWED.sub("", s)
+    # カタカナブロック内の記号（・=U+30FB / ゠=U+30A0）は許可レンジに含まれるため個別に除去
+    s = s.replace("・", "").replace("゠", "")
     return s[:limit]
 
 
@@ -365,61 +367,127 @@ def _agree_guideline(page):
     return False
 
 
-def _checkbox_label(page, cb):
-    """checkboxに紐づくラベル文言を推定して返す（id→label[for] / 祖先label / aria-label / 近傍）。"""
+# 内容系オプションのcheckbox（＝掲載前確認ではないので触ってはいけないもの）を判定する語。
+# 待遇・感染症対策・雇用形態特徴・応募条件などが該当。掲載前の確認文（虚偽/相違/同意/遵守等）
+# はこれらを含まないため区別できる。
+_CONTENT_OPTION_KW = re.compile(
+    "感染|消毒|洗浄|換気|マスク|飛沫|仕切|座席|間隔|オンライン|在宅|テレワーク|"
+    "職業紹介に該当|正社員登用|未経験|経験者|学歴|交通費|社会保険|各種保険|雇用保険|労災|"
+    "賞与|ボーナス|昇給|各種手当|資格手当|住宅手当|家族手当|役職手当|通勤手当|インセンティブ|歩合|"
+    "制服|社宅|寮|まかない|食事|転勤|急募|禁煙|喫煙|試用|副業|服装|髪|ネイル|ピアス|"
+    "車通勤|バイク|自転車|日払い|週払い|前払い|残業|深夜|産休|育休|有給|退職金|研修|健康診断|社員旅行"
+)
+
+
+# 掲載前の「確認・同意」チェックだと積極的に判定するための語（＝これを含む場合のみON）。
+# 待遇/感染症対策/職業紹介該当/正社員登用 等の内容系オプションはこれらを含まないため、
+# 「確認語を含む」ことを必須にすれば内容系を誤ってONにしない。
+_CONFIRM_KW = re.compile(
+    "虚偽|誇大|事実と相違|相違ありません|偽り|事実です|同意し|同意する|同意の上|承諾|"
+    "遵守|順守|法令|関係法令|ガイドライン|規約|反社|暴力団|反社会的|ありません|いたしません|"
+    "確認しました|確認いたし|理解しました|承知しました|間違いありません|差別的|禁止事項|"
+    "掲載基準|掲載ルール|正確|責任を負い"
+)
+
+
+def _collect_checkboxes(page):
+    """ページ内の全checkboxを {i,label,context,checked,disabled} でJS一括取得する。
+    label=直接のラベル、context=近傍行のinnerText（確認文を拾うため）。切り詰めはしない。"""
     try:
-        cid = cb.get_attribute("id")
-        if cid:
-            lab = page.locator(f'label[for="{cid}"]').first
-            if lab.count() > 0:
-                return " ".join((lab.inner_text(timeout=400) or "").split())
+        return page.evaluate(
+            """
+            () => {
+              const boxes = Array.from(document.querySelectorAll('input[type=checkbox]'));
+              return boxes.map((cb, i) => {
+                let label = '';
+                try {
+                  if (cb.id) {
+                    const l = document.querySelector('label[for="' +
+                      ((window.CSS && CSS.escape) ? CSS.escape(cb.id) : cb.id) + '"]');
+                    if (l) label = l.innerText;
+                  }
+                } catch (e) {}
+                if (!label) { const anc = cb.closest('label'); if (anc) label = anc.innerText; }
+                if (!label) label = cb.getAttribute('aria-label') || '';
+                let ctx = '';
+                const row = cb.closest('tr,li,dd,dt,p,div,section,fieldset');
+                if (row) ctx = row.innerText || '';
+                return { i: i,
+                         label: (label || '').replace(/\\s+/g, ' ').trim().slice(0, 80),
+                         context: (ctx || '').replace(/\\s+/g, ' ').trim().slice(0, 180),
+                         checked: !!cb.checked, disabled: !!cb.disabled };
+              });
+            }
+            """
+        ) or []
     except Exception:
-        pass
-    for xp in ['xpath=ancestor::label[1]', 'xpath=following::*[normalize-space(string())][1]']:
-        try:
-            el = cb.locator(xp).first
-            if el.count() > 0:
-                return " ".join((el.inner_text(timeout=400) or "").split())
-        except Exception:
-            continue
-    try:
-        return cb.get_attribute("aria-label") or ""
-    except Exception:
-        return ""
+        return []
 
 
 def _check_confirmation_boxes(page):
-    """送信前の同意・確認チェックボックス（複数）をまとめてON。
-    「求人掲載ガイドライン」等の見出し以降にあるcheckboxを対象にすることで、
-    上部の内容系チェック（『職業紹介に該当する』『正社員登用あり』等）は触らない。"""
-    checked, labels = 0, []
-    anchors = ["求人掲載ガイドライン", "掲載ガイドライン", "掲載にあたって", "以下の内容に同意",
-               "以下に同意", "確認のうえ", "確認事項", "同意事項", "注意事項"]
-    for a in anchors:
+    """送信前の確認チェック（engageでは最大7項目程度の『はい』）を安全にまとめてON。
+    安全設計（誤チェック防止）:
+      ・ONにするのは「確認・同意文（虚偽/相違/同意/遵守/ガイドライン等）を含む」checkboxのみ。
+      ・内容系オプション（待遇/感染症/職業紹介該当/正社員登用等）は積極除外も併用。
+      → 確認語を含まない内容系は決してONにしない。判定はラベル＋近傍行の全文で行う。"""
+    info = _collect_checkboxes(page)
+    if not info:
+        return 0
+    loc = page.locator('input[type="checkbox"]')
+    checked, labels, dump = 0, [], []
+    for it in info:
+        lab = (it.get("label", "") or "").strip()
+        ctx = (it.get("context", "") or "").strip()
+        text = (lab + " " + ctx).strip()
+        if not it.get("disabled"):
+            dump.append(("[x]" if it.get("checked") else "[ ]") + ((lab or ctx)[:14] or "無名"))
+        if it.get("checked") or it.get("disabled"):
+            continue
+        if not _CONFIRM_KW.search(text):
+            continue          # 確認・同意文でなければ触らない（＝内容系は対象外）
+        if _CONTENT_OPTION_KW.search(text):
+            continue          # 念のため内容系語を含むものも除外
         try:
-            node = page.get_by_text(a, exact=False).first
-            if node.count() == 0:
-                continue
-            boxes = node.locator('xpath=following::input[@type="checkbox"]')
-            n = min(boxes.count(), 15)
-            for i in range(n):
-                cb = boxes.nth(i)
-                try:
-                    if cb.is_checked():
-                        continue
-                    lab = _checkbox_label(page, cb)[:20]
-                    cb.check(force=True, timeout=2500)
-                    checked += 1
-                    labels.append(lab or "(無名)")
-                except Exception:
-                    continue
-            if checked:
-                break
+            loc.nth(it["i"]).check(force=True, timeout=2000)
+            checked += 1
+            labels.append((lab or ctx)[:24] or "(無名)")
         except Exception:
             continue
     if checked:
-        log(f"  （送信前の確認チェックを{checked}件ON: {' / '.join(labels)}）", "info")
+        log(f"  （送信前の確認チェックを{checked}件ON: {' / '.join(labels[:10])}）", "info")
+    if dump:
+        log("  （全チェックボックス: " + " / ".join(dump[:24]) + "）", "info")
     return checked
+
+
+def _dump_submit_candidates(page):
+    """送信系ボタンらしき要素（内容確認/プレビュー/掲載/完了/保存/進む等の文言）の
+    tag/class/text/表示状態をJSで一括抽出してログ出力。engageの実DOMを特定するための診断。"""
+    try:
+        res = page.evaluate(
+            """
+            () => {
+              const kw = /内容を確認|確認画面|プレビュー|掲載|公開|編集を完了|完了する|保存|次へ|進む|応募/;
+              const seen = new Set(), out = [];
+              const els = document.querySelectorAll('a,button,div,span,p,input,[role=button],[onclick]');
+              for (const e of els) {
+                let t = (e.innerText || e.value || '').replace(/\\s+/g, ' ').trim();
+                if (!t || t.length > 14 || !kw.test(t)) continue;
+                const cls = (typeof e.className === 'string' ? e.className : '').slice(0, 24);
+                const r = e.getBoundingClientRect();
+                const key = e.tagName.toLowerCase() + (cls ? '.' + cls : '') + '|' + t +
+                            ((r.width && r.height) ? '' : '(hidden)');
+                if (!seen.has(key)) { seen.add(key); out.push(key); }
+                if (out.length >= 16) break;
+              }
+              return out;
+            }
+            """
+        )
+        if res:
+            log("  【送信候補DOM】" + " ‖ ".join(res[:16]), "info")
+    except Exception:
+        pass
 
 
 def _handle_guideline_modal(page):
@@ -553,6 +621,7 @@ def publish(page, idx=0):
     if not step1:
         log("  （フォームの『内容を確認する／プレビュー』ボタンが見つかりませんでした）", "warn")
         _log_visible_buttons(page, "フォーム")
+        _dump_submit_candidates(page)
         _shot(page, f"form_stuck_{idx}")
         return None
     try:
@@ -569,6 +638,8 @@ def publish(page, idx=0):
     if not step2:
         log("  （確認画面の『編集を完了する』ボタンが見つかりませんでした）", "warn")
         _log_visible_buttons(page, "確認/プレビュー画面")
+        _dump_submit_candidates(page)
+        _shot(page, f"confirm_stuck_{idx}")
         return None
     time.sleep(2)
     try:
