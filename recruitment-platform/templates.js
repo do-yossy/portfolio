@@ -2502,6 +2502,10 @@ function opsAutomationPanel(co, siteUrl = '', indeedRepostCount = 0) {
         <div class="btn-group" style="align-items:center">
           <button id="btn-post-engage" class="btn btn-warning" onclick="startPostEngage('${co}')">🚀 engageに投稿する（ログインは手動）</button>
         </div>
+        <div style="margin-top:8px;padding:8px 12px;background:#fffbea;border:1px solid #f6c445;border-radius:6px;font-size:13px;color:#7a5b00;line-height:1.6">
+          📅 <b>掲載ルール：毎週月曜に10件を新規掲載</b>。<br>
+          10件は<b>内容が重複しないよう</b>エリア・表現を変えて掲載します（同一内容の連続掲載を避ける）。内容は継続的にブラッシュアップしていきます。
+        </div>
         <div class="text-sm text-muted" style="margin-top:4px;line-height:1.7">
           ボタンを押すと <b>Chromeが開いて engage のログイン画面</b>が表示されます。表示されたChromeで<b>手動ログイン</b>してください（認証があればご自身で操作）。ログイン後、<b>入力〜掲載（プレビューへ進む→編集を完了する→今は利用しない）まで自動</b>で行います。<br>
           ※事前に <code>.env</code> に <code>ENGAGE_PK_${co.toUpperCase()}</code> の設定が必要です。認証（CAPTCHA）は突破せず、ログインはご自身で通していただく方式です。
