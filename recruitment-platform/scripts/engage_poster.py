@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 """
-engage（エンゲージ）自動投稿スクリプト（v1・下書き保存）
+engage（エンゲージ）半自動投稿スクリプト（下書き保存）
 ------------------------------------------------------------
-標準入力から求人JSON配列を受け取り、engageの求人作成フォームに入力して
-「一時保存（下書き）」する。engageは自動操作ブラウザのログインを弾くため、
-実Chromeプロファイル（persistent context / channel=chrome）を使い、
-一度手動ログインしたセッションを再利用する。
+求人JSON配列を受け取り、engageの求人作成フォームに入力して「一時保存（下書き）」する。
+engageは自動操作を検知して認証（CAPTCHA等）を出すため、この認証は突破しない。
+方針は「ログイン＝手動 / 入力＝自動」の半自動：
+  ・あなたがブラウザで engage にログイン（認証があれば自分で操作）
+  ・Enter を押すと、フォーム入力〜下書き保存だけを自動化する
+
+■ 半自動の使い方（推奨：求人JSONはファイルで渡す＝標準入力を空けてEnter待ちを可能にする）
+  1) 普通のChromeをデバッグ起動: chrome.exe --remote-debugging-port=9222 --user-data-dir=...
+  2) set ENGAGE_PK=<PK> ＆ set ENGAGE_CDP_URL=http://localhost:9222
+  3) python scripts/engage_poster.py test-engage.json
+     → ブラウザで engage にログイン → コンソールで Enter → 自動入力→下書き保存
+
+補足：JSONを標準入力パイプ（type x.json | ...）で渡す従来モードも可（その場合はログインを自動ポーリング）。
+engageが入力操作中も認証を出す場合は自動化を許可していないため、engageは手動掲載が現実的。
 
 安全のため v1 は「下書き保存」まで。engage上で内容を確認してから公開する運用。
 
@@ -268,9 +278,19 @@ def is_logged_in(page):
 
 
 def main():
-    raw = sys.stdin.read()
+    # 求人JSONは「引数のファイル（推奨）」→ 無ければ「標準入力」から読む。
+    # 半自動（ログイン後にEnter）を使うには、標準入力を空けるためファイル渡しが必要。
+    #   例) python scripts/engage_poster.py test-engage.json
+    jobs_from_file = False
+    jobs_path = next((a for a in sys.argv[1:] if a.lower().endswith('.json')), '')
     try:
-        jobs = json.loads(raw) if raw.strip() else []
+        if jobs_path and os.path.exists(jobs_path):
+            with open(jobs_path, encoding='utf-8') as f:
+                jobs = json.load(f)
+            jobs_from_file = True
+        else:
+            raw = sys.stdin.read()
+            jobs = json.loads(raw) if raw.strip() else []
     except Exception as e:
         log(f"入力JSONの解析に失敗: {e}", "error")
         sys.exit(1)
@@ -335,35 +355,53 @@ def main():
             except Exception:
                 pass
 
-        if not is_logged_in(page):
-            if HEADLESS and not using_cdp:
-                log("未ログインです。ヘッドレスでは手動ログインできません。"
-                    "一度 ENGAGE_HEADLESS=0 で起動し、engageにログインしてください。", "error")
-                _cleanup()
-                sys.exit(1)
-            if using_cdp:
-                log("engageに未ログインです。接続中のChromeで engage にログインしてください"
-                    "（普通のChromeなのでログインできます）。ログイン後、自動的に続行します…", "warn")
-            else:
-                log("engageにログインしてください（このブラウザで手動ログイン）。"
-                    "ログイン後、自動的に続行します…", "warn")
-            # ログイン完了をポーリング（最大5分）
-            for _ in range(150):
-                time.sleep(2)
-                if is_logged_in(page):
-                    break
-                # フォームに戻す
-                if "login" not in page.url.lower():
-                    try:
-                        page.goto(JOB_NEW_URL, timeout=30000)
-                        page.wait_for_load_state("networkidle", timeout=15000)
-                    except Exception:
-                        pass
+        if jobs_from_file:
+            # ── 半自動モード（ログインだけ手動）──
+            # 認証(CAPTCHA等)は突破しない。あなたが手でログインし、Enter後に入力だけ自動化する。
+            print("\n＝＝ engage 半自動投稿（ログインだけ手動） ＝＝", flush=True)
+            print("1) 表示中のブラウザで engage にログインしてください", flush=True)
+            print("   （「私はロボットではありません」等の認証が出たら、ご自身で操作してください）", flush=True)
+            print("2) ログインできたら、このウィンドウに戻って Enter を押してください", flush=True)
+            print("   → 求人作成フォームを開いて自動入力し、下書き保存します", flush=True)
+            try:
+                input("\n>> ログインが済んだら Enter を押す ... ")
+            except EOFError:
+                pass
+            try:
+                page.goto(JOB_NEW_URL, timeout=40000)
+                page.wait_for_load_state("networkidle", timeout=20000)
+            except Exception:
+                pass
+            time.sleep(1.5)
             if not is_logged_in(page):
-                log("ログインが確認できませんでした。中断します。", "error")
+                log("求人作成フォームを開けませんでした（未ログインの可能性）。"
+                    "engageにログインできているか確認して、もう一度実行してください。", "error")
                 _cleanup()
                 sys.exit(1)
-        log("✅ ログイン確認。投稿を開始します。", "success")
+        else:
+            # ── 従来モード（標準入力パイプ）：ログイン完了を自動ポーリング ──
+            if not is_logged_in(page):
+                if HEADLESS and not using_cdp:
+                    log("未ログインです。ヘッドレスでは手動ログインできません。"
+                        "一度 ENGAGE_HEADLESS=0 で起動し、engageにログインしてください。", "error")
+                    _cleanup()
+                    sys.exit(1)
+                log("engageにログインしてください（手動ログイン）。ログイン後、自動的に続行します…", "warn")
+                for _ in range(150):
+                    time.sleep(2)
+                    if is_logged_in(page):
+                        break
+                    if "login" not in page.url.lower():
+                        try:
+                            page.goto(JOB_NEW_URL, timeout=30000)
+                            page.wait_for_load_state("networkidle", timeout=15000)
+                        except Exception:
+                            pass
+                if not is_logged_in(page):
+                    log("ログインが確認できませんでした。中断します。", "error")
+                    _cleanup()
+                    sys.exit(1)
+        log("✅ ログイン確認。自動入力を開始します。", "success")
 
         done = 0
         for i, job in enumerate(jobs):
