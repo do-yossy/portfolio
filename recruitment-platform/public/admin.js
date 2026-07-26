@@ -335,6 +335,48 @@ function startPostKyujinboxForce(co) {
   });
 }
 
+// ── engage 半自動投稿（ボタン1回：Chromeが開く→手動ログイン→自動で入力〜掲載）──
+function startPostEngage(co) {
+  confirmAction(
+    'engageに投稿します。\nボタンを押すとChromeが開き engage のログイン画面が表示されます。\n表示されたChromeで手動ログインしてください（認証があればご自身で操作）。\nログイン後、自動で入力〜掲載まで行います。\n\n実行しますか？',
+    () => {
+      const box = openProgress('progress-engage');
+      const btn = document.getElementById('btn-post-engage');
+      if (btn) { btn.disabled = true; btn.dataset.origText = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span> 実行中...'; }
+      appendLog(box, 'Chromeを起動して engage のログイン画面を開きます…', 'info');
+      fetch('/api/post/engage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: co })
+      }).then(r => r.json()).then(d => {
+        if (!d.ok) {
+          appendLog(box, d.error || 'サーバーエラーが発生しました', 'error');
+          toast(d.error || 'エラー', 'error');
+          if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+          return;
+        }
+        let fromIdx = 0;
+        const timer = setInterval(async () => {
+          try {
+            const r = await fetch(`/api/post/engage/poll?id=${d.sessionId}&from=${fromIdx}`);
+            if (!r.ok) return;
+            const s = await r.json();
+            for (const e of s.logs) appendLog(box, e.message, e.type || 'info');
+            fromIdx = s.total;
+            if (s.done) {
+              clearInterval(timer);
+              if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+              toast(s.success ? 'engageへの投稿が完了しました' : 'engage処理が終了しました', s.success ? 'success' : 'warn');
+            }
+          } catch { /* ignore transient errors */ }
+        }, 2000);
+      }).catch(e => {
+        appendLog(box, 'サーバーへの接続に失敗しました: ' + e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.origText; }
+      });
+    }
+  );
+}
+
 // ── 求人ボックスに残った下書きを巡回して公開（写真も後付け）──
 function startPublishKyujinboxDrafts() {
   confirmAction(
