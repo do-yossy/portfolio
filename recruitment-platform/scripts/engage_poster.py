@@ -347,6 +347,44 @@ def is_logged_in(page):
     return "login" not in url and "company/job/regist/form" in url
 
 
+def _all_pages(ctx, browser=None):
+    """開いている全タブを（CDP接続時は全コンテキスト横断で）列挙する。"""
+    pages, seen, contexts = [], set(), []
+    if browser is not None:
+        try:
+            contexts = list(browser.contexts)
+        except Exception:
+            contexts = []
+    if not contexts:
+        contexts = [ctx]
+    for c in contexts:
+        try:
+            for pg in c.pages:
+                if pg.is_closed() or id(pg) in seen:
+                    continue
+                seen.add(id(pg))
+                pages.append(pg)
+        except Exception:
+            pass
+    return pages
+
+
+def _find_logged_in_page(ctx, browser=None):
+    """engageにログイン済みのタブ（company配下でlogin以外）を全タブから探す。
+    ユーザーがどのタブでログインしても拾えるようにする。フォームのタブを優先。"""
+    logged = None
+    for pg in _all_pages(ctx, browser):
+        try:
+            u = pg.url.lower()
+        except Exception:
+            continue
+        if "en-gage.net" in u and "login" not in u and "/company" in u:
+            if "company/job/regist/form" in u:
+                return pg  # フォームのタブが最優先
+            logged = logged or pg
+    return logged
+
+
 def main():
     # 求人JSONは「引数のファイル（推奨）」→ 無ければ「標準入力」から読む。
     # 半自動（ログイン後にEnter）を使うには、標準入力を空けるためファイル渡しが必要。
@@ -449,28 +487,48 @@ def main():
                 _cleanup()
                 sys.exit(1)
         else:
-            # ── 従来モード（標準入力パイプ）：ログイン完了を自動ポーリング ──
-            if not is_logged_in(page):
+            # ── 従来モード（標準入力パイプ/ボタン）：ログイン完了を自動ポーリング ──
+            # ユーザーがどのタブでログイン／フォーム表示しても拾えるよう、全タブを走査する。
+            logged_page = page if is_logged_in(page) else _find_logged_in_page(ctx, browser)
+            if logged_page is None:
                 if HEADLESS and not using_cdp:
                     log("未ログインです。ヘッドレスでは手動ログインできません。"
                         "一度 ENGAGE_HEADLESS=0 で起動し、engageにログインしてください。", "error")
                     _cleanup()
                     sys.exit(1)
                 log("engageにログインしてください（手動ログイン）。ログイン後、自動的に続行します…", "warn")
-                for _ in range(150):
+                last_note = 0
+                for n in range(150):  # 最大5分（2秒×150）
                     time.sleep(2)
-                    if is_logged_in(page):
+                    logged_page = _find_logged_in_page(ctx, browser)
+                    if logged_page is not None:
                         break
-                    if "login" not in page.url.lower():
+                    # 30秒ごとに現在の状況を通知（何タブ見えているか）
+                    if n - last_note >= 15:
+                        last_note = n
                         try:
-                            page.goto(JOB_NEW_URL, timeout=30000)
-                            page.wait_for_load_state("networkidle", timeout=15000)
+                            urls = [pg.url for pg in _all_pages(ctx, browser)]
                         except Exception:
-                            pass
-                if not is_logged_in(page):
-                    log("ログインが確認できませんでした。中断します。", "error")
+                            urls = []
+                        log(f"…ログイン待機中（{n*2}秒）。検出タブ: {' | '.join(urls) if urls else 'なし'}", "info")
+                if logged_page is None:
+                    try:
+                        urls = [pg.url for pg in _all_pages(ctx, browser)]
+                    except Exception:
+                        urls = []
+                    log("ログインが確認できませんでした。中断します。 現在のタブ: "
+                        + (" | ".join(urls) if urls else "なし"), "error")
                     _cleanup()
                     sys.exit(1)
+            # ログイン済みタブを作業用ページとして採用し、フォームを確実に開く
+            page = logged_page
+            try:
+                if "company/job/regist/form" not in page.url.lower():
+                    page.goto(JOB_NEW_URL, timeout=40000)
+                    page.wait_for_load_state("networkidle", timeout=20000)
+                    time.sleep(1.5)
+            except Exception:
+                pass
         log("✅ ログイン確認。自動入力を開始します。", "success")
 
         done = 0
