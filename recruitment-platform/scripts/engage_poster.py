@@ -290,9 +290,10 @@ def _click_by_labels(page, labels):
 
 
 def publish(page):
-    """求人を「掲載（公開）」まで進める。
-    直接の掲載ボタン → 無ければプレビュー経由 → 確認ダイアログ、の順で試す。
-    engageの掲載ボタン名は環境で異なる可能性があるため候補を複数試す。"""
+    """求人を「掲載（公開）」まで進める（engageの2段階フロー）。
+      ① フォーム下部「求人プレビューへ進む」→ プレビュー画面
+      ② プレビュー画面「編集を完了する」→ 掲載（公開）完了
+    """
     # 掲載ガイドライン同意（通常は既定でON）
     try:
         cb = page.locator('input[name="submitCheck"]').first
@@ -301,29 +302,33 @@ def publish(page):
     except Exception:
         pass
 
-    PUB = ['この内容で掲載する', '掲載する', '求人を掲載する', 'この求人を掲載',
-           '公開する', 'この求人を公開', '掲載を開始する', '求人を公開する', '掲載']
-    CONFIRM = ['はい', 'OK', '掲載する', 'この内容で掲載する', '公開する', '同意して掲載']
+    PREVIEW  = ['求人プレビューへ進む', 'プレビューへ進む', 'プレビューを確認する',
+                'プレビューを確認', 'プレビュー']
+    COMPLETE = ['編集を完了する', '掲載を完了する', 'この内容で掲載する', '掲載する', '公開する']
+    CONFIRM  = ['はい', 'OK', '編集を完了する', '掲載する', 'この内容で掲載する']
 
-    hit = _click_by_labels(page, PUB)
-    if not hit:
-        # プレビュー画面経由での掲載を試す
-        _click_by_labels(page, ['プレビュー', 'プレビューを見る', '内容を確認する'])
+    # ① フォーム → プレビュー
+    step1 = _click_by_labels(page, PREVIEW)
+    if step1:
         time.sleep(2.5)
         try:
-            page.wait_for_load_state("networkidle", timeout=8000)
+            page.wait_for_load_state("networkidle", timeout=10000)
         except Exception:
             pass
-        hit = _click_by_labels(page, PUB)
-    if hit:
+    else:
+        log("  （『求人プレビューへ進む』が見つかりませんでした。ボタン名をご確認ください）", "warn")
+
+    # ② プレビュー → 編集を完了する（＝掲載）
+    step2 = _click_by_labels(page, COMPLETE)
+    if step2:
         time.sleep(2)
         try:
-            page.wait_for_load_state("networkidle", timeout=8000)
+            page.wait_for_load_state("networkidle", timeout=10000)
         except Exception:
             pass
-        # 確認ダイアログ/2段階目
+        # 確認ダイアログが出る場合に備えて
         _click_by_labels(page, CONFIRM)
-        return hit
+        return step2
     return None
 
 
