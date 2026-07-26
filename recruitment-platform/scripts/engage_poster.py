@@ -24,7 +24,7 @@ engageが入力操作中も認証を出す場合は自動化を許可してい�
   ENGAGE_PROFILE_DIR   … Chromeプロファイル保存先（既定: ./engage-profile）
   ENGAGE_JOB_NEW_URL   … 求人作成フォームURL（未設定なら ENGAGE_PK から生成）
   ENGAGE_HEADLESS      … 1 でヘッドレス（既定: 表示）
-  ENGAGE_PUBLISH       … 1 で公開まで試行（既定: 下書き保存のみ）
+  ENGAGE_DRAFT         … 1 で下書き保存のみ（既定: 掲載＝公開まで実行）
 
 ■ 進捗出力
   標準出力に1行JSON: {"type":"posted","jobId":...} / {"message":...,"level":...}
@@ -59,7 +59,8 @@ JOB_NEW_URL = os.environ.get("ENGAGE_JOB_NEW_URL", "").strip() or (
     f"https://en-gage.net/company/job/regist/form/?PK={PK}" if PK else
     "https://en-gage.net/company/job/regist/form/")
 HEADLESS = os.environ.get("ENGAGE_HEADLESS", "").strip() in ("1", "true", "yes")
-PUBLISH = os.environ.get("ENGAGE_PUBLISH", "").strip() in ("1", "true", "yes")
+# 既定で「掲載（公開）」まで実行する。下書き保存だけにしたい場合は ENGAGE_DRAFT=1 を設定。
+DRAFT_ONLY = os.environ.get("ENGAGE_DRAFT", "").strip() in ("1", "true", "yes")
 # CDP接続先（例: http://localhost:9222）。指定すると、あなたが起動した“普通のChrome”に
 # 接続して操作する。engageは自動起動ブラウザのログインを弾くため、こちらを推奨。
 CDP_URL = os.environ.get("ENGAGE_CDP_URL", "").strip()
@@ -272,6 +273,60 @@ def save_draft(page):
     return False
 
 
+def _click_by_labels(page, labels):
+    """候補ラベルの中から表示中のボタン/リンクを1つクリックして、当たったラベルを返す。"""
+    for lb in labels:
+        for sel in [f'button:has-text("{lb}")', f'a:has-text("{lb}")',
+                    f'input[type="submit"][value*="{lb}"]', f'input[type="button"][value*="{lb}"]']:
+            try:
+                loc = page.locator(sel).first
+                if loc.count() > 0 and loc.is_visible():
+                    loc.scroll_into_view_if_needed(timeout=3000)
+                    loc.click(timeout=6000)
+                    return lb
+            except Exception:
+                continue
+    return None
+
+
+def publish(page):
+    """求人を「掲載（公開）」まで進める。
+    直接の掲載ボタン → 無ければプレビュー経由 → 確認ダイアログ、の順で試す。
+    engageの掲載ボタン名は環境で異なる可能性があるため候補を複数試す。"""
+    # 掲載ガイドライン同意（通常は既定でON）
+    try:
+        cb = page.locator('input[name="submitCheck"]').first
+        if cb.count() > 0 and not cb.is_checked():
+            cb.check(force=True, timeout=3000)
+    except Exception:
+        pass
+
+    PUB = ['この内容で掲載する', '掲載する', '求人を掲載する', 'この求人を掲載',
+           '公開する', 'この求人を公開', '掲載を開始する', '求人を公開する', '掲載']
+    CONFIRM = ['はい', 'OK', '掲載する', 'この内容で掲載する', '公開する', '同意して掲載']
+
+    hit = _click_by_labels(page, PUB)
+    if not hit:
+        # プレビュー画面経由での掲載を試す
+        _click_by_labels(page, ['プレビュー', 'プレビューを見る', '内容を確認する'])
+        time.sleep(2.5)
+        try:
+            page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            pass
+        hit = _click_by_labels(page, PUB)
+    if hit:
+        time.sleep(2)
+        try:
+            page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            pass
+        # 確認ダイアログ/2段階目
+        _click_by_labels(page, CONFIRM)
+        return hit
+    return None
+
+
 def is_logged_in(page):
     url = page.url.lower()
     return "login" not in url and "company/job/regist/form" in url
@@ -415,25 +470,46 @@ def main():
                 log(f"📝 [{i+1}/{len(jobs)}] 入力中: {title[:40]}", "info")
                 fill_job(page, job)
                 time.sleep(0.5)
-                if PUBLISH:
-                    log("  （公開モードは未対応のため下書き保存します）", "warn")
-                if save_draft(page):
-                    time.sleep(2.5)
-                    os.makedirs("logs", exist_ok=True)
+                os.makedirs("logs", exist_ok=True)
+                if DRAFT_ONLY:
+                    if save_draft(page):
+                        time.sleep(2.5)
+                        try:
+                            page.screenshot(path=f"logs/engage_saved_{i+1}.png", full_page=False)
+                        except Exception:
+                            pass
+                        log(f"  ✅ 下書き保存: {title[:40]}", "success")
+                        if jid:
+                            posted(jid)
+                        done += 1
+                    else:
+                        log(f"  ⚠️ 「入力内容を保存」ボタンが見つかりませんでした: {title[:40]}", "warn")
+                else:
+                    # 掲載（公開）まで実行
+                    r = publish(page)
+                    time.sleep(2)
                     try:
-                        page.screenshot(path=f"logs/engage_saved_{i+1}.png", full_page=False)
+                        page.screenshot(path=f"logs/engage_published_{i+1}.png", full_page=False)
                     except Exception:
                         pass
-                    log(f"  ✅ 下書き保存: {title[:40]}", "success")
-                    if jid:
-                        posted(jid)
-                    done += 1
-                else:
-                    log(f"  ⚠️ 「入力内容を保存」ボタンが見つかりませんでした: {title[:40]}", "warn")
+                    if r:
+                        log(f"  ✅ 掲載（公開）完了: {title[:40]}  … ボタン『{r}』", "success")
+                        if jid:
+                            posted(jid)
+                        done += 1
+                    else:
+                        # 掲載ボタンが見つからない場合は、入力内容を失わないよう下書き保存
+                        saved = save_draft(page)
+                        log(f"  ⚠️ 掲載ボタンが見つかりませんでした: {title[:40]}"
+                            + ("（下書き保存済み）" if saved else "")
+                            + " ※engageの掲載ボタン名を教えていただければ対応します", "warn")
             except Exception as e:
                 log(f"  ❌ 失敗: {title[:40]} — {e}", "error")
 
-        log(f"完了: {done}/{len(jobs)} 件を下書き保存しました。engage上で内容を確認して公開してください。", "success")
+        if DRAFT_ONLY:
+            log(f"完了: {done}/{len(jobs)} 件を下書き保存しました。engage上で確認して公開してください。", "success")
+        else:
+            log(f"完了: {done}/{len(jobs)} 件を掲載（公開）しました。engage上でご確認ください。", "success")
         _cleanup()
 
 
