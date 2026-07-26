@@ -147,17 +147,21 @@ def holiday_type_from_text(text):
 
 # 職種欄は「求人検索エンジン連携用」で、記号・スペース・アピール文言・勤務地を含めると
 # 連携されない。括弧内(勤務地/補足)や ｜以降(訴求)を落とし、記号・空白を除去して整形する。
-_OCC_STRIP_CHARS = "・･｜|/／\\　 \t★☆♪◆◇■□●○◎＊*！!？?＜＞<>「」『』、。，．,.：:；;〜～#＃@＠&＆＋+＝=％%…‥"
+# ハイフン/ダッシュ類・アンダースコア・チルダ・波ダッシュ・各種括弧も対象（長音符ーは残す）。
+_OCC_STRIP_CHARS = ("・･｜|/／\\　 \t★☆♪◆◇■□●○◎＊*！!？?＜＞<>「」『』、。，．,.：:；;"
+                    "〜～#＃@＠&＆＋+＝=％%…‥"
+                    "-－−—–‐_~｛｝{}［］[]（）()【】〔〕")
 
 
 def clean_occupation(text, limit=50):
     import re
     s = text or ""
-    # ｜ | / ／ 以降（キャッチ・給与などの訴求）は職種名に含めない
-    s = re.split(r"[｜|/／\\]", s)[0]
+    # ｜ | （縦棒）以降＝キャッチ/給与などの訴求は除去。/ 等は区切りではなく記号として後で除去し、
+    # 「総務/経理」のような複合職種名を落とさない（→「総務経理」）。
+    s = re.split(r"[｜|]", s)[0]
     # 【…】〔…〕［…］（…）(…) 等の括弧とその中身（勤務地・補足）を除去
     s = re.sub(r"[【〔［\[（(][^】〕］\])）]*[】〕］\])）]", "", s)
-    # 残った記号・空白を除去（長音符ーや日本語・英数字は残す）
+    # 残った記号・空白・対になっていない括弧を除去（長音符ーや日本語・英数字は残す）
     for ch in _OCC_STRIP_CHARS:
         s = s.replace(ch, "")
     s = s.strip()
@@ -361,6 +365,63 @@ def _agree_guideline(page):
     return False
 
 
+def _checkbox_label(page, cb):
+    """checkboxに紐づくラベル文言を推定して返す（id→label[for] / 祖先label / aria-label / 近傍）。"""
+    try:
+        cid = cb.get_attribute("id")
+        if cid:
+            lab = page.locator(f'label[for="{cid}"]').first
+            if lab.count() > 0:
+                return " ".join((lab.inner_text(timeout=400) or "").split())
+    except Exception:
+        pass
+    for xp in ['xpath=ancestor::label[1]', 'xpath=following::*[normalize-space(string())][1]']:
+        try:
+            el = cb.locator(xp).first
+            if el.count() > 0:
+                return " ".join((el.inner_text(timeout=400) or "").split())
+        except Exception:
+            continue
+    try:
+        return cb.get_attribute("aria-label") or ""
+    except Exception:
+        return ""
+
+
+def _check_confirmation_boxes(page):
+    """送信前の同意・確認チェックボックス（複数）をまとめてON。
+    「求人掲載ガイドライン」等の見出し以降にあるcheckboxを対象にすることで、
+    上部の内容系チェック（『職業紹介に該当する』『正社員登用あり』等）は触らない。"""
+    checked, labels = 0, []
+    anchors = ["求人掲載ガイドライン", "掲載ガイドライン", "掲載にあたって", "以下の内容に同意",
+               "以下に同意", "確認のうえ", "確認事項", "同意事項", "注意事項"]
+    for a in anchors:
+        try:
+            node = page.get_by_text(a, exact=False).first
+            if node.count() == 0:
+                continue
+            boxes = node.locator('xpath=following::input[@type="checkbox"]')
+            n = min(boxes.count(), 15)
+            for i in range(n):
+                cb = boxes.nth(i)
+                try:
+                    if cb.is_checked():
+                        continue
+                    lab = _checkbox_label(page, cb)[:20]
+                    cb.check(force=True, timeout=2500)
+                    checked += 1
+                    labels.append(lab or "(無名)")
+                except Exception:
+                    continue
+            if checked:
+                break
+        except Exception:
+            continue
+    if checked:
+        log(f"  （送信前の確認チェックを{checked}件ON: {' / '.join(labels)}）", "info")
+    return checked
+
+
 def _handle_guideline_modal(page):
     """クリック後に「求人掲載ガイドライン」モーダルが出た場合、同意して進むボタンを押す。
     モーダル内は最下部までスクロールしないと同意ボタンが押せないことがある。"""
@@ -462,8 +523,13 @@ def publish(page, idx=0):
         time.sleep(0.4)
     except Exception:
         pass
+    # 送信前の確認チェックは複数あることがあるため、まとめてON（ガイドライン見出し以降が対象）。
+    n_conf = _check_confirmation_boxes(page)
     agreed = _agree_guideline(page)
-    log(f"  （掲載ガイドライン同意チェック: {'ON' if agreed else '見つからず'}）", "info")
+    if n_conf == 0 and not agreed:
+        log("  （送信前の確認チェックが見つかりませんでした。engage画面のチェック欄をご確認ください）", "warn")
+    else:
+        log(f"  （送信前チェック: 確認欄{n_conf}件 / ガイドライン同意 {'ON' if agreed else '—'}）", "info")
     _shot(page, f"form_{idx}")
 
     # ① フォーム → 確認/プレビュー（実フォームのボタンは「内容を確認する」または「プレビュー」）
@@ -521,11 +587,17 @@ def publish(page, idx=0):
     FREE = ['今は利用しない', '無料で掲載する', '無料のまま掲載する', '無料掲載', 'あとで利用する',
             'あとで', 'スキップ']
     step3 = _click_by_labels(page, FREE)
-    if step3:
-        log(f"  （掲載方法の選択で「{step3}」を選択＝無料掲載を確定）", "info")
     time.sleep(1.5)
     _shot(page, f"done_{idx}")
-    return step2
+    # 掲載の確定は step③（無料掲載の確定）が押せて初めて完了。step③が押せていない場合は
+    # 掲載方法の選択画面で止まっている可能性が高いため、完了とは報告しない（誤報防止）。
+    if step3:
+        log(f"  （掲載方法の選択で「{step3}」を選択＝無料掲載を確定）", "info")
+        return "PUBLISHED"
+    log("  （掲載方法の選択で無料確定ボタンを自動で押せませんでした。"
+        "engage画面で『今は利用しない』等を押して掲載を確定してください）", "warn")
+    _log_visible_buttons(page, "掲載方法の選択")
+    return "PENDING_METHOD"
 
 
 def is_logged_in(page):
@@ -705,11 +777,17 @@ def main():
                 time.sleep(1.0)
         log("✅ ログイン確認。自動入力を開始します。", "success")
 
-        done = 0
+        done = 0        # 掲載/下書き保存まで確実に完了した件数
+        pending = 0     # 入力は済んだが掲載確定が自動でできなかった件数（要手動確定）
         for i, job in enumerate(jobs):
-            jid = job.get("id")
-            title = jget(job, "title", "catchcopy", default=f"job#{i+1}")
+            # jid/title の取得やタイトル整形も try 内で行い、1件の不正データで全体を止めない。
+            title = f"job#{i+1}"
             try:
+                if not isinstance(job, dict):
+                    log(f"  ⚠️ [{i+1}] 不正な求人データ（dict以外）をスキップします", "warn")
+                    continue
+                jid = job.get("id")
+                title = str(jget(job, "title", "catchcopy", default=title))
                 if i > 0:
                     if not open_new_form(page):
                         raise Exception("求人作成フォームを開けませんでした（再試行後も失敗）")
@@ -732,31 +810,39 @@ def main():
                     else:
                         log(f"  ⚠️ 「入力内容を保存」ボタンが見つかりませんでした: {title[:40]}", "warn")
                 else:
-                    # 掲載（公開）まで実行
+                    # 掲載（公開）まで実行。戻り値: "PUBLISHED" / "PENDING_METHOD" / None
                     r = publish(page, i + 1)
                     time.sleep(2)
                     try:
                         page.screenshot(path=f"logs/engage_published_{i+1}.png", full_page=False)
                     except Exception:
                         pass
-                    if r:
-                        log(f"  ✅ 掲載（公開）完了: {title[:40]}  … ボタン『{r}』", "success")
+                    if r == "PUBLISHED":
+                        log(f"  ✅ 掲載（公開）完了: {title[:40]}", "success")
                         if jid:
                             posted(jid)
                         done += 1
+                    elif r == "PENDING_METHOD":
+                        # 入力・プレビューは完了、掲載方法の選択のみ未確定。誤って公開完了と報告しない。
+                        pending += 1
+                        log(f"  ⚠️ 掲載方法の選択で自動確定できませんでした: {title[:40]}"
+                            "（engage画面で『今は利用しない』等を押して掲載を確定してください）", "warn")
                     else:
-                        # 掲載ボタンが見つからない場合は、入力内容を失わないよう下書き保存
+                        # 送信ボタンが見つからない場合は、入力内容を失わないよう下書き保存
                         saved = save_draft(page)
-                        log(f"  ⚠️ 掲載ボタンが見つかりませんでした: {title[:40]}"
+                        log(f"  ⚠️ 送信ボタンが見つかりませんでした: {title[:40]}"
                             + ("（下書き保存済み）" if saved else "")
-                            + " ※engageの掲載ボタン名を教えていただければ対応します", "warn")
+                            + " ※スクショ(logs/engage_form_stuck_*.png)とボタン名を教えていただければ対応します", "warn")
             except Exception as e:
-                log(f"  ❌ 失敗: {title[:40]} — {e}", "error")
+                log(f"  ❌ 失敗: {str(title)[:40]} — {e}", "error")
 
         if DRAFT_ONLY:
             log(f"完了: {done}/{len(jobs)} 件を下書き保存しました。engage上で確認して公開してください。", "success")
         else:
-            log(f"完了: {done}/{len(jobs)} 件を掲載（公開）しました。engage上でご確認ください。", "success")
+            msg = f"完了: {done}/{len(jobs)} 件を掲載（公開）しました。engage上でご確認ください。"
+            if pending:
+                msg += f"（うち別途 {pending} 件は掲載方法の選択が未確定です。engage画面で確定してください）"
+            log(msg, "success")
         _cleanup()
 
 
