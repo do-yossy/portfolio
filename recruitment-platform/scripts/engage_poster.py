@@ -483,6 +483,44 @@ def _check_confirmation_boxes(page):
     return checked
 
 
+def _check_engage_yes_confirmations(page):
+    """engage『求人掲載にあたっての確認』の必須「はい」チェック（独自UI: div.check/md_toggle 等、
+    <input type=checkbox>ではない）を全てONにする。これがOFFだと「内容を確認する」が無効のまま。
+    テキストがちょうど『はい』のトグルをクリック（未ONのみ）。掲載ガイドライン同意は文言が違うため対象外。"""
+    clicked = 0
+    try:
+        cand = page.get_by_text("はい", exact=True)
+        n = cand.count()
+        for i in range(n):
+            el = cand.nth(i)
+            try:
+                if not el.is_visible():
+                    continue
+                # 既にONなら触らない（自身〜祖先4段に on/checked/active/selected 系クラス or aria-checked=true）
+                on = False
+                try:
+                    on = el.evaluate(
+                        "e => { const on=(x)=>!!x && (((''+(x.className||'')).match(/(^|[ _-])(on|checked|active|selected|is-checked)([ _-]|$)/i)) "
+                        "|| (x.getAttribute && x.getAttribute('aria-checked')==='true')); "
+                        "let p=e; for(let k=0;k<4&&p;k++){ if(on(p)) return true; p=p.parentElement; } return false; }"
+                    )
+                except Exception:
+                    on = False
+                if on:
+                    continue
+                el.scroll_into_view_if_needed(timeout=2000)
+                el.click(timeout=2500)
+                clicked += 1
+                time.sleep(0.15)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    if clicked:
+        log(f"  （掲載にあたっての確認「はい」を{clicked}件ONにしました）", "info")
+    return clicked
+
+
 def _dump_validation_errors(page):
     """「内容を確認する」押下後に前進しない場合、入力エラー（必須未入力等）を抽出してログ出力。
     どの項目で止まっているかを特定するための診断。"""
@@ -642,13 +680,16 @@ def publish(page, idx=0):
         time.sleep(0.4)
     except Exception:
         pass
-    # 送信前の確認チェックは複数あることがあるため、まとめてON（ガイドライン見出し以降が対象）。
-    n_conf = _check_confirmation_boxes(page)
-    agreed = _agree_guideline(page)
-    if n_conf == 0 and not agreed:
+    # 送信前の確認チェックをON。engageの「求人掲載にあたっての確認」は独自UIの必須「はい」×7で、
+    # これ＋掲載ガイドライン同意が全てONにならないと「内容を確認する」が有効化されない。
+    n_conf = _check_confirmation_boxes(page)          # <input type=checkbox>型（engageでは0）
+    agreed = _agree_guideline(page)                   # 掲載ガイドラインに同意する
+    n_yes = _check_engage_yes_confirmations(page)     # 掲載にあたっての確認「はい」×7（独自UI）
+    time.sleep(0.8)
+    if n_yes == 0 and n_conf == 0 and not agreed:
         log("  （送信前の確認チェックが見つかりませんでした。engage画面のチェック欄をご確認ください）", "warn")
     else:
-        log(f"  （送信前チェック: 確認欄{n_conf}件 / ガイドライン同意 {'ON' if agreed else '—'}）", "info")
+        log(f"  （送信前チェック: 確認{n_conf}件 / はい{n_yes}件 / ガイドライン同意 {'ON' if agreed else '—'}）", "info")
     _shot(page, f"form_{idx}")
 
     # ① フォーム → 確認/プレビュー（実フォームのボタンは「内容を確認する」または「プレビュー」）
