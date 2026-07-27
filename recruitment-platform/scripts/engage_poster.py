@@ -146,6 +146,21 @@ def holiday_type_from_text(text):
     return ""
 
 
+def extract_section(text, headings, limit=0):
+    """説明文の【見出し】直後〜次の【…】(または末尾)までを抽出する。
+    engageは勤務時間・休日・応募資格などを個別の必須欄で持つため、DB側が空でも
+    説明文の該当セクションから補完して必須未入力を防ぐ。複数の見出し候補を順に試す。"""
+    if not text:
+        return ""
+    for h in headings:
+        m = re.search(r"【\s*" + re.escape(h) + r"[^】]*】[ \t　]*\n?(.+?)(?=\n【|\Z)", text, re.S)
+        if m:
+            body = m.group(1).strip()
+            if body:
+                return body[:limit] if (limit and len(body) > limit) else body
+    return ""
+
+
 # 職種欄は「求人検索エンジン連携用」で、記号・スペース・アピール文言・勤務地を含めると
 # 連携されない。括弧内(勤務地/補足)や ｜以降(訴求)を落とし、許可文字以外(記号/空白/ダッシュ/
 # NBSP/※/矢印等すべて)を除去する。許可＝ひらがな・カタカナ(長音符ー含む)・漢字・英数字のみ。
@@ -223,11 +238,19 @@ def fill_job(page, job):
     title = jget(job, "catchcopy", "title")
     desc = jget(job, "description")
     salary = jget(job, "salary")
-    worktime = jget(job, "worktime_holiday", "worktimeHoliday", "office_hours")
-    holiday = jget(job, "holiday", default=worktime)
-    benefit = jget(job, "benefit", "treatment")
-    qualification = jget(job, "qualifications", "qualification")
-    how_to_apply = jget(job, "how_to_apply", "howToApply")
+    # engageは勤務時間・休日・待遇・応募資格・選考プロセスを個別の必須欄で持つ。
+    # DBの個別フィールドが空の場合は、説明文の該当セクションから補完して必須未入力を防ぐ。
+    worktime = jget(job, "worktime_holiday", "worktimeHoliday", "office_hours") \
+        or extract_section(desc, ["勤務時間", "就業時間", "勤務時間・曜日"], 200)
+    holiday = jget(job, "holiday") \
+        or extract_section(desc, ["休日・休暇", "休日", "休暇"], 400) or worktime
+    benefit = jget(job, "benefit", "treatment") \
+        or extract_section(desc, ["待遇・福利厚生", "待遇", "福利厚生", "各種手当・制度"], 800)
+    qualification = jget(job, "qualifications", "qualification") \
+        or extract_section(desc, ["応募資格", "求める人物像", "歓迎する経験・スキル", "必要な経験"], 400)
+    how_to_apply = jget(job, "how_to_apply", "howToApply") \
+        or extract_section(desc, ["選考プロセス", "選考の流れ", "選考フロー"], 400) \
+        or "ご応募 → 書類選考 → 面接（1〜2回）→ 内定・入社"
     location = jget(job, "location")
 
     # 雇用形態: 中途採用（正社員）
@@ -460,6 +483,34 @@ def _check_confirmation_boxes(page):
     return checked
 
 
+def _dump_validation_errors(page):
+    """「内容を確認する」押下後に前進しない場合、入力エラー（必須未入力等）を抽出してログ出力。
+    どの項目で止まっているかを特定するための診断。"""
+    try:
+        errs = page.evaluate(
+            """
+            () => {
+              const out = [];
+              const nodes = document.querySelectorAll(
+                '[class*=error],[class*=Error],[class*=err],[class*=alert],[class*=invalid],[aria-invalid=true]');
+              for (const e of nodes) {
+                if (e.offsetParent === null) continue;
+                let t = (e.innerText || '').replace(/\\s+/g, ' ').trim();
+                if (!t) continue;
+                if (t.length > 60) t = t.slice(0, 60);
+                if (!out.includes(t)) out.push(t);
+                if (out.length >= 12) break;
+              }
+              return out;
+            }
+            """
+        )
+        if errs:
+            log("  【入力エラー/必須未入力の可能性】" + " ‖ ".join(errs[:12]), "warn")
+    except Exception:
+        pass
+
+
 def _dump_submit_candidates(page):
     """送信系ボタンらしき要素（内容確認/プレビュー/掲載/完了/保存/進む等の文言）の
     tag/class/text/表示状態をJSで一括抽出してログ出力。engageの実DOMを特定するための診断。"""
@@ -637,6 +688,7 @@ def publish(page, idx=0):
     step2 = _click_by_labels(page, STEP2)
     if not step2:
         log("  （確認画面の『編集を完了する』ボタンが見つかりませんでした）", "warn")
+        _dump_validation_errors(page)   # まだフォームなら必須未入力の項目を出す
         _log_visible_buttons(page, "確認/プレビュー画面")
         _dump_submit_candidates(page)
         _shot(page, f"confirm_stuck_{idx}")
