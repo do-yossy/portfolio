@@ -146,6 +146,21 @@ def holiday_type_from_text(text):
     return ""
 
 
+def extract_section(text, headings, limit=0):
+    """説明文の【見出し】直後〜次の【…】(または末尾)までを抽出する。
+    engageは勤務時間・休日・応募資格などを個別の必須欄で持つため、DB側が空でも
+    説明文の該当セクションから補完して必須未入力を防ぐ。複数の見出し候補を順に試す。"""
+    if not text:
+        return ""
+    for h in headings:
+        m = re.search(r"【\s*" + re.escape(h) + r"[^】]*】[ \t　]*\n?(.+?)(?=\n【|\Z)", text, re.S)
+        if m:
+            body = m.group(1).strip()
+            if body:
+                return body[:limit] if (limit and len(body) > limit) else body
+    return ""
+
+
 # 職種欄は「求人検索エンジン連携用」で、記号・スペース・アピール文言・勤務地を含めると
 # 連携されない。括弧内(勤務地/補足)や ｜以降(訴求)を落とし、許可文字以外(記号/空白/ダッシュ/
 # NBSP/※/矢印等すべて)を除去する。許可＝ひらがな・カタカナ(長音符ー含む)・漢字・英数字のみ。
@@ -223,11 +238,19 @@ def fill_job(page, job):
     title = jget(job, "catchcopy", "title")
     desc = jget(job, "description")
     salary = jget(job, "salary")
-    worktime = jget(job, "worktime_holiday", "worktimeHoliday", "office_hours")
-    holiday = jget(job, "holiday", default=worktime)
-    benefit = jget(job, "benefit", "treatment")
-    qualification = jget(job, "qualifications", "qualification")
-    how_to_apply = jget(job, "how_to_apply", "howToApply")
+    # engageは勤務時間・休日・待遇・応募資格・選考プロセスを個別の必須欄で持つ。
+    # DBの個別フィールドが空の場合は、説明文の該当セクションから補完して必須未入力を防ぐ。
+    worktime = jget(job, "worktime_holiday", "worktimeHoliday", "office_hours") \
+        or extract_section(desc, ["勤務時間", "就業時間", "勤務時間・曜日"], 200)
+    holiday = jget(job, "holiday") \
+        or extract_section(desc, ["休日・休暇", "休日", "休暇"], 400) or worktime
+    benefit = jget(job, "benefit", "treatment") \
+        or extract_section(desc, ["待遇・福利厚生", "待遇", "福利厚生", "各種手当・制度"], 800)
+    qualification = jget(job, "qualifications", "qualification") \
+        or extract_section(desc, ["応募資格", "求める人物像", "歓迎する経験・スキル", "必要な経験"], 400)
+    how_to_apply = jget(job, "how_to_apply", "howToApply") \
+        or extract_section(desc, ["選考プロセス", "選考の流れ", "選考フロー"], 400) \
+        or "ご応募 → 書類選考 → 面接（1〜2回）→ 内定・入社"
     location = jget(job, "location")
 
     # 雇用形態: 中途採用（正社員）
@@ -460,6 +483,72 @@ def _check_confirmation_boxes(page):
     return checked
 
 
+def _check_engage_yes_confirmations(page):
+    """engage『求人掲載にあたっての確認』の必須「はい」チェック（独自UI: div.check/md_toggle 等、
+    <input type=checkbox>ではない）を全てONにする。これがOFFだと「内容を確認する」が無効のまま。
+    テキストがちょうど『はい』のトグルをクリック（未ONのみ）。掲載ガイドライン同意は文言が違うため対象外。"""
+    clicked = 0
+    try:
+        cand = page.get_by_text("はい", exact=True)
+        n = cand.count()
+        for i in range(n):
+            el = cand.nth(i)
+            try:
+                if not el.is_visible():
+                    continue
+                # 既にONなら触らない（自身〜祖先4段に on/checked/active/selected 系クラス or aria-checked=true）
+                on = False
+                try:
+                    on = el.evaluate(
+                        "e => { const on=(x)=>!!x && (((''+(x.className||'')).match(/(^|[ _-])(on|checked|active|selected|is-checked)([ _-]|$)/i)) "
+                        "|| (x.getAttribute && x.getAttribute('aria-checked')==='true')); "
+                        "let p=e; for(let k=0;k<4&&p;k++){ if(on(p)) return true; p=p.parentElement; } return false; }"
+                    )
+                except Exception:
+                    on = False
+                if on:
+                    continue
+                el.scroll_into_view_if_needed(timeout=2000)
+                el.click(timeout=2500)
+                clicked += 1
+                time.sleep(0.15)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    if clicked:
+        log(f"  （掲載にあたっての確認「はい」を{clicked}件ONにしました）", "info")
+    return clicked
+
+
+def _dump_validation_errors(page):
+    """「内容を確認する」押下後に前進しない場合、入力エラー（必須未入力等）を抽出してログ出力。
+    どの項目で止まっているかを特定するための診断。"""
+    try:
+        errs = page.evaluate(
+            """
+            () => {
+              const out = [];
+              const nodes = document.querySelectorAll(
+                '[class*=error],[class*=Error],[class*=err],[class*=alert],[class*=invalid],[aria-invalid=true]');
+              for (const e of nodes) {
+                if (e.offsetParent === null) continue;
+                let t = (e.innerText || '').replace(/\\s+/g, ' ').trim();
+                if (!t) continue;
+                if (t.length > 60) t = t.slice(0, 60);
+                if (!out.includes(t)) out.push(t);
+                if (out.length >= 12) break;
+              }
+              return out;
+            }
+            """
+        )
+        if errs:
+            log("  【入力エラー/必須未入力の可能性】" + " ‖ ".join(errs[:12]), "warn")
+    except Exception:
+        pass
+
+
 def _dump_submit_candidates(page):
     """送信系ボタンらしき要素（内容確認/プレビュー/掲載/完了/保存/進む等の文言）の
     tag/class/text/表示状態をJSで一括抽出してログ出力。engageの実DOMを特定するための診断。"""
@@ -591,13 +680,16 @@ def publish(page, idx=0):
         time.sleep(0.4)
     except Exception:
         pass
-    # 送信前の確認チェックは複数あることがあるため、まとめてON（ガイドライン見出し以降が対象）。
-    n_conf = _check_confirmation_boxes(page)
-    agreed = _agree_guideline(page)
-    if n_conf == 0 and not agreed:
+    # 送信前の確認チェックをON。engageの「求人掲載にあたっての確認」は独自UIの必須「はい」×7で、
+    # これ＋掲載ガイドライン同意が全てONにならないと「内容を確認する」が有効化されない。
+    n_conf = _check_confirmation_boxes(page)          # <input type=checkbox>型（engageでは0）
+    agreed = _agree_guideline(page)                   # 掲載ガイドラインに同意する
+    n_yes = _check_engage_yes_confirmations(page)     # 掲載にあたっての確認「はい」×7（独自UI）
+    time.sleep(0.8)
+    if n_yes == 0 and n_conf == 0 and not agreed:
         log("  （送信前の確認チェックが見つかりませんでした。engage画面のチェック欄をご確認ください）", "warn")
     else:
-        log(f"  （送信前チェック: 確認欄{n_conf}件 / ガイドライン同意 {'ON' if agreed else '—'}）", "info")
+        log(f"  （送信前チェック: 確認{n_conf}件 / はい{n_yes}件 / ガイドライン同意 {'ON' if agreed else '—'}）", "info")
     _shot(page, f"form_{idx}")
 
     # ① フォーム → 確認/プレビュー（実フォームのボタンは「内容を確認する」または「プレビュー」）
@@ -637,6 +729,7 @@ def publish(page, idx=0):
     step2 = _click_by_labels(page, STEP2)
     if not step2:
         log("  （確認画面の『編集を完了する』ボタンが見つかりませんでした）", "warn")
+        _dump_validation_errors(page)   # まだフォームなら必須未入力の項目を出す
         _log_visible_buttons(page, "確認/プレビュー画面")
         _dump_submit_candidates(page)
         _shot(page, f"confirm_stuck_{idx}")
