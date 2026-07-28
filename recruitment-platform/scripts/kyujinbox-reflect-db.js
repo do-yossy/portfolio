@@ -48,6 +48,7 @@ const val = (f, d) => { const i = args.indexOf(f); return i >= 0 && args[i + 1] 
 const APPLY = has('--apply');
 const DRIVERS = has('--drivers');
 const SHOW = has('--show');
+const FORCE = has('--force');   // 反映済みも含めて全件やり直す（既定は未反映のみ＝再実行で自動で次へ進む）
 const COMPANY = (val('--company', 'all') || 'all').toLowerCase();
 const LIMIT = parseInt(val('--limit', '25'), 10) || 25;
 
@@ -76,19 +77,29 @@ function detectPython() {
 const DB = process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'recruitment.db') : path.join(APP_DIR, 'data', 'recruitment.db');
 const db = new DatabaseSync(DB);
 
-let sql = `SELECT id, title, description, rewarding, company, kyujinbox_job_number, job_type
-           FROM jobs
-           WHERE is_published=1 AND kyujinbox_job_number IS NOT NULL AND kyujinbox_job_number <> ''`;
-const params = [];
-if (COMPANY !== 'all') { sql += ' AND company = ?'; params.push(COMPANY); }
-if (DRIVERS) sql += ` AND (job_type LIKE '%ドライバー%' OR job_type LIKE '%配送%' OR job_type LIKE '%運転%' OR title LIKE '%ドライバー%' OR title LIKE '%配送%' OR title LIKE '%運転手%')`;
-const rows = db.prepare(sql).all(...params);
-db.close();
+// 反映済みを記録する列を用意（無ければ追加）。これで --limit で回すと再実行のたびに次の未反映分へ進む。
+try { db.exec('ALTER TABLE jobs ADD COLUMN kyujinbox_reflected_at TEXT'); } catch { /* 既に存在 */ }
 
-console.log(`\n===== 掲載中求人へDB内容を反映（${APPLY ? '保存する' : 'ドライラン: 保存しない'}${DRIVERS ? ' / ドライバー限定' : ''}）=====`);
-console.log(`求人番号が紐づく掲載中求人: ${rows.length}件（company=${COMPANY}）`);
+let baseWhere = "is_published=1 AND kyujinbox_job_number IS NOT NULL AND kyujinbox_job_number <> ''";
+const params = [];
+if (COMPANY !== 'all') { baseWhere += ' AND company = ?'; params.push(COMPANY); }
+if (DRIVERS) baseWhere += ` AND (job_type LIKE '%ドライバー%' OR job_type LIKE '%配送%' OR job_type LIKE '%運転%' OR title LIKE '%ドライバー%' OR title LIKE '%配送%' OR title LIKE '%運転手%')`;
+const reflectedCond = FORCE ? '' : " AND (kyujinbox_reflected_at IS NULL OR kyujinbox_reflected_at = '')";
+const totalRemaining = db.prepare(`SELECT COUNT(*) c FROM jobs WHERE ${baseWhere}${reflectedCond}`).get(...params).c;
+const grandTotal = db.prepare(`SELECT COUNT(*) c FROM jobs WHERE ${baseWhere}`).get(...params).c;
+const rows = db.prepare(
+  `SELECT id, title, description, rewarding, company, kyujinbox_job_number, job_type
+   FROM jobs WHERE ${baseWhere}${reflectedCond}
+   ORDER BY company, kyujinbox_job_number`
+).all(...params);
+
+console.log(`\n===== 掲載中求人へDB内容を反映（${APPLY ? '保存する' : 'ドライラン: 保存しない'}${DRIVERS ? ' / ドライバー限定' : ''}${FORCE ? ' / 全件やり直し' : ''}）=====`);
+console.log(`対象(求人番号あり): 全${grandTotal}件 / ${FORCE ? '全件対象' : `未反映 ${totalRemaining}件`}（company=${COMPANY}）`);
 if (rows.length === 0) {
-  console.log('→ 対象がありません。先に kyujinbox_metrics.py で成績収集すると、掲載中求人にkyujinbox_job_numberが紐づきます。');
+  console.log(FORCE
+    ? '→ 対象がありません。先に kyujinbox_metrics.py で成績収集すると求人番号が紐づきます。'
+    : '→ 未反映の対象がありません（全て反映済み）。やり直すなら --force を付けてください。');
+  db.close();
   process.exit(0);
 }
 
@@ -100,13 +111,18 @@ const pyCmd = detectPython();
 console.log('使用Python:', pyCmd.join(' '));
 const reflectScript = path.join(__dirname, 'kyujinbox_reflect.py');
 
+const markReflected = db.prepare('UPDATE jobs SET kyujinbox_reflected_at=? WHERE kyujinbox_job_number=?');
 let totalReflected = 0, totalSaved = 0;
+// このバッチで扱う件数は全会社合計で LIMIT まで（＝1回の実行で最大LIMIT件）
+let budget = LIMIT;
 for (const [co, list0] of Object.entries(byCo)) {
+  if (budget <= 0) break;
   const { env, hasCreds } = credsForCompany(co);
   const name = companyName(co);
   if (!hasCreds) { console.log(`\n⏭️  ${name}(${co}): 求人ボックス認証(.env)が未設定のためスキップ`); continue; }
-  const list = list0.slice(0, LIMIT);
-  console.log(`\n=== ${name}(${co}）: ${list.length}件を反映${list0.length > LIMIT ? `（全${list0.length}件中・--limitで上限）` : ''} ===`);
+  const list = list0.slice(0, budget);
+  budget -= list.length;
+  console.log(`\n=== ${name}(${co}）: ${list.length}件を反映（未反映のうち今回分） ===`);
   const payload = list.map(j => ({
     jobNumber: String(j.kyujinbox_job_number).trim(),
     title: j.title || '',
@@ -118,15 +134,29 @@ for (const [co, list0] of Object.entries(byCo)) {
     cwd: APP_DIR, input: JSON.stringify(payload), encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024, timeout: 25 * 60 * 1000,
   });
+  const now = new Date().toISOString();
   for (const line of (rp.stdout || '').split('\n')) {
     try {
       const o = JSON.parse(line);
       if (o.type === 'progress') console.log('  ' + o.message);
-      else if (o.type === 'reflected') { totalReflected++; if (o.saved) totalSaved++; }
+      else if (o.type === 'reflected') {
+        totalReflected++;
+        if (o.saved) { totalSaved++; if (APPLY) { try { markReflected.run(now, String(o.jobNumber).trim()); } catch { /* ignore */ } } }
+      }
     } catch { /* skip non-JSON */ }
   }
   if (rp.stderr && rp.stderr.trim()) console.log('  ⚠️ ' + rp.stderr.trim().split('\n').slice(-2).join(' '));
 }
 
+// 残り（未反映）を再計算して表示
+let remain = totalRemaining;
+try { remain = db.prepare(`SELECT COUNT(*) c FROM jobs WHERE ${baseWhere}${reflectedCond}`).get(...params).c; } catch { /* ignore */ }
+db.close();
 console.log(`\n完了: 反映処理 ${totalReflected}件 / うち保存 ${totalSaved}件`);
-if (!APPLY) console.log('※ ドライランです。問題なければ --apply を付けて再実行すると掲載中求人へ保存されます。');
+if (APPLY) {
+  console.log(remain > 0
+    ? `📌 未反映は残り ${remain}件。同じコマンドをもう一度実行すると、自動で次の未反映分に進みます。`
+    : '🎉 未反映は残り 0件。全て反映済みです。');
+} else {
+  console.log('※ ドライランです。問題なければ --apply を付けて再実行すると保存＆反映済み記録されます（次回から自動で先へ進みます）。');
+}
