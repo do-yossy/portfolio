@@ -2359,6 +2359,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <td><a href="tel:${esc(a.phone || '')}" style="color:inherit;text-decoration:none">${esc(a.phone || '')}</a></td>
           <td>${esc(a.email || '')}</td>
           <td>${esc(a.gender || '')}</td>
+          <td style="white-space:nowrap">${esc(a.birth_date || '')}</td>
           <td>${a.age || ''}</td>
           <td>${esc(a.address || '')}</td>
           <td>${esc(a.job_title || '')}</td>
@@ -2380,7 +2381,7 @@ function opsPage({ tab = 'posts', co = 'sq', posts = [], postsCross = {}, applic
           <div class="table-scroll">
             <table class="data-table">
               <thead><tr>
-                <th class="name-col">名前</th><th>電話番号</th><th>メール</th><th>性別</th><th>年齢</th>
+                <th class="name-col">名前</th><th>電話番号</th><th>メール</th><th>性別</th><th>生年月日</th><th>年齢</th>
                 <th>居住地</th><th>求人タイトル</th><th>現在の職業</th><th>学歴</th>
                 <th>会社</th><th>媒体</th><th>応募日</th><th>架電回数</th><th>最終架電</th><th>メモ</th>
               </tr></thead>
