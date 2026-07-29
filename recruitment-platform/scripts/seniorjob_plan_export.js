@@ -223,8 +223,8 @@ function buildRow(ref, p, st, photoIdx) {
     const body = contentText(p.detail, p.area, ekiName, CYCLE);
     if (body) set('(必須)仕事内容', body);
   }
-  // 写真プール（任意・区＋サイクルでローテ）
-  const pool = PHOTOS[p.kei];
+  // 写真プール（任意・区＋サイクルでローテ）。職種詳細ごとの割当を優先し、無ければ職種系。
+  const pool = (Array.isArray(PHOTOS[p.detail]) && PHOTOS[p.detail].length) ? PHOTOS[p.detail] : PHOTOS[p.kei];
   if (Array.isArray(pool) && pool.length) set('(必須)写真ID1', String(pool[(photoIdx + CYCLE) % pool.length]));
   return { line: row.map(q).join(','), header: H };
 }
