@@ -431,7 +431,7 @@ function mapCSVRow(row) {
     notes:       col(['メモ','notes','備考','対応メモ']),
     // 追加フィールド（求人ボックス・Indeed 両対応）
     gender:      col(['性別','gender']),
-    birthDate:   col(['生年月日','birth_date','birthdate']),
+    birthDate:   col(['生年月日','誕生日','birth_date','birthdate','birthday','date_of_birth']),
     currentJob:  col(['現在の職業','current_job','現職','職業']),
     jobTitle:    col(['求人タイトル','job_title','職種名','求人名']),
     experience:  col(['関連のある経験','experience','経験','職歴']),
@@ -506,7 +506,7 @@ function mapOpsCSVRow(row, company, media) {
 
   // ── 求人ボックス形式: 生年月日 "1994年03月05日 (32歳)" から年齢を抽出 ──
   if (!base.age) {
-    const bd = col(['生年月日','birth_date','birthdate']);
+    const bd = col(['生年月日','誕生日','birth_date','birthdate','birthday']);
     const am = bd.match(/[（(]\s*(\d{1,3})\s*歳/);
     if (am) base.age = am[1];
   }
