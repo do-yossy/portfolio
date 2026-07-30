@@ -8,9 +8,10 @@
  *       例: MEDIA=indeed node --experimental-sqlite scripts/add-applicant-tomioka.js
  *   - 既存レコード（過去応募でアーカイブ済み・重複含む）があれば新規追加せず、
  *     それをアクティブ架電リストへ復帰（is_archived=0 / status=新規 / 重複解除）。
+ *   - 応募日を本日(現在時刻)に設定し「本日の新規応募（新規応募タブ）」にも計上。
  *   - 本スクリプトが以前作った暫定レコード（媒体google・電話空）が別にあれば掃除。
  *   - 何も無ければ新規作成。
- *   - 冪等: 何度実行しても最終状態は「アクティブ架電リストに1件（シニアジョブ）」。
+ *   - 冪等: 何度実行しても最終状態は「アクティブ架電リストに1件（シニアジョブ）・本日応募」。
  *
  * 実行: node --experimental-sqlite scripts/add-applicant-tomioka.js
  */
@@ -22,6 +23,8 @@ const SEEKER_ID = '117124';
 const MEDIA = (process.env.MEDIA || 'seniorjob').trim();
 const NAME_COMPACT = NAME.replace(/[\s　]/g, '');
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+const APPLIED_AT = now();                 // 本日応募として計上（applied_at >= JST当日開始）
+const APPLIED_MONTH = APPLIED_AT.slice(0, 7);
 
 const noteLines = [
   `求職者ID:${SEEKER_ID} / 採用決定費:8万円(税別)`,
@@ -53,15 +56,16 @@ function fillAndActivate(rec) {
   if (!notes.includes(`求職者ID:${SEEKER_ID}`)) {
     notes = notes ? `${notes}\n${NOTES}` : NOTES;
   }
-  // アクティブ架電リストへ復帰（媒体もシニアジョブへ）
+  // アクティブ架電リストへ復帰（媒体もシニアジョブへ）＋本日の新規応募として計上
   db.prepare(
     `UPDATE applicants
-        SET media = ?, status = '新規', is_archived = 0,
+        SET media = ?, status = '新規', is_archived = 0, is_imported = 0,
             is_duplicate = 0, duplicate_of_id = NULL,
+            applied_at = ?, applied_month = ?,
             work_location = CASE WHEN (work_location IS NULL OR work_location='') THEN ? ELSE work_location END,
             notes = ?, updated_at = ?
       WHERE id = ?`
-  ).run(MEDIA, '大阪府（大阪市各区・堺市ほか府内全域）', notes, now(), rec.id);
+  ).run(MEDIA, APPLIED_AT, APPLIED_MONTH, '大阪府（大阪市各区・堺市ほか府内全域）', notes, now(), rec.id);
 }
 
 if (matches.length) {
@@ -102,16 +106,16 @@ if (matches.length) {
     sourceMedia: 'シニアジョブ',
     media: MEDIA,
     status: '新規',
-    isImported: 1,
+    isImported: 0,
     isArchived: 0,
-    allowEmptyDate: true,
+    appliedAt: APPLIED_AT,        // 本日の新規応募として計上
     notes: NOTES,
   });
   console.log(`✅ 架電リスト（媒体:${MEDIA}）に新規追加しました: ${created.name}（ID:${created.id}）`);
 }
 
 if (!MEDIA || MEDIA === 'seniorjob') {
-  console.log(`   → 架電リストの「シニアジョブ」タブでご確認ください。`);
+  console.log(`   → 架電リスト「会社:SQ / 媒体:シニアジョブ」タブ、および新規応募タブ(本日)でご確認ください。`);
 }
 if (!finalPhone.trim()) {
   console.log(`   ⚠️ 電話番号が情報にありません。架電前に掲載管理から電話番号を入力してください。`);
