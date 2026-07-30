@@ -137,6 +137,33 @@ function contentVariants(stem) {
   const re = new RegExp('^' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(-\\d+)?\\.txt$');
   try { return fs.readdirSync(CONTENTS).filter(f => re.test(f)).sort(); } catch { return []; }
 }
+// シニア層に響く共通の福利厚生・働き方の訴求文（各求人の給与・休日はそのまま活かし、これを追記）。
+// ※ここは「年齢不問・相談可」など事実として安全な内容のみ。実際に提供する手当等があれば下に追記してください。
+const SENIOR_WELFARE = [
+  '年齢不問・定年後の方も歓迎。長く安定して働けます',
+  '未経験・ブランクOK。丁寧な引き継ぎとサポートがあり、はじめてでも安心です',
+  '体力に配慮した無理のない業務量。急かされず、安全第一で働けます',
+  '勤務日数・勤務時間はお気軽にご相談ください（ご家庭やご都合に合わせて調整可）',
+  'シニア世代が多数活躍中。同世代の仲間がいる環境です',
+];
+// 既存の待遇行から「給与」と「具体的な待遇（賞与・休日・社保・交通費・免許など）」を取り出す。
+function enrichWelfare(body) {
+  const m = body.match(/【募集条件・待遇】\n([^\n]*)/);
+  if (!m) return body;
+  const tokens = m[1].split('／').map((s) => s.trim()).filter(Boolean);
+  if (!tokens.length) return body;
+  const salary = tokens[0];
+  const keep = tokens.slice(1).filter((t) => /賞与|昇給|週休|休日|シフト|社会保険|保険|交通費|免許|手当|退職|制服|健康|通勤/.test(t));
+  const lines = [];
+  lines.push('【給与】');
+  lines.push(salary);
+  lines.push('・前職の給与や経験を考慮して決定します（シニア世代の再スタートも歓迎）');
+  lines.push('');
+  lines.push('【福利厚生・働き方（40〜60代が活躍中）】');
+  for (const k of keep) lines.push('・' + k);
+  for (const w of SENIOR_WELFARE) lines.push('・' + w);
+  return body.slice(0, m.index) + lines.join('\n');
+}
 function contentText(detail, area, eki, cycle) {
   const stem = CONTENT_MAP[detail];
   if (!stem) return null;
@@ -144,9 +171,10 @@ function contentText(detail, area, eki, cycle) {
   if (!vs.length) return null;
   const f = vs[(cycle || 0) % vs.length];
   try {
-    return fs.readFileSync(path.join(CONTENTS, f), 'utf8')
+    const raw = fs.readFileSync(path.join(CONTENTS, f), 'utf8')
       .replace(/\r\n/g, '\n').replace(/\s+$/, '')
       .split('{area}').join(area).split('{eki}').join(eki);
+    return enrichWelfare(raw);
   } catch { return null; }
 }
 
