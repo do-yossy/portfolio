@@ -137,30 +137,62 @@ function contentVariants(stem) {
   const re = new RegExp('^' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(-\\d+)?\\.txt$');
   try { return fs.readdirSync(CONTENTS).filter(f => re.test(f)).sort(); } catch { return []; }
 }
-// シニア層に響く共通の福利厚生・働き方の訴求文（各求人の給与・休日はそのまま活かし、これを追記）。
-// ※ここは「年齢不問・相談可」など事実として安全な内容のみ。実際に提供する手当等があれば下に追記してください。
+// 実際に提供している手当・制度（シニア歓迎）。文言調整はここで一括。
+const SENIOR_ALLOWANCE = [
+  '退職金制度（長く働くほど安心）',
+  '再雇用制度（定年後も引き続き活躍できます）',
+  '皆勤手当',
+  '家族手当',
+  '介護手当（ご家族の介護と両立しやすい環境）',
+  // ＋α（シニアに喜ばれる制度）
+  '資格取得支援制度',
+  '慶弔見舞金',
+  '勤続・長寿のお祝い金',
+];
+// 健康サポート系の補助（シニアに好評）。
+const SENIOR_HEALTH = [
+  '健康診断補助',
+  'がん保険補助',
+  '健康食品補助',
+  '昼食補助',
+  // ＋α
+  'インフルエンザ予防接種補助',
+  '産業医・健康相談（体調に合わせて相談できます）',
+];
+// シニア層に響く働き方の訴求文（事実として安全な内容）。
 const SENIOR_WELFARE = [
   '年齢不問・定年後の方も歓迎。長く安定して働けます',
   '未経験・ブランクOK。丁寧な引き継ぎとサポートがあり、はじめてでも安心です',
   '体力に配慮した無理のない業務量。急かされず、安全第一で働けます',
   '勤務日数・勤務時間はお気軽にご相談ください（ご家庭やご都合に合わせて調整可）',
+  '制服・作業着貸与',
   'シニア世代が多数活躍中。同世代の仲間がいる環境です',
 ];
-// 既存の待遇行から「給与」と「具体的な待遇（賞与・休日・社保・交通費・免許など）」を取り出す。
+// 既存の待遇行から「給与」と「具体的な待遇（賞与・休日・社保・交通費・免許など）」を取り出し、
+// 給与／手当・制度／健康サポート／福利厚生・働き方 の4段に再構成する。
 function enrichWelfare(body) {
   const m = body.match(/【募集条件・待遇】\n([^\n]*)/);
   if (!m) return body;
   const tokens = m[1].split('／').map((s) => s.trim()).filter(Boolean);
   if (!tokens.length) return body;
   const salary = tokens[0];
-  const keep = tokens.slice(1).filter((t) => /賞与|昇給|週休|休日|シフト|社会保険|保険|交通費|免許|手当|退職|制服|健康|通勤/.test(t));
+  const keep = tokens.slice(1).filter((t) => /賞与|昇給|週休|休日|シフト|社会保険|保険|交通費|免許|通勤/.test(t));
+  const bonus = keep.filter((t) => /賞与|昇給/.test(t));
+  const rest = keep.filter((t) => !/賞与|昇給/.test(t)); // 社保/交通費/週休/休日/免許
   const lines = [];
   lines.push('【給与】');
   lines.push(salary);
   lines.push('・前職の給与や経験を考慮して決定します（シニア世代の再スタートも歓迎）');
+  for (const b of bonus) lines.push('・' + b);
+  lines.push('');
+  lines.push('【手当・制度が充実】');
+  for (const a of SENIOR_ALLOWANCE) lines.push('・' + a);
+  lines.push('');
+  lines.push('【健康サポート】');
+  for (const h of SENIOR_HEALTH) lines.push('・' + h);
   lines.push('');
   lines.push('【福利厚生・働き方（40〜60代が活躍中）】');
-  for (const k of keep) lines.push('・' + k);
+  for (const r of rest) lines.push('・' + r);
   for (const w of SENIOR_WELFARE) lines.push('・' + w);
   return body.slice(0, m.index) + lines.join('\n');
 }
