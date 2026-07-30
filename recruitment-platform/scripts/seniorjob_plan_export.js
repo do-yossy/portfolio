@@ -226,7 +226,7 @@ function buildRow(ref, p, st, photoIdx) {
   // 写真プール（任意・区＋サイクルでローテ）。職種詳細ごとの割当を優先し、無ければ職種系。
   const pool = (Array.isArray(PHOTOS[p.detail]) && PHOTOS[p.detail].length) ? PHOTOS[p.detail] : PHOTOS[p.kei];
   if (Array.isArray(pool) && pool.length) set('(必須)写真ID1', String(pool[(photoIdx + CYCLE) % pool.length]));
-  return { line: row.map(q).join(','), header: H };
+  return { line: row.map(q).join(','), header: H, values: row };
 }
 
 // ── 実行 ──
@@ -267,10 +267,12 @@ if (has('--status')) {
 const rows = selectRows();
 if (!rows.length) { console.log('対象がありません（--group A〜E / --jobtype を確認）'); process.exit(0); }
 
+const PREVIEW = has('--preview');
 fs.mkdirSync(OUT_DIR, { recursive: true });
 const used = new Set();
 const outLines = []; let headerArr = null;
 let made = 0; const skipped = {}; const perKei = {};
+const previewRows = [];
 
 rows.forEach((p, i) => {
   const ref = loadRef(p.kei);
@@ -279,10 +281,22 @@ rows.forEach((p, i) => {
   const st = findStation(p.area, used);
   if (!st) { skipped['(駅なし)' + p.area] = 1; return; }
   used.add(st.station);
-  const { line, header } = buildRow(ref, p, st, perKei[p.kei] || 0);
+  const { line, header, values } = buildRow(ref, p, st, perKei[p.kei] || 0);
   perKei[p.kei] = (perKei[p.kei] || 0) + 1;
   if (!headerArr) headerArr = header;
   outLines.push(line);
+  if (PREVIEW) {
+    const g = (name) => { const idx = header.indexOf(name); return idx >= 0 ? (values[idx] || '') : ''; };
+    previewRows.push({
+      no: p.no, kei: p.kei, detail: p.detail,
+      title: g('(必須)求人タイトル'),
+      kanni: g('(必須)簡易職種名'),
+      category: g('(必須)職種'),
+      body: g('(必須)仕事内容'),
+      photo: g('(必須)写真ID1'),
+      pref: g('勤務地1都道府県'), city: g('勤務地1市区町村'), eki: g('勤務地1最寄駅'),
+    });
+  }
   made++;
 });
 
@@ -304,3 +318,46 @@ console.log('  モード:', UPDATE ? '更新（求人ID付与＝既存を上書�
 console.log('  職種別:', Object.entries(perKei).map(([k, v]) => `${k}=${v}`).join(' / '));
 if (Object.keys(skipped).length) console.log('  スキップ:', JSON.stringify(skipped));
 console.log('  （Shift-JIS形式。シニアジョブの一括登録／一括編集にそのまま取込できます）');
+
+if (PREVIEW && previewRows.length) {
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const cards = previewRows.map((r) => `
+    <article class="card">
+      <div class="head">
+        <span class="no">No.${esc(r.no)}</span>
+        <span class="kei">${esc(r.kei)}</span>
+        <span class="photo">写真ID:${esc(r.photo) || '(なし)'}</span>
+      </div>
+      <h2>${esc(r.title)}</h2>
+      <div class="meta">
+        <span>簡易職種名: <b>${esc(r.kanni)}</b></span>
+        <span>勤務地: ${esc(r.pref)}${esc(r.city)}　${esc(r.eki)}</span>
+      </div>
+      <div class="cat">職種カテゴリ: ${esc(r.category).replace(/\n/g, ' / ')}</div>
+      <pre class="body">${esc(r.body)}</pre>
+    </article>`).join('\n');
+  const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>シニアジョブ 掲載内容プレビュー（${previewRows.length}件）</title>
+<style>
+  body{font-family:-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;margin:0;background:#f4f5f7;color:#1f2328;line-height:1.7}
+  header{position:sticky;top:0;background:#0f766e;color:#fff;padding:14px 20px;font-weight:700}
+  .wrap{max-width:900px;margin:0 auto;padding:20px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;margin:0 0 18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .head{display:flex;gap:10px;align-items:center;font-size:12px;margin-bottom:6px}
+  .no{background:#0f766e;color:#fff;border-radius:6px;padding:2px 8px}
+  .kei{background:#e0f2f1;color:#0f766e;border-radius:6px;padding:2px 8px}
+  .photo{margin-left:auto;color:#6b7280}
+  h2{font-size:18px;margin:4px 0 10px}
+  .meta{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:#374151;margin-bottom:6px}
+  .cat{font-size:12px;color:#6b7280;margin-bottom:10px}
+  .body{white-space:pre-wrap;font-family:inherit;font-size:14px;background:#fafafa;border:1px solid #eee;border-radius:8px;padding:12px 14px;margin:0}
+</style></head><body>
+<header>シニアジョブ 掲載内容プレビュー（${previewRows.length}件${UPDATE ? '・更新モード' : '・新規モード'}）</header>
+<div class="wrap">${cards}</div>
+</body></html>`;
+  const htmlFile = file.replace(/\.csv$/, '.html');
+  fs.writeFileSync(htmlFile, html);
+  console.log(`  プレビュー(HTML): ${htmlFile}`);
+}
