@@ -10,7 +10,8 @@
     "seed:accounts": "node --experimental-sqlite scripts/setup-kyujinbox-accounts.js",
     "seed:restock": "node --experimental-sqlite scripts/seed-sq-weekly-restock-kyujinbox.js && node --experimental-sqlite scripts/seed-bg-weekly-restock-kyujinbox.js",
     "seed:restock-accounts": "node --experimental-sqlite scripts/seed-nl-movingsales-restock-kyujinbox.js && node --experimental-sqlite scripts/seed-bi-secretary-driver-restock-kyujinbox.js && node --experimental-sqlite scripts/seed-st-style501-restock-kyujinbox.js",
-    "seed:restock2": "node --experimental-sqlite scripts/seed-sq-restock2-25-kyujinbox.js && node --experimental-sqlite scripts/seed-bg-restock2-25-kyujinbox.js && node --experimental-sqlite scripts/seed-nl-movingsales-restock2-kyujinbox.js && node --experimental-sqlite scripts/seed-bi-secretary-driver-restock2-kyujinbox.js && node --experimental-sqlite scripts/seed-st-style501-restock2-kyujinbox.js"
+    "seed:restock2": "node --experimental-sqlite scripts/seed-sq-restock2-25-kyujinbox.js && node --experimental-sqlite scripts/seed-bg-restock2-25-kyujinbox.js && node --experimental-sqlite scripts/seed-nl-movingsales-restock2-kyujinbox.js && node --experimental-sqlite scripts/seed-bi-secretary-driver-restock2-kyujinbox.js && node --experimental-sqlite scripts/seed-st-style501-restock2-kyujinbox.js",
+    "seed:mix25": "node --experimental-sqlite scripts/seed-sq-osaka-haisou-seizou-kyujinbox.js && node --experimental-sqlite scripts/seed-bg-osaka-driver-kyujinbox.js && node --experimental-sqlite scripts/seed-st-style501-osaka-batch3-kyujinbox.js && node --experimental-sqlite scripts/seed-bi-tokyo-driver-kyujinbox.js && node --experimental-sqlite scripts/seed-nl-osaka-kyoto-driver-kyujinbox.js"
   },
   "engines": {
     "node": ">=22.0.0"
