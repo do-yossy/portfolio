@@ -27,6 +27,9 @@ const getArg = (name, def) => { const i = args.indexOf(name); return i >= 0 && a
 const COMPANY = (getArg('--company', 'all') || 'all').toLowerCase();
 const MIN = parseInt(getArg('--min', '5'), 10) || 5;
 const WRITE_MD = args.includes('--md');
+// 勝ち型ワードをタイトルへ自動反映。既定はドライラン、--apply-titles でDB更新。
+const APPLY_TITLES = args.includes('--apply-titles');
+const TITLE_MAX = parseInt(getArg('--title-max', '64'), 10) || 64;
 
 const DB_PATH = process.env.DATA_DIR
   ? path.join(process.env.DATA_DIR, 'recruitment.db')
@@ -133,6 +136,7 @@ if (metrics.length) {
   const recByTitle = {};
   for (const r of received) recByTitle[norm(r.title)] = (recByTitle[norm(r.title)] || 0) + r.received;
   scored = metrics.map(m => ({
+    job_id: m.job_id || null,
     company: m.company, title: m.title || '', location: m.location || '',
     views: m.views, applies: m.applies || recByTitle[norm(m.title)] || 0,
     salary: m.j_salary || '', job_type: m.j_job_type || '', published: m.j_pub == null ? 1 : m.j_pub,
@@ -210,6 +214,38 @@ if (metrics.length) {
   showList('コピー改善（表示はあるが応募0）', cat.copy, 'AI改善ループ(kyujinbox_autoloop --apply)の最優先対象');
   showList('露出改善（表示が伸びていない）', cat.expo, '勝ち型タイトルへ寄せる・画像追加・再掲で表示増を狙う');
   if (cat.dead.length) P(`\n▼ 表示0（${cat.dead.length}件）: 掲載枠を圧迫。勝ち型へ作り直すか間引きを推奨。`);
+}
+
+// ── 勝ち型ワードのタイトル自動反映 ──
+// 応募0の掲載中求人タイトルへ、不足している勝ち型キーワードを付与する。
+// 既定はドライラン（提案のみ）。--apply-titles でDBを更新する。
+if (metrics.length && strongKw.length) {
+  const targets = scored.filter(j => j.published && j.applies < 1 && j.job_id);
+  const APPEND_TAGS = ['未経験歓迎', '年齢不問', 'シニア歓迎', '月給', '完全週休2日', 'ブランクOK'];
+  const preferred = [...strongKw, ...APPEND_TAGS.filter(k => !strongKw.includes(k))];
+  const plans = [];
+  for (const j of targets) {
+    const missing = preferred.filter(k => !(j.title || '').includes(k));
+    let title = j.title || '';
+    const added = [];
+    for (const k of missing) {
+      const cand = `${title}｜${k}`;
+      if (cand.length > TITLE_MAX) continue;
+      title = cand; added.push(k);
+      if (added.length >= 2) break;
+    }
+    if (added.length) plans.push({ job_id: j.job_id, from: j.title, to: title, added });
+  }
+  P(`\n■ 勝ち型ワードのタイトル反映${APPLY_TITLES ? '（DB更新）' : '（ドライラン：--apply-titles で反映）'} — 対象${plans.length}件`);
+  for (const pl of plans.slice(0, 15)) P(`   ＋[${pl.added.join('・')}]  ${pl.to.slice(0, 60)}`);
+  if (APPLY_TITLES && plans.length) {
+    const upd = db.prepare(`UPDATE jobs SET title = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?`);
+    let n = 0;
+    for (const pl of plans) n += upd.run(pl.to, pl.job_id).changes;
+    P(`   → ${n}件のタイトルを更新しました。掲載管理タブから「求人ボックスに投稿」で反映してください。`);
+  } else if (plans.length) {
+    P('   → 反映するには --apply-titles を付けて再実行してください。');
+  }
 }
 
 // ── まとめ ──
