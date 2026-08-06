@@ -444,6 +444,30 @@ def human_type(page, selector, text, timeout=15000):
         page.keyboard.type(char)
         time.sleep(random.uniform(0.02, 0.06))
 
+def goto_login(page, url="https://secure.kyujinbox.com/login", attempts=3):
+    """ログインページへ堅牢に遷移する（回線が重い/遅い環境向け）。
+    - waitUntil='domcontentloaded' にして 'load' イベント待ちのタイムアウトを回避
+    - タイムアウトを60秒に延長し、失敗時は待ってから最大3回リトライ
+    - networkidle は発火しないサイトもあるため待てなくても無視する
+    """
+    last_err = None
+    for i in range(attempts):
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            try:
+                page.wait_for_load_state('networkidle', timeout=8000)
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            last_err = e
+            try:
+                page.wait_for_timeout(2000 * (i + 1))
+            except Exception:
+                pass
+    raise last_err
+
+
 def fill_text(page, selector, value, timeout=8000):
     """テキスト/テキストエリアを埋める（Vue v-model完全対応版）
     - 200字以内: press_sequentially で1文字ずつ入力 → Vue input イベントが確実に発火
@@ -2724,8 +2748,7 @@ def run_publish_drafts():
         page = ctx.new_page()
         try:
             progress("🔑 求人ボックスにログイン中...", "info")
-            page.goto("https://secure.kyujinbox.com/login", timeout=30000)
-            page.wait_for_load_state('networkidle', timeout=15000)
+            goto_login(page)
             rand_delay(1.0, 2.0)
             email_sel = find_input(page, 'input[name="login[email]"]', 'input[type="email"]', 'input[name="email"]')
             human_type(page, email_sel, email)
@@ -2890,8 +2913,7 @@ def main():
 
         try:
             progress("🔑 求人ボックスにログイン中...", "info")
-            page.goto("https://secure.kyujinbox.com/login", timeout=30000)
-            page.wait_for_load_state('networkidle', timeout=15000)
+            goto_login(page)
             rand_delay(1.0, 2.0)
 
             progress(f"📍 ログインページURL: {page.url}", "info")
