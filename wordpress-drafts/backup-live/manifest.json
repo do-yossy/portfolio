@@ -1,0 +1,56 @@
+{
+  "note": "現行公開ページのバックアップ（方針A実行前の復元用）。front_page=id11, service=id41。",
+  "front_page_id": 11,
+  "pages": [
+    {
+      "id": 11,
+      "title": "トップ",
+      "slug": "%e3%83%88%e3%83%83%e3%83%97",
+      "status": "publish",
+      "link": "https://savior-corporation.com/",
+      "modified": "2026-01-13T12:47:15",
+      "file": "backup-live/page-11.html",
+      "chars": 3538
+    },
+    {
+      "id": 41,
+      "title": "サービス",
+      "slug": "service",
+      "status": "publish",
+      "link": "https://savior-corporation.com/service/",
+      "modified": "2024-03-27T12:07:37",
+      "file": "backup-live/page-41.html",
+      "chars": 4893
+    },
+    {
+      "id": 46,
+      "title": "会社概要",
+      "slug": "company",
+      "status": "publish",
+      "link": "https://savior-corporation.com/company/",
+      "modified": "2024-05-28T18:35:29",
+      "file": "backup-live/page-46.html",
+      "chars": 3476
+    },
+    {
+      "id": 48,
+      "title": "お問い合わせ",
+      "slug": "contact",
+      "status": "publish",
+      "link": "https://savior-corporation.com/contact/",
+      "modified": "2024-03-27T09:20:54",
+      "file": "backup-live/page-48.html",
+      "chars": 2828
+    },
+    {
+      "id": 50,
+      "title": "プライバシーポリシー",
+      "slug": "policy",
+      "status": "publish",
+      "link": "https://savior-corporation.com/policy/",
+      "modified": "2024-03-27T09:32:57",
+      "file": "backup-live/page-50.html",
+      "chars": 2149
+    }
+  ]
+}
