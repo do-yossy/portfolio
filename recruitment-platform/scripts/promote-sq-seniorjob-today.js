@@ -1,0 +1,80 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * SQ × 媒体=シニアジョブ で「昨日 架電リストに追加した人」を、本日(JST)の新規応募として計上し直すツール。
+ * 「本日の新規」は applicants.applied_at が本日(JST)の日付なら計上される。昨日の日付のままだと本日分に出ないため、
+ * 対象の applied_at を本日に更新する（システムの promoteToNew と同じ挙動：is_imported/is_archived/duplicate も解除）。
+ *
+ * 使い方（recruitment-platform フォルダで）:
+ *   ① 対象を一覧表示（更新なし。既定=昨日追加分）:
+ *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js
+ *   ② 昨日追加分をまとめて本日の新規へ:
+ *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --fix
+ *   ③ 日付を指定して一覧/修正（例 8/8 追加分）:
+ *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --from 2026-08-08 --fix
+ *   ④ ID指定で確実に:
+ *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --ids <id1>,<id2> --fix
+ */
+const { DatabaseSync } = require('node:sqlite');
+const path = require('path');
+
+const DB_PATH = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'recruitment.db')
+  : path.join(__dirname, '..', 'data', 'recruitment.db');
+const db = new DatabaseSync(DB_PATH);
+
+const argv = process.argv.slice(2);
+const has = f => argv.includes(f);
+const val = f => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : null; };
+
+// JST基準の本日・昨日（YYYY-MM-DD）
+const jst = ms => new Date(Date.now() + 9 * 3600 * 1000 + ms).toISOString().slice(0, 10);
+const TODAY = jst(0);
+const YESTERDAY = jst(-86400000);
+
+const fromDate = val('--from') || YESTERDAY;   // 既定：昨日追加分
+const idsArg   = val('--ids');
+const doFix    = has('--fix');
+
+// SQ × シニアジョブ × 架電リスト（is_archived=0）
+let rows = db.prepare(
+  `SELECT id, name, applied_at, applied_month, status, is_archived, is_duplicate
+     FROM applicants
+    WHERE company = 'sq' AND media = 'seniorjob' AND is_archived = 0
+    ORDER BY datetime(applied_at) DESC`
+).all();
+
+let targets;
+if (idsArg) {
+  const set = new Set(idsArg.split(',').map(s => s.trim()).filter(Boolean));
+  targets = rows.filter(r => set.has(r.id));
+} else {
+  targets = rows.filter(r => String(r.applied_at || '').slice(0, 10) === fromDate);
+}
+
+console.log(`\n■ SQ × 媒体=シニアジョブ × 架電リスト（is_archived=0）: 全${rows.length}件`);
+console.log(`   本日(JST)=${TODAY} / 対象日=${idsArg ? 'ID指定' : fromDate}　→ 対象 ${targets.length}件\n`);
+targets.forEach((r, i) => {
+  console.log(`  [${i + 1}] id=${r.id}  ${r.name}  applied_at=${r.applied_at}  status=${r.status}  dup=${r.is_duplicate}`);
+});
+
+if (!doFix) {
+  console.log('\n（更新なし＝一覧表示のみ）本日の新規へ上げるには末尾に --fix を付けて実行してください。');
+  console.log('  例: node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --fix\n');
+  process.exit(0);
+}
+if (targets.length === 0) { console.log('\n対象がありません（日付/条件を確認してください）。\n'); process.exit(0); }
+
+const nowIso = new Date().toISOString();
+const upd = db.prepare(
+  `UPDATE applicants
+      SET is_imported = 0, is_archived = 0, is_duplicate = 0, duplicate_of_id = NULL,
+          applied_at = ?, applied_month = ?, updated_at = ?
+    WHERE id = ?`
+);
+let n = 0;
+for (const t of targets) {
+  n += upd.run(TODAY, TODAY.slice(0, 7), nowIso, t.id).changes;
+  console.log(`  ✅ 本日の新規へ: ${t.name} (id=${t.id})  applied_at ${t.applied_at} → ${TODAY}`);
+}
+console.log(`\n完了: ${n}件を本日(${TODAY})の新規応募として計上し直しました。新規応募ページ・媒体クロス集計に即反映されます。\n`);
