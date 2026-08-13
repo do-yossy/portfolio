@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>試作一覧｜個人×AI 事業案</title>
+<style>
+  :root{--bg:#0f1420;--panel:#171d2b;--line:#2a3346;--text:#e8ecf4;--muted:#93a0b8;--accent:#4c8dff;--good:#2fbf71;--warn:#ffb020}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;line-height:1.65}
+  .wrap{max-width:820px;margin:0 auto;padding:28px 16px 80px}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 22px}
+  a.card{display:block;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px;transition:.15s}
+  a.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .tit{font-size:1.12rem;font-weight:700;margin:0 0 4px}
+  .tag{display:inline-block;font-size:.72rem;border-radius:999px;padding:2px 10px;margin-bottom:8px}
+  .done{background:#12331f;color:#6ee7a0;border:1px solid #1f5c37}
+  .desc{color:var(--muted);font-size:.9rem;margin:0}
+  .arrow{color:var(--accent);font-size:.9rem;margin-top:8px;display:inline-block}
+  .note{background:#211a12;border:1px solid #4a3a1e;color:#e7c98a;border-radius:12px;padding:12px 14px;font-size:.84rem;margin-bottom:20px}
+  footer{color:var(--muted);font-size:.78rem;margin-top:28px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>試作一覧 — 個人×AI 事業案</h1>
+  <p class="sub">動画「個人×AI」で語られていた “AI×〇〇” のうち、構想止まりだった案を、実際に動く試作にしたもの。</p>
+
+  <div class="note">いずれもブラウザだけで動作し、サーバー・APIキー・初期費用は不要。データは端末内のみに保存されます。まず動かして「感触」を確かめるための試作です。</div>
+
+  <a class="card" href="./toushi-furikaeri.html">
+    <span class="tag done">試作 ｜ #4 AI×投資</span>
+    <div class="tit">売買のクセ 振り返りツール</div>
+    <p class="desc">自分の過去の取引だけを統計にして、勝てない「クセ」（利小損大・損切り遅れ・難平での悪化・連敗）を自動で言葉にする。銘柄の推奨・予測は一切せず、過去の自分の集計だけを返す＝投資助言業を避ける設計。</p>
+    <span class="arrow">開く →</span>
+  </a>
+
+  <a class="card" href="./ichiji-stock.html">
+    <span class="tag done">試作 ｜ #7 AI×一次情報</span>
+    <div class="tit">一次情報ストック</div>
+    <p class="desc">日々の実務で拾った一次情報（数字・失敗・お客様の声・気づき・手順）を素早く記録して資産化し、発信の下書き骨子に変換する。AIが汎用文を量産する時代に「あなたにしか書けない素材」を貯める入口。</p>
+    <span class="arrow">開く →</span>
+  </a>
+
+  <footer>
+    ※ すでに試作済みとされる #1・#2 スタンプ工房／#3 分身AI は本ディレクトリ外。<br>
+    関連ドキュメント：<code>app-requirements/</code>（構想・要件定義）
+  </footer>
+</div>
+</body>
+</html>
