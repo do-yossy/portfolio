@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>そばにいる — ペットの毎日を記録し、家族で見守るQOL手帳</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#faf9f7; --ink:#1c1917; --ink2:#78716c; --ink3:#c4bfba;
+  --surface:#fff; --border:#e7e5e0;
+  --accent:#0e7490; --accent-soft:#ecfeff;
+  --warm:#b45309; --warm-soft:#fffbeb;
+  --green:#16a34a; --green-soft:#f0fdf4;
+  --red:#be123c; --red-soft:#fff1f2;
+  --sans:'Zen Kaku Gothic New',sans-serif; --mono:'JetBrains Mono',monospace;
+  --shadow:0 4px 24px rgba(28,25,23,.07); --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1060px;margin:0 auto;padding:28px 20px 80px}
+header{margin-bottom:20px}
+.eyebrow{display:inline-block;font-size:11px;letter-spacing:.12em;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:4px 10px;border-radius:999px;margin-bottom:10px}
+h1{font-size:25px;font-weight:900;letter-spacing:-.01em;margin-bottom:6px}
+.lead{color:var(--ink2);max-width:740px}
+
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:10px 16px;font-size:13px;font-weight:700;color:var(--ink2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;font-family:var(--sans)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.pane{display:none}.pane.on{display:block}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+.card h2{font-size:13px;font-weight:700;letter-spacing:.04em;margin-bottom:14px}
+.note{font-size:12px;padding:11px 13px;border-radius:9px;margin-bottom:14px;line-height:1.65}
+.note.info{background:var(--accent-soft);color:#155e75}
+.note.warn{background:var(--warm-soft);color:#92400e}
+.note.ok{background:var(--green-soft);color:#166534}
+
+label.fl{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
+input[type=text],input[type=date],textarea,select{width:100%;font-family:var(--sans);font-size:13.5px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--ink)}
+textarea{min-height:70px;resize:vertical;line-height:1.7}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+.btn{font-family:var(--sans);font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--border);background:#fff;color:var(--ink);cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--ink3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(.94)}
+.btn.sm{padding:6px 11px;font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* sliders */
+.item{padding:12px 0;border-bottom:1px dashed var(--border)}
+.item:last-child{border-bottom:none}
+.ihead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.iname{font-size:13.5px;font-weight:700}
+.idesc{font-size:11.5px;color:var(--ink2);font-weight:400}
+.ival{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);flex:none}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.scale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink3);margin-top:2px}
+
+/* score */
+.score{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.score .n{font-size:38px;font-weight:900;letter-spacing:-.02em;font-family:var(--mono)}
+.score .d{font-size:14px;color:var(--ink2)}
+.track{height:8px;background:#f1f0ec;border-radius:999px;overflow:hidden;margin:8px 0 6px}
+.track span{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .3s}
+
+/* chart */
+.chart{width:100%;height:180px;display:block}
+.axis{font-size:10px;fill:var(--ink3);font-family:var(--mono)}
+
+/* changes */
+.chg{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px}
+.chgc{border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.chgc .t{font-size:12px;font-weight:700;margin-bottom:3px}
+.chgc .v{font-family:var(--mono);font-size:12.5px}
+.dn{color:var(--red);font-weight:700}.up{color:var(--green);font-weight:700}.fl0{color:var(--ink2)}
+
+/* history */
+.hrow{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px dashed var(--border)}
+.hrow:last-child{border-bottom:none}
+.hd{font-family:var(--mono);font-size:12px;color:var(--ink2);flex:none;width:86px}
+.hs{font-family:var(--mono);font-size:13px;font-weight:700;flex:none;width:52px}
+.hm{font-size:12.5px;color:var(--ink2);flex:1;white-space:pre-wrap}
+.empty{text-align:center;padding:34px 20px;color:var(--ink3);font-size:13px}
+footer{margin-top:26px;font-size:11.5px;color:var(--ink2);line-height:1.8}
+code{font-family:var(--mono);background:#f1f0ec;padding:1px 5px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">シニア期から、看取りまで</div>
+  <h1>そばにいる</h1>
+  <p class="lead">
+    毎日30秒の記録で、<strong>その子の状態の変化を「記憶」ではなく「記録」で見られる</strong>ようにします。
+    家族全員が同じグラフを見て話せるようにし、受診のときはそのまま先生に見せられます。
+  </p>
+</header>
+
+<div class="tabs">
+  <button class="tab on" data-p="today">今日の記録</button>
+  <button class="tab" data-p="trend">変化を見る</button>
+  <button class="tab" data-p="hist">記録一覧</button>
+  <button class="tab" data-p="conf">設定・共有</button>
+</div>
+
+<!-- ============ 今日の記録 ============ -->
+<div class="pane on" id="p-today">
+  <div class="card">
+    <div class="note warn">
+      これは<strong>記録のための道具</strong>です。診断や治療の判断はしません。気になる変化があるときは、必ずかかりつけの先生にご相談ください。
+    </div>
+    <h2 id="todayTitle">今日の様子</h2>
+    <div class="row" style="margin-bottom:12px">
+      <input type="date" id="date" style="width:170px">
+      <span style="font-size:12px;color:var(--ink2)" id="dupNote"></span>
+    </div>
+    <div id="items"></div>
+
+    <label class="fl" style="margin-top:14px">今日のメモ（食べたもの・お薬・気づいたこと）</label>
+    <textarea id="memo" placeholder="例）朝はごはんを半分。夜は完食。階段を自分で上がれた。"></textarea>
+
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" id="save">この日の記録を保存</button>
+      <span id="liveScore" style="margin-left:auto;font-size:13px;color:var(--ink2)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 変化を見る ============ -->
+<div class="pane" id="p-trend">
+  <div class="card">
+    <h2>合計スコアの推移</h2>
+    <div id="scoreBox"></div>
+    <svg class="chart" id="chart" viewBox="0 0 720 180" preserveAspectRatio="none"></svg>
+    <div class="note info" style="margin-top:12px">
+      合計スコアは<strong>その子の「いつも」と比べるための目安</strong>です。数字そのものに正解はなく、
+      <strong>下がってきた項目に気づくため</strong>に使ってください。判断は必ず先生と一緒に。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>直近7日 と その前7日 の比較</h2>
+    <div id="changes"><div class="empty">記録が増えると、項目ごとの変化が出ます</div></div>
+  </div>
+
+  <div class="card">
+    <h2>受診のときに見せる要約</h2>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn" id="copy">要約をコピー</button>
+      <span style="font-size:12px;color:var(--ink2)">そのまま先生に見せられる文章にまとめます</span>
+    </div>
+    <textarea id="summary" style="min-height:150px;font-family:var(--mono);font-size:12px" readonly></textarea>
+  </div>
+</div>
+
+<!-- ============ 記録一覧 ============ -->
+<div class="pane" id="p-hist">
+  <div class="card">
+    <h2>これまでの記録</h2>
+    <div id="hist"><div class="empty">まだ記録がありません</div></div>
+  </div>
+</div>
+
+<!-- ============ 設定・共有 ============ -->
+<div class="pane" id="p-conf">
+  <div class="card">
+    <h2>その子のこと</h2>
+    <label class="fl">名前</label>
+    <input type="text" id="pet" placeholder="例）モモ">
+    <label class="fl" style="margin-top:12px">ひとこと（種類・年齢・通っている病院など）</label>
+    <input type="text" id="petmemo" placeholder="例）柴犬 14歳 / ○○動物病院">
+    <div class="row" style="margin-top:10px"><button class="btn primary" id="petSave">保存</button></div>
+  </div>
+
+  <div class="card">
+    <h2>家族と共有する</h2>
+    <div class="note info">
+      いまは<strong>ファイルの書き出し／読み込み</strong>で共有します（試作のため）。
+      同じ記録を家族が読み込めば、<strong>全員が同じグラフを見て話せます</strong>。
+    </div>
+    <div class="row">
+      <button class="btn" id="exp">記録を書き出す（JSON）</button>
+      <button class="btn" id="impBtn">記録を読み込む</button>
+      <input type="file" id="imp" accept="application/json" hidden>
+      <button class="btn" id="reset" style="color:var(--red)">全部消す</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <strong>記録している7項目</strong>：痛み／食欲／水分／清潔／元気・機嫌／動きやすさ／良い日が多いか。
+  獣医療で広く使われている QOL（生活の質）の考え方を参考にしています。<br>
+  <strong>この試作でできること</strong>：日々の記録・推移グラフ・項目別の変化・受診用の要約・ファイルでの家族共有。
+  要件定義は <code>app-requirements/06-pet-mitori.md</code> を参照。
+</footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const LS='sobani_v1';
+const ITEMS=[
+  {k:'pain', n:'痛み',        d:'つらそうな様子はないか（10＝痛みがなさそう）'},
+  {k:'food', n:'食欲',        d:'ごはんを食べられているか'},
+  {k:'water',n:'水分',        d:'お水を飲めているか'},
+  {k:'clean',n:'清潔',        d:'体をきれいに保てているか'},
+  {k:'joy',  n:'元気・機嫌',  d:'反応や表情、そばに来るか'},
+  {k:'move', n:'動きやすさ',  d:'自分で立つ・歩く・向きを変えられるか'},
+  {k:'good', n:'良い日が多いか',d:'つらい日より良い日が多いと感じるか'},
+];
+const MAX=ITEMS.length*10;
+
+let S=load();
+function load(){
+  try{const r=JSON.parse(localStorage.getItem(LS)); if(r) return Object.assign({logs:[],pet:{}},r);}catch(e){}
+  return {logs:[],pet:{}};
+}
+function save(){localStorage.setItem(LS,JSON.stringify(S));}
+const today=()=>new Date().toISOString().slice(0,10);
+
+/* tabs */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); $('p-'+t.dataset.p).classList.add('on');
+  if(t.dataset.p==='trend'){renderChart();renderChanges();renderSummary();}
+  if(t.dataset.p==='hist') renderHist();
+}));
+
+/* sliders */
+$('items').innerHTML=ITEMS.map(i=>`
+  <div class="item">
+    <div class="ihead">
+      <div><span class="iname">${i.n}</span><span class="idesc"> — ${i.d}</span></div>
+      <span class="ival" id="v-${i.k}">5</span>
+    </div>
+    <input type="range" id="r-${i.k}" min="0" max="10" value="5">
+    <div class="scale"><span>0 つらそう</span><span>10 いつも通り</span></div>
+  </div>`).join('');
+ITEMS.forEach(i=>{
+  $('r-'+i.k).addEventListener('input',e=>{ $('v-'+i.k).textContent=e.target.value; liveScore(); });
+});
+function liveScore(){
+  const t=ITEMS.reduce((s,i)=>s+ +$('r-'+i.k).value,0);
+  $('liveScore').textContent=`合計 ${t} / ${MAX}`;
+}
+
+$('date').value=today();
+$('date').addEventListener('change',loadDay);
+function loadDay(){
+  const d=$('date').value;
+  const ex=S.logs.find(l=>l.date===d);
+  $('dupNote').textContent = ex ? 'この日の記録を読み込みました（保存すると上書きします）' : '';
+  ITEMS.forEach(i=>{
+    const v = ex ? ex[i.k] : 5;
+    $('r-'+i.k).value=v; $('v-'+i.k).textContent=v;
+  });
+  $('memo').value = ex ? (ex.memo||'') : '';
+  liveScore();
+}
+
+$('save').addEventListener('click',()=>{
+  const d=$('date').value||today();
+  const rec={date:d,memo:$('memo').value.trim()};
+  ITEMS.forEach(i=>rec[i.k]=+$('r-'+i.k).value);
+  rec.total=ITEMS.reduce((s,i)=>s+rec[i.k],0);
+  S.logs=S.logs.filter(l=>l.date!==d);
+  S.logs.push(rec);
+  S.logs.sort((a,b)=>a.date.localeCompare(b.date));
+  save();
+  $('dupNote').textContent='保存しました';
+  renderChart();renderChanges();renderSummary();renderHist();
+});
+
+/* chart */
+function renderChart(){
+  const box=$('scoreBox'), svg=$('chart');
+  if(!S.logs.length){
+    box.innerHTML='<div class="empty">記録するとここに推移が出ます</div>'; svg.innerHTML=''; return;
+  }
+  const last=S.logs[S.logs.length-1];
+  box.innerHTML=`<div class="score"><span class="n">${last.total}</span><span class="d">/ ${MAX}（${last.date}）</span></div>
+    <div class="track"><span style="width:${Math.round(last.total/MAX*100)}%"></span></div>`;
+
+  const pts=S.logs.slice(-30);
+  const W=720,H=180,P=26;
+  const n=pts.length;
+  const x=i=> n===1 ? W/2 : P + i*(W-P*2)/(n-1);
+  const y=v=> H-P - (v/MAX)*(H-P*2);
+  const line=pts.map((p,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(p.total).toFixed(1)}`).join(' ');
+  const area=`${line} L${x(n-1).toFixed(1)},${H-P} L${x(0).toFixed(1)},${H-P} Z`;
+  svg.innerHTML=`
+    <line x1="${P}" y1="${y(MAX/2)}" x2="${W-P}" y2="${y(MAX/2)}" stroke="#e7e5e0" stroke-dasharray="4 4"/>
+    <text class="axis" x="${W-P}" y="${y(MAX/2)-5}" text-anchor="end">中間 ${MAX/2}</text>
+    <path d="${area}" fill="var(--accent-soft)"/>
+    <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    ${pts.map((p,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(p.total).toFixed(1)}" r="3" fill="var(--accent)"/>`).join('')}
+    <text class="axis" x="${P}" y="${H-6}">${pts[0].date.slice(5)}</text>
+    <text class="axis" x="${W-P}" y="${H-6}" text-anchor="end">${pts[n-1].date.slice(5)}</text>`;
+}
+
+/* changes */
+function avg(list,k){ return list.length ? list.reduce((s,l)=>s+l[k],0)/list.length : null; }
+function renderChanges(){
+  const box=$('changes');
+  const recent=S.logs.slice(-7), prev=S.logs.slice(-14,-7);
+  if(recent.length<2||prev.length<1){
+    box.innerHTML='<div class="empty">2週間ぶん記録すると、項目ごとの変化を比べられます</div>'; return;
+  }
+  box.innerHTML='<div class="chg">'+ITEMS.map(i=>{
+    const a=avg(recent,i.k), b=avg(prev,i.k), diff=a-b;
+    const cls = diff<=-0.8?'dn' : diff>=0.8?'up' : 'fl0';
+    const sign = diff>0?'+':'';
+    return `<div class="chgc"><div class="t">${i.n}</div>
+      <div class="v"><span class="${cls}">${sign}${diff.toFixed(1)}</span>
+      <span style="color:var(--ink3)"> （${b.toFixed(1)} → ${a.toFixed(1)}）</span></div></div>`;
+  }).join('')+'</div>';
+  const drops=ITEMS.filter(i=>avg(recent,i.k)-avg(prev,i.k)<=-0.8).map(i=>i.n);
+  if(drops.length){
+    box.insertAdjacentHTML('afterbegin',
+      `<div class="note warn">この2週間で下がってきているのは <strong>${drops.join('・')}</strong> です。次の受診でこの点を伝えると、先生が状態をつかみやすくなります。</div>`);
+  }else{
+    box.insertAdjacentHTML('afterbegin','<div class="note ok">この2週間、大きく下がっている項目はありません。</div>');
+  }
+}
+
+/* summary */
+function renderSummary(){
+  if(!S.logs.length){ $('summary').value=''; return; }
+  const name=S.pet.name||'（名前未設定）';
+  const recent=S.logs.slice(-7), prev=S.logs.slice(-14,-7);
+  let t=`【${name} の記録まとめ】${S.pet.memo?'\n'+S.pet.memo:''}\n`;
+  t+=`記録期間：${S.logs[0].date} 〜 ${S.logs[S.logs.length-1].date}（${S.logs.length}日ぶん）\n`;
+  t+=`直近の合計：${S.logs[S.logs.length-1].total} / ${MAX}\n\n`;
+  if(recent.length){
+    t+=`■ 直近7日の平均（0〜10）\n`;
+    ITEMS.forEach(i=>{ t+=`  ${i.n}：${avg(recent,i.k).toFixed(1)}\n`; });
+  }
+  if(prev.length&&recent.length>=2){
+    const drops=ITEMS.filter(i=>avg(recent,i.k)-avg(prev,i.k)<=-0.8);
+    t+=`\n■ その前の7日と比べて下がった項目\n`;
+    t+= drops.length ? drops.map(i=>`  ${i.n}：${avg(prev,i.k).toFixed(1)} → ${avg(recent,i.k).toFixed(1)}`).join('\n')+'\n'
+                     : '  目立った低下はありません\n';
+  }
+  const memos=S.logs.slice(-7).filter(l=>l.memo);
+  if(memos.length){
+    t+=`\n■ 直近のメモ\n`+memos.map(l=>`  ${l.date} ${l.memo}`).join('\n')+'\n';
+  }
+  $('summary').value=t;
+}
+$('copy').addEventListener('click',()=>{
+  const el=$('summary'); if(!el.value) return;
+  navigator.clipboard.writeText(el.value).then(
+    ()=>{ $('copy').textContent='コピーしました'; setTimeout(()=>$('copy').textContent='要約をコピー',1600); },
+    ()=>{ el.select(); document.execCommand('copy'); }
+  );
+});
+
+/* history */
+function renderHist(){
+  const box=$('hist');
+  if(!S.logs.length){ box.innerHTML='<div class="empty">まだ記録がありません</div>'; return; }
+  box.innerHTML=S.logs.slice().reverse().map(l=>`
+    <div class="hrow">
+      <div class="hd">${l.date}</div>
+      <div class="hs">${l.total}/${MAX}</div>
+      <div class="hm">${l.memo?escape2(l.memo):'<span style="color:var(--ink3)">（メモなし）</span>'}</div>
+    </div>`).join('');
+}
+function escape2(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+
+/* settings */
+$('petSave').addEventListener('click',()=>{
+  S.pet={name:$('pet').value.trim(),memo:$('petmemo').value.trim()}; save();
+  $('todayTitle').textContent=(S.pet.name?S.pet.name+' の':'')+'今日の様子';
+  alert('保存しました');
+});
+$('exp').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='sobani_'+today()+'.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+});
+$('impBtn').addEventListener('click',()=>$('imp').click());
+$('imp').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{
+      const d=JSON.parse(rd.result);
+      if(Array.isArray(d.logs)){
+        const map={}; [...S.logs,...d.logs].forEach(l=>map[l.date]=l);
+        S.logs=Object.values(map).sort((a,b)=>a.date.localeCompare(b.date));
+      }
+      if(d.pet&&!S.pet.name) S.pet=d.pet;
+      save(); init(); alert('読み込みました');
+    }catch(err){alert('読み込めませんでした');}};
+  rd.readAsText(f);
+});
+$('reset').addEventListener('click',()=>{
+  if(!confirm('すべての記録を削除します。よろしいですか？')) return;
+  S={logs:[],pet:{}}; save(); init();
+});
+
+/* init */
+function init(){
+  $('pet').value=S.pet.name||''; $('petmemo').value=S.pet.memo||'';
+  $('todayTitle').textContent=(S.pet.name?S.pet.name+' の':'')+'今日の様子';
+  loadDay(); renderChart(); renderChanges(); renderSummary(); renderHist();
+}
+init();
+</script>
+</body>
+</html>
