@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スタンプ工房 — AI画像をLINEスタンプ・グッズ入稿形式に一括変換</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fafaf8;
+  --ink: #1c1917;
+  --ink2: #78716c;
+  --ink3: #c4bfba;
+  --surface: #ffffff;
+  --border: #e7e5e0;
+  --accent: #06c755;        /* LINE green */
+  --accent-soft: #f0fdf4;
+  --blue: #2563eb;
+  --blue-soft: #eff6ff;
+  --amber: #d97706;
+  --amber-soft: #fffbeb;
+  --red: #dc2626;
+  --red-soft: #fef2f2;
+  --sans: 'Zen Kaku Gothic New', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --shadow: 0 4px 24px rgba(28,25,23,0.08);
+  --radius: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 32px 20px 80px; }
+
+/* ---------- header ---------- */
+header { margin-bottom: 28px; }
+.eyebrow {
+  display: inline-block; font-size: 11px; letter-spacing: .12em; font-weight: 700;
+  color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 999px;
+  margin-bottom: 12px;
+}
+h1 { font-size: 26px; font-weight: 900; letter-spacing: -.01em; margin-bottom: 8px; }
+.lead { color: var(--ink2); font-size: 14px; max-width: 720px; }
+
+/* ---------- layout ---------- */
+.grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px;
+}
+.card h2 {
+  font-size: 13px; font-weight: 700; letter-spacing: .04em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.step {
+  width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: #fff;
+  font-size: 11px; display: grid; place-items: center; font-weight: 700; flex: none;
+}
+
+/* ---------- preset ---------- */
+.presets { display: grid; gap: 8px; }
+.preset {
+  display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px;
+  border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: #fff;
+  transition: .15s;
+}
+.preset:hover { border-color: var(--ink3); }
+.preset.on { border-color: var(--accent); background: var(--accent-soft); }
+.preset input { margin-top: 4px; accent-color: var(--accent); }
+.preset .t { font-weight: 700; font-size: 13px; }
+.preset .d { font-size: 11.5px; color: var(--ink2); line-height: 1.5; }
+
+/* ---------- options ---------- */
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--border); }
+.opt:last-child { border-bottom: none; }
+.opt label { font-size: 13px; font-weight: 500; }
+.opt .hint { font-size: 11px; color: var(--ink2); font-weight: 400; display: block; }
+input[type="number"], select {
+  font-family: var(--mono); font-size: 12px; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--ink); width: 84px;
+}
+input[type="range"] { width: 110px; accent-color: var(--accent); }
+.switch { position: relative; width: 40px; height: 22px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; inset: 0; background: var(--ink3); border-radius: 999px; cursor: pointer; transition: .2s;
+}
+.slider::before {
+  content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: .2s;
+}
+.switch input:checked + .slider { background: var(--accent); }
+.switch input:checked + .slider::before { transform: translateX(18px); }
+
+/* ---------- dropzone ---------- */
+.drop {
+  border: 2px dashed var(--border); border-radius: var(--radius); padding: 44px 20px;
+  text-align: center; cursor: pointer; transition: .18s; background: #fff;
+}
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop .big { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.drop .sub { font-size: 12px; color: var(--ink2); }
+
+/* ---------- toolbar ---------- */
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.btn {
+  font-family: var(--sans); font-size: 13px; font-weight: 700; padding: 9px 16px;
+  border-radius: 9px; border: 1px solid var(--border); background: #fff; color: var(--ink);
+  cursor: pointer; transition: .15s;
+}
+.btn:hover { border-color: var(--ink3); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(.94); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.count { font-size: 12px; color: var(--ink2); font-family: var(--mono); margin-left: auto; }
+
+/* ---------- status ---------- */
+.note {
+  font-size: 12px; padding: 10px 12px; border-radius: 9px; margin-bottom: 14px; line-height: 1.6;
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.note.ok { background: var(--accent-soft); color: #166534; }
+.note.warn { background: var(--amber-soft); color: #92400e; }
+.note.err { background: var(--red-soft); color: #991b1b; }
+.note.info { background: var(--blue-soft); color: #1e40af; }
+
+/* ---------- results ---------- */
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; }
+.thumb {
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff;
+}
+.thumb .imgbox {
+  height: 116px; display: grid; place-items: center; padding: 8px;
+  background-image:
+    linear-gradient(45deg, #f1f0ec 25%, transparent 25%),
+    linear-gradient(-45deg, #f1f0ec 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f1f0ec 75%),
+    linear-gradient(-45deg, transparent 75%, #f1f0ec 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+}
+.thumb img { max-width: 100%; max-height: 100%; display: block; }
+.thumb .meta { padding: 7px 9px; border-top: 1px solid var(--border); }
+.thumb .name { font-family: var(--mono); font-size: 11px; font-weight: 500; }
+.thumb .size { font-size: 10.5px; color: var(--ink2); font-family: var(--mono); }
+.thumb .size.over { color: var(--red); font-weight: 700; }
+
+.empty { text-align: center; padding: 40px 20px; color: var(--ink3); font-size: 13px; }
+
+footer { margin-top: 32px; font-size: 11.5px; color: var(--ink2); line-height: 1.8; }
+footer code { font-family: var(--mono); background: #f1f0ec; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">AI × グッズ販売 / LINEスタンプ</div>
+  <h1>スタンプ工房</h1>
+  <p class="lead">
+    AIで生成した画像を、<strong>LINEスタンプ／グッズ販売の入稿規格に一括変換</strong>します。
+    余白トリム・リサイズ・白背景の透過・連番リネームまで自動。ブラウザ内で完結し、画像はどこにも送信されません。
+  </p>
+</header>
+
+<div class="grid">
+  <!-- ============ 左：設定 ============ -->
+  <div>
+    <div class="card">
+      <h2><span class="step">1</span>出力プリセット</h2>
+      <div class="presets" id="presets"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">2</span>加工オプション</h2>
+
+      <div class="opt">
+        <label>白背景を透過
+          <span class="hint">AI生成画像の白地を抜きます</span>
+        </label>
+        <div class="switch"><input type="checkbox" id="optWhite" checked><span class="slider"></span></div>
+      </div>
+
+      <div class="opt">
+        <label>透過のしきい値
+          <span class="hint">高いほど純白だけを抜く</span>
+        </label>
+        <input type="range" id="optThresh" min="180" max="255" value="238">
+      </div>
+
+      <div class="opt">
+        <label>余白を自動トリム
+          <span class="hint">被写体の周囲の空白を詰める</span>
+        </label>
+        <div class="switch"><input type="checkbox" id="optTrim" checked><span class="slider"></span></div>
+      </div>
+
+      <div class="opt">
+        <label>外側の余白 (px)
+          <span class="hint">LINEは10px以上を推奨</span>
+        </label>
+        <input type="number" id="optPad" value="10" min="0" max="60">
+      </div>
+
+      <div class="opt">
+        <label>出力サイズ
+          <span class="hint">プリセットで自動設定</span>
+        </label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" id="optW" value="370" min="16" max="4096" style="width:66px">
+          <span style="color:var(--ink3)">×</span>
+          <input type="number" id="optH" value="320" min="16" max="4096" style="width:66px">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">3</span>ファイル名</h2>
+      <div class="opt">
+        <label>命名ルール</label>
+        <select id="optNaming" style="width:150px">
+          <option value="line">01.png / 02.png …</option>
+          <option value="seq">stamp_01.png …</option>
+          <option value="keep">元のファイル名</option>
+        </select>
+      </div>
+      <div class="opt">
+        <label>メイン画像/タブ画像も生成
+          <span class="hint">1枚目から main.png・tab.png</span>
+        </label>
+        <div class="switch"><input type="checkbox" id="optExtras" checked><span class="slider"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 右：本体 ============ -->
+  <div>
+    <div class="card">
+      <h2><span class="step">4</span>画像を読み込む</h2>
+      <div class="drop" id="drop">
+        <div class="big">画像をドラッグ＆ドロップ</div>
+        <div class="sub">またはクリックして選択　/　PNG・JPEG・WebP対応　/　複数枚まとめてOK</div>
+      </div>
+      <input type="file" id="file" accept="image/*" multiple hidden>
+    </div>
+
+    <div class="card">
+      <div class="bar">
+        <button class="btn primary" id="run" disabled>変換する</button>
+        <button class="btn" id="zip" disabled>ZIPでまとめてダウンロード</button>
+        <button class="btn" id="clear" disabled>クリア</button>
+        <span class="count" id="count">0 枚</span>
+      </div>
+      <div id="status"></div>
+      <div id="results"><div class="empty">変換結果がここに表示されます</div></div>
+    </div>
+
+    <footer>
+      <strong>入稿規格の目安</strong><br>
+      LINEスタンプ：スタンプ画像 <code>370×320px</code>・メイン画像 <code>240×240px</code>・トークルームタブ <code>96×74px</code>、
+      PNG（背景透過）、1ファイル <code>1MB</code> 以下、個数は <code>8 / 16 / 24 / 32 / 40</code> のいずれか。<br>
+      グッズ（SUZURI等）：背景透過のPNGで、なるべく高解像度の正方形。プリントしたい実寸に対して余裕を持たせます。<br>
+      ※ 規格は各サービスの公式ガイドラインが最新です。申請前に必ずご確認ください。
+    </footer>
+  </div>
+</div>
+</div>
+
+<script>
+/* =========================================================
+   プリセット定義
+   ========================================================= */
+const PRESETS = [
+  { id:'line',  name:'LINEスタンプ 一式',  w:370, h:320,
+    desc:'スタンプ370×320 ＋ メイン240×240 ＋ タブ96×74 を同時生成', extras:true, naming:'line' },
+  { id:'stamp', name:'スタンプ画像のみ',    w:370, h:320,
+    desc:'370×320px のスタンプ画像だけを書き出す', extras:false, naming:'line' },
+  { id:'main',  name:'メイン画像',          w:240, h:240,
+    desc:'240×240px（ストアの顔になる1枚）', extras:false, naming:'seq' },
+  { id:'tab',   name:'トークルームタブ',    w:96,  h:74,
+    desc:'96×74px（トーク画面下部のタブ用）', extras:false, naming:'seq' },
+  { id:'goods', name:'グッズ用（高解像度）', w:2000, h:2000,
+    desc:'2000×2000px の透過PNG。Tシャツ等のプリント用', extras:false, naming:'seq' },
+];
+let preset = PRESETS[0];
+
+const $ = id => document.getElementById(id);
+const presetsEl = $('presets');
+PRESETS.forEach((p,i) => {
+  const el = document.createElement('label');
+  el.className = 'preset' + (i===0 ? ' on' : '');
+  el.innerHTML = `<input type="radio" name="preset" value="${p.id}" ${i===0?'checked':''}>
+    <div><div class="t">${p.name}</div><div class="d">${p.desc}</div></div>`;
+  el.querySelector('input').addEventListener('change', () => {
+    preset = p;
+    document.querySelectorAll('.preset').forEach(x => x.classList.remove('on'));
+    el.classList.add('on');
+    $('optW').value = p.w; $('optH').value = p.h;
+    $('optExtras').checked = p.extras;
+    $('optNaming').value = p.naming;
+    $('optPad').value = (p.id === 'goods') ? 0 : 10;
+    checkLineCount();
+  });
+  presetsEl.appendChild(el);
+});
+
+/* =========================================================
+   画像の読み込み
+   ========================================================= */
+let sources = [];   // {name, img}
+let outputs = [];   // {name, blob, url, w, h, bytes}
+
+const drop = $('drop'), fileInput = $('file');
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('over');
+  handleFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+});
+fileInput.addEventListener('change', e => handleFiles([...e.target.files]));
+
+function handleFiles(files) {
+  if (!files.length) return;
+  files.sort((a,b) => a.name.localeCompare(b.name, 'ja', {numeric:true}));
+  let pending = files.length;
+  files.forEach(f => {
+    const img = new Image();
+    const url = URL.createObjectURL(f);
+    img.onload = () => {
+      sources.push({ name: f.name.replace(/\.[^.]+$/, ''), img });
+      if (--pending === 0) refreshCounts();
+    };
+    img.onerror = () => { if (--pending === 0) refreshCounts(); };
+    img.src = url;
+  });
+}
+
+function refreshCounts() {
+  sources.sort((a,b) => a.name.localeCompare(b.name, 'ja', {numeric:true}));
+  $('count').textContent = `${sources.length} 枚`;
+  $('run').disabled = sources.length === 0;
+  $('clear').disabled = sources.length === 0;
+  checkLineCount();
+}
+
+function checkLineCount() {
+  const s = $('status');
+  if (!sources.length) { s.innerHTML = ''; return; }
+  if (preset.id === 'line' || preset.id === 'stamp') {
+    const ok = [8,16,24,32,40];
+    if (ok.includes(sources.length)) {
+      s.innerHTML = `<div class="note ok">✓ ${sources.length}枚 — LINEスタンプの規定個数です。そのまま申請できます。</div>`;
+    } else {
+      const next = ok.find(n => n > sources.length);
+      s.innerHTML = `<div class="note warn">⚠ ${sources.length}枚 — LINEスタンプは 8/16/24/32/40 枚のいずれかである必要があります。`
+        + (next ? `あと <strong>${next - sources.length}枚</strong> で ${next}枚 に届きます。` : '') + `</div>`;
+    }
+  } else { s.innerHTML = ''; }
+}
+
+/* =========================================================
+   画像処理
+   ========================================================= */
+function processOne(img, W, H, pad, doWhite, thresh, doTrim) {
+  // 1) 元画像を作業キャンバスへ
+  const wc = document.createElement('canvas');
+  wc.width = img.naturalWidth; wc.height = img.naturalHeight;
+  const wx = wc.getContext('2d', { willReadFrequently: true });
+  wx.drawImage(img, 0, 0);
+
+  let data;
+  try { data = wx.getImageData(0, 0, wc.width, wc.height); }
+  catch (e) { data = null; }
+
+  // 2) 白背景を透過
+  if (data && doWhite) {
+    const d = data.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] >= thresh && d[i+1] >= thresh && d[i+2] >= thresh) d[i+3] = 0;
+    }
+    wx.putImageData(data, 0, 0);
+  }
+
+  // 3) 余白トリム（不透明ピクセルのバウンディングボックス）
+  let sx = 0, sy = 0, sw = wc.width, sh = wc.height;
+  if (data && doTrim) {
+    const d = (doWhite ? wx.getImageData(0,0,wc.width,wc.height) : data).data;
+    let minX = wc.width, minY = wc.height, maxX = -1, maxY = -1;
+    for (let y = 0; y < wc.height; y++) {
+      for (let x = 0; x < wc.width; x++) {
+        if (d[(y * wc.width + x) * 4 + 3] > 8) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX >= minX && maxY >= minY) { sx = minX; sy = minY; sw = maxX - minX + 1; sh = maxY - minY + 1; }
+  }
+
+  // 4) 出力キャンバスへ、アスペクト比を保って収める
+  const oc = document.createElement('canvas');
+  oc.width = W; oc.height = H;
+  const ox = oc.getContext('2d');
+  ox.imageSmoothingQuality = 'high';
+  const availW = Math.max(1, W - pad * 2), availH = Math.max(1, H - pad * 2);
+  const scale = Math.min(availW / sw, availH / sh);
+  const dw = Math.round(sw * scale), dh = Math.round(sh * scale);
+  ox.drawImage(wc, sx, sy, sw, sh, Math.round((W - dw) / 2), Math.round((H - dh) / 2), dw, dh);
+  return oc;
+}
+
+function canvasToBlob(c) {
+  return new Promise(res => c.toBlob(res, 'image/png'));
+}
+
+$('run').addEventListener('click', async () => {
+  const W = +$('optW').value, H = +$('optH').value, pad = +$('optPad').value;
+  const doWhite = $('optWhite').checked, thresh = +$('optThresh').value, doTrim = $('optTrim').checked;
+  const naming = $('optNaming').value, extras = $('optExtras').checked;
+
+  $('run').disabled = true; $('run').textContent = '変換中…';
+  outputs.forEach(o => URL.revokeObjectURL(o.url));
+  outputs = [];
+
+  for (let i = 0; i < sources.length; i++) {
+    const s = sources[i];
+    const c = processOne(s.img, W, H, pad, doWhite, thresh, doTrim);
+    const blob = await canvasToBlob(c);
+    let name;
+    if (naming === 'line') name = String(i + 1).padStart(2, '0') + '.png';
+    else if (naming === 'seq') name = 'stamp_' + String(i + 1).padStart(2, '0') + '.png';
+    else name = s.name + '.png';
+    outputs.push({ name, blob, url: URL.createObjectURL(blob), w: W, h: H, bytes: blob.size });
+  }
+
+  // メイン画像・タブ画像
+  if (extras && sources.length) {
+    const first = sources[0].img;
+    const mainC = processOne(first, 240, 240, pad, doWhite, thresh, doTrim);
+    const mainB = await canvasToBlob(mainC);
+    outputs.push({ name:'main.png', blob:mainB, url:URL.createObjectURL(mainB), w:240, h:240, bytes:mainB.size });
+
+    const tabC = processOne(first, 96, 74, Math.min(pad, 4), doWhite, thresh, doTrim);
+    const tabB = await canvasToBlob(tabC);
+    outputs.push({ name:'tab.png', blob:tabB, url:URL.createObjectURL(tabB), w:96, h:74, bytes:tabB.size });
+  }
+
+  render();
+  $('run').disabled = false; $('run').textContent = '変換する';
+  $('zip').disabled = outputs.length === 0;
+});
+
+function render() {
+  const box = $('results');
+  if (!outputs.length) { box.innerHTML = '<div class="empty">変換結果がここに表示されます</div>'; return; }
+  const over = outputs.filter(o => o.bytes > 1024 * 1024).length;
+  const head = over
+    ? `<div class="note err">⚠ ${over}件が1MBを超えています。サイズを下げるか、色数の少ない画像でお試しください。</div>`
+    : `<div class="note ok">✓ ${outputs.length}ファイルを生成しました（すべて1MB以内）。</div>`;
+  box.innerHTML = head + '<div class="thumbs">' + outputs.map(o => `
+    <div class="thumb">
+      <div class="imgbox"><img src="${o.url}" alt="${o.name}"></div>
+      <div class="meta">
+        <div class="name">${o.name}</div>
+        <div class="size ${o.bytes > 1024*1024 ? 'over' : ''}">${o.w}×${o.h} ・ ${(o.bytes/1024).toFixed(0)}KB</div>
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+$('clear').addEventListener('click', () => {
+  outputs.forEach(o => URL.revokeObjectURL(o.url));
+  sources = []; outputs = [];
+  $('results').innerHTML = '<div class="empty">変換結果がここに表示されます</div>';
+  $('status').innerHTML = '';
+  $('zip').disabled = true;
+  refreshCounts();
+});
+
+/* =========================================================
+   ZIP 生成（無圧縮 store 方式・外部ライブラリ不要）
+   PNGは既に圧縮済みのため store で十分
+   ========================================================= */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function dosTime(d) {
+  return ((d.getHours() << 11) | (d.getMinutes() << 5) | (Math.floor(d.getSeconds() / 2))) & 0xFFFF;
+}
+function dosDate(d) {
+  return (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF;
+}
+async function buildZip(files) {
+  const enc = new TextEncoder();
+  const now = new Date();
+  const time = dosTime(now), date = dosDate(now);
+  const locals = [], centrals = [];
+  let offset = 0;
+
+  for (const f of files) {
+    const nameBytes = enc.encode(f.name);
+    const content = new Uint8Array(await f.blob.arrayBuffer());
+    const crc = crc32(content);
+
+    const lh = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true); lv.setUint16(6, 0, true); lv.setUint16(8, 0, true);
+    lv.setUint16(10, time, true); lv.setUint16(12, date, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, content.length, true);
+    lv.setUint32(22, content.length, true);
+    lv.setUint16(26, nameBytes.length, true); lv.setUint16(28, 0, true);
+    lh.set(nameBytes, 30);
+    locals.push(lh, content);
+
+    const ch = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true); cv.setUint16(10, 0, true);
+    cv.setUint16(12, time, true); cv.setUint16(14, date, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, content.length, true);
+    cv.setUint32(24, content.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint32(42, offset, true);
+    ch.set(nameBytes, 46);
+    centrals.push(ch);
+
+    offset += lh.length + content.length;
+  }
+
+  const centralSize = centrals.reduce((a, c) => a + c.length, 0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+
+  return new Blob([...locals, ...centrals, end], { type: 'application/zip' });
+}
+
+$('zip').addEventListener('click', async () => {
+  $('zip').disabled = true; $('zip').textContent = '作成中…';
+  const blob = await buildZip(outputs);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (preset.id === 'goods' ? 'goods' : 'line_stamps') + '_' +
+    new Date().toISOString().slice(0,10).replace(/-/g,'') + '.zip';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  $('zip').disabled = false; $('zip').textContent = 'ZIPでまとめてダウンロード';
+});
+</script>
+</body>
+</html>
