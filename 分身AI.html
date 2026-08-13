@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分身AI — あなたの考え方を学習して、あなたの代わりに答える</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fafaf8; --ink:#1c1917; --ink2:#78716c; --ink3:#c4bfba;
+  --surface:#fff; --border:#e7e5e0;
+  --accent:#7c3aed; --accent-soft:#f5f3ff;
+  --green:#16a34a; --green-soft:#f0fdf4;
+  --amber:#d97706; --amber-soft:#fffbeb;
+  --red:#dc2626; --red-soft:#fef2f2;
+  --sans:'Zen Kaku Gothic New',sans-serif; --mono:'JetBrains Mono',monospace;
+  --shadow:0 4px 24px rgba(28,25,23,.08); --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 20px 80px}
+header{margin-bottom:22px}
+.eyebrow{display:inline-block;font-size:11px;letter-spacing:.12em;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:4px 10px;border-radius:999px;margin-bottom:10px}
+h1{font-size:25px;font-weight:900;letter-spacing:-.01em;margin-bottom:6px}
+.lead{color:var(--ink2);max-width:760px}
+
+/* tabs */
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:10px 16px;font-size:13px;font-weight:700;color:var(--ink2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;font-family:var(--sans)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.pane{display:none}.pane.on{display:block}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+.card h2{font-size:13px;font-weight:700;letter-spacing:.04em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.badge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+
+label.fl{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
+input[type=text],input[type=password],textarea,select{
+  width:100%;font-family:var(--sans);font-size:13.5px;padding:10px 12px;
+  border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--ink);resize:vertical}
+textarea{min-height:96px;line-height:1.7}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+.btn{font-family:var(--sans);font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--border);background:#fff;color:var(--ink);cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--ink3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(.94)}
+.btn.sm{padding:6px 11px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.note{font-size:12px;padding:10px 12px;border-radius:9px;margin-bottom:14px;line-height:1.6}
+.note.info{background:var(--accent-soft);color:#5b21b6}
+.note.warn{background:var(--amber-soft);color:#92400e}
+.note.ok{background:var(--green-soft);color:#166534}
+
+/* interview */
+.q{background:var(--accent-soft);border-left:3px solid var(--accent);padding:12px 14px;border-radius:0 9px 9px 0;margin-bottom:12px;font-size:14px;font-weight:500}
+.qmeta{font-size:11px;color:var(--ink2);font-weight:400;margin-top:4px}
+
+/* cards list */
+.klist{display:grid;gap:10px}
+.kcard{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#fff}
+.kcard .kq{font-size:12px;color:var(--ink2);margin-bottom:5px}
+.kcard .ka{font-size:13.5px;white-space:pre-wrap}
+.kcard .kf{display:flex;justify-content:space-between;align-items:center;margin-top:9px;gap:8px}
+.tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:#f1f0ec;color:var(--ink2)}
+.del{font-size:11px;color:var(--ink3);cursor:pointer;background:none;border:none;font-family:var(--sans)}
+.del:hover{color:var(--red)}
+
+/* chat */
+.chat{display:flex;flex-direction:column;gap:12px;margin-bottom:16px;min-height:120px}
+.msg{max-width:82%;padding:11px 14px;border-radius:12px;font-size:13.5px;white-space:pre-wrap;line-height:1.75}
+.msg.me{align-self:flex-end;background:var(--ink);color:#fff;border-bottom-right-radius:3px}
+.msg.ai{align-self:flex-start;background:#fff;border:1px solid var(--border);border-bottom-left-radius:3px}
+.src{margin-top:9px;padding-top:9px;border-top:1px dashed var(--border);font-size:11.5px;color:var(--ink2)}
+.src b{color:var(--accent);font-weight:700}
+.src .item{margin-top:4px;padding-left:10px;border-left:2px solid var(--accent-soft)}
+
+/* map */
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.mcell{border:1px solid var(--border);border-radius:10px;padding:12px}
+.mcell .mt{font-size:12.5px;font-weight:700;margin-bottom:8px}
+.bar{height:6px;background:#f1f0ec;border-radius:999px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--accent);border-radius:999px}
+.mcell .mn{font-size:11px;color:var(--ink2);margin-top:6px;font-family:var(--mono)}
+.empty{text-align:center;padding:34px 20px;color:var(--ink3);font-size:13px}
+footer{margin-top:26px;font-size:11.5px;color:var(--ink2);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">AI × 自分の分身（デジタル弟子）</div>
+  <h1>分身AI</h1>
+  <p class="lead">
+    質問に答えていくだけで、<strong>あなたの判断・考え方が「知識カード」として溜まり</strong>、
+    その蓄積だけを根拠に <strong>あなたの代わりに答える分身</strong> ができます。
+    回答には必ず<strong>根拠にしたカード</strong>を表示し、知らないことは「まだ教わっていません」と答えます。
+  </p>
+</header>
+
+<div class="tabs">
+  <button class="tab on" data-p="build">① 分身をつくる</button>
+  <button class="tab" data-p="ask">② 分身に聞く</button>
+  <button class="tab" data-p="map">③ 承継マップ</button>
+  <button class="tab" data-p="conf">設定</button>
+</div>
+
+<!-- ============ ① 分身をつくる ============ -->
+<div class="pane on" id="p-build">
+  <div class="card">
+    <h2>いまの質問 <span class="badge" id="domainBadge">判断基準</span></h2>
+    <div class="q" id="qText">読み込み中…
+      <div class="qmeta" id="qMeta"></div>
+    </div>
+    <label class="fl">あなたの答え（"なぜそう判断するか" まで書くほど分身は賢くなります）</label>
+    <textarea id="ans" placeholder="例）見積は必ず現地を見てから出す。図面だけだと搬入経路の手間が読めず、あとで必ず赤字になるから。"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="save">この答えを覚えさせる</button>
+      <button class="btn" id="skip">別の質問にする</button>
+      <span style="font-size:12px;color:var(--ink2);margin-left:auto" id="kcount">0 枚</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>覚えたこと（知識カード）</h2>
+    <div id="klist"><div class="empty">まだ何も覚えていません</div></div>
+  </div>
+</div>
+
+<!-- ============ ② 分身に聞く ============ -->
+<div class="pane" id="p-ask">
+  <div class="card">
+    <h2>分身に相談する</h2>
+    <div id="askNote"></div>
+    <div class="chat" id="chat"><div class="empty">質問すると、覚えたことだけを根拠に答えます</div></div>
+    <div class="row">
+      <input type="text" id="qin" placeholder="例）新しい取引先から短納期の依頼。受けるべき？" style="flex:1;min-width:220px">
+      <button class="btn primary" id="ask">聞く</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ③ 承継マップ ============ -->
+<div class="pane" id="p-map">
+  <div class="card">
+    <h2>どこまで承継できたか</h2>
+    <div class="note info">空いている領域が、次に聞くべきことです。バーが短い領域から埋めていくと、分身の穴が減ります。</div>
+    <div class="map" id="map"></div>
+  </div>
+</div>
+
+<!-- ============ 設定 ============ -->
+<div class="pane" id="p-conf">
+  <div class="card">
+    <h2>APIキー（任意）</h2>
+    <div class="note warn">
+      キーは<strong>この端末のブラウザ内だけ</strong>に保存され、Anthropic以外へは送信しません。
+      未設定でも<strong>デモモード</strong>（端末内の簡易照合）で動作します。
+    </div>
+    <label class="fl">Anthropic API キー</label>
+    <input type="password" id="key" placeholder="sk-ant-...">
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="keySave">保存</button>
+      <button class="btn" id="keyClear">削除</button>
+      <span id="keyState" style="font-size:12px;color:var(--ink2)"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>分身のプロフィール</h2>
+    <label class="fl">名前・肩書き（回答の一人称に使われます）</label>
+    <input type="text" id="pname" placeholder="例）山田 太郎 / 町工場 二代目">
+    <label class="fl" style="margin-top:12px">話し方の特徴</label>
+    <input type="text" id="ptone" placeholder="例）結論から短く。回りくどい説明はしない。">
+    <div class="row" style="margin-top:10px"><button class="btn primary" id="pSave">保存</button></div>
+  </div>
+
+  <div class="card">
+    <h2>データ</h2>
+    <div class="row">
+      <button class="btn" id="exp">エクスポート（JSON）</button>
+      <button class="btn" id="impBtn">インポート</button>
+      <input type="file" id="imp" accept="application/json" hidden>
+      <button class="btn" id="reset" style="color:var(--red)">全部消す</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--ink2);margin-top:10px">
+      データは端末内（localStorage）に保存されます。機種変更や共有はエクスポートしたJSONで行えます。
+    </div>
+  </div>
+</div>
+
+<footer>
+  <strong>この試作でできること</strong>：質問に答えて知識を溜める／溜めた知識だけを根拠に分身が答える（根拠カードを明示）／領域ごとの充足度を見る。<br>
+  <strong>まだできないこと</strong>：音声での聞き取り、複数人での共同編集、チーム配布。要件定義は <code>app-requirements/01-digital-deshi.md</code> を参照。
+</footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const LS='bunshin_ai_v1';
+const DOMAINS=['判断基準','失敗と対処','段取り・コツ','人との接し方','価値観・軸'];
+
+const QBANK={
+  '判断基準':[
+    '仕事を「受ける／断る」を、あなたは何で決めていますか。直近で断った例と理由も。',
+    '値段を決めるとき、何を見て決めていますか。安くしてはいけない一線は？',
+    '同じような選択肢が2つあるとき、最後の決め手にしているものは何ですか。',
+    '「これは自分がやるべき」と「人に任せる」の線引きはどこですか。'
+  ],
+  '失敗と対処':[
+    'これまでで一番大きな失敗と、そこから決めたルールを教えてください。',
+    '「これは危ないサインだ」と気づく兆候は何ですか。何を見て気づきますか。',
+    'トラブルが起きたとき、最初にやることは何ですか。順番も含めて。',
+    '新人がよくやる失敗と、その防ぎ方は？'
+  ],
+  '段取り・コツ':[
+    'あなたの仕事の一日の段取りを、順番に教えてください。なぜその順番ですか。',
+    'マニュアルに書きにくいけれど、これを外すと質が落ちるという勘所は？',
+    '時間がないとき、どこを削ってどこは絶対に削りませんか。',
+    '道具・環境で、こだわっている点とその理由は？'
+  ],
+  '人との接し方':[
+    '取引先ともめそうなとき、どう対応しますか。実際の例で。',
+    '相手の信頼を得るために、意識的にやっていることは？',
+    '言いにくいことを伝えるとき、どう切り出しますか。',
+    '人を採るとき／組むとき、何を見ていますか。'
+  ],
+  '価値観・軸':[
+    '仕事で絶対に譲れないことは何ですか。なぜですか。',
+    'お金より優先することはありますか。それはどんな場面で表れますか。',
+    '10年後、この仕事はどうなっていてほしいですか。',
+    '後任に一つだけ伝えるとしたら、何を伝えますか。'
+  ]
+};
+
+let S = load();
+function load(){
+  try{ const r=JSON.parse(localStorage.getItem(LS)); if(r) return Object.assign({cards:[],profile:{},key:'',asked:[]},r);}catch(e){}
+  return {cards:[],profile:{},key:'',asked:[]};
+}
+function save(){ localStorage.setItem(LS, JSON.stringify(S)); }
+
+/* ---------- タブ ---------- */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); $('p-'+t.dataset.p).classList.add('on');
+  if(t.dataset.p==='map') renderMap();
+  if(t.dataset.p==='ask') renderAskNote();
+}));
+
+/* ---------- 質問出し（薄い領域を優先） ---------- */
+let cur={domain:null,q:null};
+function pickQuestion(){
+  const count={}; DOMAINS.forEach(d=>count[d]=S.cards.filter(c=>c.domain===d).length);
+  const min=Math.min(...DOMAINS.map(d=>count[d]));
+  const thin=DOMAINS.filter(d=>count[d]===min);
+  const domain=thin[Math.floor(Math.random()*thin.length)];
+  const pool=QBANK[domain].filter(q=>!S.asked.includes(q));
+  const q=(pool.length?pool:QBANK[domain])[Math.floor(Math.random()*(pool.length||QBANK[domain].length))];
+  cur={domain,q};
+  $('domainBadge').textContent=domain;
+  $('qText').childNodes[0].nodeValue=q;
+  $('qMeta').textContent=`この領域はいま ${count[domain]} 枚。薄い領域から優先的に聞いています。`;
+}
+$('skip').addEventListener('click',()=>{ if(cur.q) S.asked.push(cur.q); save(); pickQuestion(); });
+$('save').addEventListener('click',()=>{
+  const a=$('ans').value.trim();
+  if(!a){ $('ans').focus(); return; }
+  S.cards.unshift({id:Date.now(),domain:cur.domain,q:cur.q,a,at:new Date().toISOString().slice(0,10)});
+  S.asked.push(cur.q); save(); $('ans').value=''; renderCards(); pickQuestion();
+});
+
+function renderCards(){
+  $('kcount').textContent=S.cards.length+' 枚';
+  const box=$('klist');
+  if(!S.cards.length){ box.innerHTML='<div class="empty">まだ何も覚えていません</div>'; return; }
+  box.innerHTML='<div class="klist">'+S.cards.map(c=>`
+    <div class="kcard">
+      <div class="kq">Q. ${esc(c.q)}</div>
+      <div class="ka">${esc(c.a)}</div>
+      <div class="kf"><span class="tag">${esc(c.domain)} ・ ${esc(c.at)}</span>
+        <button class="del" data-id="${c.id}">削除</button></div>
+    </div>`).join('')+'</div>';
+  box.querySelectorAll('.del').forEach(b=>b.addEventListener('click',()=>{
+    S.cards=S.cards.filter(c=>c.id!=b.dataset.id); save(); renderCards();
+  }));
+}
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+
+/* ---------- 承継マップ ---------- */
+function renderMap(){
+  const goal=8;
+  $('map').innerHTML=DOMAINS.map(d=>{
+    const n=S.cards.filter(c=>c.domain===d).length;
+    const pct=Math.min(100,Math.round(n/goal*100));
+    return `<div class="mcell"><div class="mt">${d}</div>
+      <div class="bar"><span style="width:${pct}%"></span></div>
+      <div class="mn">${n} / ${goal} 枚（${pct}%）</div></div>`;
+  }).join('');
+}
+
+/* ---------- 分身に聞く ---------- */
+function renderAskNote(){
+  const n=S.cards.length;
+  $('askNote').innerHTML = n===0
+    ? '<div class="note warn">まだ知識が0枚です。まず「① 分身をつくる」で数問答えてください。</div>'
+    : (S.key ? `<div class="note ok">✓ ${n}枚の知識とAPIキーで動作します。</div>`
+             : `<div class="note info">${n}枚の知識で動作中（デモモード：端末内の簡易照合）。設定でAPIキーを入れると、より自然に答えます。</div>`);
+}
+function addMsg(text,who,sources){
+  const c=$('chat'); if(c.querySelector('.empty')) c.innerHTML='';
+  const d=document.createElement('div'); d.className='msg '+who;
+  d.textContent=text;
+  if(sources&&sources.length){
+    const s=document.createElement('div'); s.className='src';
+    s.innerHTML='<b>根拠にしたカード</b>'+sources.map(x=>`<div class="item">${esc(x)}</div>`).join('');
+    d.appendChild(s);
+  }
+  c.appendChild(d); c.scrollTop=c.scrollHeight;
+}
+
+/* 日本語は空白で区切られないため、文字N-gramで照合する */
+function norm(s){ return String(s).replace(/[\s、。,.？?！!「」『』（）()【】・…ー～]/g,''); }
+function grams(s,n){ const t=norm(s),o=[]; for(let i=0;i+n<=t.length;i++) o.push(t.slice(i,i+n)); return o; }
+function scoreCard(card,q){
+  const hay=norm(card.q+card.a);
+  if(!hay) return 0;
+  let s=0;
+  const seen=new Set();
+  for(const g of grams(q,2)){ if(seen.has(g))continue; seen.add(g); if(hay.includes(g)) s+=1; }
+  for(const g of grams(q,3)){ if(seen.has(g))continue; seen.add(g); if(hay.includes(g)) s+=2; }
+  return s;
+}
+/* 質問の長さに応じた「関連あり」の下限 */
+function matchThreshold(q){
+  const n=grams(q,2).length;
+  return Math.max(1, Math.min(3, Math.floor(n/4)));
+}
+
+$('ask').addEventListener('click',doAsk);
+$('qin').addEventListener('keydown',e=>{ if(e.key==='Enter') doAsk(); });
+
+async function doAsk(){
+  const q=$('qin').value.trim(); if(!q) return;
+  if(!S.cards.length){ renderAskNote(); return; }
+  addMsg(q,'me'); $('qin').value=''; $('ask').disabled=true;
+
+  const th=matchThreshold(q);
+  const ranked=S.cards.map(c=>({c,s:scoreCard(c,q)})).sort((a,b)=>b.s-a.s);
+  const hits=ranked.filter(r=>r.s>=th).slice(0,4).map(r=>r.c);
+  const used=hits.length?hits:ranked.slice(0,3).map(r=>r.c);
+
+  if(!S.key){
+    // デモモード：最も近いカードをそのまま提示
+    if(!hits.length){
+      addMsg('それについては、まだ教わっていません。「① 分身をつくる」で教えてもらえますか。','ai');
+    }else{
+      addMsg(hits[0].a,'ai',hits.map(c=>`${c.domain}：${c.q}`));
+    }
+    $('ask').disabled=false; return;
+  }
+
+  const name=S.profile.name||'本人';
+  const tone=S.profile.tone||'簡潔に、結論から。';
+  const ctx=used.map((c,i)=>`【カード${i+1}｜${c.domain}】\nQ:${c.q}\nA:${c.a}`).join('\n\n');
+  const prompt=`あなたは「${name}」本人の分身です。話し方の特徴：${tone}
+
+以下は${name}本人が語った知識カードです。これ以外の知識で答えてはいけません。
+
+${ctx}
+
+相談：${q}
+
+制約：
+- 上のカードに根拠がある範囲だけで、${name}本人として一人称で答える
+- カードに根拠が無い場合は、推測せず「それについては、まだ教わっていません」とだけ答える
+- 前置きや説明は不要。本人の言葉として自然に。200字程度。`;
+
+  addMsg('…','ai');
+  const last=$('chat').lastChild;
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':S.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-5',max_tokens:600,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await r.json();
+    if(data.error) throw new Error(data.error.message||'APIエラー');
+    const text=(data.content&&data.content[0]&&data.content[0].text||'').trim();
+    last.remove();
+    addMsg(text||'（応答が空でした）','ai',used.map(c=>`${c.domain}：${c.q}`));
+  }catch(e){
+    last.remove();
+    addMsg('APIに接続できませんでした（'+e.message+'）。設定のキーをご確認ください。デモモードで答えます。\n\n'+(hits.length?hits[0].a:'それについては、まだ教わっていません。'),'ai',hits.map(c=>`${c.domain}：${c.q}`));
+  }
+  $('ask').disabled=false;
+}
+
+/* ---------- 設定 ---------- */
+$('keySave').addEventListener('click',()=>{ S.key=$('key').value.trim(); save(); showKey(); renderAskNote(); });
+$('keyClear').addEventListener('click',()=>{ S.key=''; $('key').value=''; save(); showKey(); renderAskNote(); });
+function showKey(){ $('keyState').textContent = S.key ? '保存済み（この端末のみ）' : '未設定（デモモードで動作）'; }
+$('pSave').addEventListener('click',()=>{ S.profile={name:$('pname').value.trim(),tone:$('ptone').value.trim()}; save(); alert('保存しました'); });
+
+$('exp').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify({cards:S.cards,profile:S.profile},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='bunshin_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+});
+$('impBtn').addEventListener('click',()=>$('imp').click());
+$('imp').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{
+      const d=JSON.parse(rd.result);
+      if(Array.isArray(d.cards)) S.cards=d.cards.concat(S.cards);
+      if(d.profile) S.profile=Object.assign({},d.profile,S.profile);
+      save(); renderCards(); fillProfile(); alert('取り込みました');
+    }catch(err){ alert('読み込めませんでした'); } };
+  rd.readAsText(f);
+});
+$('reset').addEventListener('click',()=>{
+  if(!confirm('覚えたことをすべて削除します。よろしいですか？')) return;
+  S={cards:[],profile:{},key:'',asked:[]}; save();
+  renderCards(); fillProfile(); showKey(); pickQuestion(); $('chat').innerHTML='<div class="empty">質問すると、覚えたことだけを根拠に答えます</div>';
+});
+function fillProfile(){ $('pname').value=S.profile.name||''; $('ptone').value=S.profile.tone||''; $('key').value=S.key||''; }
+
+/* ---------- init ---------- */
+fillProfile(); showKey(); renderCards(); pickQuestion(); renderMap(); renderAskNote();
+</script>
+</body>
+</html>
