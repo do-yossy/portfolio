@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>見て分かる授業｜AI教育コンテンツ 体験デモ</title>
+<style>
+  :root{
+    --bg:#0e1526; --panel:#16203a; --panel2:#1d2a4a; --line:#2c3b60;
+    --text:#eef2fb; --muted:#93a3c4; --accent:#5b8cff; --good:#2fbf71; --bad:#ff5d6c; --warn:#ffc44d;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;line-height:1.7}
+  .wrap{max-width:900px;margin:0 auto;padding:22px 16px 90px}
+  .badge{display:inline-block;background:#23325a;color:#a9c2ff;border:1px solid #34456b;border-radius:999px;padding:3px 12px;font-size:.76rem;margin-bottom:12px}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  .lead{color:var(--muted);margin:0 0 18px;font-size:.95rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+  h2{font-size:1.05rem;margin:0 0 12px}
+  /* lesson list */
+  .lessons{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .lesson{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:15px;cursor:pointer;transition:.15s}
+  .lesson:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .subj{display:inline-block;font-size:.72rem;border-radius:999px;padding:2px 10px;background:#2c3b60;color:#bcd0ff;margin-bottom:8px}
+  .lesson .lt{font-size:1.08rem;font-weight:700}
+  .lesson .ld{color:var(--muted);font-size:.84rem;margin-top:4px}
+  .hidden{display:none}
+  /* textbook before */
+  .before{background:#241d10;border:1px solid #5a4a20;border-radius:12px;padding:14px}
+  .before .tag{color:#ffc44d;font-weight:700;font-size:.85rem;margin-bottom:6px}
+  .before p{margin:0;color:#e9dcbf;font-size:.92rem}
+  .before .small{color:#b9a67e;font-size:.8rem;margin-top:8px}
+  /* player */
+  .stage{position:relative;background:linear-gradient(160deg,#12203f,#0e1730);border:1px solid var(--line);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px;overflow:hidden}
+  .emoji{font-size:74px;line-height:1;filter:drop-shadow(0 6px 16px rgba(0,0,0,.4));animation:pop .5s ease}
+  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  .scene-title{font-size:1.35rem;font-weight:800;margin-top:12px}
+  .scene-visual{margin-top:8px;font-size:1rem;color:#cfe0ff}
+  .caption{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);padding:12px 16px;font-size:1.02rem;text-align:left}
+  .teacher{position:absolute;top:12px;right:14px;font-size:34px}
+  .progress{height:6px;background:var(--panel2);border-radius:6px;margin-top:10px;overflow:hidden}
+  .progress > i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s linear}
+  .controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 15px;font-size:.9rem;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .steps{margin-left:auto;color:var(--muted);font-size:.82rem}
+  textarea,input[type=text]{width:100%;background:#0c1428;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit}
+  .quiz .q{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+  .quiz .q .qt{font-weight:700;margin-bottom:8px}
+  .opt{display:block;width:100%;text-align:left;margin:6px 0}
+  .opt.correct{background:#12331f;border-color:#1f5c37;color:#8ff0b5}
+  .opt.wrong{background:#3a1620;border-color:#5c2230;color:#ffb3bd}
+  .muted{color:var(--muted);font-size:.85rem}
+  .draft-out{background:#0c1428;border:1px dashed #3a4a6b;border-radius:10px;padding:12px;margin-top:10px;white-space:pre-wrap;font-size:.9rem}
+  footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:28px}
+  .back{color:var(--accent);cursor:pointer;font-size:.9rem;margin-bottom:10px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="badge">AI教育コンテンツ 体験デモ ｜ 小中学生向け</div>
+  <h1>見て分かる授業</h1>
+  <p class="lead">教科書の「文字だと分かりにくい」内容を、<b>映像で見て直感的に分かる</b>解説に。まずは題材を選んで、"教科書 → 映像" の違いを体験してください。<br><span class="muted">※これは体験デモです。実際の映像はAI（動画生成）で量産します。ここでは"動画風"に再現しています。</span></p>
+
+  <!-- 選択 -->
+  <div class="card" id="listView">
+    <h2>題材をえらぶ</h2>
+    <div class="lessons" id="lessons"></div>
+  </div>
+
+  <!-- プレイヤー -->
+  <div class="card hidden" id="playView">
+    <span class="back" onclick="toList()">← 題材一覧へ</span>
+    <div class="before" id="beforeBox">
+      <div class="tag">📖 教科書だと…（文字だけ）</div>
+      <p id="beforeText"></p>
+      <div class="small">↑ 結論や用語が並ぶだけで、小中学生には「なぜ？」が入ってこない。</div>
+    </div>
+    <div style="text-align:center;margin:14px 0">
+      <button class="primary" id="watchBtn" onclick="startPlay()">▶ 映像で見る</button>
+    </div>
+
+    <div id="stageWrap" class="hidden">
+      <div class="stage" id="stage">
+        <span class="teacher" title="ふくろう先生">🦉</span>
+        <div class="emoji" id="sEmoji">📘</div>
+        <div class="scene-title" id="sTitle"></div>
+        <div class="scene-visual" id="sVisual"></div>
+        <div class="caption" id="sCaption"></div>
+      </div>
+      <div class="progress"><i id="bar"></i></div>
+      <div class="controls">
+        <button id="playBtn" onclick="togglePlay()">⏸ 一時停止</button>
+        <button onclick="prevScene()">◀ 前</button>
+        <button onclick="nextScene()">次 ▶</button>
+        <span class="steps" id="steps"></span>
+      </div>
+    </div>
+
+    <!-- クイズ -->
+    <div id="quizView" class="hidden quiz" style="margin-top:16px">
+      <h2>クイズで確認 🎯</h2>
+      <div id="quizBox"></div>
+      <div id="quizResult" class="muted"></div>
+    </div>
+  </div>
+
+  <!-- 台本ジェネレーター -->
+  <div class="card">
+    <h2>台本ジェネレーター（量産の仕組み）</h2>
+    <p class="muted">教科書の題材を入れると、映像化の「台本の骨子」を自動でひな形化します（＝これをAI映像にかけて量産）。</p>
+    <input id="topicIn" type="text" placeholder="例）てこの原理／江戸幕府の成立／割合">
+    <div style="margin-top:8px"><button class="primary" onclick="genDraft()">台本の骨子をつくる</button></div>
+    <div id="draftOut" class="draft-out hidden"></div>
+  </div>
+
+  <footer>試作（プロトタイプ）｜ブラウザだけで動作。実映像はAI動画生成で量産する前提の"体験デモ"。<br>「個人×AI」事業案 #8 AI教育コンテンツ</footer>
+</div>
+
+<script>
+"use strict";
+const LESSONS = [
+  {
+    subject:"算数", title:"分数のわり算", desc:"なぜ「ひっくり返してかける」の？",
+    textbook:"分数のわり算は、わる数の逆数をかける。すなわち  a/b ÷ c/d = a/b × d/c  である。",
+    scenes:[
+      {emoji:"🍕", title:"問題：1/2 ÷ 1/4", visual:"「1/2 の中に 1/4 はいくつ入る？」と考える", caption:"わり算は“いくつ分あるか”を数える計算。まずはピザで考えよう。"},
+      {emoji:"🍕", title:"半分のピザ", visual:"半分（1/2）のピザを用意", caption:"これが 1/2。ここに、1/4（4分の1切れ）が何個入るかな？"},
+      {emoji:"🔪", title:"1/4 で切ってみる", visual:"1/2 のピザは 1/4 の切れが【2つ】ぶん", caption:"数えると2つ。だから 1/2 ÷ 1/4 ＝ 2 になる！"},
+      {emoji:"🔁", title:"逆数のひみつ", visual:"÷ 1/4  は  × 4  と同じ働き", caption:"「4分の1で割る」＝「4倍する」。だから“ひっくり返してかける”んだ。"},
+      {emoji:"✅", title:"まとめ", visual:"a/b ÷ c/d = a/b × d/c", caption:"わり算は逆数のかけ算。理由が分かれば、もう忘れない。"},
+    ],
+    quiz:[
+      {q:"1/2 ÷ 1/4 の答えは？", choices:["1/8","2","4"], a:1},
+      {q:"「÷ 1/4」は何と同じ働き？", choices:["×4","÷4","+4"], a:0},
+    ]
+  },
+  {
+    subject:"理科", title:"光合成", desc:"植物はどうやって養分を作る？",
+    textbook:"植物は光エネルギーを利用して、二酸化炭素と水から有機物（デンプン）を合成し、酸素を放出する。この反応を光合成という。",
+    scenes:[
+      {emoji:"🌞", title:"材料あつめ", visual:"太陽の【光】", caption:"植物は太陽の光をエネルギーとして受け取る。これがスタート。"},
+      {emoji:"🍃", title:"葉のなかの工場", visual:"葉緑体（緑のつぶ）が工場", caption:"葉の中の“葉緑体”が、光を使う小さな工場なんだ。"},
+      {emoji:"💨", title:"二酸化炭素を吸う", visual:"空気から CO₂ を取り込む", caption:"葉のあなから、空気中の二酸化炭素を吸い込む。"},
+      {emoji:"💧", title:"水を吸い上げる", visual:"根から水を吸い、葉へ", caption:"根っこからは水。工場の材料がそろった。"},
+      {emoji:"🍚", title:"養分ができる", visual:"光＋CO₂＋水 → デンプン", caption:"3つを合わせて、栄養（デンプン）を作り出す。"},
+      {emoji:"🫧", title:"酸素を出す", visual:"いらない酸素を放出", caption:"そのとき酸素ができて外へ。私たちが吸う酸素はこれ。"},
+      {emoji:"✅", title:"まとめ", visual:"光＋水＋CO₂ → デンプン＋酸素", caption:"植物は“自分でごはんを作れる”。それが光合成。"},
+    ],
+    quiz:[
+      {q:"光合成に必要ないものは？", choices:["光","二酸化炭素","塩"], a:2},
+      {q:"光合成で放出されるものは？", choices:["酸素","水素","窒素"], a:0},
+    ]
+  },
+  {
+    subject:"歴史", title:"鎌倉幕府の成立", desc:"武士の世は、どう始まった？",
+    textbook:"1185年、源頼朝は守護・地頭を設置。1192年、征夷大将軍に任じられ鎌倉に幕府を開いた。将軍と御家人は御恩と奉公の関係で結ばれた。",
+    scenes:[
+      {emoji:"⚔️", title:"貴族から武士へ", visual:"平安の終わり、源氏 vs 平氏", caption:"貴族の時代が終わり、武士どうしが力を争う時代へ。"},
+      {emoji:"🏹", title:"1185年 源氏の勝利", visual:"壇ノ浦の戦いで平氏をたおす", caption:"源頼朝の軍が勝利。全国に“守護・地頭”を置いて支配を広げる。"},
+      {emoji:"👑", title:"1192年 将軍に", visual:"頼朝が征夷大将軍に", caption:"頼朝がトップ（征夷大将軍）になり、鎌倉に政府（幕府）を開く。"},
+      {emoji:"🤝", title:"御恩と奉公", visual:"将軍⇄御家人の約束", caption:"将軍は領地を守る（御恩）、武士は戦う（奉公）。この“ギブ＆テイク”が仕組み。"},
+      {emoji:"✅", title:"まとめ", visual:"武士による政治のはじまり", caption:"貴族でなく武士が国を動かす“武家政権”がここから始まった。"},
+    ],
+    quiz:[
+      {q:"源頼朝が征夷大将軍になった年は？", choices:["1185年","1192年","1600年"], a:1},
+      {q:"将軍が武士の領地を守ることを何という？", choices:["奉公","御恩","参勤"], a:1},
+    ]
+  },
+];
+
+let cur=null, idx=0, timer=null, playing=false;
+
+function renderList(){
+  document.getElementById('lessons').innerHTML = LESSONS.map((l,i)=>`
+    <div class="lesson" onclick="openLesson(${i})">
+      <span class="subj">${l.subject}</span>
+      <div class="lt">${l.title}</div>
+      <div class="ld">${l.desc}</div>
+    </div>`).join('');
+}
+function openLesson(i){
+  cur=LESSONS[i]; idx=0; playing=false; clearTimer();
+  document.getElementById('listView').classList.add('hidden');
+  document.getElementById('playView').classList.remove('hidden');
+  document.getElementById('beforeText').textContent = cur.textbook;
+  document.getElementById('beforeBox').classList.remove('hidden');
+  document.getElementById('stageWrap').classList.add('hidden');
+  document.getElementById('quizView').classList.add('hidden');
+  document.getElementById('watchBtn').classList.remove('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function toList(){
+  clearTimer(); playing=false;
+  document.getElementById('playView').classList.add('hidden');
+  document.getElementById('listView').classList.remove('hidden');
+}
+function startPlay(){
+  document.getElementById('watchBtn').classList.add('hidden');
+  document.getElementById('stageWrap').classList.remove('hidden');
+  idx=0; renderScene(); play();
+}
+function renderScene(){
+  const s=cur.scenes[idx];
+  document.getElementById('sEmoji').textContent=s.emoji;
+  // re-trigger pop animation
+  const e=document.getElementById('sEmoji'); e.style.animation='none'; void e.offsetWidth; e.style.animation='';
+  document.getElementById('sTitle').textContent=s.title;
+  document.getElementById('sVisual').textContent=s.visual;
+  document.getElementById('sCaption').textContent=s.caption;
+  document.getElementById('steps').textContent=`${idx+1} / ${cur.scenes.length}`;
+  document.getElementById('bar').style.width=((idx)/(cur.scenes.length-1)*100)+'%';
+}
+function play(){
+  playing=true; document.getElementById('playBtn').textContent='⏸ 一時停止';
+  schedule();
+}
+function schedule(){
+  clearTimer();
+  const dur = Math.max(3800, cur.scenes[idx].caption.length*90);
+  timer=setTimeout(()=>{
+    if(idx < cur.scenes.length-1){ idx++; renderScene(); schedule(); }
+    else { playing=false; document.getElementById('playBtn').textContent='▶ 再生'; showQuiz(); }
+  }, dur);
+}
+function togglePlay(){
+  if(playing){ playing=false; clearTimer(); document.getElementById('playBtn').textContent='▶ 再生'; }
+  else { play(); }
+}
+function nextScene(){ if(idx<cur.scenes.length-1){ idx++; renderScene(); if(playing) schedule(); } else { showQuiz(); } }
+function prevScene(){ if(idx>0){ idx--; renderScene(); if(playing) schedule(); } }
+function clearTimer(){ if(timer){ clearTimeout(timer); timer=null; } }
+
+function showQuiz(){
+  document.getElementById('bar').style.width='100%';
+  const box=document.getElementById('quizBox'); let answered=0, correct=0;
+  box.innerHTML = cur.quiz.map((q,qi)=>`
+    <div class="q">
+      <div class="qt">Q${qi+1}. ${q.q}</div>
+      ${q.choices.map((c,ci)=>`<button class="opt" id="q${qi}o${ci}" onclick="answer(${qi},${ci})">${c}</button>`).join('')}
+    </div>`).join('');
+  document.getElementById('quizResult').textContent='';
+  document.getElementById('quizView').classList.remove('hidden');
+  window._quizState={answered:0,correct:0,total:cur.quiz.length,done:{}};
+  document.getElementById('quizView').scrollIntoView({behavior:'smooth'});
+}
+function answer(qi,ci){
+  const st=window._quizState; if(st.done[qi]) return; st.done[qi]=true;
+  const q=cur.quiz[qi];
+  document.getElementById(`q${qi}o${q.a}`).classList.add('correct');
+  if(ci!==q.a){ document.getElementById(`q${qi}o${ci}`).classList.add('wrong'); } else { st.correct++; }
+  st.answered++;
+  if(st.answered===st.total){
+    document.getElementById('quizResult').innerHTML=`<b style="color:var(--good)">${st.total}問中 ${st.correct}問 正解！</b>　映像で見たあとだと、答えられるよね。`;
+  }
+}
+
+function genDraft(){
+  const t=(document.getElementById('topicIn').value||'（題材）').trim();
+  const out=`【題材】${t}（小中学生向け・約90秒の解説動画）
+
+■ 台本の骨子（各シーン：映像イメージ＋ナレーション）
+1. つかみ（問いを立てる）：「${t}って、なんで○○なの？」と身近な疑問から入る
+2. 教科書だと：文字で説明されている“結論”を1枚で提示（分かりにくさを見せる）
+3. 具体例・たとえ：身近なモノ（食べ物・お金・道具など）でイメージ化
+4. 仕組みを分解：①→②→③ の順で、映像で1ステップずつ見せる
+5. まとめ：結論をもう一度（今度は“分かった状態”で）
+6. クイズ：2問で理解を確認
+
+■ 映像の指示（AI動画生成用）
+・一貫キャラ「ふくろう先生」がナビ／明るい配色／1シーン約10〜15秒
+・図・矢印・アニメで“動き”をつける（静止画にしない）
+・専門用語は最後に確認、まず直感優先
+
+※ 教科書の文章・図版は複製しない（事実・学ぶ範囲はオリジナルで作図）。歴史等は時代考証を人が確認。`;
+  const el=document.getElementById('draftOut'); el.textContent=out; el.classList.remove('hidden');
+}
+
+renderList();
+</script>
+</body>
+</html>
