@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>稟議書 AI映像コンテンツ2案</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  :root{
+    --ink:#1c2430; --sub:#54627a; --line:#c9d2df; --line2:#e4e9f1;
+    --navy:#1f3a5f; --navy-bg:#eef3fa; --accent:#2f6df0;
+    --good:#1f7a4d; --good-bg:#e8f5ee; --warn:#9a6a00; --warn-bg:#fbf3df;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"IPAPGothic","IPAGothic","Noto Sans JP",sans-serif;color:var(--ink);font-size:10.2pt;line-height:1.7;background:#fff}
+  .doc{max-width:180mm;margin:0 auto}
+  /* header */
+  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid var(--navy);padding-bottom:8px;margin-bottom:6px}
+  .title{font-size:20pt;font-weight:800;letter-spacing:.16em;color:var(--navy)}
+  .docmeta{font-size:8.6pt;color:var(--sub);text-align:right;line-height:1.6}
+  /* approval boxes */
+  .approval{display:flex;gap:0;justify-content:flex-end;margin:8px 0 14px}
+  .appbox{width:26mm;border:1px solid var(--line);border-left:none;text-align:center}
+  .appbox:first-child{border-left:1px solid var(--line)}
+  .appbox .r{font-size:8pt;color:var(--sub);border-bottom:1px solid var(--line);padding:2px 0;background:var(--navy-bg)}
+  .appbox .c{height:16mm}
+  .metaline{font-size:9pt;color:var(--sub);margin-bottom:2px}
+  .metaline b{color:var(--ink)}
+  h2{font-size:11.5pt;color:var(--navy);border-left:4px solid var(--accent);padding-left:8px;margin:16px 0 7px}
+  h3{font-size:10.2pt;margin:10px 0 4px;color:var(--ink)}
+  p{margin:4px 0}
+  .lead{background:var(--navy-bg);border:1px solid #d6e2f2;border-radius:6px;padding:9px 12px;font-size:9.6pt}
+  table{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:9.2pt}
+  th,td{border:1px solid var(--line);padding:5px 7px;vertical-align:top;text-align:left}
+  th{background:var(--navy-bg);color:var(--navy);font-weight:700;white-space:nowrap}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .two{display:flex;gap:10px}
+  .two > div{flex:1}
+  .pill{display:inline-block;font-size:8pt;border-radius:999px;padding:1px 8px;font-weight:700}
+  .pill.g{background:var(--good-bg);color:var(--good)}
+  .pill.w{background:var(--warn-bg);color:var(--warn)}
+  .note{font-size:8.4pt;color:var(--sub)}
+  .box{border:1px solid var(--line);border-radius:6px;padding:8px 11px;margin:6px 0}
+  ul{margin:4px 0;padding-left:1.2em}
+  li{margin:2px 0}
+  .card-title{font-weight:800;color:var(--navy);font-size:11pt;margin-bottom:2px}
+  .kpi{display:flex;gap:8px;margin:6px 0}
+  .kpi > div{flex:1;border:1px solid var(--line2);border-radius:6px;padding:6px 8px;text-align:center}
+  .kpi .v{font-size:12pt;font-weight:800;color:var(--navy)}
+  .kpi .l{font-size:7.8pt;color:var(--sub)}
+  .footer{margin-top:14px;border-top:1px solid var(--line2);padding-top:6px;font-size:8pt;color:var(--sub)}
+  .sec{page-break-inside:avoid}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="head">
+    <div class="title">稟 議 書</div>
+    <div class="docmeta">
+      文書番号：AI-2026-08-01<br>
+      起案日：2026年8月17日<br>
+      分類：新規事業／社内提案
+    </div>
+  </div>
+
+  <div class="approval">
+    <div class="appbox"><div class="r">社長</div><div class="c"></div></div>
+    <div class="appbox"><div class="r">役員</div><div class="c"></div></div>
+    <div class="appbox"><div class="r">部長</div><div class="c"></div></div>
+    <div class="appbox"><div class="r">起案者</div><div class="c"></div></div>
+  </div>
+
+  <div class="metaline"><b>件名：</b>AI映像コンテンツ事業 2案（①AI教育コンテンツ ②AIペットメモリアル）の着手可否について</div>
+  <div class="metaline"><b>起案者：</b>　　　　　　　／　<b>提出先：</b>経営会議</div>
+
+  <div class="lead">
+    <b>ご承認いただきたいこと：</b>下記2案について、<b>小規模（月1万円台のツール費）での試作・市場検証への着手</b>をご承認いただきたい。生成原価がほぼ0のため、少額で「売れるか」を実証できる。実際に触れる<b>体験デモを添付</b>（末尾URL）。
+  </div>
+
+  <h2>1. 目的・背景</h2>
+  <p>動画「個人×AI」を起点に検討した事業案のうち、AI動画生成（Higgsfield等）で<b>低コスト・高粗利で即開始できる映像コンテンツ2案</b>を、市場・競合・コスト・効果の観点で比較し、着手可否の判断を仰ぐ。両案とも制作の主原価がほぼ0で、少額・短期間で検証できるのが特徴。</p>
+
+  <h2>2. 提案の概要（2案）</h2>
+  <table>
+    <tr><th style="width:14%">案</th><th>概要</th><th style="width:20%">形態・課金</th></tr>
+    <tr>
+      <td><b>①AI教育コンテンツ</b><br>「見て分かる授業」</td>
+      <td>教科書の<b>文章では分かりにくい</b>内容を、小中学生が<b>映像で見て理解できる</b>短尺解説動画に量産（歴史の再現映像・仕組みのアニメ・地図の変化 等）。「読んで覚える」を「見て分かる」に変える。</td>
+      <td>YouTube収益／動画教材サブスク／塾・学校B2B／教材販売</td>
+    </tr>
+    <tr>
+      <td><b>②AIペットメモリアル</b></td>
+      <td>生前（シニア期〜看取り期）に蓄積した写真・動画から、見送り後に<b>追悼動画・3Dモデル</b>を制作。「ペット看取り伴走」アプリの自然な出口。<span class="note">※"再現"でなく"表現"に限定（倫理配慮）。</span></td>
+      <td>1点 数千〜数万円／看取りアプリの上位オプション</td>
+    </tr>
+  </table>
+
+  <h2>3. 市場</h2>
+  <table>
+    <tr><th style="width:14%">案</th><th>市場規模・動向</th><th style="width:34%">狙う顧客</th></tr>
+    <tr><td>①教育</td><td>教育・EdTech は大規模。暗記科目は「つまらない・挫折しやすい」ため<b>動画解説の需要が高い</b>。少子化でも一人当たり教育投資は底堅い。</td><td>小中学生と保護者、塾・学校、（多言語展開で）海外の日本語学習者</td></tr>
+    <tr><td>②メモリアル</td><td>ペット関連市場は拡大基調。ペットの高齢化で看取り・供養の需要増。<b>ペットロス領域は支払い意欲が高い</b>。</td><td>シニア期〜看取り期のペット飼い主、緩和ケア・往診の動物病院</td></tr>
+  </table>
+
+  <h2>4. 競合分析</h2>
+  <table>
+    <tr><th style="width:14%">案</th><th style="width:44%">主な競合</th><th>差別化（勝てる角度）</th></tr>
+    <tr>
+      <td>①教育</td>
+      <td>中田敦彦のYouTube大学（登録420万超）、<b>スタディサプリ</b>（生成AI字幕も導入）、NHK for School、教育系YouTuber多数。<span class="pill w">激戦</span></td>
+      <td>AIによる<b>量産×網羅性×低コスト</b>／一貫キャラで親しみ／<b>多言語</b>で海外／万人向けを避け<b>特定ニッチに集中</b></td>
+    </tr>
+    <tr>
+      <td>②メモリアル</td>
+      <td><b>PetMemory AI</b>（2026/1開始・月2,980円〜・グリーフケア連携・"依存させない"設計）、<b>再会AR</b>（3D/AR）、ココナラの個人サービス。<span class="pill w">先行者あり</span></td>
+      <td>単体で戦わず<b>「ペット看取り伴走」の一気通貫の出口</b>に。生前からの豊富な素材＋既存の信頼関係が後発でも勝てる差別化</td>
+    </tr>
+  </table>
+
+  <h2>5. コスト（初期・ランニング）</h2>
+  <table>
+    <tr><th>費目</th><th>①AI教育コンテンツ</th><th>②AIペットメモリアル</th></tr>
+    <tr><td>ツール費（Higgsfield）</td><td class="num">月 約1.1万円<br>（ULTRA年払・動画約500本/月相当）</td><td class="num">月 約1.1万円</td></tr>
+    <tr><td>1コンテンツの生成原価</td><td class="num">数十円/本</td><td class="num">数十〜数千円/点</td></tr>
+    <tr><td>監修費</td><td>時代考証・内容チェック（スポット）</td><td>グリーフケア／獣医監修（スポット）</td></tr>
+    <tr><td>その他</td><td colspan="2">自身の作業時間（企画・生成・編集・投稿・分析）。開発を伴う場合はClaude Codeで内製可。</td></tr>
+    <tr><td><b>立ち上げ費用の規模</b></td><td colspan="2"><b>月1万円台のツール費＋作業時間で開始可能（大きな初期投資は不要）</b></td></tr>
+  </table>
+  <p class="note">※金額は2026年8月時点・1ドル≒155円換算の暫定。為替・料金改定で変動。</p>
+
+  <h2>6. 効果（収益見込み・KPI・定性）</h2>
+  <div class="two">
+    <div class="box sec">
+      <div class="card-title">① AI教育コンテンツ</div>
+      <div class="kpi">
+        <div><div class="v">≈0円</div><div class="l">1本の生成原価</div></div>
+        <div><div class="v">1〜2週</div><div class="l">立ち上げ</div></div>
+        <div><div class="v">高粗利</div><div class="l">量産で拡大</div></div>
+      </div>
+      <b>収益源：</b>
+      <ul>
+        <li>YouTube広告収益（認知＆初期収益）</li>
+        <li>動画教材サブスク（月数百〜千円 × 会員）</li>
+        <li>塾・学校 B2B（1校 月数万円）／教材販売</li>
+      </ul>
+      <b>定性効果：</b>文章が苦手な子も直感的に理解。自社のAI活用力の対外実証にもなる。
+    </div>
+    <div class="box sec">
+      <div class="card-title">② AIペットメモリアル</div>
+      <div class="kpi">
+        <div><div class="v">数千〜<br>数万円</div><div class="l">1点単価</div></div>
+        <div><div class="v">1〜2週</div><div class="l">立ち上げ</div></div>
+        <div><div class="v">高い</div><div class="l">支払い意欲</div></div>
+      </div>
+      <b>収益源：</b>
+      <ul>
+        <li>追悼動画・3Dモデルの都度販売（1点 数千〜数万円）</li>
+        <li>「看取り伴走」アプリの上位・オプション</li>
+        <li>動物病院経由の紹介（B2B2C）</li>
+      </ul>
+      <b>定性効果：</b>飼い主の悲しみに寄り添い、深い感謝を得られる。看取りアプリのLTVを補完。
+    </div>
+  </div>
+
+  <h2>7. スケジュール（着手後）</h2>
+  <table>
+    <tr><th style="width:22%">フェーズ</th><th>内容</th><th style="width:20%">期間目安</th></tr>
+    <tr><td>1. 立ち上げ・試作</td><td>ワークフロー整備、サンプル数本／数点の制作、監修者の確保</td><td>約1〜2週間</td></tr>
+    <tr><td>2. 小規模公開・検証</td><td>①YouTube少数公開で反応検証／②数件の受注または看取りアプリ利用者へ提案</td><td>約1〜2ヶ月</td></tr>
+    <tr><td>3. 判断</td><td>反応（再生・登録・受注・満足度）を見て、拡大 or 撤退を判断</td><td>随時</td></tr>
+  </table>
+
+  <h2>8. リスクと対策</h2>
+  <table>
+    <tr><th style="width:14%">案</th><th>主なリスク</th><th style="width:42%">対策</th></tr>
+    <tr><td>①教育</td><td>激戦市場／教科書の著作権／AI映像の時代考証ミス</td><td>特定ニッチに集中／事実・学習範囲はオリジナル自作（教科書を複製しない）／人による監修を必須化</td></tr>
+    <tr><td>②メモリアル</td><td>先行者（PetMemory AI等）／悲嘆を長引かせる倫理リスク</td><td>看取り伴走の出口として差別化／"再現でなく表現"に限定・グリーフケア監修・依存させない設計</td></tr>
+    <tr><td>共通</td><td>生成物の権利・第三者の肖像/商標</td><td>権利処理・利用規約の確認。商用利用可否を事前精査</td></tr>
+  </table>
+
+  <h2>9. 稟議事項（ご承認をお願いする事項）</h2>
+  <div class="box">
+    <ul>
+      <li><b>①②いずれか（または両方）について、月1万円台のツール費での試作・市場検証への着手</b>のご承認</li>
+      <li>Higgsfield 有料プラン（ULTRA 年払 月約1.1万円）の利用開始</li>
+      <li>監修（時代考証／グリーフケア・獣医）のスポット依頼の可否</li>
+    </ul>
+    <p class="note">※本格展開（教材サブスク基盤・看取りアプリ連携等）は、検証結果を踏まえ改めて起案する。</p>
+  </div>
+
+  <h2>10. 添付：体験デモ</h2>
+  <p>①AI教育コンテンツは、実際に触れる体験デモを用意した（ブラウザで開くだけ・インストール不要）。</p>
+  <div class="box"><b>体験デモURL：</b> https://claude.ai/code/artifact/a6da311d-4d21-4f33-8793-9915d9802e55<br>
+  <span class="note">題材（分数のわり算／光合成／鎌倉幕府）を選び「▶ 映像で見る」で、"教科書の文字 → 映像で理解 → クイズ" を体験できます。</span></div>
+
+  <div class="footer">
+    ※ 本書の数値は2026年8月時点の暫定試算（要検証）。競合・市場は同時点の調査に基づく定性評価。着手決定後、定量は一次情報で更新する。
+  </div>
+
+</div>
+</body>
+</html>
