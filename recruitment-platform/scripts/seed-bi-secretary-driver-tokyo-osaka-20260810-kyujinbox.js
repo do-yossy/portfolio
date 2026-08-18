@@ -34,7 +34,7 @@ const { hashSeed } = require('./lib/kyujinbox-vary');
 const COMPANY      = 'bi';
 const NOW          = new Date().toISOString();
 const TARGET_MEDIA = ['求人ボックス'];
-const JOB_TYPE     = '秘書兼ドライバー';
+const JOB_TYPE     = '送迎ドライバー';
 const EMP_TYPE     = '正社員';
 const SALARY       = '月給350,000円〜430,000円（経験・能力を考慮）';
 const IMAGE_URL    = '/images/bi-secretary-driver.jpg';
@@ -52,9 +52,9 @@ const AREAS = [
 function pick(pool, area, salt) { return pool[hashSeed(`${salt}|${area}`) % pool.length]; }
 
 const TITLE_CORE = [
-  '代表専属の秘書兼ドライバー｜送迎＋秘書業務｜未経験歓迎｜月給35万〜43万円｜普通免許OK',
-  '秘書兼ドライバー（代表専属）｜安全送迎＆秘書サポート｜完全週休2日｜月給35万〜43万円',
-  '代表を支える秘書兼ドライバー｜運転＋スケジュール管理など｜未経験OK・普通免許OK｜月給35万〜43万円',
+  '社長専属の送迎ドライバー｜未経験OK・普通免許のみ｜月給35万〜43万円・週休2日・9〜18時',
+  'ドライバー（社長の送迎メイン＋かんたんサポート）｜未経験歓迎・普通免許OK｜月給35万〜43万円・転勤なし',
+  '運転手／社長の送迎｜月給35万〜43万円・完全週休2日｜未経験OK・PC不問・普通免許OK',
 ];
 const INTRO = [
   a => `${a}周辺エリアで、代表専属ドライバーとして安全な送迎と秘書業務をお任せします。`,
@@ -129,7 +129,7 @@ const JOBS = AREAS.map(a => ({
   employmentType: EMP_TYPE,
   description: buildDescription(a),
   tags: ['未経験歓迎', '普通免許OK', '秘書兼ドライバー', '完全週休2日制', '社用車貸与', '転勤なし', 'PC貸与', '賞与年2回'],
-  catchcopy: `未経験歓迎｜代表専属の秘書兼ドライバー（${a.area}）｜月給35万〜43万円・完全週休2日・9〜18時｜普通免許OK・PC基本操作でOK`,
+  catchcopy: `未経験OK｜社長の送迎ドライバー（${a.area}）｜月給35万〜43万円・完全週休2日・9〜18時｜普通免許のみでOK・運転メイン`,
   imageUrl:  IMAGE_URL,
   isPublished: true,
   publishedAt: NOW,
