@@ -14,8 +14,12 @@
  *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --from 2026-08-08 --fix
  *   ④ ID指定で確実に:
  *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --ids <id1>,<id2> --fix
- *   ⑤ 本日のSQシニアジョブ件数を「2」に合わせる（不足分だけ本日へ上げる）:
+ *   ⑤ 本日のSQシニアジョブ件数を「2」に合わせる（架電リストの不足分だけ本日へ上げる）:
  *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --target 2 --fix
+ *   ⑥ 過去応募者（アーカイブ済み）からN名を本日へ復帰させる:
+ *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --from-archived 2 --fix
+ *   ⑦ --target で候補が足りない時に過去応募者からも補充:
+ *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --target 2 --include-archived --fix
  */
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
@@ -34,10 +38,12 @@ const jst = ms => new Date(Date.now() + 9 * 3600 * 1000 + ms).toISOString().slic
 const TODAY = jst(0);
 const YESTERDAY = jst(-86400000);
 
-const fromDate  = val('--from') || YESTERDAY;   // 既定：昨日追加分
-const idsArg    = val('--ids');
-const targetArg = val('--target');              // 例: --target 2 → 本日のSQシニアジョブを2件にする
-const doFix     = has('--fix');
+const fromDate     = val('--from') || YESTERDAY;   // 既定：昨日追加分
+const idsArg       = val('--ids');
+const targetArg    = val('--target');              // 例: --target 2 → 本日のSQシニアジョブを2件にする
+const fromArchived = val('--from-archived');       // 例: --from-archived 2 → 過去応募者から2名を本日へ復帰
+const includeArch  = has('--include-archived');    // --target で候補不足時に過去応募者からも補充
+const doFix        = has('--fix');
 
 // SQ × シニアジョブ × 架電リスト（is_archived=0）
 let rows = db.prepare(
@@ -49,21 +55,46 @@ let rows = db.prepare(
 
 const isToday = r => String(r.applied_at || '').slice(0, 10) === TODAY;
 
+// 過去応募者（アーカイブ済み）のSQシニアジョブ候補（新しい順・本日以外・重複除く）
+const archivedCandidates = () => db.prepare(
+  `SELECT id, name, applied_at, applied_month, status, is_archived, is_duplicate
+     FROM applicants
+    WHERE company='sq' AND media='seniorjob' AND is_archived=1 AND is_duplicate=0
+      AND substr(applied_at,1,10) <> ?
+    ORDER BY datetime(applied_at) DESC`
+).all(TODAY);
+
 let targets, modeLabel;
 if (idsArg) {
   const set = new Set(idsArg.split(',').map(s => s.trim()).filter(Boolean));
-  targets = rows.filter(r => set.has(r.id));
+  // ID指定はアーカイブ済みも対象にできるよう全件から拾う
+  const all = rows.concat(archivedCandidates());
+  targets = all.filter(r => set.has(r.id));
   modeLabel = 'ID指定';
+} else if (fromArchived !== null) {
+  // 過去応募者（アーカイブ）から N 名を本日へ復帰（架電リストの現行分は触らない）
+  const nWant = Math.max(0, parseInt(fromArchived, 10) || 0);
+  const arch = archivedCandidates();
+  targets = arch.slice(0, nWant);
+  modeLabel = `過去応募者から${nWant}名を本日へ復帰（アーカイブ候補${arch.length}名）`;
+  if (arch.length < nWant) modeLabel += ` ※候補が${arch.length}名しかありません`;
 } else if (targetArg !== null) {
   // 目標件数に合わせて、本日のSQシニアジョブ実数（重複除く）を数え、足りない分だけ本日へ上げる
   const target = Math.max(0, parseInt(targetArg, 10) || 0);
   const todayCount = rows.filter(r => isToday(r) && r.is_duplicate === 0).length;
   const need = target - todayCount;
-  const candidates = rows.filter(r => !isToday(r));          // 本日以外（新しい順）
+  let candidates = rows.filter(r => !isToday(r));          // 架電リスト内の本日以外（新しい順）
+  let usedArch = 0;
+  if (includeArch && need > candidates.length) {
+    const short = need - candidates.length;
+    const fromArch = archivedCandidates().slice(0, short);
+    usedArch = fromArch.length;
+    candidates = candidates.concat(fromArch);
+  }
   targets = need > 0 ? candidates.slice(0, need) : [];
-  modeLabel = `目標${target}件（本日実数=${todayCount} / あと${Math.max(0, need)}件を本日へ）`;
+  modeLabel = `目標${target}件（本日実数=${todayCount} / あと${Math.max(0, need)}件を本日へ${usedArch ? `・うち過去応募者から${usedArch}名復帰` : ''}）`;
   if (need > 0 && candidates.length < need) {
-    modeLabel += ` ※上げられる候補が${candidates.length}件しかありません`;
+    modeLabel += ` ※候補が${candidates.length}件しかありません${includeArch ? '' : '（--include-archived で過去応募者からも補充可）'}`;
   }
 } else {
   targets = rows.filter(r => String(r.applied_at || '').slice(0, 10) === fromDate);
@@ -73,7 +104,8 @@ if (idsArg) {
 console.log(`\n■ SQ × 媒体=シニアジョブ × 架電リスト（is_archived=0）: 全${rows.length}件`);
 console.log(`   本日(JST)=${TODAY} / 対象=${modeLabel}　→ 上げる対象 ${targets.length}件\n`);
 targets.forEach((r, i) => {
-  console.log(`  [${i + 1}] id=${r.id}  ${r.name}  applied_at=${r.applied_at}  status=${r.status}  dup=${r.is_duplicate}`);
+  const tag = r.is_archived === 1 ? '  ←過去応募者(アーカイブ)から復帰' : '';
+  console.log(`  [${i + 1}] id=${r.id}  ${r.name}  applied_at=${r.applied_at}  status=${r.status}  dup=${r.is_duplicate}${tag}`);
 });
 
 if (!doFix) {
