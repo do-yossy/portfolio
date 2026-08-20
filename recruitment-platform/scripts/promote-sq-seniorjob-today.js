@@ -14,6 +14,8 @@
  *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --from 2026-08-08 --fix
  *   ④ ID指定で確実に:
  *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --ids <id1>,<id2> --fix
+ *   ⑤ 本日のSQシニアジョブ件数を「2」に合わせる（不足分だけ本日へ上げる）:
+ *      node --experimental-sqlite scripts/promote-sq-seniorjob-today.js --target 2 --fix
  */
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
@@ -32,9 +34,10 @@ const jst = ms => new Date(Date.now() + 9 * 3600 * 1000 + ms).toISOString().slic
 const TODAY = jst(0);
 const YESTERDAY = jst(-86400000);
 
-const fromDate = val('--from') || YESTERDAY;   // 既定：昨日追加分
-const idsArg   = val('--ids');
-const doFix    = has('--fix');
+const fromDate  = val('--from') || YESTERDAY;   // 既定：昨日追加分
+const idsArg    = val('--ids');
+const targetArg = val('--target');              // 例: --target 2 → 本日のSQシニアジョブを2件にする
+const doFix     = has('--fix');
 
 // SQ × シニアジョブ × 架電リスト（is_archived=0）
 let rows = db.prepare(
@@ -44,16 +47,31 @@ let rows = db.prepare(
     ORDER BY datetime(applied_at) DESC`
 ).all();
 
-let targets;
+const isToday = r => String(r.applied_at || '').slice(0, 10) === TODAY;
+
+let targets, modeLabel;
 if (idsArg) {
   const set = new Set(idsArg.split(',').map(s => s.trim()).filter(Boolean));
   targets = rows.filter(r => set.has(r.id));
+  modeLabel = 'ID指定';
+} else if (targetArg !== null) {
+  // 目標件数に合わせて、本日のSQシニアジョブ実数（重複除く）を数え、足りない分だけ本日へ上げる
+  const target = Math.max(0, parseInt(targetArg, 10) || 0);
+  const todayCount = rows.filter(r => isToday(r) && r.is_duplicate === 0).length;
+  const need = target - todayCount;
+  const candidates = rows.filter(r => !isToday(r));          // 本日以外（新しい順）
+  targets = need > 0 ? candidates.slice(0, need) : [];
+  modeLabel = `目標${target}件（本日実数=${todayCount} / あと${Math.max(0, need)}件を本日へ）`;
+  if (need > 0 && candidates.length < need) {
+    modeLabel += ` ※上げられる候補が${candidates.length}件しかありません`;
+  }
 } else {
   targets = rows.filter(r => String(r.applied_at || '').slice(0, 10) === fromDate);
+  modeLabel = fromDate;
 }
 
 console.log(`\n■ SQ × 媒体=シニアジョブ × 架電リスト（is_archived=0）: 全${rows.length}件`);
-console.log(`   本日(JST)=${TODAY} / 対象日=${idsArg ? 'ID指定' : fromDate}　→ 対象 ${targets.length}件\n`);
+console.log(`   本日(JST)=${TODAY} / 対象=${modeLabel}　→ 上げる対象 ${targets.length}件\n`);
 targets.forEach((r, i) => {
   console.log(`  [${i + 1}] id=${r.id}  ${r.name}  applied_at=${r.applied_at}  status=${r.status}  dup=${r.is_duplicate}`);
 });
