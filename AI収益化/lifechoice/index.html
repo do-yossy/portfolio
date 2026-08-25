@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LIFE CHOICE｜今ある選択肢から、最適な選択を</title>
+<meta name="description" content="個人の無駄を減らし、今ある選択肢の中から最適な選択を見つけるサービスです。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="LIFE CHOICE">
+<meta property="og:description" content="個人の無駄を減らし、今ある選択肢の中から最適な選択を見つける">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧭%3C/text%3E%3C/svg%3E">
+<style>
+  .lc-hero { text-align:center; padding: var(--sp-8) 0 var(--sp-6); }
+  .lc-hero__logo { font-size: var(--fs-sm); letter-spacing:.22em; color: var(--sub); font-weight:700; }
+  .lc-hero__title { font-size: clamp(22px,5.4vw,30px); font-weight:800; margin: var(--sp-2) 0; }
+  .lc-hero__lead { font-size: var(--fs-base); color: var(--sub); }
+  .lc-grid { display:grid; gap: var(--sp-3); }
+  @media (min-width:600px){ .lc-grid { grid-template-columns: 1fr 1fr; } }
+  .lc-entry { display:block; text-decoration:none; color:inherit; }
+  .lc-entry__icon { font-size: 22px; }
+  .lc-entry__name { font-size: var(--fs-md); font-weight:800; margin: var(--sp-1) 0 2px; }
+  .lc-entry__tag { font-size: var(--fs-sm); color: var(--sub); }
+</style>
+</head>
+<body>
+
+<main class="lc-wrap lc-main">
+  <div class="lc-hero">
+    <div class="lc-hero__logo">LIFE CHOICE</div>
+    <h1 class="lc-hero__title">今日は何をしますか？</h1>
+    <p class="lc-hero__lead">個人の無駄を減らし、今ある選択肢から最適な選択を見つけます</p>
+  </div>
+
+  <div class="lc-section" id="search-area"></div>
+  <div id="groups"></div>
+  <div class="lc-section" id="reco"></div>
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { BottomNavigation } from './components/layout.js';
+import { SearchBox } from './components/filter.js';
+import { Disclaimer } from './components/footer.js';
+import { SERVICES, GROUPS, servicesInGroup } from './lib/services.js';
+import { $, html, esc } from './utils/dom.js';
+import { loadPreference, hasPreference, loadHistory } from './utils/storage.js';
+
+document.body.setAttribute('data-service', 'buy-check');
+document.body.insertAdjacentHTML('beforeend', BottomNavigation('home'));
+
+// 統合検索（Phase 6 で実装）
+html('#search-area',
+  SearchBox({ placeholder: '例：3万円くらいでキャンプを始めたい' }) +
+  `<p class="lc-field__hint" style="margin-top:var(--sp-2)">※ 統合検索は準備中です。下の入口からお選びください。</p>`);
+$('#lc-search').addEventListener('submit', () => {
+  alert('統合検索は Phase 6 で実装予定です。\n\n入力された内容から「買う・借りる・中古・無料」を振り分け、推定節約額を出す機能になります。');
+});
+
+// 3グループの入口
+html('#groups', GROUPS.map(g => `
+  <section class="lc-section">
+    <h2 class="lc-section-title">${esc(g.label)}</h2>
+    <div class="lc-grid">
+      ${servicesInGroup(g.id).map(s => `
+        <a class="lc-card lc-card--tap lc-entry" href="app/${s.path}" data-service="${s.id}" style="margin-top:0">
+          <span class="lc-entry__icon" aria-hidden="true">${s.icon}</span>
+          <div class="lc-entry__name">${esc(s.name)}</div>
+          <div class="lc-entry__tag">${esc(s.tagline)}</div>
+          ${s.hasDemoData ? '<span class="lc-demo" style="margin-top:8px">DEMO データ</span>' : ''}
+        </a>`).join('')}
+    </div>
+  </section>`).join(''));
+
+// あなたへのおすすめ（Phase 6 で本実装。今は時刻ベースの簡易版）
+const hour = new Date().getHours();
+const history = loadHistory();
+let pickId = 'buy-check', reason = 'まずは買い物の判断から試せます';
+if (hour >= 16 && hour <= 23) { pickId = 'now-what'; reason = '夕方以降は「今から行ける場所」が探しやすい時間です'; }
+else if (history[0] && history[0].service === 'buy-check') { pickId = 'unnecessary-buy'; reason = '直前に買う前チェックを使ったので、借りる選択肢も見てみませんか'; }
+const rec = SERVICES.find(s => s.id === pickId);
+html('#reco', `
+  <h2 class="lc-section-title">あなたへのおすすめ</h2>
+  <a class="lc-card lc-card--tap lc-entry" href="app/${rec.path}" style="margin-top:0">
+    <span class="lc-entry__icon" aria-hidden="true">${rec.icon}</span>
+    <div class="lc-entry__name">${esc(rec.name)}</div>
+    <div class="lc-entry__tag">${esc(reason)}</div>
+  </a>
+  ${hasPreference() ? `<p class="lc-field__hint" style="margin-top:var(--sp-2)">保存された条件（予算 ${loadPreference().budget}円）を各機能に引き継いでいます</p>` : ''}`);
+
+html('#note', Disclaimer({
+  dataNote: '各機能で表示する価格・営業時間・スコアは、業態や品目の一般的な水準にもとづく参考情報です。' +
+    '「今日だけ安い」「無料品レーダー」の掲載データはすべてサンプルで、実在の店舗・出品ではありません。'
+}));
+</script>
+</body>
+</html>

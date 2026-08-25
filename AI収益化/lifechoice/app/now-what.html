@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>いまから何する？｜LIFE CHOICE</title>
+<meta name="description" content="時間・予算・気分から、今から間に合う場所を探します。予約不要の選択肢も出します。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="いまから何する？｜LIFE CHOICE">
+<meta property="og:description" content="今から行ける場所を、予約不要のものも含めて探します。">
+<meta name="theme-color" content="#ea580c">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⏰%3C/text%3E%3C/svg%3E">
+</head>
+<body data-service="now-what">
+
+<main class="lc-wrap lc-main">
+  <div class="lc-card" id="form">
+    <div class="lc-field">
+      <span class="lc-field__label">いま何時？ / 何時まで空いてる？</span>
+      <div class="lc-row" style="flex-wrap:wrap">
+        <select id="now" style="padding:11px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--surface)"></select>
+        <span class="lc-sub">から</span>
+        <select id="until" style="padding:11px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--surface)"></select>
+        <span class="lc-sub">まで</span>
+      </div>
+    </div>
+    <div id="conds"></div>
+    <button class="lc-btn" id="go" style="margin-top:var(--sp-4)">今から行けるところを探す</button>
+  </div>
+
+  <div id="out" class="lc-hidden"></div>
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { Filter, TransportSelector } from '../components/filter.js';
+import { ResultCard, ResultSummary, ResultCount, EmptyState } from '../components/result.js';
+import { Cta, Disclaimer } from '../components/footer.js';
+import { findNowWhat, summarize } from '../lib/time-calculation.js';
+import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
+import { StaticDataProvider } from '../lib/data-provider.js';
+import { yen, hhmm, duration, priceRange, travelMinutes, TRANSPORT_LABEL } from '../utils/format.js';
+import { pick, pickNumber, $, html, esc, scrollTop } from '../utils/dom.js';
+import { loadPreference, savePreference, pushHistory } from '../utils/storage.js';
+
+mountShell('now-what');
+const stores = (await StaticDataProvider.getStores()).filter(s => s.openingTime !== null);
+const pref = loadPreference();
+
+// 時刻セレクト（30分刻み）
+['now', 'until'].forEach(id => {
+  const el = $('#' + id);
+  for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 30) {
+    el.add(new Option(String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'), h + m / 60));
+  }
+});
+const nowDate = new Date();
+$('#now').value = Math.floor(nowDate.getHours() + (nowDate.getMinutes() >= 30 ? 0.5 : 0));
+$('#until').value = Math.min(23.5, Number($('#now').value) + 4);
+
+html('#conds',
+  Filter({ name: 'budget', label: '予算（1人あたり）', value: pref.budget,
+    options: [{ value: 0, label: '0円' }, { value: 1000, label: '〜1,000円' }, { value: 2000, label: '〜2,000円' },
+              { value: 3000, label: '〜3,000円' }, { value: 5000, label: '〜5,000円' }, { value: 99999, label: '気にしない' }] }) +
+  Filter({ name: 'who', label: '誰と？', value: 'solo',
+    options: [{ value: 'solo', label: 'ひとり' }, { value: 'multi', label: '2人以上' }] }) +
+  Filter({ name: 'mood', label: '今日の気分', value: 'quiet',
+    options: [{ value: 'quiet', label: '人と話したくない' }, { value: 'talk', label: '誰かと話したい' }, { value: 'any', label: 'どちらでも' }] }) +
+  Filter({ name: 'body', label: '動きたい？', value: 'rest',
+    options: [{ value: 'rest', label: 'のんびり' }, { value: 'active', label: '体を動かしたい' }, { value: 'any', label: 'どちらでも' }] }) +
+  TransportSelector(pref.transportation)
+);
+
+html('#note', Disclaimer({
+  dataNote: `<b>${stores.length}業態</b>を収録。相場・営業時間・所要時間は代表的な業態の一般的な水準で、実在の個別店舗の情報ではありません。`
+}));
+
+$('#go').addEventListener('click', () => {
+  const now = Number($('#now').value), until = Number($('#until').value);
+  const budget = pickNumber('budget'), who = pick('who'), mood = pick('mood'), body = pick('body');
+  const transportation = pick('transportation') || 'walk';
+  savePreference({ budget, transportation });
+
+  // 移動時間は2km想定でユーザーの移動手段から算出（既定は徒歩25分相当）
+  const travel = Math.max(10, travelMinutes(2, transportation));
+  const hits = findNowWhat(stores, { now, until, budget, who, mood, body, travelMinutes: travel });
+  const sm = summarize(hits);
+
+  let freeMin = Math.round(((until <= now ? until + 24 : until) - now) * 60);
+
+  const cards = hits.slice(0, 10).map(h => {
+    const s = h.store;
+    const link = s.requiresReservation ? linksFor('booking', s.name)[0] : null;
+    return ResultCard({
+      title: s.name,
+      price: priceRange(s.budgetMin, s.budgetMax),
+      priceNote: '1人あたり',
+      tags: [
+        { label: s.category },
+        { label: '所要 約' + duration(s.estimatedStayMinutes) },
+        s.requiresReservation ? { label: '要予約', variant: 'accent' } : { label: '予約不要・今すぐ行ける', variant: 'ok' },
+        (who === 'solo' && s.soloScore >= 5) ? { label: 'ひとり歓迎', variant: 'warn' } : null,
+        { label: '〜' + hhmm(s.closingTime) }
+      ].filter(Boolean),
+      why: s.why + (h.notes.length ? '　※' + h.notes.join('／') : ''),
+      footer: link
+        ? `<p style="margin-top:var(--sp-3);font-size:var(--fs-base);border-top:1px dashed var(--line);padding-top:var(--sp-3)">→ <a href="${esc(link.url)}" target="_blank" rel="noopener sponsored">当日枠を確認する</a></p>`
+        : (s.requiresReservation
+          ? `<p style="margin-top:var(--sp-3);font-size:var(--fs-base);opacity:.6;border-top:1px dashed var(--line);padding-top:var(--sp-3)">→ 当日枠を確認する（提携準備中）</p>` : '')
+    });
+  }).join('');
+
+  html('#out',
+    ResultSummary(
+      `<b>${hhmm(now)}</b> から <b>${duration(freeMin)}</b>、予算 <b>${budget >= 99999 ? '上限なし' : yen(budget)}</b>、` +
+      `${who === 'solo' ? '<b>ひとり</b>' : '<b>2人以上</b>'}で` +
+      `${mood === 'quiet' ? '、<b>静かに</b>過ごす' : mood === 'talk' ? '、<b>誰かと話せる</b>ところ' : ''}前提で探しました。` +
+      `<br><span class="lc-sub">移動は${TRANSPORT_LABEL[transportation]}で約${travel}分を見込んでいます</span>`) +
+    ResultCount(`<b>${sm.total}件</b>見つかりました（うち予約が要るもの ${sm.needBooking}件 / <span style="color:var(--ok)">予約不要 ${sm.noBooking}件</span>）`) +
+    (cards || EmptyState({ title: '条件に合うものが見つかりませんでした', hint: '予算を上げるか、時間を長めに取ってみてください' })) +
+    `<button class="lc-btn lc-btn--ghost" id="again" style="margin-top:var(--sp-4)">条件を変えてやり直す</button>`
+  );
+
+  $('#again').addEventListener('click', () => {
+    $('#out').classList.add('lc-hidden'); $('#form').classList.remove('lc-hidden'); scrollTop();
+  });
+  pushHistory({ service: 'now-what', count: sm.total });
+  $('#form').classList.add('lc-hidden');
+  $('#out').classList.remove('lc-hidden');
+  scrollTop();
+});
+</script>
+</body>
+</html>

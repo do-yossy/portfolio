@@ -4,7 +4,9 @@
   "type": "module",
   "description": "LIFE CHOICE - 個人の無駄を減らし、今ある選択肢の中から最適な選択を見つける",
   "scripts": {
-    "test": "node tests/regression-phase2.js && node tests/components-phase3.js"
+    "test": "node tests/regression-phase2.js && node tests/components-phase3.js && node tests/logic-phase4.js && node tests/pages-phase4.js"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

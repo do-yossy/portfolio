@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>買わなくていい物レーダー｜LIFE CHOICE</title>
+<meta name="description" content="何回使えば買ったほうが得か。損益分岐点を品目ごとに算出します。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="買わなくていい物レーダー｜LIFE CHOICE">
+<meta property="og:description" content="買うより借りた方がいい物が分かります。">
+<meta name="theme-color" content="#c2410c">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📡%3C/text%3E%3C/svg%3E">
+</head>
+<body data-service="unnecessary-buy">
+
+<main class="lc-wrap lc-main">
+  <div class="lc-card" id="conds"></div>
+  <p class="lc-count" id="lead"></p>
+  <div id="list"></div>
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { Filter } from '../components/filter.js';
+import { PriceComparison, EmptyState } from '../components/result.js';
+import { Disclaimer } from '../components/footer.js';
+import { calcBreakEven, totalSaving } from '../lib/break-even.js';
+import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
+import { StaticDataProvider } from '../lib/data-provider.js';
+import { yen } from '../utils/format.js';
+import { pickNumber, html, esc, onChange } from '../utils/dom.js';
+
+mountShell('unnecessary-buy');
+const products = await StaticDataProvider.getProducts();
+
+html('#conds',
+  Filter({ name: 'freq', label: 'あなたの使用頻度は？', value: 1,
+    options: [{ value: 1, label: '年1回' }, { value: 2, label: '年2回' }, { value: 4, label: '年4回' }, { value: 12, label: '月1回' }] }) +
+  Filter({ name: 'years', label: '何年使う想定？', value: 3,
+    options: [{ value: 1, label: '1年' }, { value: 3, label: '3年' }, { value: 5, label: '5年' }] })
+);
+
+html('#note', Disclaimer({
+  dataNote: '損益分岐点は「購入価格 ÷ レンタル料金」で算出しています（保管コスト・売却益は未算入）。' +
+    '「実勢価格」表示のある品目は各社の掲載価格を確認済みです。'
+}));
+
+function render() {
+  const freq = pickNumber('freq'), years = pickNumber('years');
+  const rows = calcBreakEven(products, { freq, years });
+  const uses = freq * years;
+  const rentCount = rows.filter(r => r.rentWins).length;
+  const save = totalSaving(rows);
+
+  html('#lead',
+    `通算<b>${uses}回</b>（年${freq}回 × ${years}年）使う前提だと、<b>${rentCount}品目</b>は買うよりレンタルのほうが安く済みます。` +
+    (rentCount ? `全部レンタルにした場合の差額は<b>${yen(save)}</b>。` : ''));
+
+  if (!rows.length) { html('#list', EmptyState()); return; }
+
+  html('#list', rows.map(r => {
+    const p = r.product;
+    const link = r.rentWins ? linksFor('rent', p.name)[0] : null;
+    return `
+<article class="lc-card">
+  <div class="lc-card__head">
+    <h3 class="lc-card__title">${esc(p.name)}
+      <span class="lc-sub" style="font-weight:400">　${esc(p.category)}${p.source === '実測' ? ' ・実勢価格' : ''}</span>
+    </h3>
+    <span class="lc-tag lc-tag--${r.rentWins ? 'warn' : 'ok'}">${r.rentWins ? '借りたほうが安い' : '買ったほうが安い'}</span>
+  </div>
+  ${PriceComparison({ a: { label: '買う', value: p.newPrice }, b: { label: '借りる', value: r.rentTotal } })}
+  <div class="lc-tag lc-tag--warn" style="display:block;padding:9px 12px">
+    損益分岐は<b>${r.breakEvenUses}回</b>目 — ${r.breakEvenUses}回以上使うなら買ったほうが得です（今回の想定は${uses}回）
+  </div>
+  ${r.rentWins ? (link
+    ? `<p style="margin-top:var(--sp-3);font-size:var(--fs-base)">→ <a href="${esc(link.url)}" target="_blank" rel="noopener sponsored">${esc(p.name)}を借りられる店を探す</a></p>`
+    : `<p style="margin-top:var(--sp-3);font-size:var(--fs-base);opacity:.6">→ ${esc(p.name)}を借りられる店を探す（ID未設定）</p>`) : ''}
+</article>`;
+  }).join(''));
+}
+
+onChange(['freq', 'years'], render);
+render();
+</script>
+</body>
+</html>
