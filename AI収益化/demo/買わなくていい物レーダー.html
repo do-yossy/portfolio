@@ -80,6 +80,9 @@ main{padding:24px 0 60px}
 
 <script>
 (function(){
+// ═══ 送客先の設定 ── ASP提携後ここにURLを入れるだけで本番稼働 ═══
+var AFF={rent:{url:"",note:"Rentio・ホームセンター等レンタル各社への送客"}};
+
 // buy:新品の実勢価格帯の中央値 / rent:1回(3泊4日)のレンタル料 / src:実測=掲載価格を確認済み
 var ITEMS=[
  // ── ホームセンター系（1日単位・極端に安い）★実測
@@ -146,7 +149,7 @@ function render(){
         '<div class="bar"><span class="lb">借りる</span><span class="tr"><span class="fl r" style="width:'+rw+'%">'+yen(r.rentTotal)+'</span></span></div>'+
       '</div>'+
       '<div class="bp">損益分岐は<b>'+r.bp+'回</b>目 — '+r.bp+'回以上使うなら買ったほうが得です（今回の想定は'+uses+'回）</div>'+
-      (r.rentWins?'<div class="cta">→ <a href="#" onclick="alert(\'本番ではレンタル各社の予約ページへ送客し、ここで成果報酬が発生します\');return false;">'+it.n+'を借りられる店を探す</a></div>':'')+
+      (r.rentWins?(AFF.rent.url?'<div class="cta">→ <a href="'+AFF.rent.url+'" target="_blank" rel="noopener sponsored">'+it.n+'を借りられる店を探す</a></div>':'<div class="cta" style="opacity:.6">→ <span style="color:var(--sub)">'+it.n+'を借りられる店を探す（提携準備中）</span></div>'):'')+
     '</div>';
   }).join('');
 }

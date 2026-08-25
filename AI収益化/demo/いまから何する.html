@@ -150,6 +150,9 @@ main{padding:26px 0 60px}
 
 <script>
 (function(){
+// ═══ 送客先の設定 ── ASP提携後ここにURLを入れるだけで本番稼働 ═══
+var AFF={book:{url:"",note:"アソビュー・じゃらん等の予約サイトへの送客"}};
+var SHARE_TAG="#いまから何する";
   // 所要時間 min(分) / 予算 min-max(円) / 営業 open-close(時) / solo:一人適性1-5
   // talk: 会話度 0=不要 1=あってもなくても 2=会話が主目的 / active: 0=のんびり 1=中間 2=運動
   // book: true=要予約(送客対象) false=予約不要
@@ -280,7 +283,9 @@ main{padding:26px 0 60px}
         '<span class="tag">〜'+hhmm(d.close>24?d.close-24:d.close)+'</span>';
       var extra=r.reasons.length?'<br>※'+r.reasons.join('／'):'';
       var cta=d.book
-        ? '<div class="cta-line">→ <a href="#" onclick="alert(\'本番ではアソビュー・じゃらん等の予約ページへ送客し、ここで成果報酬が発生します\');return false;">当日枠を確認する</a>　<span style="color:var(--sub)">（送客＝収益発生点）</span></div>'
+        ? (AFF.book.url
+            ? '<div class="cta-line">→ <a href="'+AFF.book.url+'" target="_blank" rel="noopener sponsored">当日枠を確認する</a>　<span style="color:var(--sub)">（送客＝収益発生点）</span></div>'
+            : '<div class="cta-line" style="opacity:.6">→ <span style="color:var(--sub)">当日枠を確認する（提携準備中）</span></div>')
         : '';
       return '<div class="card"><div class="head"><h3>'+d.n+'</h3>'+
         '<div class="price">'+price+'<small>1人あたり</small></div></div>'+
