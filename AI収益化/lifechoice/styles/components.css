@@ -1,0 +1,243 @@
+/* ═══════════════════════════════════════════════════════════
+ * LIFE CHOICE ── 共通コンポーネント
+ * 既存6プロトタイプで重複していたCSS（26行・約3.7KB）をここに集約する。
+ * ═══════════════════════════════════════════════════════════ */
+
+/* ───────── Header ───────── */
+.lc-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 20;
+}
+.lc-header__inner {
+  max-width: var(--wrap); margin-inline: auto;
+  padding: var(--sp-3) var(--sp-4);
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-height: var(--tap);
+}
+.lc-header__back {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; margin-left: -6px;
+  border-radius: var(--r-sm); text-decoration: none;
+  color: var(--sub); font-size: 19px; flex-shrink: 0;
+}
+.lc-header__back:hover { background: var(--surface-2); }
+.lc-header__title { font-size: var(--fs-md); font-weight: 800; flex: 1; min-width: 0; }
+.lc-header__brand { font-size: var(--fs-xs); color: var(--sub); letter-spacing: .1em; }
+
+/* ───────── BottomNavigation ───────── */
+.lc-nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.lc-nav__inner {
+  max-width: var(--wrap); margin-inline: auto;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+}
+.lc-nav__item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; height: var(--nav-h);
+  text-decoration: none; color: var(--sub); font-size: 10.5px; font-weight: 700;
+}
+.lc-nav__item[aria-current="page"] { color: var(--accent); }
+.lc-nav__icon { font-size: 19px; line-height: 1; }
+
+@media (min-width: 700px) {
+  .lc-nav { position: static; border-top: none; border-bottom: 1px solid var(--line); }
+  .lc-nav__inner { grid-template-columns: repeat(4, auto); justify-content: center; gap: var(--sp-5); }
+  .lc-nav__item { flex-direction: row; height: 46px; font-size: var(--fs-sm); }
+}
+
+/* ───────── Card ───────── */
+.lc-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+}
+.lc-card + .lc-card { margin-top: var(--sp-3); }
+.lc-card--tap { transition: border-color .15s, transform .15s; cursor: pointer; }
+.lc-card--tap:hover { border-color: var(--line-2); }
+.lc-card--tap:active { transform: scale(.995); }
+.lc-card__head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); margin-bottom: var(--sp-2); }
+.lc-card__title { font-size: var(--fs-lg); font-weight: 700; line-height: var(--lh-tight); }
+.lc-card__price { font-size: var(--fs-lg); font-weight: 800; color: var(--ok); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.lc-card__price small { display: block; font-size: var(--fs-xs); font-weight: 400; color: var(--sub); }
+.lc-card__why {
+  font-size: var(--fs-base); color: var(--sub);
+  border-left: 2px solid var(--accent); padding-left: var(--sp-3);
+}
+
+@media (max-width: 520px) {
+  .lc-card__head { flex-direction: column; gap: var(--sp-1); }
+  .lc-card__price, .lc-card__price small { text-align: left; }
+}
+
+/* ───────── Filter（chips）───────── */
+.lc-field + .lc-field { margin-top: var(--sp-5); }
+.lc-field__label {
+  display: block; font-size: var(--fs-sm); font-weight: 700;
+  color: var(--sub); margin-bottom: var(--sp-2);
+}
+.lc-field__hint { font-size: var(--fs-sm); color: var(--sub); margin: -2px 0 var(--sp-2); }
+
+.lc-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.lc-chips input { position: absolute; opacity: 0; width: 0; height: 0; }
+.lc-chips label {
+  display: inline-flex; align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--sp-4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  cursor: pointer; user-select: none;
+  font-size: var(--fs-base);
+  transition: background .15s, border-color .15s;
+}
+.lc-chips label:hover { border-color: var(--line-2); }
+.lc-chips input:checked + label {
+  background: var(--accent); border-color: var(--accent);
+  color: #fff; font-weight: 700;
+}
+.lc-chips input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ───────── Button ───────── */
+.lc-btn {
+  display: block; width: 100%;
+  min-height: var(--tap); padding: var(--sp-4);
+  border: none; border-radius: var(--r);
+  background: var(--accent); color: #fff;
+  font-size: var(--fs-md); font-weight: 800;
+  cursor: pointer; text-align: center; text-decoration: none;
+  transition: background .15s;
+}
+.lc-btn:hover { background: var(--accent-d); }
+.lc-btn:disabled { background: var(--line-2); cursor: not-allowed; }
+.lc-btn--ghost { background: var(--surface); color: var(--accent); border: 1.5px solid var(--accent); }
+.lc-btn--ghost:hover { background: var(--accent-bg); }
+.lc-btn--sm { min-height: 38px; padding: var(--sp-2) var(--sp-4); font-size: var(--fs-base); width: auto; display: inline-block; }
+
+/* ───────── Badge / Tag ───────── */
+.lc-tag {
+  display: inline-block;
+  font-size: var(--fs-xs); padding: 3px 9px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--sub);
+  border: 1px solid var(--line);
+}
+.lc-tag--ok   { background: var(--ok-bg);   color: var(--ok);   border-color: transparent; font-weight: 700; }
+.lc-tag--warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; font-weight: 700; }
+.lc-tag--bad  { background: var(--bad-bg);  color: var(--bad);  border-color: transparent; font-weight: 700; }
+.lc-tag--accent { background: var(--accent-bg); color: var(--accent); border-color: transparent; font-weight: 700; }
+.lc-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ───────── DemoBadge（架空データの明示。厳守事項11）───────── */
+.lc-demo {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-xs); font-weight: 800;
+  padding: 3px 9px; border-radius: var(--r-sm);
+  background: var(--demo-bg); color: var(--demo);
+  border: 1px dashed var(--demo);
+}
+.lc-demo-banner {
+  background: var(--demo-bg); border: 1px solid var(--demo);
+  border-radius: var(--r); padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-sm); color: var(--ink-2);
+  margin-bottom: var(--sp-4);
+}
+.lc-demo-banner b { color: var(--demo); }
+
+/* ───────── Score ───────── */
+.lc-score { text-align: center; flex-shrink: 0; }
+.lc-score__value { font-size: 21px; font-weight: 800; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; }
+.lc-score__label { font-size: 10px; color: var(--sub); }
+
+.lc-meter { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.lc-meter + .lc-meter { margin-top: 4px; }
+.lc-meter__label { width: 104px; color: var(--sub); flex-shrink: 0; }
+.lc-meter__track { flex: 1; height: 7px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.lc-meter__fill { height: 100%; background: var(--accent); border-radius: 4px; }
+
+/* ───────── PriceComparison（横棒）───────── */
+.lc-bars { margin-bottom: var(--sp-3); }
+.lc-bar { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.lc-bar + .lc-bar { margin-top: 5px; }
+.lc-bar__label { width: 66px; color: var(--sub); flex-shrink: 0; }
+.lc-bar__track { flex: 1; height: 19px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+.lc-bar__fill {
+  height: 100%; border-radius: 5px;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 7px; color: #fff; font-size: var(--fs-xs); font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.lc-bar__fill--a { background: var(--ink-2); }
+.lc-bar__fill--b { background: var(--accent); }
+
+/* ───────── 比較テーブル ───────── */
+.lc-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
+.lc-table th, .lc-table td { padding: var(--sp-3) var(--sp-2); border-bottom: 1px solid var(--line); text-align: left; }
+.lc-table th { font-size: var(--fs-sm); color: var(--sub); font-weight: 700; }
+.lc-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.lc-table tr.win td { background: var(--ok-bg); }
+
+/* ───────── EmptyState ───────── */
+.lc-empty { text-align: center; padding: var(--sp-8) var(--sp-5); color: var(--sub); }
+.lc-empty__icon { font-size: 30px; margin-bottom: var(--sp-2); opacity: .6; }
+.lc-empty__title { font-size: var(--fs-md); font-weight: 700; color: var(--ink-2); margin-bottom: var(--sp-1); }
+.lc-empty__hint { font-size: var(--fs-sm); }
+
+/* ───────── ResultSummary ───────── */
+.lc-summary {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+  font-size: var(--fs-base);
+  margin-bottom: var(--sp-4);
+}
+.lc-summary b { color: var(--accent-d); }
+.lc-count { font-size: var(--fs-sm); color: var(--sub); margin-bottom: var(--sp-3); }
+.lc-count b { color: var(--accent); }
+
+/* ───────── ShareBox ───────── */
+.lc-share { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--sp-4); margin-top: var(--sp-4); }
+.lc-share__label { font-size: var(--fs-sm); color: var(--sub); font-weight: 700; margin-bottom: var(--sp-2); }
+.lc-share__text {
+  font-size: var(--fs-base); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: var(--sp-3); margin-bottom: var(--sp-3); line-height: 1.7;
+}
+.lc-share__btns { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.lc-share__btns > * { flex: 1; min-width: 130px; }
+
+/* ───────── CTA（送客）───────── */
+.lc-cta { background: var(--ink); color: var(--surface); border-radius: var(--r); padding: var(--sp-4); text-align: center; font-size: var(--fs-base); }
+.lc-cta__links { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: center; margin-top: var(--sp-3); }
+.lc-cta a {
+  display: inline-block; background: var(--surface); color: var(--ink);
+  padding: var(--sp-2) var(--sp-5); border-radius: var(--r-sm);
+  text-decoration: none; font-weight: 700; min-height: 38px; line-height: 22px;
+}
+.lc-cta a[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+
+/* ───────── Disclaimer ───────── */
+.lc-note {
+  font-size: var(--fs-sm); color: var(--sub); line-height: 1.85;
+  border-top: 1px solid var(--line);
+  margin-top: var(--sp-6); padding-top: var(--sp-4);
+}
+.lc-note b { color: var(--warn); }
+.lc-note a { color: inherit; }
+
+/* ───────── SearchBox ───────── */
+.lc-search { display: flex; gap: var(--sp-2); }
+.lc-search__input {
+  flex: 1; min-height: var(--tap);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1.5px solid var(--line); border-radius: var(--r);
+  background: var(--surface); color: var(--ink);
+}
+.lc-search__input::placeholder { color: var(--sub); }
+.lc-search__input:focus { border-color: var(--accent); outline: none; }
