@@ -48,7 +48,7 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
 .why h3{font-size:12.5px;color:var(--sub);margin-bottom:8px}
 .why li{margin-left:17px;margin-bottom:5px}
 .cta{background:#0f172a;color:#fff;border-radius:12px;padding:18px;text-align:center;font-size:14px}
-.cta a{display:inline-block;background:#fff;color:#0f172a;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700;margin-top:10px;font-size:14px}
+.cta a{display:inline-block;background:#fff;color:#0f172a;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700;margin:10px 5px 0;font-size:14px}
 .share{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:14px}
 .sh-t{font-size:12.5px;color:var(--sub);font-weight:700;margin-bottom:9px}
 .sh-box{font-size:13px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-bottom:10px;line-height:1.7}
@@ -143,15 +143,53 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
 
 <script>
 (function(){
-// ═══════════════════════════════════════════════════════
-// 送客先の設定 ── ASP提携後、ここにURLを入れるだけで本番稼働する
-// 空文字のままなら「提携準備中」と表示され、リンクは無効になる
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// アフィリエイト設定 ── ここに ID を入れるだけで全品目のリンクが有効になる
+//
+//   amazonTag : AmazonアソシエイトのトラッキングID（例 "yourname-22"）
+//   rakutenId : 楽天アフィリエイトID（例 "1a2b3c4d.5e6f7g8h"）
+//   a8Rent    : A8で提携済みのレンタル系プログラムの広告URL（固定リンク）
+//   a8Used    : A8で提携済みの中古・買取系プログラムの広告URL（固定リンク）
+//
+// ※ Amazonは「リンクを貼るサイトのURL」を事前にアソシエイト・セントラルへ
+//    登録する必要があります。未登録サイトでの利用は規約違反になります。
+// ═══════════════════════════════════════════════════════════════
 var AFF={
-  buy:  {url:"", label:"新品の最安値を探す",       note:"ECアフィリエイト（Amazon・楽天・Yahoo）"},
-  used: {url:"", label:"中古の在庫を探す",         note:"中古販売サイトへの送客"},
-  rent: {url:"", label:"レンタルできる店を探す",   note:"Rentio・ホームセンター等への送客"},
-  stop: {url:"", label:"それでも欲しい場合は価格をチェック", note:"ECアフィリエイト"}
+  amazonTag:"",
+  rakutenId:"",
+  a8Rent:"",
+  a8Used:"",
+
+  // 商品名から検索リンクを組み立てる
+  amazon:function(kw){
+    if(!this.amazonTag) return "";
+    return "https://www.amazon.co.jp/s?k="+encodeURIComponent(kw)+"&tag="+this.amazonTag;
+  },
+  rakuten:function(kw){
+    if(!this.rakutenId) return "";
+    var target="https://search.rakuten.co.jp/search/mall/"+encodeURIComponent(kw)+"/";
+    return "https://hb.afl.rakuten.co.jp/hgc/"+this.rakutenId+"/?pc="+encodeURIComponent(target);
+  },
+
+  // 判定種別 → 送客先の候補リスト（設定済みのものだけ返す）
+  links:function(kind,kw){
+    var out=[];
+    if(kind==="buy"||kind==="stop"){
+      if(this.amazon(kw)) out.push({label:"Amazonで探す",url:this.amazon(kw)});
+      if(this.rakuten(kw)) out.push({label:"楽天で探す",url:this.rakuten(kw)});
+    }
+    if(kind==="used"){
+      if(this.amazon(kw+" 中古")) out.push({label:"Amazonの中古を見る",url:this.amazon(kw+" 中古")});
+      if(this.rakuten(kw+" 中古")) out.push({label:"楽天の中古を見る",url:this.rakuten(kw+" 中古")});
+      if(this.a8Used) out.push({label:"買取・中古専門店を見る",url:this.a8Used});
+    }
+    if(kind==="rent"){
+      if(this.a8Rent) out.push({label:"レンタルできる店を探す",url:this.a8Rent});
+      if(this.rakuten(kw+" レンタル")) out.push({label:"楽天でレンタルを探す",url:this.rakuten(kw+" レンタル")});
+    }
+    return out;
+  },
+  ready:function(){return !!(this.amazonTag||this.rakutenId||this.a8Rent||this.a8Used);}
 };
 var SHARE_TAG="#買う前チェック";
 
@@ -272,13 +310,14 @@ document.getElementById('go').addEventListener('click',function(){
   if(need===2) reasons.push('今すぐ必要とのことなので、<b>入手までの時間</b>も考慮してください（レンタルは配送に数日かかります）');
   document.getElementById('why').innerHTML='<h3>この判定の根拠</h3><ul><li>'+reasons.join('</li><li>')+'</li></ul>';
 
-  // ── 送客リンク（AFF.url が空なら準備中表示）
-  var aff=AFF[kind];
-  document.getElementById('cta').innerHTML=
-    '<div>この判定に沿って進める場合はこちら</div>'+
-    (aff.url
-      ? '<a href="'+aff.url+'" target="_blank" rel="noopener sponsored">'+aff.label+'</a>'
-      : '<a href="#" onclick="alert(\'提携準備中です。\\n\\n'+aff.note+'\\n\\nASP提携後、AFF設定にURLを入れるだけで有効になります\');return false;" style="opacity:.55">'+aff.label+'（提携準備中）</a>');
+  // ── 送客リンク（AFFにIDが入っていれば自動生成、無ければ準備中表示）
+  var links=AFF.links(kind,it.n);
+  var ctaHead={buy:'新品を買うなら',used:'中古を探すなら',rent:'借りるなら',stop:'それでも欲しくなったら'}[kind];
+  document.getElementById('cta').innerHTML= links.length
+    ? '<div>'+ctaHead+'</div>'+links.map(function(l){
+        return '<a href="'+l.url+'" target="_blank" rel="noopener sponsored">'+l.label+'</a>';
+      }).join('')
+    : '<div>'+ctaHead+'</div><a href="#" onclick="alert(\'アフィリエイトIDが未設定です。\\n\\nスクリプト冒頭の AFF に AmazonトラッキングID・楽天アフィリエイトID・A8の広告URLを入れると、全品目のリンクが自動で有効になります。\');return false;" style="opacity:.55">リンク準備中（IDを設定してください）</a>';
 
   // ── シェア用テキスト
   var kindWord={buy:'新品を買う',used:'中古を買う',rent:'レンタルする',stop:'今は見送る'}[kind];
