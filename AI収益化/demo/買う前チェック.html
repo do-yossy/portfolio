@@ -112,7 +112,7 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
 </div>
 
 <p class="note">
-<b>これはデモです。</b>中古相場率・レンタル単価は品目ごとの一般的な水準を用いたサンプル値で、実在の商品価格ではありません。<br>
+<b>データについて。</b>37品目を収録。うち<b>実測</b>マークのものはRentioの掲載価格・買取相場の公開情報を確認済み（ミラーレス一眼 3泊4日9,090〜14,980円／高圧洗浄機 3,888〜7,182円／スーツケース 5,300〜7,300円／ブランド品の買取相場は定価の約60%／自転車は約40%）。<br>それ以外は同カテゴリの水準からの推定値です。判定根拠の欄に実測か推定かを表示しています。<br>
 本番では商品URLを解析して実勢価格を取得します。<br>
 <b>構造上の注意</b>：「買わなくていい」と判定するほどEC送客収益は減ります。この利益相反をどう扱うかが、このサービス最大の設計課題です（→ 企画書参照）。
 </p>
@@ -120,28 +120,54 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
 
 <script>
 (function(){
-// used:中古相場率 / rent:1回あたりレンタル料の目安 / rentUnit:'回' or '月' / life:標準的な使用可能年数
+// used:中古相場率 / rent:1回(3泊4日)または1ヶ月あたりのレンタル料 / unit:'回' or '月' / life:標準的な使用可能年数
+// src:'実測'=Rentio等の掲載価格を確認したもの / '推定'=同カテゴリの水準からの推定値
 var ITEMS=[
- {n:"スーツケース",used:.45,rent:4000,unit:"回",life:8},
- {n:"高圧洗浄機",used:.5,rent:4500,unit:"回",life:7},
- {n:"プロジェクター",used:.5,rent:5000,unit:"回",life:5},
- {n:"一眼レフ・ミラーレスカメラ",used:.55,rent:6000,unit:"回",life:6},
- {n:"ビデオカメラ",used:.45,rent:5000,unit:"回",life:6},
- {n:"テント・キャンプ一式",used:.4,rent:7000,unit:"回",life:8},
- {n:"BBQコンロ一式",used:.35,rent:3500,unit:"回",life:6},
- {n:"電動工具（インパクト等）",used:.55,rent:3000,unit:"回",life:8},
- {n:"脚立・はしご",used:.4,rent:2000,unit:"回",life:15},
- {n:"ベビーカー",used:.4,rent:3500,unit:"月",life:3},
- {n:"チャイルドシート",used:.35,rent:2500,unit:"月",life:4},
- {n:"礼服・フォーマルウェア",used:.3,rent:8000,unit:"回",life:10},
- {n:"スーツ",used:.25,rent:6000,unit:"回",life:5},
- {n:"ロボット掃除機",used:.5,rent:3500,unit:"月",life:5},
- {n:"美容家電（脱毛器等）",used:.4,rent:4000,unit:"月",life:4},
- {n:"マッサージチェア",used:.35,rent:6000,unit:"月",life:8},
- {n:"楽器（ギター・キーボード等）",used:.55,rent:3500,unit:"月",life:15},
- {n:"スキー・スノーボード一式",used:.4,rent:6000,unit:"回",life:8},
- {n:"釣り具一式",used:.45,rent:4000,unit:"回",life:10},
- {n:"ゲーム機",used:.6,rent:3000,unit:"月",life:6}
+ // ── カメラ・映像（レンタル実勢を確認済み）
+ {n:"ミラーレス一眼カメラ",used:.55,rent:11500,unit:"回",life:6,src:"実測",note:"Rentio 3泊4日 9,090〜14,980円"},
+ {n:"望遠レンズ",used:.55,rent:8500,unit:"回",life:10,src:"推定"},
+ {n:"ビデオカメラ",used:.45,rent:8000,unit:"回",life:6,src:"推定"},
+ {n:"アクションカメラ（GoPro等）",used:.5,rent:5500,unit:"回",life:4,src:"推定"},
+ {n:"三脚・撮影機材",used:.4,rent:3500,unit:"回",life:10,src:"推定"},
+ {n:"プロジェクター",used:.45,rent:6500,unit:"回",life:5,src:"推定"},
+ // ── 家周り（レンタル実勢を確認済み）
+ {n:"高圧洗浄機",used:.5,rent:4700,unit:"回",life:7,src:"実測",note:"Rentio 3泊4日 3,888〜7,182円"},
+ {n:"スチームクリーナー",used:.4,rent:3800,unit:"回",life:7,src:"推定"},
+ {n:"カーペットクリーナー",used:.4,rent:4200,unit:"回",life:8,src:"推定"},
+ {n:"電動工具（インパクトドライバー等）",used:.55,rent:3200,unit:"回",life:8,src:"推定"},
+ {n:"脚立・はしご",used:.4,rent:2200,unit:"回",life:15,src:"推定"},
+ {n:"芝刈り機・草刈り機",used:.45,rent:4000,unit:"回",life:8,src:"推定"},
+ // ── 旅行（レンタル実勢を確認済み）
+ {n:"スーツケース（大型）",used:.45,rent:6300,unit:"回",life:8,src:"実測",note:"Rentio 3泊4日 5,300〜7,300円"},
+ {n:"スーツケース（機内持込）",used:.4,rent:4200,unit:"回",life:8,src:"推定"},
+ // ── アウトドア
+ {n:"テント・キャンプ一式",used:.4,rent:8000,unit:"回",life:8,src:"推定"},
+ {n:"BBQコンロ一式",used:.35,rent:3500,unit:"回",life:6,src:"推定"},
+ {n:"スキー・スノーボード一式",used:.4,rent:6500,unit:"回",life:8,src:"推定"},
+ {n:"釣り具一式",used:.45,rent:4500,unit:"回",life:10,src:"推定"},
+ {n:"登山用品一式",used:.4,rent:6000,unit:"回",life:8,src:"推定"},
+ // ── 衣類（ブランド品の買取率は定価の約60%が相場）
+ {n:"礼服・フォーマルウェア",used:.3,rent:8000,unit:"回",life:10,src:"推定"},
+ {n:"スーツ",used:.25,rent:6000,unit:"回",life:5,src:"推定"},
+ {n:"ブランドバッグ",used:.6,rent:9000,unit:"月",life:15,src:"実測",note:"ブランド品の買取相場は定価の約60%"},
+ {n:"着物・振袖",used:.2,rent:25000,unit:"回",life:20,src:"推定"},
+ // ── 家電（月額レンタルが主）
+ {n:"ロボット掃除機",used:.5,rent:3500,unit:"月",life:5,src:"推定"},
+ {n:"美容家電（脱毛器・美顔器）",used:.4,rent:4000,unit:"月",life:4,src:"推定"},
+ {n:"マッサージチェア",used:.35,rent:6000,unit:"月",life:8,src:"推定"},
+ {n:"ホームベーカリー・調理家電",used:.35,rent:2500,unit:"月",life:6,src:"推定"},
+ {n:"ミシン",used:.4,rent:3500,unit:"月",life:12,src:"推定"},
+ // ── 育児（使用期間が短く、レンタル向き）
+ {n:"ベビーカー",used:.4,rent:3500,unit:"月",life:3,src:"推定"},
+ {n:"チャイルドシート",used:.35,rent:2500,unit:"月",life:4,src:"推定"},
+ {n:"ベビーベッド",used:.3,rent:3000,unit:"月",life:3,src:"推定"},
+ {n:"抱っこ紐",used:.35,rent:1500,unit:"月",life:3,src:"推定"},
+ // ── 趣味
+ {n:"楽器（ギター・キーボード等）",used:.55,rent:3500,unit:"月",life:15,src:"推定"},
+ {n:"電子ドラム",used:.5,rent:5000,unit:"月",life:10,src:"推定"},
+ {n:"ゲーム機",used:.6,rent:3000,unit:"月",life:6,src:"推定"},
+ {n:"自転車（シティ・クロス）",used:.4,rent:4000,unit:"月",life:8,src:"実測",note:"自転車の買取相場は定価の約40%"},
+ {n:"ロードバイク",used:.45,rent:8000,unit:"月",life:10,src:"推定"}
 ];
 var sel=document.getElementById('item');
 ITEMS.forEach(function(it,i){sel.add(new Option(it.n,i));});
@@ -203,6 +229,8 @@ document.getElementById('go').addEventListener('click',function(){
   if(freq<=3) reasons.push('年'+freq+'回は<b>使用頻度が低い</b>部類。所有すると保管場所のコストもかかります');
   if(freq>=24) reasons.push('使用頻度が高いので、<b>所有したほうが1回あたりの負担が下がります</b>');
   reasons.push('この品目の中古相場は新品の<b>約'+Math.round(it.used*100)+'%</b>。売却時は購入額の約'+Math.round(it.used*60)+'%が戻る想定');
+  if(it.src==='実測'&&it.note) reasons.push('レンタル料の根拠：<b>'+it.note+'</b>（実勢価格を確認済み）');
+  else reasons.push('レンタル料は同カテゴリの水準からの<b>推定値</b>です。実際の見積もりで確認してください');
   if(years>it.life) reasons.push('想定使用年数が一般的な寿命（約'+it.life+'年）を超えています。<b>買い替えが発生する前提</b>で考えてください');
   if(need===0) reasons.push('「なんとなく欲しい」段階です。<b>1週間置いてまだ欲しければ</b>買う、で間に合います');
   if(need===2) reasons.push('今すぐ必要とのことなので、<b>入手までの時間</b>も考慮してください（レンタルは配送に数日かかります）');

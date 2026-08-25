@@ -141,7 +141,7 @@ main{padding:26px 0 60px}
   </div>
 
   <p class="note">
-    <b>これはデモです。</b>掲載データは代表的な業態の一般的な相場・営業時間をもとにした<b>サンプル</b>で、実在の店舗情報ではありません。<br>
+    <b>データについて。</b><b>47業態</b>を収録。相場・営業時間・所要時間は代表的な業態の一般的な水準で、実在の個別店舗の情報ではありません。<br>本番では地域を1つに絞り、実在施設のデータに差し替えます。<br>
     本番では、予約商材（アソビュー・じゃらん等）と<b>予約不要の選択肢</b>を横断して提示し、予約商材の送客で収益化します。<br>
     既存の予約サイトが「予約できるもの」しか出せないのに対し、<b>予約不要の選択肢も含めて正直に提案する</b>のが本サービスの差別化点です。
   </p>
@@ -181,7 +181,26 @@ main{padding:26px 0 60px}
     {n:"謎解き・脱出ゲーム",dur:120,lo:2500,hi:4000,open:11,close:22,solo:2,talk:2,active:0,book:true,cat:"体験",why:"複数人向け。当日枠は埋まりやすい"},
     {n:"料理教室・ワークショップ",dur:120,lo:3000,hi:6000,open:10,close:21,solo:4,talk:2,active:1,book:true,cat:"体験",why:"一人参加が多く、自然に会話が生まれる"},
     {n:"カフェで作業・読書",dur:90,lo:500,hi:1200,open:7,close:22,solo:5,talk:0,active:0,book:false,cat:"カフェ",why:"最も手軽。時間が余ったときの保険"},
-    {n:"ショッピングモール",dur:120,lo:0,hi:99999,open:10,close:21,solo:4,talk:0,active:1,book:false,cat:"屋内",why:"予算ゼロでも時間はつぶせる"}
+    {n:"ショッピングモール",dur:120,lo:0,hi:99999,open:10,close:21,solo:4,talk:0,active:1,book:false,cat:"屋内",why:"予算ゼロでも時間はつぶせる"},
+    {n:"回転寿司・定食チェーン",dur:45,lo:800,hi:1800,open:11,close:23,solo:5,talk:0,active:0,book:false,cat:"食事",why:"タッチパネル注文の店なら会話ゼロで完結する"},
+    {n:"ラーメン店",dur:30,lo:800,hi:1500,open:11,close:23,solo:5,talk:0,active:0,book:false,cat:"食事",why:"一人客が前提。滞在30分で済む"},
+    {n:"ファミレスで長居",dur:120,lo:600,hi:1500,open:7,close:24,solo:5,talk:0,active:0,book:false,cat:"食事",why:"ドリンクバーだけでも居座れる。深夜まで開いている店が多い"},
+    {n:"スーパー銭湯の岩盤浴",dur:150,lo:1200,hi:2500,open:10,close:24,solo:5,talk:0,active:0,book:false,cat:"温浴",why:"サウナより低温で長く居られる"},
+    {n:"日帰り入浴（ホテル大浴場）",dur:90,lo:1500,hi:3000,open:12,close:23,solo:5,talk:0,active:0,book:false,cat:"温浴",why:"空いていて清潔。ホテルによっては日帰り利用ができる"},
+    {n:"カラオケ（複数人）",dur:150,lo:800,hi:2500,open:11,close:24,solo:3,talk:2,active:1,book:false,cat:"交流",why:"深夜料金のほうが安い店もある"},
+    {n:"ダーツバー",dur:120,lo:1500,hi:3500,open:17,close:24,solo:3,talk:2,active:1,book:false,cat:"交流",why:"一人客も受け入れる店が多いが、常連の輪がある"},
+    {n:"銭湯サウナのあとの一杯",dur:150,lo:1500,hi:3500,open:15,close:23,solo:4,talk:1,active:0,book:false,cat:"温浴",why:"風呂上がりの食堂がある銭湯なら、そのまま完結する"},
+    {n:"プラネタリウム",dur:60,lo:600,hi:1600,open:10,close:20,solo:5,talk:0,active:0,book:false,cat:"文化",why:"暗いので一人でも全く目立たない。上映時刻の確認だけ必要"},
+    {n:"神社・寺めぐり",dur:90,lo:0,hi:500,open:6,close:17,solo:5,talk:0,active:1,book:false,cat:"屋外",why:"ほぼ無料。ただし夕方には閉まる"},
+    {n:"デパートの屋上・展望フロア",dur:45,lo:0,hi:800,open:10,close:20,solo:4,talk:0,active:0,book:false,cat:"屋外",why:"無料で座れる場所があることが多い"},
+    {n:"ドライブ・ひとり車中",dur:120,lo:0,hi:2000,open:0,close:24,solo:5,talk:0,active:0,book:false,cat:"屋外",why:"時間の制約が最も少ない。ガソリン代のみ"},
+    {n:"24時間営業のジム",dur:75,lo:0,hi:3000,open:0,close:24,solo:5,talk:0,active:2,book:false,cat:"運動",why:"時間帯を選ばない。ビジター利用可の店もある"},
+    {n:"フットサル・スポーツの個人参加",dur:120,lo:1000,hi:2500,open:18,close:23,solo:3,talk:2,active:2,book:true,cat:"運動",why:"一人で申し込める個人参加枠。当日空きがあれば入れる"},
+    {n:"ヨガ・ピラティスの体験",dur:75,lo:1000,hi:3000,open:9,close:21,solo:4,talk:1,active:2,book:true,cat:"運動",why:"体験レッスンは当日でも受けられる教室がある"},
+    {n:"ネイル・まつげの当日枠",dur:90,lo:3000,hi:7000,open:10,close:20,solo:5,talk:1,active:0,book:true,cat:"美容",why:"当日キャンセル枠が出ることがある"},
+    {n:"マッサージ・整体",dur:60,lo:2500,hi:6000,open:10,close:22,solo:5,talk:1,active:0,book:true,cat:"美容",why:"当日予約を受ける店が多い"},
+    {n:"猫カフェ・動物カフェ",dur:60,lo:1000,hi:2500,open:11,close:20,solo:5,talk:0,active:0,book:false,cat:"屋内",why:"一人客がむしろ多い。会話は不要"},
+    {n:"陶芸以外のものづくり体験",dur:90,lo:2500,hi:5000,open:10,close:19,solo:4,talk:1,active:1,book:true,cat:"体験",why:"アクセサリー・レザー・ガラスなど。当日枠が残ることがある"}
   ];
 
   var nowSel=document.getElementById('now'), untilSel=document.getElementById('until');
