@@ -104,12 +104,19 @@ export function compareWays(product, uses, years, freeItems = []) {
   const p = product;
   const ways = [];
 
-  if (p.newPrice) ways.push({ kind: 'buy', label: '買う', cost: p.newPrice, note: '新品を買う' });
+  if (p.newPrice) {
+    ways.push({
+      kind: 'buy', label: '買う', cost: p.newPrice, note: '新品を買う',
+      net: p.newPrice - Math.round(p.newPrice * (p.estimatedResaleRate || 0))
+    });
+  }
 
   if (p.newPrice && p.usedPriceRate) {
+    const usedCost = Math.round(p.newPrice * p.usedPriceRate);
     ways.push({
-      kind: 'used', label: '中古', cost: Math.round(p.newPrice * p.usedPriceRate),
-      note: '中古で買う（新品の' + Math.round(p.usedPriceRate * 100) + '%）'
+      kind: 'used', label: '中古', cost: usedCost,
+      note: '中古で買う（新品の' + Math.round(p.usedPriceRate * 100) + '%）',
+      net: usedCost - Math.round(p.newPrice * (p.usedEstimatedResaleRate || 0))
     });
   }
 
@@ -117,7 +124,7 @@ export function compareWays(product, uses, years, freeItems = []) {
   if (rent !== null) {
     const months = Math.min(years * 12, Math.ceil(uses / 2));
     ways.push({
-      kind: 'rent', label: '借りる', cost: rent,
+      kind: 'rent', label: '借りる', cost: rent, net: rent,
       note: p.rentalUnit === '回'
         ? uses + '回ぶん借りる（1回 ' + p.rentalPrice.toLocaleString('ja-JP') + '円）'
         : months + 'ヶ月ぶん借りる（月 ' + p.rentalPrice.toLocaleString('ja-JP') + '円）'
@@ -128,9 +135,13 @@ export function compareWays(product, uses, years, freeItems = []) {
   // 現状の無料品データはすべてサンプルなので isDemo を必ず立てる（厳守事項11）。
   const free = freeItems.find(f => f.category && p.category && f.category === p.category);
   if (free) {
-    ways.push({ kind: 'free', label: 'もらう', cost: 0, note: '同じ分類の出品あり', isDemo: true, freeItemId: free.id });
+    ways.push({ kind: 'free', label: 'もらう', cost: 0, net: 0, note: '同じ分類の出品あり', isDemo: true, freeItemId: free.id });
   }
 
+  // 並び順は「支払額」で決める。
+  // ①買う前チェックは実質負担（売却額を引いた額）で判定するが、
+  // 統合検索は予算に収まるかを見る機能であり、予算を縛るのは実際に出ていく金額のため。
+  // 売却額は net として併記し、画面で両方見せる。
   ways.sort((a, b) => a.cost - b.cost);
   return ways;
 }
@@ -139,7 +150,12 @@ export function compareWays(product, uses, years, freeItems = []) {
  * 借りるのが得でいられる上限回数を求める。
  * 「何回までなら借りたほうが安いか」は利用者がいちばん知りたい数字。
  *
- * @returns {number|null} 回数。レンタルか購入の情報が無ければ null
+ * 月額のレンタルは「使う年数」で頭打ちになるため、上限まで借りても
+ * 買うより安いことがある（例：ブランドバッグ 月9,000円×12ヶ月＜中古12万円）。
+ * その場合は分岐点が存在しないので Infinity を返す。
+ *
+ * @returns {number|null} 回数。Infinity＝その期間ならずっと借りるほうが安い。
+ *                        レンタルか購入の情報が無ければ null
  */
 export function rentBreakEven(product, years) {
   if (!product.rentalPrice || !product.newPrice) return null;
@@ -147,11 +163,13 @@ export function rentBreakEven(product, years) {
   const target = product.usedPriceRate
     ? Math.round(product.newPrice * product.usedPriceRate)
     : product.newPrice;
+  // 使用回数をいくら増やしても買う額を超えないなら、分岐点は存在しない
+  if (rentalTotal(product, 100000, years) <= target) return Infinity;
   for (let n = 1; n <= 400; n++) {
     const t = rentalTotal(product, n, years);
     if (t === null || t > target) return n - 1;
   }
-  return 400;
+  return Infinity;
 }
 
 /**

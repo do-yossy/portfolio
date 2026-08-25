@@ -119,16 +119,49 @@ check('キャンプ一式の「借りる」は回数×単価', ways.find(w => w.
 truthy('安い順に並んでいる', ways.every((w, i) => i === 0 || ways[i - 1].cost <= w.cost));
 
 // 損益分岐
+let infinite = 0;
 products.filter(p => p.rentalPrice && p.newPrice).forEach(p => {
   const n = rentBreakEven(p, 1);
-  truthy(p.id + ' の分岐点は0以上の整数', Number.isInteger(n) && n >= 0);
-  if (n >= 1) {
-    const target = p.usedPriceRate ? Math.round(p.newPrice * p.usedPriceRate) : p.newPrice;
+  const target = p.usedPriceRate ? Math.round(p.newPrice * p.usedPriceRate) : p.newPrice;
+  truthy(p.id + ' の分岐点は0以上の整数か Infinity', n === Infinity || (Number.isInteger(n) && n >= 0));
+  if (n === Infinity) {
+    // 月額レンタルが年数で頭打ちになり、上限まで借りても買うより安い品目
+    infinite++;
+    truthy(p.id + ' は上限まで借りても買うより安い', rentalTotal(p, 100000, 1) <= target);
+  } else if (n >= 1) {
     truthy(p.id + ' 分岐点ちょうどでは借りるほうが安い', rentalTotal(p, n, 1) <= target);
     truthy(p.id + ' 分岐点+1回では借りるほうが高い', rentalTotal(p, n + 1, 1) > target);
   }
 });
+truthy('分岐点が存在しない品目を検出できている（' + infinite + '件）', infinite > 0);
+check('検索結果ページが分岐点なしの文言を持っている',
+  fs.readFileSync(path.join(ROOT, 'app', 'search.html'), 'utf8').includes('何回使っても'), true);
 check('レンタルが無い品目は分岐点なし', rentBreakEven(products.find(p => !p.rentalPrice) || { }, 1), null);
+
+// 実質負担（売却額を引いた額）を併記できているか
+products.forEach(p => {
+  const ws = compareWays(p, 3, 1, []);
+  ws.forEach(w => {
+    truthy(p.id + '/' + w.kind + ' に実質負担がある', typeof w.net === 'number');
+    truthy(p.id + '/' + w.kind + ' 実質負担は支払額以下', w.net <= w.cost);
+  });
+  const buy = ws.find(w => w.kind === 'buy');
+  if (buy && p.estimatedResaleRate) {
+    check(p.id + ' 買うの実質負担 = 新品価格 − 売却想定',
+      buy.net, p.newPrice - Math.round(p.newPrice * p.estimatedResaleRate));
+  }
+  const rent = ws.find(w => w.kind === 'rent');
+  if (rent) check(p.id + ' 借りるは手元に残らないので実質負担＝支払額', rent.net, rent.cost);
+});
+
+// 並び順は支払額で決める（予算に収まるかを見る機能のため）
+activitySets.forEach(set => {
+  const r = search(set.name, data);
+  r.rows.forEach(x => truthy(set.id + '/' + x.product.id + ' は支払額の安い順',
+    x.ways.every((w, i) => i === 0 || x.ways[i - 1].cost <= w.cost)));
+});
+contains('①との基準の違いを説明している',
+  fs.readFileSync(path.join(ROOT, 'app', 'search.html'), 'utf8'), '実質負担で判定する');
 close(b);
 
 /* ═══ 5. 厳守事項11：サンプルデータを推奨にしない ═══ */

@@ -34,7 +34,7 @@ import { Disclaimer } from '../components/footer.js';
 import { calcBreakEven, totalSaving } from '../lib/break-even.js';
 import { linksFor } from '../lib/affiliate.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
-import { yen } from '../utils/format.js';
+import { yen, priceSourceLabel } from '../utils/format.js';
 import { pickNumber, html, esc, onChange } from '../utils/dom.js';
 
 mountShell('unnecessary-buy');
@@ -50,7 +50,7 @@ html('#conds',
 
 html('#note', Disclaimer({
   dataNote: '損益分岐点は「購入価格 ÷ レンタル料金」で算出しています（保管コスト・売却益は未算入）。' +
-    '「実勢価格」表示のある品目は各社の掲載価格を確認済みです。'
+    '「実勢価格」は各社の掲載価格を確認済み、「推定価格」は市場の中位帯からの推定です。'
 }));
 
 function render() {
@@ -73,7 +73,7 @@ function render() {
 <article class="lc-card">
   <div class="lc-card__head">
     <h3 class="lc-card__title">${esc(p.name)}
-      <span class="lc-sub" style="font-weight:400">　${esc(p.category)}${p.source === '実測' ? ' ・実勢価格' : ''}</span>
+      <span class="lc-sub" style="font-weight:400">　${esc(p.category)}・${priceSourceLabel(p)}</span>
     </h3>
     <span class="lc-tag lc-tag--${r.rentWins ? 'warn' : 'ok'}">${r.rentWins ? '借りたほうが安い' : '買ったほうが安い'}</span>
   </div>

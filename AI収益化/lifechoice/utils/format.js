@@ -56,6 +56,23 @@ export function travelMinutes(km, transportation = 'walk') {
 }
 
 /** 移動手段の表示名 */
+/**
+ * 新品価格の出典が実測か推定かを返す。
+ * レンタル価格が実測でも新品価格は推定、という品目があるため、
+ * product.source ではなく newPriceSource を優先して見る。
+ *
+ * @param {{source?:string, newPriceSource?:string}} product
+ * @returns {'実測'|'推定'}
+ */
+export function newPriceSource(product) {
+  return (product && (product.newPriceSource || product.source)) === '実測' ? '実測' : '推定';
+}
+
+/** 画面に出す短いラベル */
+export function priceSourceLabel(product) {
+  return newPriceSource(product) === '実測' ? '実勢価格' : '推定価格';
+}
+
 export const TRANSPORT_LABEL = {
   walk: '徒歩', bike: '自転車', moto: 'バイク', kei: '軽自動車', car: '普通車'
 };

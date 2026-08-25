@@ -32,7 +32,7 @@ import { Disclaimer, ShareBox, bindShare } from '../components/footer.js';
 import { search } from '../lib/integrated-search.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
 import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
-import { yen } from '../utils/format.js';
+import { yen, priceSourceLabel, newPriceSource } from '../utils/format.js';
 import { $, html, esc, pickNumber, onChange, scrollTop } from '../utils/dom.js';
 import { loadPreference, pushHistory } from '../utils/storage.js';
 
@@ -64,7 +64,11 @@ html('#conds',
 );
 
 html('#note', Disclaimer({
-  dataNote: '価格は' + products.filter(p => p.source === '実測').length + '品目が実勢価格の確認済み、残りは推定です。' +
+  dataNote: '新品価格は' + products.filter(p => newPriceSource(p) === '実測').length + '品目が確認済み、' +
+    (products.length - products.filter(p => newPriceSource(p) === '実測').length) + '品目は市場の中位帯からの推定です。' +
+    'レンタル価格は' + products.filter(p => p.source === '実測').length + '品目で各社の掲載価格を確認しています。' +
+    'この画面の並び順は「実際に支払う金額」で決めています（予算に収まるかを見るため）。' +
+    '買う前チェックは売却額を引いた実質負担で判定するので、結論が異なる場合があります。' +
     '中古価格は相場からの推定で、実際の出品価格ではありません。' +
     '「もらう」に出る品目は無料品レーダーのサンプルデータに同じ分類があることを示すもので、実在の出品ではありません。'
 }));
@@ -170,7 +174,7 @@ function rowCard(x) {
 <article class="lc-card">
   <div class="lc-card__head">
     <h3 class="lc-card__title">${esc(x.product.name)}
-      <span class="lc-sub" style="font-weight:400">　${esc(x.product.category)}${x.product.source === '実測' ? '・実勢価格' : '・推定'}</span>
+      <span class="lc-sub" style="font-weight:400">　${esc(x.product.category)}・${priceSourceLabel(x.product)}</span>
     </h3>
     <span class="lc-tag lc-tag--${x.essential ? 'accent' : ''}">${x.essential ? '必須' : '任意'}</span>
   </div>
@@ -191,9 +195,17 @@ function rowCard(x) {
       x.saving !== null && x.saving > 0 ? `。新品より <b>${yen(x.saving)}</b> 安くなります` : ''}
   </p>
 
+  ${x.best.net !== undefined && x.best.net !== x.best.cost ? `
+    <p class="lc-sub" style="margin-top:var(--sp-2)">
+      あとで売る前提なら、実質の負担は <b>${yen(x.best.net)}</b> まで下がります
+      <span style="opacity:.75">（売却額の想定を引いた額。買う前チェックはこの実質負担で判定しています）</span>
+    </p>` : ''}
+
   ${x.rentBreakEvenUses !== null ? `
     <p class="lc-sub" style="margin-top:var(--sp-2)">
-      ${x.rentBreakEvenUses >= 1
+      ${x.rentBreakEvenUses === Infinity
+        ? `目安：この期間なら、何回使っても<b>借りるほうが安く</b>済みます`
+        : x.rentBreakEvenUses >= 1
         ? `目安：<b>${x.rentBreakEvenUses}回</b>までなら借りるほうが安く、それ以上使うなら買ったほうが安くなります`
         : '目安：1回だけの使用でも、借りるより中古で買うほうが安く済みます'}
     </p>` : ''}
