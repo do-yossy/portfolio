@@ -17,6 +17,7 @@
 <body data-service="buy-check">
 
 <main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
   <div id="form" class="lc-card">
     <div class="lc-field">
       <label class="lc-field__label" for="item">何を買おうとしていますか？</label>
@@ -37,19 +38,21 @@
 
 <script type="module">
 import { mountShell } from '../components/layout.js';
+import { PreferenceBar } from '../components/preference-bar.js';
+import { CrossLinkCard, afterBuyCheck } from '../lib/cross-link.js';
 import { Filter } from '../components/filter.js';
 import { ShareBox, bindShare, Cta, Disclaimer } from '../components/footer.js';
 import { evaluateBuyCheck, buildShareText } from '../lib/buy-check.js';
-import { linksFor, isConfigured, PENDING_NOTE } from '../lib/affiliate.js';
+import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
 import { yen } from '../utils/format.js';
-import { pick, pickNumber, $, html, esc, scrollTop } from '../utils/dom.js';
-import { loadPreference, pushHistory } from '../utils/storage.js';
+import { pickNumber, $, html, esc, scrollTop } from '../utils/dom.js';
+import { pushHistory } from '../utils/storage.js';
 
 mountShell('buy-check');
+html('#prefbar', PreferenceBar());
 
 const products = await StaticDataProvider.getProducts();
-const pref = loadPreference();
 
 // 品目セレクト
 $('#item').innerHTML = products
@@ -81,9 +84,9 @@ syncPrice();
 
 $('#go').addEventListener('click', () => {
   const p = products[$('#item').value];
-  const price = pickNumber('price') || Number($('#price').value) || p.newPrice;
   const freq = pickNumber('freq'), years = pickNumber('years'), need = pickNumber('need');
-  const r = evaluateBuyCheck({ product: p, price: Number($('#price').value), freq, years, need });
+  const price = Number($('#price').value) || p.newPrice;
+  const r = evaluateBuyCheck({ product: p, price, freq, years, need });
 
   const rows = r.options.map(o => `
     <tr class="${o.kind === r.verdict ? 'win' : ''}">
@@ -123,6 +126,7 @@ $('#go').addEventListener('click', () => {
     </div>
 
     ${Cta({ heading: 'この判定に沿って進める場合はこちら', links, pendingLabel: 'リンク準備中', pendingNote: PENDING_NOTE })}
+    ${CrossLinkCard(afterBuyCheck(r.verdict, p.name))}
     ${ShareBox(shareText)}
     <button class="lc-btn lc-btn--ghost" id="again" style="margin-top:var(--sp-4)">条件を変えて再判定</button>
   `);

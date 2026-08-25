@@ -35,6 +35,7 @@
     <p class="lc-hero__lead">個人の無駄を減らし、今ある選択肢から最適な選択を見つけます</p>
   </div>
 
+  <div id="prefbar"></div>
   <div class="lc-section" id="search-area"></div>
   <div id="groups"></div>
   <div class="lc-section" id="reco"></div>
@@ -43,14 +44,19 @@
 
 <script type="module">
 import { BottomNavigation } from './components/layout.js';
+import { PreferenceBarTop } from './components/preference-bar.js';
 import { SearchBox } from './components/filter.js';
 import { Disclaimer } from './components/footer.js';
 import { SERVICES, GROUPS, servicesInGroup } from './lib/services.js';
 import { $, html, esc } from './utils/dom.js';
-import { loadPreference, hasPreference, loadHistory } from './utils/storage.js';
+import { hasPreference, loadHistory } from './utils/storage.js';
+import { describe } from './lib/preference-sync.js';
 
 document.body.setAttribute('data-service', 'buy-check');
 document.body.insertAdjacentHTML('beforeend', BottomNavigation('home'));
+
+// 全機能で共有している条件（本サービスの中核）
+html('#prefbar', PreferenceBarTop());
 
 // 統合検索（Phase 6 で実装）
 html('#search-area',
@@ -89,7 +95,9 @@ html('#reco', `
     <div class="lc-entry__name">${esc(rec.name)}</div>
     <div class="lc-entry__tag">${esc(reason)}</div>
   </a>
-  ${hasPreference() ? `<p class="lc-field__hint" style="margin-top:var(--sp-2)">保存された条件（予算 ${loadPreference().budget}円）を各機能に引き継いでいます</p>` : ''}`);
+  ${hasPreference()
+    ? `<p class="lc-field__hint" style="margin-top:var(--sp-2)">保存済みの条件は <b>${esc(describe())}</b>。いまから何する？／今日だけ安い／ソロマップ／無料品レーダーに自動で引き継がれます</p>`
+    : `<p class="lc-field__hint" style="margin-top:var(--sp-2)">条件を1回設定すると、4つの機能が同時に絞り込まれます</p>`}`);
 
 html('#note', Disclaimer({
   dataNote: '各機能で表示する価格・営業時間・スコアは、業態や品目の一般的な水準にもとづく参考情報です。' +

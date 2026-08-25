@@ -17,6 +17,7 @@
 <body data-service="now-what">
 
 <main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
   <div class="lc-card" id="form">
     <div class="lc-field">
       <span class="lc-field__label">いま何時？ / 何時まで空いてる？</span>
@@ -37,19 +38,23 @@
 
 <script type="module">
 import { mountShell } from '../components/layout.js';
+import { PreferenceBar, noticeInherited } from '../components/preference-bar.js';
+import { toFilters, fromFilters, snapBudget } from '../lib/preference-sync.js';
+import { CrossLinkCard, afterNowWhat } from '../lib/cross-link.js';
 import { Filter, TransportSelector } from '../components/filter.js';
 import { ResultCard, ResultSummary, ResultCount, EmptyState } from '../components/result.js';
-import { Cta, Disclaimer } from '../components/footer.js';
+import { Disclaimer } from '../components/footer.js';
 import { findNowWhat, summarize } from '../lib/time-calculation.js';
-import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
+import { linksFor } from '../lib/affiliate.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
 import { yen, hhmm, duration, priceRange, travelMinutes, TRANSPORT_LABEL } from '../utils/format.js';
 import { pick, pickNumber, $, html, esc, scrollTop } from '../utils/dom.js';
-import { loadPreference, savePreference, pushHistory } from '../utils/storage.js';
+import { hasPreference, pushHistory } from '../utils/storage.js';
 
 mountShell('now-what');
+html('#prefbar', PreferenceBar());
 const stores = (await StaticDataProvider.getStores()).filter(s => s.openingTime !== null);
-const pref = loadPreference();
+const f = toFilters('now-what');
 
 // 時刻セレクト（30分刻み）
 ['now', 'until'].forEach(id => {
@@ -63,16 +68,17 @@ $('#now').value = Math.floor(nowDate.getHours() + (nowDate.getMinutes() >= 30 ? 
 $('#until').value = Math.min(23.5, Number($('#now').value) + 4);
 
 html('#conds',
-  Filter({ name: 'budget', label: '予算（1人あたり）', value: pref.budget,
+  Filter({ name: 'budget', label: '予算（1人あたり）', value: snapBudget(f.budget, [0, 1000, 2000, 3000, 5000, 99999]),
     options: [{ value: 0, label: '0円' }, { value: 1000, label: '〜1,000円' }, { value: 2000, label: '〜2,000円' },
               { value: 3000, label: '〜3,000円' }, { value: 5000, label: '〜5,000円' }, { value: 99999, label: '気にしない' }] }) +
-  Filter({ name: 'who', label: '誰と？', value: 'solo',
+  Filter({ name: 'who', label: '誰と？', value: f.who,
     options: [{ value: 'solo', label: 'ひとり' }, { value: 'multi', label: '2人以上' }] }) +
-  Filter({ name: 'mood', label: '今日の気分', value: 'quiet',
+  Filter({ name: 'mood', label: '今日の気分', value: f.mood,
     options: [{ value: 'quiet', label: '人と話したくない' }, { value: 'talk', label: '誰かと話したい' }, { value: 'any', label: 'どちらでも' }] }) +
   Filter({ name: 'body', label: '動きたい？', value: 'rest',
     options: [{ value: 'rest', label: 'のんびり' }, { value: 'active', label: '体を動かしたい' }, { value: 'any', label: 'どちらでも' }] }) +
-  TransportSelector(pref.transportation)
+  TransportSelector(f.transportation) +
+  (hasPreference() ? noticeInherited('now-what', f) : '')
 );
 
 html('#note', Disclaimer({
@@ -83,7 +89,8 @@ $('#go').addEventListener('click', () => {
   const now = Number($('#now').value), until = Number($('#until').value);
   const budget = pickNumber('budget'), who = pick('who'), mood = pick('mood'), body = pick('body');
   const transportation = pick('transportation') || 'walk';
-  savePreference({ budget, transportation });
+  // 操作した内容を設定へ書き戻す（使うほど設定が育つ）
+  fromFilters('now-what', { budget, transportation, who, mood });
 
   // 移動時間は2km想定でユーザーの移動手段から算出（既定は徒歩25分相当）
   const travel = Math.max(10, travelMinutes(2, transportation));
@@ -122,6 +129,7 @@ $('#go').addEventListener('click', () => {
       `<br><span class="lc-sub">移動は${TRANSPORT_LABEL[transportation]}で約${travel}分を見込んでいます</span>`) +
     ResultCount(`<b>${sm.total}件</b>見つかりました（うち予約が要るもの ${sm.needBooking}件 / <span style="color:var(--ok)">予約不要 ${sm.noBooking}件</span>）`) +
     (cards || EmptyState({ title: '条件に合うものが見つかりませんでした', hint: '予算を上げるか、時間を長めに取ってみてください' })) +
+    CrossLinkCard(afterNowWhat(sm, who)) +
     `<button class="lc-btn lc-btn--ghost" id="again" style="margin-top:var(--sp-4)">条件を変えてやり直す</button>`
   );
 

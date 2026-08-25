@@ -16,6 +16,7 @@
 <body data-service="today-deals">
 
 <main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
   <div id="demo-banner"></div>
   <div class="lc-card" id="conds"></div>
   <p class="lc-count" id="stat"></p>
@@ -25,16 +26,22 @@
 
 <script type="module">
 import { mountShell } from '../components/layout.js';
+import { PreferenceBar, noticeInherited } from '../components/preference-bar.js';
+import { toFilters, fromFilters, snapBudget } from '../lib/preference-sync.js';
+import { CrossLinkCard, afterTodayDeals } from '../lib/cross-link.js';
 import { Filter } from '../components/filter.js';
 import { ResultCard, EmptyState, DemoBanner } from '../components/result.js';
 import { Disclaimer } from '../components/footer.js';
 import { rankDeals } from '../lib/deal-ranking.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
 import { yen, hhmm, percent } from '../utils/format.js';
-import { pick, pickNumber, html, esc, onChange } from '../utils/dom.js';
+import { pick, pickNumber, html, onChange } from '../utils/dom.js';
+import { hasPreference } from '../utils/storage.js';
 
 mountShell('today-deals');
+html('#prefbar', PreferenceBar());
 const deals = await StaticDataProvider.getDeals();
+const f = toFilters('today-deals');
 
 // 厳守事項11：架空データは画面上部で明示し、カード1枚ごとにもDEMO印を出す
 html('#demo-banner', DemoBanner(
@@ -42,12 +49,13 @@ html('#demo-banner', DemoBanner(
   'この機能は店舗が「今日の余り枠」を投稿しないと成立しないため、実データの供給が最大の課題です。'));
 
 html('#conds',
-  Filter({ name: 'budget', label: '予算', value: 3000,
+  Filter({ name: 'budget', label: '予算', value: snapBudget(f.budget, [1000, 3000, 6000, 99999]),
     options: [{ value: 1000, label: '〜1,000円' }, { value: 3000, label: '〜3,000円' },
               { value: 6000, label: '〜6,000円' }, { value: 99999, label: '上限なし' }] }) +
   Filter({ name: 'cat', label: 'カテゴリ', value: 'all',
     options: [{ value: 'all', label: 'すべて' }, { value: '食', label: '食べ物' }, { value: '美容', label: '美容' },
-              { value: '遊び', label: '遊び' }, { value: '宿', label: '宿' }] })
+              { value: '遊び', label: '遊び' }, { value: '宿', label: '宿' }] }) +
+  (hasPreference() ? noticeInherited('today-deals', { budget: f.budget }) : '')
 );
 
 html('#note', Disclaimer({
@@ -58,6 +66,7 @@ html('#note', Disclaimer({
 
 function render() {
   const budget = pickNumber('budget'), category = pick('cat');
+  fromFilters('today-deals', { budget });
   const nowHour = new Date().getHours();
   const ranked = rankDeals(deals, { budget, category, nowHour });
   const totalSave = ranked.reduce((s, r) => s + (r.deal.normalPrice - r.deal.salePrice), 0);
@@ -84,7 +93,7 @@ function render() {
       footer: `<p style="margin-top:var(--sp-3);font-size:var(--fs-sm);color:var(--sub);border-top:1px dashed var(--line);padding-top:var(--sp-2)">
         内訳　割引 ${r.score.discount} ／ 締切 ${r.score.urgency} ／ 残数 ${r.score.availability} ／ 距離 ${r.score.distance}</p>`
     });
-  }).join(''));
+  }).join('') + CrossLinkCard(afterTodayDeals(ranked.length)));
 }
 
 onChange(['budget', 'cat'], render);

@@ -16,6 +16,7 @@
 <body data-service="solo-map">
 
 <main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
   <div class="lc-card" id="conds"></div>
   <p class="lc-count" id="stat"></p>
   <div id="list"></div>
@@ -24,26 +25,31 @@
 
 <script type="module">
 import { mountShell } from '../components/layout.js';
+import { PreferenceBar, noticeInherited } from '../components/preference-bar.js';
+import { toFilters, fromFilters, snapBudget } from '../lib/preference-sync.js';
+import { CrossLinkCard, afterSoloMap } from '../lib/cross-link.js';
 import { Filter } from '../components/filter.js';
-import { ResultCard, Score, EmptyState } from '../components/result.js';
+import { ResultCard, EmptyState } from '../components/result.js';
 import { Disclaimer } from '../components/footer.js';
 import { rankSolo, FEAR_OPTIONS } from '../lib/solo-score.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
 import { priceRange, duration } from '../utils/format.js';
 import { pick, pickNumber, html, onChange } from '../utils/dom.js';
-import { loadPreference, savePreference } from '../utils/storage.js';
+import { hasPreference } from '../utils/storage.js';
 
 mountShell('solo-map');
+html('#prefbar', PreferenceBar());
 const stores = await StaticDataProvider.getStores();
-const pref = loadPreference();
+const f = toFilters('solo-map');
 
 html('#conds',
-  Filter({ name: 'fear', label: 'いちばん避けたいことは？', value: 'talk', options: FEAR_OPTIONS }) +
-  Filter({ name: 'budget', label: '予算', value: pref.budget,
+  Filter({ name: 'fear', label: 'いちばん避けたいことは？', value: f.fear, options: FEAR_OPTIONS }) +
+  Filter({ name: 'budget', label: '予算', value: snapBudget(f.budget, [0, 1000, 2000, 4000]),
     options: [{ value: 0, label: '0円' }, { value: 1000, label: '〜1,000円' },
               { value: 2000, label: '〜2,000円' }, { value: 4000, label: '〜4,000円' }] }) +
   Filter({ name: 'stay', label: '滞在時間', value: 120,
-    options: [{ value: 60, label: '1時間以内' }, { value: 120, label: '2時間くらい' }, { value: 240, label: '長居したい' }] })
+    options: [{ value: 60, label: '1時間以内' }, { value: 120, label: '2時間くらい' }, { value: 240, label: '長居したい' }] }) +
+  (hasPreference() ? noticeInherited('solo-map', { budget: f.budget, fear: f.fear }) : '')
 );
 
 html('#note', Disclaimer({
@@ -53,10 +59,15 @@ html('#note', Disclaimer({
 
 function render() {
   const fear = pick('fear'), budget = pickNumber('budget'), stay = pickNumber('stay');
-  savePreference({ budget });
+  fromFilters('solo-map', { budget, fear });
   const ranked = rankSolo(stores, { fear, budget, maxStayMinutes: stay });
 
-  html('#stat', `<b>${ranked.length}件</b>該当（スコア順）`);
+  // 5項目すべて満点の業態は、どれを選んでも同点になる。黙って並べると
+  // 「選んでも変わらない」と誤解されるため、同率であることを明示する。
+  const topScore = ranked.length ? ranked[0].score : 0;
+  const tied = ranked.filter(r => r.score === topScore).length;
+  html('#stat', `<b>${ranked.length}件</b>該当（スコア順）` +
+    (tied > 1 ? `　<span class="lc-sub">上位${tied}件は${topScore}点で同率です</span>` : ''));
   if (!ranked.length) { html('#list', EmptyState({ title: '条件に合う場所がありません', hint: '予算か滞在時間を広げてください' })); return; }
 
   html('#list', ranked.map(r => {
@@ -72,10 +83,10 @@ function render() {
         s.beginnerScore >= 5 ? { label: '初めてでも安心', variant: 'ok' } : null,
         s.stayFreedomScore >= 5 ? { label: '長居できる', variant: 'ok' } : null
       ].filter(Boolean),
-      meters: r.breakdown,
+      meters: r.breakdown,   // 「重視」印つきの項目が、選んだ条件で3倍に効いている
       why: s.why
     });
-  }).join(''));
+  }).join('') + CrossLinkCard(afterSoloMap()));
 }
 
 onChange(['fear', 'budget', 'stay'], render);
