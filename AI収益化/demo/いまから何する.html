@@ -68,6 +68,20 @@ main{padding:26px 0 60px}
 .note b{color:var(--warn)}
 @media(max-width:520px){.card .head{flex-direction:column;gap:4px}.card .price{text-align:left}.card .price small{text-align:left}}
 </style>
+
+<!-- ═══ 配信用メタ（OGP / PWA / 正規URL） ═══ -->
+<link rel="canonical" href="https://www.social-quality.com/apps/nowdo/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="いまから何する？">
+<meta property="og:description" content="時間・予算・気分から、今から間に合う場所を47業態から探します。予約不要の選択肢も出します。">
+<meta property="og:url" content="https://www.social-quality.com/apps/nowdo/">
+<meta property="og:site_name" content="いまから何する？">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="いまから何する？">
+<meta name="twitter:description" content="時間・予算・気分から、今から間に合う場所を47業態から探します。予約不要の選択肢も出します。">
+<meta name="theme-color" content="#ff7a45">
+<link rel="manifest" href="nowdo.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%8F%B0%3C%2Ftext%3E%3C%2Fsvg%3E">
 </head>
 <body>
 
@@ -146,6 +160,7 @@ main{padding:26px 0 60px}
     既存の予約サイトが「予約できるもの」しか出せないのに対し、<b>予約不要の選択肢も含めて正直に提案する</b>のが本サービスの差別化点です。
   </p>
 
+<p style="text-align:center;font-size:11.5px;padding:14px 0 26px;opacity:.7"><a href="../legal.html" style="color:inherit">利用規約・プライバシーポリシー・免責事項</a></p>
 </main>
 
 <script>
@@ -305,6 +320,9 @@ var SHARE_TAG="#いまから何する";
     window.scrollTo({top:0,behavior:'smooth'});
   });
 })();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
 </script>
 </body>
 </html>
