@@ -49,6 +49,14 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
 .why li{margin-left:17px;margin-bottom:5px}
 .cta{background:#0f172a;color:#fff;border-radius:12px;padding:18px;text-align:center;font-size:14px}
 .cta a{display:inline-block;background:#fff;color:#0f172a;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700;margin-top:10px;font-size:14px}
+.share{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:14px}
+.sh-t{font-size:12.5px;color:var(--sub);font-weight:700;margin-bottom:9px}
+.sh-box{font-size:13px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-bottom:10px;line-height:1.7}
+.sh-btns{display:flex;gap:8px;flex-wrap:wrap}
+.sh-b{flex:1;min-width:130px;padding:11px;border:1.5px solid var(--accent);background:#fff;color:var(--accent);border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;text-align:center;text-decoration:none;display:block}
+.sh-b:hover{background:#eff6ff}
+.sh-b.x{background:#0f172a;border-color:#0f172a;color:#fff}
+.sh-b.x:hover{background:#1e293b}
 .again{display:block;width:100%;padding:13px;background:#fff;color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;font-size:15px;cursor:pointer;font-family:inherit;margin-top:14px;font-weight:700}
 .note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
 .note b{color:var(--warn)}
@@ -108,6 +116,7 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
   <table id="tbl"></table>
   <div class="why" id="why"></div>
   <div class="cta" id="cta"></div>
+  <div class="share" id="share"></div>
   <button class="again" id="again">条件を変えて再判定</button>
 </div>
 
@@ -119,6 +128,18 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
 
 <script>
 (function(){
+// ═══════════════════════════════════════════════════════
+// 送客先の設定 ── ASP提携後、ここにURLを入れるだけで本番稼働する
+// 空文字のままなら「提携準備中」と表示され、リンクは無効になる
+// ═══════════════════════════════════════════════════════
+var AFF={
+  buy:  {url:"", label:"新品の最安値を探す",       note:"ECアフィリエイト（Amazon・楽天・Yahoo）"},
+  used: {url:"", label:"中古の在庫を探す",         note:"中古販売サイトへの送客"},
+  rent: {url:"", label:"レンタルできる店を探す",   note:"Rentio・ホームセンター等への送客"},
+  stop: {url:"", label:"それでも欲しい場合は価格をチェック", note:"ECアフィリエイト"}
+};
+var SHARE_TAG="#買う前チェック";
+
 // used:中古相場率 / rent:1回(3泊4日)または1ヶ月あたりのレンタル料 / unit:'回' or '月' / life:標準的な使用可能年数
 // src:'実測'=Rentio等の掲載価格を確認したもの / '推定'=同カテゴリの水準からの推定値
 var ITEMS=[
@@ -236,13 +257,31 @@ document.getElementById('go').addEventListener('click',function(){
   if(need===2) reasons.push('今すぐ必要とのことなので、<b>入手までの時間</b>も考慮してください（レンタルは配送に数日かかります）');
   document.getElementById('why').innerHTML='<h3>この判定の根拠</h3><ul><li>'+reasons.join('</li><li>')+'</li></ul>';
 
-  var ctaMap={
-    buy:'新品の最安値を探す',used:'中古の在庫を探す',rent:'レンタルできる店を探す',
-    stop:'それでも欲しい場合は価格をチェック'
-  };
+  // ── 送客リンク（AFF.url が空なら準備中表示）
+  var aff=AFF[kind];
   document.getElementById('cta').innerHTML=
     '<div>この判定に沿って進める場合はこちら</div>'+
-    '<a href="#" onclick="alert(\'本番ではEC・中古・レンタルの各サービスへ送客し、ここで成果報酬が発生します\');return false;">'+ctaMap[kind]+'</a>';
+    (aff.url
+      ? '<a href="'+aff.url+'" target="_blank" rel="noopener sponsored">'+aff.label+'</a>'
+      : '<a href="#" onclick="alert(\'提携準備中です。\\n\\n'+aff.note+'\\n\\nASP提携後、AFF設定にURLを入れるだけで有効になります\');return false;" style="opacity:.55">'+aff.label+'（提携準備中）</a>');
+
+  // ── シェア用テキスト
+  var kindWord={buy:'新品を買う',used:'中古を買う',rent:'レンタルする',stop:'今は見送る'}[kind];
+  var shareText=it.n+'を買おうか迷ったので調べたら、'+
+    '年'+freq+'回×'+years+'年なら「'+kindWord+'」が'+yen(saveAmt)+'お得という判定でした。'+SHARE_TAG;
+  var shareEl=document.getElementById('share');
+  shareEl.innerHTML=
+    '<div class="sh-t">この結果をシェアする</div>'+
+    '<div class="sh-box" id="shTxt">'+shareText+'</div>'+
+    '<div class="sh-btns">'+
+      '<button class="sh-b" id="shCopy">テキストをコピー</button>'+
+      '<a class="sh-b x" href="https://twitter.com/intent/tweet?text='+encodeURIComponent(shareText)+'" target="_blank" rel="noopener">Xに投稿</a>'+
+    '</div>';
+  document.getElementById('shCopy').addEventListener('click',function(){
+    var b=this;
+    if(navigator.clipboard){navigator.clipboard.writeText(shareText).then(function(){b.textContent='コピーしました';setTimeout(function(){b.textContent='テキストをコピー';},1600);});}
+    else{var r=document.createRange();r.selectNode(document.getElementById('shTxt'));window.getSelection().removeAllRanges();window.getSelection().addRange(r);}
+  });
 
   document.getElementById('form').style.display='none';
   document.getElementById('out').style.display='block';
