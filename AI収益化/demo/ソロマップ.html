@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ソロマップ｜一人で行っても浮かない場所だけ</title>
+<meta name="description" content="一人で入りやすいか、話しかけられないか、予約が要らないか。一人客の不安だけで絞り込みます。">
+<style>
+:root{--bg:#f8fafc;--card:#fff;--ink:#0f172a;--sub:#64748b;--line:#e2e8f0;--accent:#7c3aed;--ok:#059669;--warn:#d97706}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+.wrap{max-width:760px;margin:0 auto;padding:0 18px}
+header{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;padding:38px 0 30px;text-align:center}
+.tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:3px 11px;border-radius:99px;font-size:11.5px;margin-bottom:12px;font-weight:700}
+header h1{font-size:clamp(22px,5vw,30px);font-weight:800}
+header p{margin-top:9px;font-size:14px;opacity:.93}
+main{padding:24px 0 60px}
+.ctrl{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;margin-bottom:16px}
+.ctrl .t{font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:8px;display:block}
+.ctrl .t:not(:first-child){margin-top:16px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips input{position:absolute;opacity:0;width:0;height:0}
+.chips label{padding:8px 14px;border:1.5px solid var(--line);border-radius:99px;cursor:pointer;font-size:13.5px;background:#fff;transition:.15s}
+.chips input:checked+label{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.stat{font-size:13px;color:var(--sub);margin-bottom:13px}
+.stat b{color:var(--accent)}
+.p{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:10px}
+.p .h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:9px}
+.p h3{font-size:16.5px;font-weight:700}
+.score{text-align:center;flex-shrink:0}
+.score .n{font-size:21px;font-weight:800;color:var(--accent);line-height:1}
+.score .l{font-size:10px;color:var(--sub)}
+.bars{margin-bottom:10px}
+.b{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:4px}
+.b .lb{width:96px;color:var(--sub);flex-shrink:0}
+.b .tr{flex:1;height:7px;background:#f1f5f9;border-radius:4px;overflow:hidden}
+.b .fl{height:100%;background:var(--accent);border-radius:4px}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
+.m{font-size:11.5px;padding:3px 9px;border-radius:6px;background:#f8fafc;color:var(--sub);border:1px solid var(--line)}
+.m.g{background:#ecfdf5;color:var(--ok);border-color:#a7f3d0}
+.m.y{background:#fffbeb;color:var(--warn);border-color:#fde68a}
+.why{font-size:13.5px;color:var(--sub);border-left:2px solid var(--accent);padding-left:11px}
+.empty{text-align:center;padding:38px;color:var(--sub)}
+.note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
+.note b{color:var(--warn)}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<span class="tag">DEMO ／ 社内検証用</span>
+<h1>ソロマップ</h1>
+<p>「一人で入って浮かないか」だけで絞り込む</p>
+</div></header>
+
+<main class="wrap">
+<div class="ctrl">
+  <span class="t">いちばん避けたいことは？</span>
+  <div class="chips">
+    <input type="radio" name="fear" id="x1" value="talk" checked><label for="x1">店員に話しかけられる</label>
+    <input type="radio" name="fear" id="x2" value="eye"><label for="x2">一人だと目立つ</label>
+    <input type="radio" name="fear" id="x3" value="book"><label for="x3">予約が要る</label>
+    <input type="radio" name="fear" id="x4" value="none"><label for="x4">特にない</label>
+  </div>
+  <span class="t">予算</span>
+  <div class="chips">
+    <input type="radio" name="b" id="b0" value="0"><label for="b0">0円</label>
+    <input type="radio" name="b" id="b1" value="1000"><label for="b1">〜1,000円</label>
+    <input type="radio" name="b" id="b2" value="2000" checked><label for="b2">〜2,000円</label>
+    <input type="radio" name="b" id="b3" value="4000"><label for="b3">〜4,000円</label>
+  </div>
+  <span class="t">滞在時間</span>
+  <div class="chips">
+    <input type="radio" name="d" id="d1" value="60"><label for="d1">1時間以内</label>
+    <input type="radio" name="d" id="d2" value="120" checked><label for="d2">2時間くらい</label>
+    <input type="radio" name="d" id="d3" value="240"><label for="d3">長居したい</label>
+  </div>
+</div>
+
+<div class="stat" id="stat"></div>
+<div id="list"></div>
+
+<p class="note">
+<b>これはデモです。</b>スコアは業態ごとの一般的な傾向をもとにした<b>サンプル値</b>で、実在店舗の評価ではありません。<br>
+本番では口コミから「一人客の割合」「話しかけられ度」を推定してスコア化します。<br>
+<b>この案は「いまから何する？」と機能が7割重複します。</b>統合するか、一人客向けの入口として分けるかは判断が必要です。
+</p>
+</main>
+
+<script>
+(function(){
+// solo:一人入りやすさ / quiet:話しかけられない度 / nobook:予約不要度 (各5点満点)
+var P=[
+ {n:"映画館",solo:5,quiet:5,nobook:4,lo:1300,hi:2000,dur:150,why:"暗いので誰にも見られない。一人客が最も多い場所のひとつ"},
+ {n:"漫画喫茶・ネットカフェ",solo:5,quiet:5,nobook:5,lo:800,hi:2000,dur:180,why:"個室。受付以外で人と接触しない"},
+ {n:"美術館・博物館",solo:5,quiet:5,nobook:5,lo:500,hi:1800,dur:100,why:"一人で来る人が前提の空間。話しかけられない"},
+ {n:"サウナ・スーパー銭湯",solo:5,quiet:4,nobook:5,lo:800,hi:1600,dur:120,why:"ほぼ全員が一人。会話が起きにくい"},
+ {n:"ひとりカラオケ",solo:5,quiet:5,nobook:4,lo:500,hi:1500,dur:120,why:"専門店もあるほど一人利用が一般的"},
+ {n:"図書館",solo:5,quiet:5,nobook:5,lo:0,hi:0,dur:120,why:"無料。声を出す場所ではないので気楽"},
+ {n:"チェーンのカフェ",solo:5,quiet:5,nobook:5,lo:400,hi:900,dur:90,why:"一人客が大半。長居も許容されやすい"},
+ {n:"ゲームセンター",solo:4,quiet:5,nobook:5,lo:500,hi:2000,dur:60,why:"誰も他人を見ていない。短時間でも成立"},
+ {n:"公園・散歩",solo:5,quiet:5,nobook:5,lo:0,hi:0,dur:60,why:"完全無料。誰とも接触しない"},
+ {n:"バッティングセンター",solo:5,quiet:5,nobook:5,lo:500,hi:1500,dur:45,why:"一人利用が基本。話しかけられることはまずない"},
+ {n:"ボルダリングジム",solo:4,quiet:2,nobook:4,lo:2000,hi:3200,dur:120,why:"一人客は多いが、初回は説明があり常連に話しかけられることも"},
+ {n:"立ち飲み・角打ち",solo:4,quiet:1,nobook:5,lo:1000,hi:3000,dur:90,why:"一人客前提だが、隣の人や店主との会話が発生しやすい"},
+ {n:"回転寿司・定食チェーン",solo:5,quiet:5,nobook:5,lo:800,hi:1800,dur:45,why:"タッチパネル注文の店なら会話ゼロで完結"},
+ {n:"銭湯",solo:5,quiet:4,nobook:5,lo:500,hi:600,dur:60,why:"予算500円台。地元客が多いが干渉は少ない"},
+ {n:"ライブハウス",solo:4,quiet:3,nobook:3,lo:2000,hi:4500,dur:120,why:"一人客は珍しくない。当日券があれば予約不要"},
+ {n:"ボードゲームカフェ",solo:2,quiet:1,nobook:3,lo:1500,hi:2800,dur:150,why:"相席で知らない人と遊ぶ形式が多く、会話は避けられない"},
+ {n:"ショッピングモール",solo:5,quiet:5,nobook:5,lo:0,hi:99999,dur:120,why:"予算ゼロでも時間をつぶせる。誰も気にしない"},
+ {n:"展望台",solo:4,quiet:5,nobook:5,lo:0,hi:1200,dur:60,why:"カップルが多い場所もあるが、干渉されることはない"}
+];
+function pick(n){return document.querySelector('input[name="'+n+'"]:checked').value;}
+function yen(n){return '¥'+n.toLocaleString('ja-JP');}
+
+function render(){
+  var fear=pick('fear'), b=parseInt(pick('b'),10), d=parseInt(pick('d'),10);
+  var res=P.filter(function(p){return p.lo<=b && p.dur<=d*1.3;}).map(function(p){
+    var w={talk:{q:3,s:1,n:1},eye:{q:1,s:3,n:1},book:{q:1,s:1,n:3},none:{q:1,s:1,n:1}}[fear];
+    var raw=p.quiet*w.q+p.solo*w.s+p.nobook*w.n;
+    var max=5*(w.q+w.s+w.n);
+    return {p:p,score:Math.round(raw/max*100)};
+  }).sort(function(a,b2){return b2.score-a.score;});
+
+  document.getElementById('stat').innerHTML='<b>'+res.length+'件</b>該当（スコア順）';
+  document.getElementById('list').innerHTML=res.length?res.map(function(r){
+    var p=r.p, price=(p.lo===0&&p.hi===0)?'無料':(p.hi>=99999?yen(p.lo)+'〜':yen(p.lo)+'〜'+yen(p.hi));
+    return '<div class="p"><div class="h"><h3>'+p.n+'</h3>'+
+      '<div class="score"><div class="n">'+r.score+'</div><div class="l">ソロ度</div></div></div>'+
+      '<div class="bars">'+
+        '<div class="b"><span class="lb">一人で入りやすい</span><span class="tr"><span class="fl" style="width:'+p.solo*20+'%"></span></span></div>'+
+        '<div class="b"><span class="lb">話しかけられない</span><span class="tr"><span class="fl" style="width:'+p.quiet*20+'%"></span></span></div>'+
+        '<div class="b"><span class="lb">予約が要らない</span><span class="tr"><span class="fl" style="width:'+p.nobook*20+'%"></span></span></div>'+
+      '</div>'+
+      '<div class="meta"><span class="m">'+price+'</span>'+
+        '<span class="m">約'+(p.dur>=60?Math.floor(p.dur/60)+'時間'+(p.dur%60?p.dur%60+'分':''):p.dur+'分')+'</span>'+
+        (p.nobook>=5?'<span class="m g">予約不要</span>':'')+
+        (p.quiet<=2?'<span class="m y">会話が発生しやすい</span>':'')+
+      '</div><div class="why">'+p.why+'</div></div>';
+  }).join(''):'<div class="empty">条件に合う場所がありません。<br>予算か滞在時間を広げてください。</div>';
+}
+document.querySelectorAll('input[type=radio]').forEach(function(e){e.addEventListener('change',render);});
+render();
+})();
+</script>
+</body>
+</html>

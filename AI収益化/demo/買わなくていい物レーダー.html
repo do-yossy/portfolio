@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>買わなくていい物レーダー｜借りたほうが得な物ランキング</title>
+<meta name="description" content="年に数回しか使わない物は、買うより借りたほうが安い。品目別に損益分岐点を出します。">
+<style>
+:root{--bg:#fafaf9;--card:#fff;--ink:#1c1917;--sub:#78716c;--line:#e7e5e4;--accent:#c2410c;--ok:#15803d;--bad:#b91c1c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+.wrap{max-width:760px;margin:0 auto;padding:0 18px}
+header{background:linear-gradient(135deg,#c2410c,#7c2d12);color:#fff;padding:38px 0 30px;text-align:center}
+.tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:3px 11px;border-radius:99px;font-size:11.5px;margin-bottom:12px;font-weight:700}
+header h1{font-size:clamp(21px,4.8vw,29px);font-weight:800}
+header p{margin-top:9px;font-size:14px;opacity:.93}
+main{padding:24px 0 60px}
+.ctrl{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;margin-bottom:18px}
+.ctrl .t{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:9px;display:block}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips input{position:absolute;opacity:0;width:0;height:0}
+.chips label{padding:8px 14px;border:1.5px solid var(--line);border-radius:99px;cursor:pointer;font-size:13.5px;background:#fff;transition:.15s}
+.chips input:checked+label{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.lead{font-size:14px;color:var(--sub);margin-bottom:14px}
+.lead b{color:var(--accent)}
+.item{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:10px}
+.item .h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:11px}
+.item h3{font-size:16.5px;font-weight:700}
+.badge{font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:7px;white-space:nowrap}
+.badge.rent{background:#fef3c7;color:#b45309}
+.badge.buy{background:#dcfce7;color:var(--ok)}
+.bars{margin-bottom:10px}
+.bar{display:flex;align-items:center;gap:9px;margin-bottom:5px;font-size:12.5px}
+.bar .lb{width:66px;color:var(--sub);flex-shrink:0}
+.bar .tr{flex:1;height:19px;background:#f5f5f4;border-radius:5px;overflow:hidden}
+.bar .fl{height:100%;border-radius:5px;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;color:#fff;font-size:11px;font-weight:700}
+.bar .fl.b{background:#57534e}
+.bar .fl.r{background:var(--accent)}
+.bp{font-size:13px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px}
+.bp b{color:var(--accent);font-size:15px}
+.cta{margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);font-size:13px}
+.cta a{color:var(--accent);font-weight:700;text-decoration:none}
+.cta a:hover{text-decoration:underline}
+.note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
+.note b{color:var(--accent)}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<span class="tag">DEMO ／ 社内検証用</span>
+<h1>買わなくていい物レーダー</h1>
+<p>年に何回使うかを決めるだけ。買うより借りたほうが安い物が分かります</p>
+</div></header>
+
+<main class="wrap">
+<div class="ctrl">
+  <span class="t">あなたの使用頻度は？</span>
+  <div class="chips">
+    <input type="radio" name="f" id="f1" value="1" checked><label for="f1">年1回</label>
+    <input type="radio" name="f" id="f2" value="2"><label for="f2">年2回</label>
+    <input type="radio" name="f" id="f3" value="4"><label for="f3">年4回</label>
+    <input type="radio" name="f" id="f4" value="12"><label for="f4">月1回</label>
+  </div>
+  <span class="t" style="margin-top:16px">何年使う想定？</span>
+  <div class="chips">
+    <input type="radio" name="y" id="y1" value="1"><label for="y1">1年</label>
+    <input type="radio" name="y" id="y2" value="3" checked><label for="y2">3年</label>
+    <input type="radio" name="y" id="y3" value="5"><label for="y3">5年</label>
+  </div>
+</div>
+
+<p class="lead" id="lead"></p>
+<div id="list"></div>
+
+<p class="note">
+<b>これはデモです。</b>購入価格・レンタル料は品目ごとの一般的な水準を用いたサンプル値です。<br>
+損益分岐点は「購入価格 ÷ 1回あたりレンタル料」で算出しています（保管コスト・売却益は未算入）。<br>
+本番ではレンタル各社の実勢価格を取得し、そのまま予約ページへ送客して成果報酬を得ます。
+</p>
+</main>
+
+<script>
+(function(){
+var ITEMS=[
+ {n:"テント・キャンプ一式",buy:78000,rent:7000,cat:"アウトドア"},
+ {n:"スキー・スノーボード一式",buy:95000,rent:6000,cat:"スポーツ"},
+ {n:"高圧洗浄機",buy:32000,rent:4500,cat:"家周り"},
+ {n:"スーツケース（大型）",buy:38000,rent:4000,cat:"旅行"},
+ {n:"プロジェクター",buy:65000,rent:5000,cat:"家電"},
+ {n:"一眼レフ・ミラーレス",buy:180000,rent:6000,cat:"カメラ"},
+ {n:"望遠レンズ",buy:150000,rent:5500,cat:"カメラ"},
+ {n:"礼服・フォーマルウェア",buy:45000,rent:8000,cat:"衣類"},
+ {n:"電動工具（インパクト等）",buy:22000,rent:3000,cat:"家周り"},
+ {n:"脚立・はしご",buy:15000,rent:2000,cat:"家周り"},
+ {n:"BBQコンロ一式",buy:25000,rent:3500,cat:"アウトドア"},
+ {n:"釣り具一式",buy:55000,rent:4000,cat:"スポーツ"},
+ {n:"チャイルドシート",buy:35000,rent:2500,cat:"育児"},
+ {n:"ベビーカー",buy:48000,rent:3500,cat:"育児"},
+ {n:"カーペットクリーナー",buy:28000,rent:3500,cat:"家周り"},
+ {n:"ミシン",buy:42000,rent:3500,cat:"家電"},
+ {n:"スチームクリーナー",buy:19000,rent:3000,cat:"家周り"},
+ {n:"三脚・撮影機材",buy:35000,rent:2500,cat:"カメラ"}
+];
+function pick(n){return parseFloat(document.querySelector('input[name="'+n+'"]:checked').value);}
+function yen(n){return '¥'+Math.round(n).toLocaleString('ja-JP');}
+
+function render(){
+  var f=pick('f'), y=pick('y'), uses=f*y;
+  var rows=ITEMS.map(function(it){
+    var bp=Math.ceil(it.buy/it.rent);          // 損益分岐の使用回数
+    var rentTotal=it.rent*uses;
+    var diff=it.buy-rentTotal;                  // プラスならレンタルが得
+    return {it:it,bp:bp,rentTotal:rentTotal,diff:diff,rentWins:uses<bp};
+  }).sort(function(a,b){return b.diff-a.diff;});
+
+  var rentCount=rows.filter(function(r){return r.rentWins;}).length;
+  var totalSave=rows.filter(function(r){return r.rentWins;}).reduce(function(s,r){return s+r.diff;},0);
+  document.getElementById('lead').innerHTML=
+    '通算<b>'+uses+'回</b>（年'+f+'回 × '+y+'年）使う前提だと、'+
+    '<b>'+rentCount+'品目</b>は買うよりレンタルのほうが安く済みます。'+
+    (rentCount?'全部レンタルにした場合の差額は<b>'+yen(totalSave)+'</b>。':'');
+
+  document.getElementById('list').innerHTML=rows.map(function(r){
+    var it=r.it, max=Math.max(it.buy,r.rentTotal);
+    var bw=Math.round(it.buy/max*100), rw=Math.round(r.rentTotal/max*100);
+    return '<div class="item">'+
+      '<div class="h"><h3>'+it.n+'<span style="font-size:11.5px;color:var(--sub);font-weight:400">　'+it.cat+'</span></h3>'+
+      '<span class="badge '+(r.rentWins?'rent':'buy')+'">'+(r.rentWins?'借りたほうが安い':'買ったほうが安い')+'</span></div>'+
+      '<div class="bars">'+
+        '<div class="bar"><span class="lb">買う</span><span class="tr"><span class="fl b" style="width:'+bw+'%">'+yen(it.buy)+'</span></span></div>'+
+        '<div class="bar"><span class="lb">借りる</span><span class="tr"><span class="fl r" style="width:'+rw+'%">'+yen(r.rentTotal)+'</span></span></div>'+
+      '</div>'+
+      '<div class="bp">損益分岐は<b>'+r.bp+'回</b>目 — '+r.bp+'回以上使うなら買ったほうが得です（今回の想定は'+uses+'回）</div>'+
+      (r.rentWins?'<div class="cta">→ <a href="#" onclick="alert(\'本番ではレンタル各社の予約ページへ送客し、ここで成果報酬が発生します\');return false;">'+it.n+'を借りられる店を探す</a></div>':'')+
+    '</div>';
+  }).join('');
+}
+document.querySelectorAll('input[type=radio]').forEach(function(el){el.addEventListener('change',render);});
+render();
+})();
+</script>
+</body>
+</html>
