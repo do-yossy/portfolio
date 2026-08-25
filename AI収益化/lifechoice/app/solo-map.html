@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ソロマップ｜LIFE CHOICE</title>
+<meta name="description" content="一人で入りやすい・話しかけられない・予約不要・初めてでも安心・ゆっくり居られるでスコア化します。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ソロマップ｜LIFE CHOICE">
+<meta name="theme-color" content="#7c3aed">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚶%3C/text%3E%3C/svg%3E">
+</head>
+<body data-service="solo-map">
+
+<main class="lc-wrap lc-main">
+  <div class="lc-card" id="conds"></div>
+  <p class="lc-count" id="stat"></p>
+  <div id="list"></div>
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { Filter } from '../components/filter.js';
+import { ResultCard, Score, EmptyState } from '../components/result.js';
+import { Disclaimer } from '../components/footer.js';
+import { rankSolo, FEAR_OPTIONS } from '../lib/solo-score.js';
+import { StaticDataProvider } from '../lib/data-provider.js';
+import { priceRange, duration } from '../utils/format.js';
+import { pick, pickNumber, html, onChange } from '../utils/dom.js';
+import { loadPreference, savePreference } from '../utils/storage.js';
+
+mountShell('solo-map');
+const stores = await StaticDataProvider.getStores();
+const pref = loadPreference();
+
+html('#conds',
+  Filter({ name: 'fear', label: 'いちばん避けたいことは？', value: 'talk', options: FEAR_OPTIONS }) +
+  Filter({ name: 'budget', label: '予算', value: pref.budget,
+    options: [{ value: 0, label: '0円' }, { value: 1000, label: '〜1,000円' },
+              { value: 2000, label: '〜2,000円' }, { value: 4000, label: '〜4,000円' }] }) +
+  Filter({ name: 'stay', label: '滞在時間', value: 120,
+    options: [{ value: 60, label: '1時間以内' }, { value: 120, label: '2時間くらい' }, { value: 240, label: '長居したい' }] })
+);
+
+html('#note', Disclaimer({
+  dataNote: 'スコアは「一人で入りやすい・話しかけられない・予約が要らない・初めてでも安心・ゆっくり居られる」の5要素を、' +
+    '選んだ「避けたいこと」で重み付けして算出しています。業態ごとの一般的な傾向にもとづく値で、実在店舗の評価ではありません。'
+}));
+
+function render() {
+  const fear = pick('fear'), budget = pickNumber('budget'), stay = pickNumber('stay');
+  savePreference({ budget });
+  const ranked = rankSolo(stores, { fear, budget, maxStayMinutes: stay });
+
+  html('#stat', `<b>${ranked.length}件</b>該当（スコア順）`);
+  if (!ranked.length) { html('#list', EmptyState({ title: '条件に合う場所がありません', hint: '予算か滞在時間を広げてください' })); return; }
+
+  html('#list', ranked.map(r => {
+    const s = r.store;
+    return ResultCard({
+      title: s.name,
+      score: { value: r.score, label: 'ソロ度' },
+      tags: [
+        { label: priceRange(s.budgetMin, s.budgetMax) },
+        { label: '約' + duration(s.estimatedStayMinutes) },
+        s.reservationFreeScore >= 5 ? { label: '予約不要', variant: 'ok' } : null,
+        s.conversationFreeScore <= 2 ? { label: '会話が発生しやすい', variant: 'warn' } : null,
+        s.beginnerScore >= 5 ? { label: '初めてでも安心', variant: 'ok' } : null,
+        s.stayFreedomScore >= 5 ? { label: '長居できる', variant: 'ok' } : null
+      ].filter(Boolean),
+      meters: r.breakdown,
+      why: s.why
+    });
+  }).join(''));
+}
+
+onChange(['fear', 'budget', 'stay'], render);
+render();
+</script>
+</body>
+</html>
