@@ -17,6 +17,7 @@
 <body data-service="unnecessary-buy">
 
 <main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
   <div class="lc-card" id="conds"></div>
   <p class="lc-count" id="lead"></p>
   <div id="list"></div>
@@ -25,16 +26,19 @@
 
 <script type="module">
 import { mountShell } from '../components/layout.js';
+import { PreferenceBar } from '../components/preference-bar.js';
+import { CrossLinkCard, afterBreakEven } from '../lib/cross-link.js';
 import { Filter } from '../components/filter.js';
 import { PriceComparison, EmptyState } from '../components/result.js';
 import { Disclaimer } from '../components/footer.js';
 import { calcBreakEven, totalSaving } from '../lib/break-even.js';
-import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
+import { linksFor } from '../lib/affiliate.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
 import { yen } from '../utils/format.js';
 import { pickNumber, html, esc, onChange } from '../utils/dom.js';
 
 mountShell('unnecessary-buy');
+html('#prefbar', PreferenceBar());
 const products = await StaticDataProvider.getProducts();
 
 html('#conds',
@@ -81,7 +85,7 @@ function render() {
     ? `<p style="margin-top:var(--sp-3);font-size:var(--fs-base)">→ <a href="${esc(link.url)}" target="_blank" rel="noopener sponsored">${esc(p.name)}を借りられる店を探す</a></p>`
     : `<p style="margin-top:var(--sp-3);font-size:var(--fs-base);opacity:.6">→ ${esc(p.name)}を借りられる店を探す（ID未設定）</p>`) : ''}
 </article>`;
-  }).join(''));
+  }).join('') + CrossLinkCard(afterBreakEven()));
 }
 
 onChange(['freq', 'years'], render);

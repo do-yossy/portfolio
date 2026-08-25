@@ -16,6 +16,7 @@
 <body data-service="free-items">
 
 <main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
   <div id="demo-banner"></div>
   <div class="lc-card" id="conds"></div>
   <p class="lc-count" id="stat"></p>
@@ -25,18 +26,22 @@
 
 <script type="module">
 import { mountShell } from '../components/layout.js';
+import { PreferenceBar, noticeInherited } from '../components/preference-bar.js';
+import { toFilters, fromFilters } from '../lib/preference-sync.js';
+import { CrossLinkCard, afterFreeItems } from '../lib/cross-link.js';
 import { Filter, TransportSelector } from '../components/filter.js';
-import { ResultCard, StarScore, EmptyState, DemoBanner } from '../components/result.js';
+import { ResultCard, EmptyState, DemoBanner } from '../components/result.js';
 import { Disclaimer } from '../components/footer.js';
 import { findFreeItems } from '../lib/distance.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
 import { distance, TRANSPORT_LABEL } from '../utils/format.js';
 import { pick, pickNumber, html, onChange } from '../utils/dom.js';
-import { loadPreference, savePreference } from '../utils/storage.js';
+import { hasPreference } from '../utils/storage.js';
 
 mountShell('free-items');
+html('#prefbar', PreferenceBar());
 const items = await StaticDataProvider.getFreeItems();
-const pref = loadPreference();
+const f = toFilters('free-items');
 
 html('#demo-banner', DemoBanner(
   '掲載品はすべてサンプルです。実在の出品ではありません。' +
@@ -49,7 +54,8 @@ html('#conds',
     options: [{ value: 1, label: '手で持てる' }, { value: 2, label: '両手で運べる' }, { value: 3, label: '大きい物もOK' }] }) +
   Filter({ name: 'when', label: 'いつ取りに行ける？', value: 'today',
     options: [{ value: 'today', label: '今日中' }, { value: 'week', label: '今週中' }] }) +
-  TransportSelector(pref.transportation)
+  TransportSelector(f.transportation) +
+  (hasPreference() ? noticeInherited('free-items', { transportation: f.transportation }) : '')
 );
 
 html('#note', Disclaimer({
@@ -60,7 +66,7 @@ html('#note', Disclaimer({
 function render() {
   const maxDistanceKm = pickNumber('dist'), maxSize = pickNumber('size');
   const pickupEnd = pick('when'), transportation = pick('transportation') || 'walk';
-  savePreference({ transportation });
+  fromFilters('free-items', { transportation });
 
   const rows = findFreeItems(items, { maxDistanceKm, maxSize, pickupEnd, transportation });
   html('#stat', `<b>${rows.length}件</b> 見つかりました（近い順）`);
@@ -82,7 +88,7 @@ function render() {
       i.pickupEnd === 'today' ? { label: '今日受取可', variant: 'warn' } : { label: '今週中' }
     ],
     why: i.condition + '　' + carry.note
-  })).join(''));
+  })).join('') + CrossLinkCard(afterFreeItems(rows.length)));
 }
 
 onChange(['dist', 'size', 'when', 'transportation'], render);

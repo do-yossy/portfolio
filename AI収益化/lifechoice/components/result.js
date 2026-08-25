@@ -23,7 +23,7 @@ export function DemoBanner(text) {
 /* ═══ ResultCard ═══
  * ②③④⑤⑥のカードを1つの実装に統合。
  * @param {{title:string, price?:string, priceNote?:string, tags?:{label:string,variant?:string}[],
- *          why?:string, meters?:{label:string,value:number,max?:number}[],
+ *          why?:string, meters?:{label:string,value:number,max?:number,weighted?:boolean}[],
  *          score?:{value:number,label:string}, footer?:string, isDemo?:boolean}} p
  */
 export function ResultCard(p) {
@@ -64,8 +64,8 @@ export function StarScore(value, label) {
 /** 5段階のメーター（⑤のソロスコア内訳） */
 export function Meter(p) {
   const pct = Math.round((p.value / (p.max || 5)) * 100);
-  return `<div class="lc-meter">
-    <span class="lc-meter__label">${esc(p.label)}</span>
+  return `<div class="lc-meter${p.weighted ? ' lc-meter--on' : ''}">
+    <span class="lc-meter__label">${esc(p.label)}${p.weighted ? '<span class="lc-meter__mark" title="この条件で重視した項目">重視</span>' : ''}</span>
     <span class="lc-meter__track"><span class="lc-meter__fill" style="width:${pct}%"></span></span>
   </div>`;
 }

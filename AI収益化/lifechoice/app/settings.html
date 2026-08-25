@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>設定｜LIFE CHOICE</title>
+<meta name="description" content="1回設定すれば、6つの機能すべてに反映されます。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="設定｜LIFE CHOICE">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚙️%3C/text%3E%3C/svg%3E">
+</head>
+<body data-service="buy-check">
+
+<main class="lc-wrap lc-main">
+  <div class="lc-summary" style="margin-bottom:var(--sp-5)">
+    ここで設定した条件は<b>6つの機能すべてに引き継がれます</b>。<br>
+    「大阪・ひとり・3,000円」を1回入れておけば、次からは条件を入れ直さずに済みます。
+  </div>
+
+  <div class="lc-card" id="form"></div>
+
+  <div class="lc-card" id="effect"></div>
+
+  <button class="lc-btn" id="save" style="margin-top:var(--sp-4)">保存する</button>
+  <button class="lc-btn lc-btn--ghost" id="reset" style="margin-top:var(--sp-3)">設定をリセット</button>
+
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { Filter, LocationSelector, TransportSelector } from '../components/filter.js';
+import { Disclaimer } from '../components/footer.js';
+import { SERVICES } from '../lib/services.js';
+import { AFFECTED_SERVICES, describe } from '../lib/preference-sync.js';
+import { loadPreference, savePreference, clearPreference } from '../utils/storage.js';
+import { pick, pickNumber, $, html, esc } from '../utils/dom.js';
+
+mountShell('buy-check', { title: '設定' });
+const pref = loadPreference();
+
+html('#form',
+  LocationSelector({ value: pref.location.areaName }) +
+  Filter({ name: 'budget', label: '普段の予算', value: pref.budget,
+    options: [{ value: 1000, label: '〜1,000円' }, { value: 2000, label: '〜2,000円' },
+              { value: 3000, label: '〜3,000円' }, { value: 5000, label: '〜5,000円' },
+              { value: 10000, label: '〜10,000円' }] }) +
+  TransportSelector(pref.transportation) +
+  Filter({ name: 'solo', label: '一人で行動することが多い？', value: pref.soloPreference,
+    options: [{ value: 5, label: 'ほとんど一人' }, { value: 3, label: 'どちらも' }, { value: 1, label: '誰かと一緒が多い' }] }) +
+  Filter({ name: 'conv', label: 'お店で話しかけられるのは？', value: pref.conversationPreference,
+    options: [{ value: 5, label: '避けたい' }, { value: 3, label: '気にしない' }, { value: 1, label: 'むしろ歓迎' }] }) +
+  Filter({ name: 'resv', label: '予約が必要なお店は？', value: pref.reservationPreference,
+    options: [{ value: 5, label: '面倒なので避けたい' }, { value: 3, label: '気にしない' }, { value: 1, label: '予約したほうが安心' }] })
+);
+
+function renderEffect() {
+  const rows = [
+    ['予算', AFFECTED_SERVICES.budget],
+    ['移動手段', AFFECTED_SERVICES.transportation],
+    ['一人行動', AFFECTED_SERVICES.soloPreference],
+    ['会話', AFFECTED_SERVICES.conversationPreference],
+    ['予約', AFFECTED_SERVICES.reservationPreference],
+    ['エリア', AFFECTED_SERVICES.location]
+  ];
+  html('#effect', `
+    <h3 class="lc-section-title">この設定が効く機能</h3>
+    <table class="lc-table">
+      ${rows.map(([label, ids]) => `
+        <tr>
+          <td style="width:32%">${esc(label)}</td>
+          <td>${ids.length
+            ? ids.map(id => esc(SERVICES.find(s => s.id === id).name)).join('、')
+            : '<span class="lc-sub">現在は未対応（位置データの整備後に有効になります）</span>'}</td>
+        </tr>`).join('')}
+    </table>`);
+}
+renderEffect();
+
+html('#note', Disclaimer({
+  dataNote: '設定はこの端末のブラウザ内にのみ保存され、サーバーには送信されません。' +
+    'プライベートブラウジングなど保存できない環境では、そのセッション中のみ有効になります。'
+}));
+
+// 現在地の取得（許可されない前提で、失敗しても手動選択で進める）
+$('#lc-geo').addEventListener('click', () => {
+  if (!navigator.geolocation) { alert('この端末では現在地を取得できません。エリアを選んでください。'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      savePreference({ location: { lat: pos.coords.latitude, lng: pos.coords.longitude, areaName: '現在地' } });
+      alert('現在地を保存しました。\n※ 場所データの整備が済むまで、距離による絞り込みは限定的です。');
+    },
+    () => alert('現在地を取得できませんでした。エリアを選んでください。')
+  );
+});
+
+$('#save').addEventListener('click', () => {
+  const area = $('#lc-area').value;
+  const next = savePreference({
+    budget: pickNumber('budget'),
+    transportation: pick('transportation'),
+    soloPreference: pickNumber('solo'),
+    conversationPreference: pickNumber('conv'),
+    reservationPreference: pickNumber('resv'),
+    location: area ? { areaName: area } : {}
+  });
+  const btn = $('#save');
+  btn.textContent = '保存しました（' + describe(next) + '）';
+  setTimeout(() => { btn.textContent = '保存する'; }, 2200);
+});
+
+$('#reset').addEventListener('click', () => {
+  if (!confirm('保存した条件をすべて消します。よろしいですか？')) return;
+  clearPreference();
+  location.reload();
+});
+</script>
+</body>
+</html>

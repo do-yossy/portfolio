@@ -241,3 +241,26 @@
 }
 .lc-search__input::placeholder { color: var(--sub); }
 .lc-search__input:focus { border-color: var(--accent); outline: none; }
+
+/* ───────── PreferenceBar ─────────
+ * 6機能が同じ設定を共有していることを常に見せる。
+ * これが「1つのアプリ」だと体感させる最大の要素。 */
+.lc-prefbar {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.lc-prefbar__body { display: flex; align-items: center; gap: var(--sp-3); }
+.lc-prefbar__icon { font-size: 18px; flex-shrink: 0; }
+.lc-prefbar__label { font-size: var(--fs-sm); color: var(--sub); }
+.lc-prefbar__value { font-size: var(--fs-base); font-weight: 700; color: var(--accent-d); }
+.lc-prefbar .lc-btn { flex-shrink: 0; }
+.lc-meter--on .lc-meter__label { color: var(--accent-d); font-weight: 700; }
+.lc-meter--on .lc-meter__fill { background: var(--accent-d); }
+.lc-meter__mark {
+  display: inline-block; margin-left: 5px; padding: 0 5px;
+  font-size: 10px; font-weight: 800; border-radius: 3px;
+  background: var(--accent); color: #fff; vertical-align: 1px;
+}
