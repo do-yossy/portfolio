@@ -45,7 +45,7 @@ import { ShareBox, bindShare, Cta, Disclaimer } from '../components/footer.js';
 import { evaluateBuyCheck, buildShareText } from '../lib/buy-check.js';
 import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
 import { StaticDataProvider } from '../lib/data-provider.js';
-import { yen } from '../utils/format.js';
+import { yen, newPriceSource } from '../utils/format.js';
 import { pickNumber, $, html, esc, scrollTop } from '../utils/dom.js';
 import { pushHistory } from '../utils/storage.js';
 
@@ -72,7 +72,7 @@ html('#conds',
 );
 
 html('#note', Disclaimer({
-  dataNote: `全${products.length}品目のうち<b>${products.filter(p => p.source === '実測').length}品目は実勢価格を確認済み</b>です。判定根拠の欄に実測か推定かを表示しています。`
+  dataNote: `全${products.length}品目のうち<b>${products.filter(p => newPriceSource(p) === '実測').length}品目は新品価格を確認済み</b>、残りは市場の中位帯からの推定です。レンタル価格は${products.filter(p => p.source === '実測').length}品目で各社の掲載価格を確認しています。`
 }));
 
 function syncPrice() {
