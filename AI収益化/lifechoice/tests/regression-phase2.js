@@ -6,8 +6,10 @@
  *
  * 実行：node AI収益化/lifechoice/tests/regression-phase2.js
  */
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const ROOT = path.join(__dirname, '..');
 const DEMO = path.join(__dirname, '..', '..', 'demo');
