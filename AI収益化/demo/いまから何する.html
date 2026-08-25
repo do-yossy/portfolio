@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>いまから何する？｜時間・予算から今できることを探す</title>
+<meta name="description" content="今の時刻・使える時間・予算・気分から、今から行ける場所を横断で探します。予約不要の選択肢も含めて提案。">
+<style>
+:root{
+  --bg:#0f1117; --card:#181b23; --card2:#1f232d; --ink:#f2f4f8; --sub:#98a1b3;
+  --line:#2a2f3b; --accent:#ff7a45; --accent2:#4ea8ff; --ok:#3ddc97; --warn:#ffc857;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:0 18px}
+header{padding:40px 0 28px;text-align:center;border-bottom:1px solid var(--line)}
+header h1{font-size:clamp(24px,5.4vw,34px);font-weight:800;letter-spacing:-.01em}
+header h1 span{color:var(--accent)}
+header p{margin-top:10px;font-size:14.5px;color:var(--sub)}
+.demo-tag{display:inline-block;background:rgba(255,122,69,.14);border:1px solid rgba(255,122,69,.4);
+  color:var(--accent);padding:4px 12px;border-radius:999px;font-size:12px;margin-bottom:14px;font-weight:700}
+main{padding:26px 0 60px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:18px}
+.row{margin-bottom:20px}
+.row:last-child{margin-bottom:0}
+.row label.t{display:block;font-size:13px;color:var(--sub);margin-bottom:9px;font-weight:700;letter-spacing:.04em}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips input{position:absolute;opacity:0;width:0;height:0}
+.chips label{padding:9px 15px;border:1.5px solid var(--line);border-radius:999px;cursor:pointer;
+  font-size:14px;background:var(--card2);transition:.15s;user-select:none}
+.chips label:hover{border-color:#3d4456}
+.chips input:checked+label{background:var(--accent);border-color:var(--accent);color:#12141a;font-weight:700}
+.chips.blue input:checked+label{background:var(--accent2);border-color:var(--accent2)}
+.timeline{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.timeline select{background:var(--card2);color:var(--ink);border:1.5px solid var(--line);border-radius:9px;
+  padding:10px 13px;font-size:15px;font-family:inherit;cursor:pointer}
+.timeline span{color:var(--sub);font-size:14px}
+.go{display:block;width:100%;padding:16px;background:var(--accent);color:#12141a;border:none;border-radius:12px;
+  font-size:16.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:.15s;margin-top:6px}
+.go:hover{filter:brightness(1.08)}
+#out{display:none}
+.summary{background:linear-gradient(135deg,rgba(255,122,69,.13),rgba(78,168,255,.1));
+  border:1px solid rgba(255,122,69,.3);border-radius:14px;padding:18px 20px;margin-bottom:16px;font-size:14.5px}
+.summary b{color:var(--accent)}
+.count{font-size:13px;color:var(--sub);margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px 18px;margin-bottom:11px;
+  transition:.15s}
+.card:hover{border-color:#3a4152}
+.card .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:9px}
+.card h3{font-size:17px;font-weight:700}
+.card .price{font-size:16px;font-weight:800;color:var(--ok);white-space:nowrap;font-variant-numeric:tabular-nums}
+.card .price small{font-size:11px;color:var(--sub);font-weight:400;display:block;text-align:right}
+.meta{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--card2);color:var(--sub);border:1px solid var(--line)}
+.tag.book{background:rgba(78,168,255,.14);color:var(--accent2);border-color:rgba(78,168,255,.35)}
+.tag.free{background:rgba(61,220,151,.13);color:var(--ok);border-color:rgba(61,220,151,.32)}
+.tag.solo{background:rgba(255,200,87,.13);color:var(--warn);border-color:rgba(255,200,87,.32)}
+.why{font-size:13.5px;color:var(--sub);border-left:2px solid var(--accent);padding-left:11px}
+.cta-line{margin-top:12px;padding-top:11px;border-top:1px dashed var(--line);font-size:13px}
+.cta-line a{color:var(--accent2);text-decoration:none;font-weight:700}
+.cta-line a:hover{text-decoration:underline}
+.empty{text-align:center;padding:40px 20px;color:var(--sub)}
+.again{display:block;width:100%;padding:14px;background:transparent;color:var(--sub);border:1.5px solid var(--line);
+  border-radius:11px;font-size:15px;cursor:pointer;font-family:inherit;margin-top:16px}
+.again:hover{border-color:var(--sub);color:var(--ink)}
+.note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:26px;padding-top:18px}
+.note b{color:var(--warn)}
+@media(max-width:520px){.card .head{flex-direction:column;gap:4px}.card .price{text-align:left}.card .price small{text-align:left}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="demo-tag">DEMO ／ 社内検証用</span>
+    <h1>いまから<span>何する？</span></h1>
+    <p>時間・予算・気分から、今すぐ行ける場所を横断で探します</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="panel" id="form">
+    <div class="row">
+      <label class="t">いま何時？ / 何時まで空いてる？</label>
+      <div class="timeline">
+        <select id="now"></select>
+        <span>から</span>
+        <select id="until"></select>
+        <span>まで</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="t">予算（1人あたり）</label>
+      <div class="chips">
+        <input type="radio" name="budget" id="b0" value="0"><label for="b0">0円</label>
+        <input type="radio" name="budget" id="b1" value="1000"><label for="b1">〜1,000円</label>
+        <input type="radio" name="budget" id="b2" value="2000" checked><label for="b2">〜2,000円</label>
+        <input type="radio" name="budget" id="b3" value="3000"><label for="b3">〜3,000円</label>
+        <input type="radio" name="budget" id="b4" value="5000"><label for="b4">〜5,000円</label>
+        <input type="radio" name="budget" id="b5" value="99999"><label for="b5">気にしない</label>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="t">誰と？</label>
+      <div class="chips blue">
+        <input type="radio" name="who" id="w1" value="solo" checked><label for="w1">ひとり</label>
+        <input type="radio" name="who" id="w2" value="multi"><label for="w2">2人以上</label>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="t">今日の気分</label>
+      <div class="chips blue">
+        <input type="radio" name="mood" id="m1" value="quiet" checked><label for="m1">人と話したくない</label>
+        <input type="radio" name="mood" id="m2" value="talk"><label for="m2">誰かと話したい</label>
+        <input type="radio" name="mood" id="m3" value="any"><label for="m3">どちらでも</label>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="t">動きたい？</label>
+      <div class="chips blue">
+        <input type="radio" name="body" id="a1" value="rest" checked><label for="a1">のんびり</label>
+        <input type="radio" name="body" id="a2" value="active"><label for="a2">体を動かしたい</label>
+        <input type="radio" name="body" id="a3" value="any"><label for="a3">どちらでも</label>
+      </div>
+    </div>
+
+    <button class="go" id="go">今から行けるところを探す</button>
+  </div>
+
+  <div id="out">
+    <div class="summary" id="summary"></div>
+    <div class="count" id="count"></div>
+    <div id="list"></div>
+    <button class="again" id="again">条件を変えてやり直す</button>
+  </div>
+
+  <p class="note">
+    <b>これはデモです。</b>掲載データは代表的な業態の一般的な相場・営業時間をもとにした<b>サンプル</b>で、実在の店舗情報ではありません。<br>
+    本番では、予約商材（アソビュー・じゃらん等）と<b>予約不要の選択肢</b>を横断して提示し、予約商材の送客で収益化します。<br>
+    既存の予約サイトが「予約できるもの」しか出せないのに対し、<b>予約不要の選択肢も含めて正直に提案する</b>のが本サービスの差別化点です。
+  </p>
+
+</main>
+
+<script>
+(function(){
+  // 所要時間 min(分) / 予算 min-max(円) / 営業 open-close(時) / solo:一人適性1-5
+  // talk: 会話度 0=不要 1=あってもなくても 2=会話が主目的 / active: 0=のんびり 1=中間 2=運動
+  // book: true=要予約(送客対象) false=予約不要
+  var DATA=[
+    {n:"映画館（レイトショー）",dur:150,lo:1300,hi:2000,open:10,close:23.5,solo:5,talk:0,active:0,book:false,cat:"映画",why:"座って完結。話す必要がまったくない"},
+    {n:"サウナ・スーパー銭湯",dur:120,lo:800,hi:1600,open:10,close:24,solo:5,talk:0,active:1,book:false,cat:"温浴",why:"深夜までやっている店が多く、時間の融通が利く"},
+    {n:"銭湯",dur:60,lo:500,hi:600,open:15,close:23,solo:5,talk:0,active:0,book:false,cat:"温浴",why:"予算500円台。短時間でも成立する"},
+    {n:"美術館・博物館",dur:100,lo:500,hi:1800,open:9.5,close:17,solo:5,talk:0,active:0,book:false,cat:"文化",why:"閉館が早いので、夕方以降は間に合わないことが多い"},
+    {n:"漫画喫茶・ネットカフェ",dur:180,lo:800,hi:2000,open:0,close:24,solo:5,talk:0,active:0,book:false,cat:"屋内",why:"24時間営業。時間が半端なときの受け皿になる"},
+    {n:"ひとりカラオケ",dur:120,lo:500,hi:1500,open:11,close:24,solo:5,talk:0,active:1,book:false,cat:"屋内",why:"平日夕方はフリータイムが安い"},
+    {n:"ゲームセンター",dur:60,lo:500,hi:2000,open:10,close:24,solo:4,talk:0,active:1,book:false,cat:"屋内",why:"予算を自分で決められる。滞在時間も自由"},
+    {n:"書店・ブックカフェ",dur:90,lo:500,hi:1200,open:8,close:22,solo:5,talk:0,active:0,book:false,cat:"カフェ",why:"低予算で長居しやすい"},
+    {n:"公園を歩く・散歩",dur:60,lo:0,hi:0,open:0,close:24,solo:5,talk:0,active:1,book:false,cat:"屋外",why:"完全無料。思い立った瞬間に始められる"},
+    {n:"図書館",dur:120,lo:0,hi:0,open:9,close:20,solo:5,talk:0,active:0,book:false,cat:"文化",why:"無料。閉館が20時前後なので時間に注意"},
+    {n:"展望台・夜景スポット",dur:60,lo:0,hi:1200,open:10,close:22.5,solo:4,talk:0,active:0,book:false,cat:"屋外",why:"夜のほうが本領。無料の展望台もある"},
+    {n:"サウナ付きジム（ビジター利用）",dur:120,lo:2000,hi:3500,open:7,close:23,solo:4,talk:0,active:2,book:false,cat:"運動",why:"ビジター利用なら会員でなくても使える"},
+    {n:"ボルダリングジム",dur:120,lo:2000,hi:3200,open:12,close:23,solo:4,talk:1,active:2,book:false,cat:"運動",why:"一人客が多く、初回講習だけ受ければすぐ登れる"},
+    {n:"バッティングセンター",dur:45,lo:500,hi:1500,open:10,close:24,solo:5,talk:0,active:2,book:false,cat:"運動",why:"短時間で汗をかける。予約も不要"},
+    {n:"プール（区民・市民）",dur:90,lo:400,hi:800,open:9,close:21,solo:5,talk:0,active:2,book:false,cat:"運動",why:"公営なら数百円。閉館が早い点だけ注意"},
+    {n:"ランニング（河川敷・公園）",dur:60,lo:0,hi:0,open:0,close:24,solo:5,talk:0,active:2,book:false,cat:"屋外",why:"無料。時間も距離も自分次第"},
+    {n:"卓球・ビリヤード・ダーツ",dur:90,lo:1000,hi:2500,open:11,close:24,solo:2,talk:1,active:2,book:false,cat:"運動",why:"2人以上向き。深夜までやっている店が多い"},
+    {n:"ボードゲームカフェ",dur:150,lo:1500,hi:2800,open:12,close:23,solo:3,talk:2,active:0,book:false,cat:"交流",why:"相席で知らない人と遊べる店もある"},
+    {n:"立ち飲み・角打ち",dur:90,lo:1000,hi:3000,open:15,close:23,solo:4,talk:2,active:0,book:false,cat:"交流",why:"一人客が前提の店が多く、会話も生まれやすい"},
+    {n:"ライブハウス・ジャズバー",dur:120,lo:2000,hi:4500,open:18,close:23.5,solo:4,talk:1,active:0,book:false,cat:"音楽",why:"当日券で入れる公演も多い"},
+    {n:"水族館・動物園",dur:150,lo:1500,hi:2600,open:9.5,close:17,solo:4,talk:0,active:1,book:true,cat:"レジャー",why:"閉園が早い。夜間開館のある日は狙い目"},
+    {n:"陶芸・ものづくり体験",dur:120,lo:3000,hi:5500,open:10,close:18,solo:4,talk:1,active:1,book:true,cat:"体験",why:"当日枠が残っていれば予約できる"},
+    {n:"日帰り温泉（郊外）",dur:180,lo:1200,hi:3000,open:10,close:23,solo:5,talk:0,active:0,book:true,cat:"温浴",why:"移動時間を含めて3時間以上ほしい"},
+    {n:"スポーツ観戦（当日券）",dur:180,lo:2000,hi:5000,open:13,close:22,solo:4,talk:1,active:0,book:true,cat:"レジャー",why:"当日券が残っていれば入れる。開催日は要確認"},
+    {n:"謎解き・脱出ゲーム",dur:120,lo:2500,hi:4000,open:11,close:22,solo:2,talk:2,active:0,book:true,cat:"体験",why:"複数人向け。当日枠は埋まりやすい"},
+    {n:"料理教室・ワークショップ",dur:120,lo:3000,hi:6000,open:10,close:21,solo:4,talk:2,active:1,book:true,cat:"体験",why:"一人参加が多く、自然に会話が生まれる"},
+    {n:"カフェで作業・読書",dur:90,lo:500,hi:1200,open:7,close:22,solo:5,talk:0,active:0,book:false,cat:"カフェ",why:"最も手軽。時間が余ったときの保険"},
+    {n:"ショッピングモール",dur:120,lo:0,hi:99999,open:10,close:21,solo:4,talk:0,active:1,book:false,cat:"屋内",why:"予算ゼロでも時間はつぶせる"}
+  ];
+
+  var nowSel=document.getElementById('now'), untilSel=document.getElementById('until');
+  for(var h=0;h<24;h++){
+    for(var m=0;m<60;m+=30){
+      var v=h+m/60, t=('0'+h).slice(-2)+':'+('0'+m).slice(-2);
+      nowSel.add(new Option(t,v)); untilSel.add(new Option(t,v));
+    }
+  }
+  nowSel.value=17; untilSel.value=21;
+
+  function pick(n){var e=document.querySelector('input[name="'+n+'"]:checked');return e?e.value:null;}
+  function yen(n){return '¥'+n.toLocaleString('ja-JP');}
+  function hhmm(v){var h=Math.floor(v),m=Math.round((v-h)*60);return ('0'+h).slice(-2)+':'+('0'+m).slice(-2);}
+
+  document.getElementById('go').addEventListener('click',function(){
+    var now=parseFloat(nowSel.value), until=parseFloat(untilSel.value);
+    if(until<=now) until+=24;
+    var freeMin=Math.round((until-now)*60);
+    var budget=parseInt(pick('budget'),10);
+    var who=pick('who'), mood=pick('mood'), body=pick('body');
+
+    var res=DATA.map(function(d){
+      var reasons=[], score=0;
+
+      // 時間：移動30分を見込み、閉店までに所要時間が収まるか
+      var startable=now+0.5;
+      var closeAdj=d.close<=d.open?d.close+24:d.close;
+      var latestStart=closeAdj-(d.dur/60);
+      var fitsTime=(d.dur+30)<=freeMin;
+      var fitsOpen=startable>=d.open-0.01 && startable<=latestStart+0.01;
+      if(!fitsTime||!fitsOpen) return null;
+
+      // 予算
+      if(d.lo>budget) return null;
+      if(d.hi<=budget){score+=2;} else {score+=1;reasons.push('予算内に収まるプランを選ぶ必要あり');}
+
+      // ひとり適性
+      if(who==='solo'){
+        if(d.solo<=2) return null;
+        score+=d.solo;
+        if(d.solo>=5) reasons.push('一人客が多く浮かない');
+      } else { score+=3; }
+
+      // 気分（会話）
+      if(mood==='quiet'){ if(d.talk===2) return null; if(d.talk===0) score+=3; }
+      else if(mood==='talk'){ if(d.talk===0) score-=2; if(d.talk===2) score+=4; }
+
+      // 体を動かすか
+      if(body==='rest'){ if(d.active===2) score-=3; if(d.active===0) score+=2; }
+      else if(body==='active'){ if(d.active===0) score-=3; if(d.active===2) score+=4; }
+
+      // 時間がぴったり使えるほど加点
+      var ratio=(d.dur+30)/freeMin;
+      if(ratio>0.6&&ratio<=1) score+=2;
+
+      return {d:d,score:score,reasons:reasons};
+    }).filter(Boolean).sort(function(a,b){return b.score-a.score;});
+
+    var bookCount=res.filter(function(r){return r.d.book;}).length;
+    document.getElementById('summary').innerHTML=
+      '<b>'+hhmm(now%24)+'</b> から <b>'+Math.floor(freeMin/60)+'時間'+(freeMin%60?freeMin%60+'分':'')+'</b>、'+
+      '予算 <b>'+(budget>=99999?'上限なし':yen(budget))+'</b>、'+
+      (who==='solo'?'<b>ひとり</b>で':'<b>2人以上</b>で')+
+      (mood==='quiet'?'、<b>静かに</b>過ごす':mood==='talk'?'、<b>誰かと話せる</b>ところ':'')+
+      '前提で探しました。';
+    document.getElementById('count').innerHTML=
+      '<b>'+res.length+'件</b>見つかりました（うち予約が要るもの '+bookCount+'件 / <span style="color:var(--ok)">予約不要 '+(res.length-bookCount)+'件</span>）';
+
+    var html=res.slice(0,10).map(function(r){
+      var d=r.d;
+      var price=d.lo===0&&d.hi===0?'無料':(d.hi>=99999?yen(d.lo)+'〜':yen(d.lo)+'〜'+yen(d.hi));
+      var tags='<span class="tag">'+d.cat+'</span>'+
+        '<span class="tag">所要 約'+(d.dur>=60?Math.floor(d.dur/60)+'時間'+(d.dur%60?d.dur%60+'分':''):d.dur+'分')+'</span>'+
+        (d.book?'<span class="tag book">要予約</span>':'<span class="tag free">予約不要・今すぐ行ける</span>')+
+        (d.solo>=5&&who==='solo'?'<span class="tag solo">ひとり歓迎</span>':'')+
+        '<span class="tag">〜'+hhmm(d.close>24?d.close-24:d.close)+'</span>';
+      var extra=r.reasons.length?'<br>※'+r.reasons.join('／'):'';
+      var cta=d.book
+        ? '<div class="cta-line">→ <a href="#" onclick="alert(\'本番ではアソビュー・じゃらん等の予約ページへ送客し、ここで成果報酬が発生します\');return false;">当日枠を確認する</a>　<span style="color:var(--sub)">（送客＝収益発生点）</span></div>'
+        : '';
+      return '<div class="card"><div class="head"><h3>'+d.n+'</h3>'+
+        '<div class="price">'+price+'<small>1人あたり</small></div></div>'+
+        '<div class="meta">'+tags+'</div>'+
+        '<div class="why">'+d.why+extra+'</div>'+cta+'</div>';
+    }).join('');
+
+    document.getElementById('list').innerHTML=html||'<div class="empty">条件に合うものが見つかりませんでした。<br>予算を上げるか、時間を長めに取ってみてください。</div>';
+    document.getElementById('form').style.display='none';
+    document.getElementById('out').style.display='block';
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+
+  document.getElementById('again').addEventListener('click',function(){
+    document.getElementById('out').style.display='none';
+    document.getElementById('form').style.display='block';
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+})();
+</script>
+</body>
+</html>
