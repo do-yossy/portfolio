@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>何をすればいい？｜LIFE CHOICE</title>
+<meta name="description" content="やりたいことと予算を書くだけで、買う・中古・借りる・もらうを比べて最適な組み合わせを出します。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="何をすればいい？｜LIFE CHOICE">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧭%3C/text%3E%3C/svg%3E">
+</head>
+<body data-service="buy-check">
+
+<main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
+  <div id="search-area"></div>
+  <div id="conds" class="lc-hidden"></div>
+  <div id="out"></div>
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { PreferenceBar } from '../components/preference-bar.js';
+import { SearchBox, Filter } from '../components/filter.js';
+import { EmptyState, DemoBadge, ResultSummary } from '../components/result.js';
+import { Disclaimer, ShareBox, bindShare } from '../components/footer.js';
+import { search } from '../lib/integrated-search.js';
+import { StaticDataProvider } from '../lib/data-provider.js';
+import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
+import { yen } from '../utils/format.js';
+import { $, html, esc, pickNumber, onChange, scrollTop } from '../utils/dom.js';
+import { loadPreference, pushHistory } from '../utils/storage.js';
+
+mountShell('buy-check', { title: '何をすればいい？' });
+html('#prefbar', PreferenceBar());
+
+const [products, freeItems, activitySets] = await Promise.all([
+  StaticDataProvider.getProducts(),
+  StaticDataProvider.getFreeItems(),
+  StaticDataProvider.getActivitySets()
+]);
+const data = { products, freeItems, activitySets };
+const pref = loadPreference();
+
+const params = new URLSearchParams(location.search);
+let query = params.get('q') || '';
+
+html('#search-area', SearchBox({ value: query }) + `
+  <p class="lc-field__hint" style="margin-top:var(--sp-2)">
+    「${esc(activitySets.slice(0, 4).map(s => s.name).join('」「'))}」など${activitySets.length}種類に対応しています
+  </p>`);
+
+html('#conds',
+  Filter({ name: 'years', label: 'どれくらい続ける想定？', hint: '期間が変わると答えが変わります。まずは1年で見るのがおすすめです。',
+    value: 1, options: [{ value: 1, label: 'まず1年' }, { value: 3, label: '3年' }, { value: 5, label: '5年以上' }] }) +
+  Filter({ name: 'budget', label: '予算', value: 0,
+    options: [{ value: 0, label: '文章から読み取る' }, { value: 10000, label: '1万円' }, { value: 30000, label: '3万円' },
+              { value: 50000, label: '5万円' }, { value: 100000, label: '10万円' }, { value: -1, label: '決めていない' }] })
+);
+
+html('#note', Disclaimer({
+  dataNote: '価格は' + products.filter(p => p.source === '実測').length + '品目が実勢価格の確認済み、残りは推定です。' +
+    '中古価格は相場からの推定で、実際の出品価格ではありません。' +
+    '「もらう」に出る品目は無料品レーダーのサンプルデータに同じ分類があることを示すもので、実在の出品ではありません。'
+}));
+
+$('#lc-search').addEventListener('submit', () => {
+  query = $('#lc-search input[name=q]').value.trim();
+  history.replaceState(null, '', '?q=' + encodeURIComponent(query));
+  render();
+});
+onChange(['years', 'budget'], () => { if (query) render(); });
+
+function render() {
+  if (!query) { html('#out', ''); $('#conds').classList.add('lc-hidden'); return; }
+
+  const years = pickNumber('years') || 1;
+  const picked = pickNumber('budget');
+  // 0 = 文章から読み取る（opts に渡さない）、-1 = 予算なし（null を明示）
+  const opts = { years };
+  if (picked > 0) opts.budget = picked;
+  else if (picked === -1) opts.budget = null;
+
+  const r = search(query, data, opts);
+  $('#conds').classList.remove('lc-hidden');
+
+  if (!r.found) {
+    html('#out', EmptyState({
+      title: '「' + query + '」に合うものが見つかりませんでした',
+      hint: '次のような書き方だと探せます'
+    }) + `
+      <div class="lc-card">
+        <div class="lc-tags">
+          ${r.suggestions.map(s => `<button class="lc-tag lc-tag--accent lc-try" data-q="${esc(s.name)}"
+             style="cursor:pointer;border:none">${esc(s.name)}</button>`).join('')}
+        </div>
+      </div>`);
+    bindTryButtons();
+    return;
+  }
+
+  pushHistory({ service: 'search', activity: r.activity ? r.activity.id : null, query });
+  const p = r.plan;
+
+  html('#out',
+    ResultSummary(
+      `<b>${esc(r.activity ? r.activity.name : query)}</b>` +
+      `<br>全部新品でそろえると <b>${yen(r.buyAll)}</b>、` +
+      `いちばん安い組み合わせなら <b style="color:var(--ok)">${yen(r.bestAll)}</b>` +
+      `<br><span class="lc-sub">${r.years}年で通算${r.uses}回使う想定` +
+      (r.unpricedCount ? `／新品価格が不明な品目が${r.unpricedCount}件あり、この比較には含めていません` : '') +
+      `</span>`) +
+
+    `<div class="lc-card" style="text-align:center;background:var(--warn-bg);border-color:var(--warn)">
+      <div class="lc-num" style="font-size:28px;font-weight:800;color:var(--warn)">${yen(r.totalSaving)}</div>
+      <div class="lc-sub">新品で全部そろえる場合との差額</div>
+    </div>` +
+
+    planCard(r, p) +
+    r.rows.map(rowCard).join('') +
+    nextSteps(r) +
+    ShareBox(shareText(r))
+  );
+
+  bindShare(shareText(r));
+  $('#again') && $('#again').addEventListener('click', scrollTop);
+}
+
+function planCard(r, p) {
+  if (!p.feasible) {
+    return `
+<div class="lc-card" style="border-color:var(--bad)">
+  <h3 class="lc-section-title" style="color:var(--bad)">この予算では足りません</h3>
+  <p>必要なものだけに絞っても <b>${yen(p.essentialTotal)}</b> かかります。</p>
+  <p style="font-size:20px;font-weight:800;color:var(--bad);margin:var(--sp-3) 0">
+    あと ${yen(p.shortage)} 必要です
+  </p>
+  <p class="lc-sub">続ける期間を短くするか、予算を上げると結果が変わります。
+  「まず1年」で見ると、借りる選択肢が有利になりやすいです。</p>
+</div>`;
+  }
+  return `
+<div class="lc-card">
+  <h3 class="lc-section-title">${r.selection === 'any' ? 'この中から選べます' : 'おすすめの組み合わせ'}　<span style="color:var(--ok)">${yen(p.total)}</span>
+    ${r.budget ? `<span class="lc-sub" style="font-weight:400">／ 予算 ${yen(r.budget)}</span>` : ''}</h3>
+  <table class="lc-table">
+    ${p.included.map(x => `
+      <tr>
+        <td>${x.essential ? '<span class="lc-tag lc-tag--accent">必須</span> ' : ''}${esc(x.product.name)}</td>
+        <td style="white-space:nowrap"><b>${esc(x.best.label)}</b></td>
+        <td class="num">${yen(x.best.cost)}</td>
+      </tr>`).join('')}
+  </table>
+  ${r.selection === 'any' ? '<p class="lc-sub">必要なものだけ選んでください。合計は全部そろえた場合の金額です。</p>' : ''}
+  ${p.excluded.length ? `
+    <p class="lc-sub" style="margin-top:var(--sp-3);border-top:1px dashed var(--line);padding-top:var(--sp-3)">
+      予算の都合で外したもの：${p.excluded.map(x => esc(x.product.name) + '（' + yen(x.best.cost) + '）').join('、')}
+    </p>` : ''}
+</div>`;
+}
+
+function rowCard(x) {
+  const max = Math.max(...x.ways.map(w => w.cost), 1);
+  return `
+<article class="lc-card">
+  <div class="lc-card__head">
+    <h3 class="lc-card__title">${esc(x.product.name)}
+      <span class="lc-sub" style="font-weight:400">　${esc(x.product.category)}${x.product.source === '実測' ? '・実勢価格' : '・推定'}</span>
+    </h3>
+    <span class="lc-tag lc-tag--${x.essential ? 'accent' : ''}">${x.essential ? '必須' : '任意'}</span>
+  </div>
+
+  <div class="lc-bars">
+    ${x.ways.map(w => `
+      <div class="lc-bar">
+        <span class="lc-bar__label">${esc(w.label)}</span>
+        <span class="lc-bar__track">
+          <span class="lc-bar__fill" style="width:${Math.max(12, Math.round(w.cost / max * 100))}%;
+            background:${w === x.best ? 'var(--ok)' : 'var(--line-2)'}">${yen(w.cost)}</span>
+        </span>
+      </div>`).join('')}
+  </div>
+
+  <p class="lc-card__why">
+    ${esc(x.best.label)}がいちばん安く済みます（${esc(x.best.note)}）${
+      x.saving !== null && x.saving > 0 ? `。新品より <b>${yen(x.saving)}</b> 安くなります` : ''}
+  </p>
+
+  ${x.rentBreakEvenUses !== null ? `
+    <p class="lc-sub" style="margin-top:var(--sp-2)">
+      ${x.rentBreakEvenUses >= 1
+        ? `目安：<b>${x.rentBreakEvenUses}回</b>までなら借りるほうが安く、それ以上使うなら買ったほうが安くなります`
+        : '目安：1回だけの使用でも、借りるより中古で買うほうが安く済みます'}
+    </p>` : ''}
+
+  ${x.freeChance ? `
+    <p class="lc-sub" style="margin-top:var(--sp-2);border-top:1px dashed var(--line);padding-top:var(--sp-2)">
+      ${DemoBadge()} 無料品レーダーに同じ分類（${esc(x.product.category)}）の出品があります。
+      ただし現在の掲載はすべてサンプルで、実在の出品ではありません。
+    </p>` : ''}
+</article>`;
+}
+
+function nextSteps(r) {
+  const first = r.rows[0];
+  const link = first ? linksFor(first.best.kind, first.product.name)[0] : null;
+  return `
+<div class="lc-card">
+  <h3 class="lc-section-title">次にすること</h3>
+  <p style="margin-bottom:var(--sp-3)">
+    ${link
+      ? `→ <a href="${esc(link.url)}" target="_blank" rel="noopener sponsored">${esc(first.product.name)}を探す</a>`
+      : `<span style="opacity:.6">→ ${esc(first ? first.product.name : '')}を探す（提携準備中）</span>`}
+  </p>
+  <div class="lc-tags">
+    <a class="lc-tag lc-tag--accent" href="buy-check.html">1品目ずつ詳しく判定する</a>
+    <a class="lc-tag lc-tag--accent" href="unnecessary-buy.html">損益分岐点を一覧で見る</a>
+    <a class="lc-tag lc-tag--accent" href="free-items.html">もらえる物を探す</a>
+  </div>
+  <p class="lc-sub" style="margin-top:var(--sp-3)">${esc(PENDING_NOTE)}</p>
+</div>`;
+}
+
+function shareText(r) {
+  const name = r.activity ? r.activity.name : r.parsed.text;
+  return `「${name}」を全部新品でそろえると${yen(r.buyAll)}。` +
+    `買う・中古・借りるを比べたら${yen(r.bestAll)}で済むと出ました（${yen(r.totalSaving)}の差）。\n#LIFECHOICE`;
+}
+
+function bindTryButtons() {
+  document.querySelectorAll('.lc-try').forEach(b => b.addEventListener('click', () => {
+    query = b.dataset.q;
+    $('#lc-search input[name=q]').value = query;
+    history.replaceState(null, '', '?q=' + encodeURIComponent(query));
+    render();
+  }));
+}
+
+render();
+</script>
+</body>
+</html>

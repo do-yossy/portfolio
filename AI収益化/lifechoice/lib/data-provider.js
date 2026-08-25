@@ -71,6 +71,11 @@ export const StaticDataProvider = {
     return list;
   },
 
+  /** 統合検索用。「キャンプを始めたい」→必要な品目 の対応表 */
+  async getActivitySets() {
+    return loadJson('activity-sets.json');
+  },
+
   meta() {
     return { name: 'StaticDataProvider', updatedAt: '2026-08-26', isLive: false };
   }
@@ -131,6 +136,7 @@ export function createPartnerDataProvider(feedUrl, mapFn) {
  *   が前提。無断のスクレイピングはサービス停止リスクになる。
  * ═══════════════════════════════════════════════ */
 export const ScrapingDataProvider = {
+  getActivitySets: notImplemented,
   getProducts: notImplemented,
   getRentals: notImplemented,
   getStores: notImplemented,
