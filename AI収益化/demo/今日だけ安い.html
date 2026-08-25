@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>今日だけ安い｜本日中に消える値引きだけを集める</title>
+<meta name="description" content="当日キャンセル・売り切りたい在庫・本日限定クーポン。今日で消える値引きだけを集めます。">
+<style>
+:root{--bg:#0c0a09;--card:#1c1917;--card2:#292524;--ink:#fafaf9;--sub:#a8a29e;--line:#37322f;--hot:#f43f5e;--ok:#22c55e;--warn:#f59e0b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+.wrap{max-width:780px;margin:0 auto;padding:0 18px}
+header{padding:34px 0 24px;text-align:center;border-bottom:1px solid var(--line)}
+.tag{display:inline-block;background:rgba(244,63,94,.15);border:1px solid rgba(244,63,94,.4);color:var(--hot);padding:3px 11px;border-radius:99px;font-size:11.5px;margin-bottom:12px;font-weight:700}
+header h1{font-size:clamp(23px,5.2vw,32px);font-weight:800}
+header h1 span{color:var(--hot)}
+header p{margin-top:9px;font-size:14px;color:var(--sub)}
+main{padding:22px 0 60px}
+.ctrl{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:17px 19px;margin-bottom:16px}
+.ctrl .t{font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:8px;display:block}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips input{position:absolute;opacity:0;width:0;height:0}
+.chips label{padding:8px 14px;border:1.5px solid var(--line);border-radius:99px;cursor:pointer;font-size:13.5px;background:var(--card2);transition:.15s}
+.chips input:checked+label{background:var(--hot);border-color:var(--hot);color:#fff;font-weight:700}
+.stat{display:flex;gap:10px;margin-bottom:14px;font-size:13px;color:var(--sub)}
+.stat b{color:var(--hot);font-size:17px}
+.deal{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px 17px;margin-bottom:10px;position:relative;overflow:hidden}
+.deal.urgent{border-color:rgba(244,63,94,.5)}
+.deal .off{position:absolute;top:0;right:0;background:var(--hot);color:#fff;font-size:13px;font-weight:800;padding:5px 12px;border-bottom-left-radius:10px}
+.deal h3{font-size:16px;font-weight:700;margin-bottom:3px;padding-right:70px}
+.deal .shop{font-size:12.5px;color:var(--sub);margin-bottom:10px}
+.prices{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.prices .was{font-size:13px;color:var(--sub);text-decoration:line-through}
+.prices .now{font-size:23px;font-weight:800;color:var(--ok);font-variant-numeric:tabular-nums}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
+.m{font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--card2);color:var(--sub);border:1px solid var(--line)}
+.m.time{background:rgba(245,158,11,.14);color:var(--warn);border-color:rgba(245,158,11,.35);font-weight:700}
+.m.left{background:rgba(244,63,94,.14);color:var(--hot);border-color:rgba(244,63,94,.35);font-weight:700}
+.reason{font-size:13px;color:var(--sub);border-left:2px solid var(--hot);padding-left:10px}
+.cta{margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);font-size:13px}
+.cta a{color:var(--warn);font-weight:700;text-decoration:none}
+.empty{text-align:center;padding:38px;color:var(--sub)}
+.note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
+.note b{color:var(--warn)}
+.warnbox{background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);border-radius:11px;padding:14px 16px;font-size:13px;margin-bottom:16px}
+.warnbox b{color:var(--hot)}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<span class="tag">DEMO ／ 社内検証用</span>
+<h1>今日<span>だけ</span>安い</h1>
+<p>明日には消える値引きだけを集めています</p>
+</div></header>
+
+<main class="wrap">
+<div class="warnbox">
+<b>この案の最大の課題はUIではなくデータ供給です。</b>
+「今日だけ安い」情報は店側が入力しないと存在しません。店舗を集める＝営業が必要になり、
+本プロジェクトの前提（営業なし）と衝突します。<b>片面化の設計が必須</b>です（→ 企画書参照）。
+</div>
+
+<div class="ctrl">
+  <span class="t">予算</span>
+  <div class="chips">
+    <input type="radio" name="b" id="b1" value="1000"><label for="b1">〜1,000円</label>
+    <input type="radio" name="b" id="b2" value="3000" checked><label for="b2">〜3,000円</label>
+    <input type="radio" name="b" id="b3" value="6000"><label for="b3">〜6,000円</label>
+    <input type="radio" name="b" id="b4" value="99999"><label for="b4">上限なし</label>
+  </div>
+  <span class="t" style="margin-top:15px">カテゴリ</span>
+  <div class="chips">
+    <input type="radio" name="c" id="c0" value="all" checked><label for="c0">すべて</label>
+    <input type="radio" name="c" id="c1" value="食"><label for="c1">食べ物</label>
+    <input type="radio" name="c" id="c2" value="美容"><label for="c2">美容</label>
+    <input type="radio" name="c" id="c3" value="遊び"><label for="c3">遊び</label>
+    <input type="radio" name="c" id="c4" value="宿"><label for="c4">宿</label>
+  </div>
+</div>
+
+<div class="stat" id="stat"></div>
+<div id="list"></div>
+
+<p class="note">
+<b>これはデモです。</b>掲載している案件はすべてサンプルで、実在の店舗・価格ではありません。<br>
+本番では店舗が「今日の余り枠」を1タップで投稿し、成約時に手数料を得るモデルを想定しています。
+</p>
+</main>
+
+<script>
+(function(){
+var DEALS=[
+ {n:"ホールケーキ（当日渡し）",shop:"洋菓子店",was:4200,now:2100,cat:"食",left:3,close:19,why:"予約キャンセルが出た分。本日中に引き取りが条件"},
+ {n:"カット＋カラー",shop:"美容室",was:12000,now:5000,cat:"美容",left:1,close:20,why:"18時からの1枠が空いた。当日予約のみ"},
+ {n:"花束（当日限り）",shop:"生花店",was:3500,now:1500,cat:"食",left:5,close:19.5,why:"翌日には鮮度が落ちるため売り切り"},
+ {n:"惣菜・弁当セット",shop:"デリカ",was:1200,now:500,cat:"食",left:12,close:21,why:"閉店前の見切り。数量限定"},
+ {n:"整体60分",shop:"整体院",was:7000,now:3500,cat:"美容",left:2,close:20,why:"当日キャンセル枠。19時と20時が空き"},
+ {n:"ビジネスホテル素泊まり",shop:"ホテル",was:14000,now:6800,cat:"宿",left:4,close:23,why:"当日残室。チェックイン22時まで"},
+ {n:"パン詰め合わせ",shop:"ベーカリー",was:1800,now:700,cat:"食",left:6,close:19,why:"焼きすぎた分の詰め合わせ。中身は選べません"},
+ {n:"ネイル（ワンカラー）",shop:"ネイルサロン",was:6500,now:2900,cat:"美容",left:2,close:19,why:"本日17時以降の空き枠"},
+ {n:"ボルダリング1日利用",shop:"クライミングジム",was:2800,now:1400,cat:"遊び",left:8,close:22,why:"平日夕方の集客のため本日限定"},
+ {n:"陶芸体験（2名分）",shop:"工房",was:8000,now:4000,cat:"遊び",left:1,close:17,why:"直前キャンセル。本日15時開始の枠のみ"},
+ {n:"日帰り温泉＋food",shop:"温浴施設",was:3200,now:1600,cat:"遊び",left:20,close:23,why:"平日限定・本日発行のクーポン"},
+ {n:"寿司テイクアウト",shop:"寿司店",was:2600,now:1300,cat:"食",left:4,close:20,why:"仕入れ過多のため本日中に売り切り"},
+ {n:"まつげエクステ",shop:"アイラッシュ",was:7500,now:3800,cat:"美容",left:1,close:19,why:"本日18時の1枠のみ"},
+ {n:"カラオケ フリータイム",shop:"カラオケ店",was:2400,now:900,cat:"遊び",left:15,close:23.5,why:"平日夕方の空き稼働。本日限定価格"},
+ {n:"民宿1泊（2名1室）",shop:"民宿",was:18000,now:8900,cat:"宿",left:2,close:20,why:"当日キャンセル分。夕食なし"}
+];
+function pick(n){return document.querySelector('input[name="'+n+'"]:checked').value;}
+function yen(n){return '¥'+n.toLocaleString('ja-JP');}
+function hhmm(v){var h=Math.floor(v),m=Math.round((v-h)*60);return ('0'+h).slice(-2)+':'+('0'+m).slice(-2);}
+
+function render(){
+  var b=parseInt(pick('b'),10), c=pick('c');
+  var res=DEALS.filter(function(d){return d.now<=b && (c==='all'||d.cat===c);})
+    .sort(function(x,y){return (1-y.now/y.was)-(1-x.now/x.was);});
+  var totalSave=res.reduce(function(s,d){return s+(d.was-d.now);},0);
+  document.getElementById('stat').innerHTML=
+    '<div><b>'+res.length+'</b> 件</div><div style="margin-left:auto">合計値引き額 <b>'+yen(totalSave)+'</b></div>';
+  document.getElementById('list').innerHTML=res.length?res.map(function(d){
+    var off=Math.round((1-d.now/d.was)*100);
+    var urgent=d.left<=2;
+    return '<div class="deal'+(urgent?' urgent':'')+'"><span class="off">'+off+'% OFF</span>'+
+      '<h3>'+d.n+'</h3><div class="shop">'+d.shop+'</div>'+
+      '<div class="prices"><span class="was">'+yen(d.was)+'</span><span class="now">'+yen(d.now)+'</span></div>'+
+      '<div class="meta">'+
+        '<span class="m time">本日'+hhmm(d.close)+'まで</span>'+
+        '<span class="m '+(urgent?'left':'')+'">残り'+d.left+'</span>'+
+        '<span class="m">'+d.cat+'</span>'+
+      '</div>'+
+      '<div class="reason">'+d.why+'</div>'+
+      '<div class="cta">→ <a href="#" onclick="alert(\'本番では店舗の予約ページへ送客し、成約手数料が発生します\');return false;">今すぐ確保する</a></div>'+
+    '</div>';
+  }).join(''):'<div class="empty">条件に合うものがありません。<br>予算を上げるかカテゴリを広げてください。</div>';
+}
+document.querySelectorAll('input[type=radio]').forEach(function(e){e.addEventListener('change',render);});
+render();
+})();
+</script>
+</body>
+</html>
