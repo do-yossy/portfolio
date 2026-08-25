@@ -100,6 +100,25 @@ UIの出来にかかわらず構造で詰まります。</b>
   <b>課題</b>：ジモティーが巨大。しかも<b>0円取引なので手数料が取れない</b>。</div>
 </a>
 
+<h2>配信の準備状況</h2>
+<table>
+<tr><th>項目</th><th class="n">状態</th><th>内容</th></tr>
+<tr><td>PWA（アプリ化）</td><td class="n">✓</td><td>6サービスすべてに manifest と Service Worker を実装。スマホの「ホーム画面に追加」でアプリとして起動し、<b>オフラインでも動きます</b></td></tr>
+<tr><td>OGP（SNSシェア）</td><td class="n">✓</td><td>タイトル・説明・テーマカラーを設定済み。LINEやXに貼るとカードが表示されます</td></tr>
+<tr><td>送客リンク枠</td><td class="n">✓</td><td>①②③に <code>AFF</code> 設定を実装。<b>URLを1行入れるだけで本番稼働</b>します</td></tr>
+<tr><td>結果のシェア</td><td class="n">✓</td><td>①に実装。判定結果をテキスト化してコピー／X投稿できます</td></tr>
+<tr><td>法務ページ</td><td class="n">△</td><td><a href="../legal.html">利用規約・プライバシー・特商法</a>のドラフトを用意。<b>事業者情報の記入が必要</b></td></tr>
+<tr><td>ASP提携</td><td class="n">✕</td><td><b>未着手。ここが全ての前提</b>です</td></tr>
+<tr><td>計測タグ</td><td class="n">✕</td><td>未設置</td></tr>
+</table>
+
+<h2>配信するには</h2>
+<div class="lead" style="background:#f0f9ff;border-color:#bae6fd">
+<b>1.</b> ASPに提携申請する（A8.net・afb・楽天・Amazon・アソビュー）── <b>人の作業・無料・1日</b><br>
+<b>2.</b> 取得したURLを各HTMLの <code>AFF</code> に貼る ── 10分<br>
+<b>3.</b> <a href="../legal.html">法務ページ</a>の赤字部分を埋める ── 30分<br>
+<b>4.</b> このフォルダを公開ディレクトリに置く ── PWAは<b>HTTPS配信が必須</b>（GitHub Pagesなら条件を満たします）
+</div>
 <h2>6案の比較</h2>
 <table>
 <tr><th>案</th><th class="n">データを<br>自前で持てるか</th><th class="n">両面市場か</th><th class="n">収益源</th><th class="n">判定</th></tr>
@@ -112,7 +131,7 @@ UIの出来にかかわらず構造で詰まります。</b>
 </table>
 
 <p class="note">
-これらは社内検証用のデモです。<code>sitemap.xml</code> に登録しておらず、公開サイトのどこからもリンクしていません。<br>
+これらは社内検証用のデモです。<code>sitemap.xml</code> に登録しておらず、公開サイトのどこからもリンクしていません。<br>各サービスは<b>そのまま配信できる状態</b>（PWA・OGP・法務ページ・送客枠）まで整えてありますが、<b>ASP提携が済むまでは収益が発生しません</b>。<br>
 公開の可否は内容を確認したうえでご判断ください。
 </p>
 

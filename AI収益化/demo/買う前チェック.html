@@ -61,6 +61,20 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
 .note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
 .note b{color:var(--warn)}
 </style>
+
+<!-- ═══ 配信用メタ（OGP / PWA / 正規URL） ═══ -->
+<link rel="canonical" href="https://www.social-quality.com/apps/kaumae/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="買う前チェック">
+<meta property="og:description" content="買う・中古・レンタル・見送るを総コストで判定。年間使用回数から1回あたりの負担額を出します。">
+<meta property="og:url" content="https://www.social-quality.com/apps/kaumae/">
+<meta property="og:site_name" content="買う前チェック">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="買う前チェック">
+<meta name="twitter:description" content="買う・中古・レンタル・見送るを総コストで判定。年間使用回数から1回あたりの負担額を出します。">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="kaumae.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%A7%AE%3C%2Ftext%3E%3C%2Fsvg%3E">
 </head>
 <body>
 <header><div class="wrap">
@@ -124,6 +138,7 @@ tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
 <b>データについて。</b>38品目のうち<b>22品目は実勢価格を確認済み</b>（Rentio・ホームセンター各社・レンタル各社の掲載価格、および買取相場の公開情報）。判定根拠の欄に実測か推定かと、その出典を表示しています。<br>本番では商品URLを解析して実勢価格を取得します。<br>
 <b>構造上の注意</b>：「買わなくていい」と判定するほどEC送客収益は減ります。この利益相反をどう扱うかが、このサービス最大の設計課題です（→ 企画書参照）。
 </p>
+<p style="text-align:center;font-size:11.5px;padding:14px 0 26px;opacity:.7"><a href="../legal.html" style="color:inherit">利用規約・プライバシーポリシー・免責事項</a></p>
 </main>
 
 <script>
@@ -293,6 +308,9 @@ document.getElementById('again').addEventListener('click',function(){
   window.scrollTo({top:0,behavior:'smooth'});
 });
 })();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
 </script>
 </body>
 </html>

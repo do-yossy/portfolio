@@ -44,6 +44,20 @@ main{padding:24px 0 60px}
 .note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
 .note b{color:var(--warn)}
 </style>
+
+<!-- ═══ 配信用メタ（OGP / PWA / 正規URL） ═══ -->
+<link rel="canonical" href="https://www.social-quality.com/apps/solomap/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ソロマップ">
+<meta property="og:description" content="一人で入りやすい・話しかけられない・予約不要でスコア化。一人客の不安だけで絞り込みます。">
+<meta property="og:url" content="https://www.social-quality.com/apps/solomap/">
+<meta property="og:site_name" content="ソロマップ">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ソロマップ">
+<meta name="twitter:description" content="一人で入りやすい・話しかけられない・予約不要でスコア化。一人客の不安だけで絞り込みます。">
+<meta name="theme-color" content="#7c3aed">
+<link rel="manifest" href="solomap.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%9A%B6%3C%2Ftext%3E%3C%2Fsvg%3E">
 </head>
 <body>
 <header><div class="wrap">
@@ -84,6 +98,7 @@ main{padding:24px 0 60px}
 本番では口コミから「一人客の割合」「話しかけられ度」を推定してスコア化します。<br>
 <b>この案は「いまから何する？」と機能が7割重複します。</b>統合するか、一人客向けの入口として分けるかは判断が必要です。
 </p>
+<p style="text-align:center;font-size:11.5px;padding:14px 0 26px;opacity:.7"><a href="../legal.html" style="color:inherit">利用規約・プライバシーポリシー・免責事項</a></p>
 </main>
 
 <script>
@@ -141,6 +156,9 @@ function render(){
 document.querySelectorAll('input[type=radio]').forEach(function(e){e.addEventListener('change',render);});
 render();
 })();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
 </script>
 </body>
 </html>

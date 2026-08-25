@@ -41,6 +41,20 @@ main{padding:24px 0 60px}
 .note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
 .note b{color:var(--warn)}
 </style>
+
+<!-- ═══ 配信用メタ（OGP / PWA / 正規URL） ═══ -->
+<link rel="canonical" href="https://www.social-quality.com/apps/freefind/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="無料品レーダー">
+<meta property="og:description" content="0円の物だけ。運べる大きさと距離、受け取れる時期で絞り込みます。">
+<meta property="og:url" content="https://www.social-quality.com/apps/freefind/">
+<meta property="og:site_name" content="無料品レーダー">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="無料品レーダー">
+<meta name="twitter:description" content="0円の物だけ。運べる大きさと距離、受け取れる時期で絞り込みます。">
+<meta name="theme-color" content="#059669">
+<link rel="manifest" href="freefind.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%86%93%3C%2Ftext%3E%3C%2Fsvg%3E">
 </head>
 <body>
 <header><div class="wrap">
@@ -83,6 +97,7 @@ main{padding:24px 0 60px}
 <b>これはデモです。</b>掲載品はすべてサンプルで、実在の出品ではありません。<br>
 本番では出品情報の供給が最大の課題になります。UIをどれだけ磨いても、出品がなければ画面は空のままです。
 </p>
+<p style="text-align:center;font-size:11.5px;padding:14px 0 26px;opacity:.7"><a href="../legal.html" style="color:inherit">利用規約・プライバシーポリシー・免責事項</a></p>
 </main>
 
 <script>
@@ -130,6 +145,9 @@ function render(){
 document.querySelectorAll('input[type=radio]').forEach(function(e){e.addEventListener('change',render);});
 render();
 })();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
 </script>
 </body>
 </html>
