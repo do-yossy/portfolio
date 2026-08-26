@@ -36,6 +36,7 @@
   </div>
 
   <div id="prefbar"></div>
+  <div id="notice"></div>
   <div class="lc-section" id="search-area"></div>
   <div id="groups"></div>
   <div class="lc-section" id="reco"></div>
@@ -48,7 +49,8 @@ import { PreferenceBarTop } from './components/preference-bar.js';
 import { SearchBox } from './components/filter.js';
 import { Disclaimer } from './components/footer.js';
 import { GROUPS, servicesInGroup } from './lib/services.js';
-import { recommend } from './lib/recommendation.js';
+import { recommend, notificationCandidates } from './lib/recommendation.js';
+import { NoticeBar, CountBadge, countByService } from './components/notice.js';
 import { StaticDataProvider } from './lib/data-provider.js';
 import { $, html, esc } from './utils/dom.js';
 import { loadPreference, hasPreference, loadHistory } from './utils/storage.js';
@@ -71,6 +73,19 @@ $('#lc-search').addEventListener('submit', () => {
   if (q) location.href = 'app/search.html?q=' + encodeURIComponent(q);
 });
 
+const [stores, deals, freeItems, products, activitySets] = await Promise.all([
+  StaticDataProvider.getStores(), StaticDataProvider.getDeals(),
+  StaticDataProvider.getFreeItems(), StaticDataProvider.getProducts(),
+  StaticDataProvider.getActivitySets()
+]);
+const nowHour = new Date().getHours();
+const pref = loadPreference();
+
+// 締切のあるものだけを1か所に集める（プッシュ通知は使わない）
+const notices = notificationCandidates({ pref, nowHour, data: { deals, freeItems } });
+html('#notice', NoticeBar(notices));
+const badges = countByService(notices);
+
 // 3グループの入口
 html('#groups', GROUPS.map(g => `
   <section class="lc-section">
@@ -78,7 +93,10 @@ html('#groups', GROUPS.map(g => `
     <div class="lc-grid">
       ${servicesInGroup(g.id).map(s => `
         <a class="lc-card lc-card--tap lc-entry" href="app/${s.path}" data-service="${s.id}" style="margin-top:0">
-          <span class="lc-entry__icon" aria-hidden="true">${s.icon}</span>
+          <div style="display:flex;align-items:center;gap:var(--sp-2)">
+            <span class="lc-entry__icon" aria-hidden="true">${s.icon}</span>
+            ${badges[s.id] ? CountBadge(badges[s.id].count, badges[s.id].isDemo) : ''}
+          </div>
           <div class="lc-entry__name">${esc(s.name)}</div>
           <div class="lc-entry__tag">${esc(s.tagline)}</div>
           ${s.hasDemoData ? '<span class="lc-demo" style="margin-top:8px">DEMO データ</span>' : ''}
@@ -87,16 +105,12 @@ html('#groups', GROUPS.map(g => `
   </section>`).join(''));
 
 // あなたへのおすすめ：共通Recommendation Engine が決める
-const [stores, deals, freeItems, products] = await Promise.all([
-  StaticDataProvider.getStores(), StaticDataProvider.getDeals(),
-  StaticDataProvider.getFreeItems(), StaticDataProvider.getProducts()
-]);
 const recos = recommend({
-  pref: loadPreference(),
+  pref,
   hasPref: hasPreference(),
-  nowHour: new Date().getHours(),
+  nowHour,
   history: loadHistory(),
-  data: { stores, deals, freeItems, products }
+  data: { stores, deals, freeItems, products, activitySets }
 });
 html('#reco', `
   <h2 class="lc-section-title">あなたへのおすすめ</h2>

@@ -112,6 +112,21 @@ export function recommend(ctx, n = 3) {
     }
   }
 
+  /* ── 関心のある分野があれば、統合検索を勧める ── */
+  if ((pref.preferredCategories || []).length) {
+    const sets = data.activitySets || [];
+    const picked = sets.filter(s => pref.preferredCategories.includes(s.id));
+    if (picked.length) {
+      const names = picked.slice(0, 3).map(s => s.shortName || s.name).join('、');
+      cands.push({
+        serviceId: 'search', name: '何をすればいい？', icon: '🧭', href: 'app/search.html',
+        reason: `関心のある「${names}」${picked.length > 3 ? 'ほか' : ''}について、` +
+          '必要なものと費用をまとめて比べられます',
+        score: 48, isDemo: false
+      });
+    }
+  }
+
   // 直近で見た機能は下げる（同じものを出し続けない）
   cands.forEach(c => { if (usedRecently(c.serviceId)) c.score -= 20; });
 
