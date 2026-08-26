@@ -118,6 +118,48 @@ function restoreHistory(list) {
 }
 
 /* ═══════════════════════════════════════════
+ * 自分で追加した品目
+ *
+ * 同梱の products.json は書き換えない（厳守事項2）。
+ * 追加分だけをここに持ち、読み出すときに束ねる。
+ * ═══════════════════════════════════════════ */
+const CUSTOM_KEY = 'lifechoice.customProducts.v1';
+const CUSTOM_MAX = 200;
+let customFallback = null;
+
+export function loadCustomProducts() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_KEY);
+    if (raw) return JSON.parse(raw);
+    return customFallback ? [...customFallback] : [];
+  } catch (e) {
+    return customFallback ? [...customFallback] : [];
+  }
+}
+
+/** 追加または上書き。同じIDがあれば差し替える */
+export function saveCustomProduct(product) {
+  const list = loadCustomProducts().filter(p => p.id !== product.id);
+  list.unshift(product);
+  writeCustom(list.slice(0, CUSTOM_MAX));
+  return product;
+}
+
+export function removeCustomProduct(id) {
+  writeCustom(loadCustomProducts().filter(p => p.id !== id));
+}
+
+export function clearCustomProducts() {
+  customFallback = null;
+  try { localStorage.removeItem(CUSTOM_KEY); } catch (e) { /* noop */ }
+}
+
+function writeCustom(list) {
+  customFallback = list;
+  try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(list)); } catch (e) { /* メモリ上のみ */ }
+}
+
+/* ═══════════════════════════════════════════
  * 書き出し・読み込み
  *
  * 保存先が localStorage だけなので、ブラウザを変えたり
@@ -131,7 +173,8 @@ export function exportData() {
     version: DEFAULT_PREFERENCE.version,
     exportedAt: new Date().toISOString().slice(0, 10),
     preference: loadPreference(),
-    history: loadHistory()
+    history: loadHistory(),
+    customProducts: loadCustomProducts()
   }, null, 2);
 }
 
@@ -165,5 +208,12 @@ export function importData(text) {
   savePreference(clean);
 
   if (Array.isArray(parsed.history)) restoreHistory(parsed.history);
+
+  // 自作の品目も一緒に戻す。壊れた要素は落とす
+  if (Array.isArray(parsed.customProducts)) {
+    const clean = parsed.customProducts.filter(p =>
+      p && typeof p.id === 'string' && typeof p.name === 'string' && Number.isFinite(p.newPrice));
+    writeCustom(clean.slice(0, CUSTOM_MAX));
+  }
   return { ok: true, message: '読み込みました。' };
 }
