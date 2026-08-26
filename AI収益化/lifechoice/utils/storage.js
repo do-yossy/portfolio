@@ -81,16 +81,89 @@ function migrate(old) {
 const HISTORY_KEY = 'lifechoice.history.v1';
 const HISTORY_MAX = 30;
 
+// 設定と同じく、localStorage が使えない環境ではメモリ上に保持する。
+// ここが無いと、プライベートブラウジングで履歴だけ静かに消えて
+// 設定は残る、という食い違いが起きる。
+let historyFallback = null;
+
 export function pushHistory(entry) {
-  try {
-    const list = loadHistory();
-    list.unshift({ ...entry, at: Date.now() });
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX)));
-  } catch (e) { /* noop */ }
+  const list = loadHistory();
+  list.unshift({ ...entry, at: Date.now() });
+  const next = list.slice(0, HISTORY_MAX);
+  historyFallback = next;
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch (e) { /* メモリ上のみ */ }
 }
 
 export function loadHistory() {
   try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-  } catch (e) { return []; }
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) return JSON.parse(raw);
+    return historyFallback ? [...historyFallback] : [];
+  } catch (e) {
+    return historyFallback ? [...historyFallback] : [];
+  }
+}
+
+/** 履歴を消す（設定画面から） */
+export function clearHistory() {
+  historyFallback = null;
+  try { localStorage.removeItem(HISTORY_KEY); } catch (e) { /* noop */ }
+}
+
+/** 書き出したデータから履歴を復元する（importData から使う） */
+function restoreHistory(list) {
+  const next = list.slice(0, HISTORY_MAX);
+  historyFallback = next;
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch (e) { /* メモリ上のみ */ }
+}
+
+/* ═══════════════════════════════════════════
+ * 書き出し・読み込み
+ *
+ * 保存先が localStorage だけなので、ブラウザを変えたり
+ * 履歴を消したりすると設定が消える。持ち出せる形を用意しておく。
+ * ═══════════════════════════════════════════ */
+
+/** 設定と履歴をまとめてJSON文字列にする */
+export function exportData() {
+  return JSON.stringify({
+    kind: 'lifechoice-backup',
+    version: DEFAULT_PREFERENCE.version,
+    exportedAt: new Date().toISOString().slice(0, 10),
+    preference: loadPreference(),
+    history: loadHistory()
+  }, null, 2);
+}
+
+/**
+ * 書き出したJSONを読み込む。
+ * 他所からコピーした文字列が入る可能性があるので、形を確かめてから反映する。
+ *
+ * @param {string} text
+ * @returns {{ok:boolean, message:string}}
+ */
+export function importData(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    return { ok: false, message: '読み取れませんでした。書き出した内容をそのまま貼り付けてください。' };
+  }
+  if (!parsed || parsed.kind !== 'lifechoice-backup') {
+    return { ok: false, message: 'LIFE CHOICE の書き出しデータではないようです。' };
+  }
+  if (!parsed.preference || typeof parsed.preference !== 'object') {
+    return { ok: false, message: '設定が含まれていません。' };
+  }
+
+  // 既定値にある項目だけを取り込む（余計なキーを持ち込ませない）
+  const clean = {};
+  Object.keys(DEFAULT_PREFERENCE).forEach(k => {
+    if (k === 'version' || k === 'updatedAt') return;
+    if (parsed.preference[k] !== undefined) clean[k] = parsed.preference[k];
+  });
+  savePreference(clean);
+
+  if (Array.isArray(parsed.history)) restoreHistory(parsed.history);
+  return { ok: true, message: '読み込みました。' };
 }

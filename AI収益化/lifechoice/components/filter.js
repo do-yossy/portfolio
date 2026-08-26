@@ -25,6 +25,28 @@ export function Filter(p) {
 </div>`;
 }
 
+/**
+ * 複数選べる chips。Filter と見た目は同じで、input が checkbox になる。
+ * 値の取り出しは utils/dom.js の pickAll(name) を使う。
+ *
+ * @param {{name:string, label:string, hint?:string, options:{value:string|number,label:string}[], values?:(string|number)[]}} p
+ */
+export function MultiFilter(p) {
+  const selected = (p.values || []).map(String);
+  const opts = p.options.map((o, i) => {
+    const id = p.name + '-' + i;
+    const checked = selected.includes(String(o.value)) ? ' checked' : '';
+    return `<input type="checkbox" name="${p.name}" id="${id}" value="${esc(o.value)}"${checked}>` +
+           `<label for="${id}">${esc(o.label)}</label>`;
+  }).join('');
+  return `
+<div class="lc-field">
+  <span class="lc-field__label">${esc(p.label)}</span>
+  ${p.hint ? `<p class="lc-field__hint">${esc(p.hint)}</p>` : ''}
+  <div class="lc-chips">${opts}</div>
+</div>`;
+}
+
 /** 自由入力の検索欄（トップの「何をすればいい？」で使用） */
 export function SearchBox(p = {}) {
   return `

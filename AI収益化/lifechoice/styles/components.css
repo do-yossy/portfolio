@@ -264,3 +264,66 @@
   font-size: 10px; font-weight: 800; border-radius: 3px;
   background: var(--accent); color: #fff; vertical-align: 1px;
 }
+
+/* ───────── Notice（Phase 9：締切のあるものだけを1か所に）───────── */
+.lc-notice {
+  border: 1px solid var(--warn);
+  background: var(--warn-bg);
+  border-radius: var(--r);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.lc-notice--demo { border-style: dashed; border-color: var(--demo); background: var(--demo-bg); }
+.lc-notice__head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  flex-wrap: wrap; font-size: var(--fs-base); margin-bottom: var(--sp-2);
+}
+.lc-notice__list { list-style: none; margin: 0; padding: 0; }
+.lc-notice__list li + li { border-top: 1px dashed var(--line); }
+.lc-notice__list a {
+  display: flex; flex-wrap: wrap; gap: 2px var(--sp-3);
+  padding: var(--sp-2) 0; min-height: var(--tap);
+  align-items: center; text-decoration: none; color: inherit;
+}
+.lc-notice__title { font-weight: 700; }
+.lc-notice__body { font-size: var(--fs-sm); color: var(--sub); }
+.lc-notice__note { font-size: var(--fs-xs); color: var(--sub); margin-top: var(--sp-2); }
+
+.lc-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: var(--r-full);
+  background: var(--warn); color: #fff;
+  font-size: 11px; font-weight: 800; line-height: 1;
+}
+.lc-badge--demo { background: var(--demo); }
+
+/* ───────── 狭い画面の調整（Phase 10）─────────
+ * 想定する最小幅は 320px（iPhone SE 等）。
+ * .lc-wrap の左右余白 16px×2 を引くと、使える幅は 288px しかない。
+ * 固定幅の要素がこの中で場所を取りすぎないようにする。 */
+@media (max-width: 400px) {
+  /* ラベルが幅の1/3を占めると、肝心のバーが潰れる */
+  .lc-meter__label { width: 84px; font-size: var(--fs-xs); }
+  .lc-bar__label { width: 54px; font-size: var(--fs-xs); }
+  /* 2つ並ぶと 130px×2 + 余白 で溢れる */
+  .lc-share__btns > * { min-width: 0; flex: 1; }
+  .lc-card { padding: var(--sp-4); }
+  .lc-chips label { padding: 0 var(--sp-3); }
+}
+
+/* 「電動工具（インパクトドライバー等）」のような長い名称が
+ * 表のセルや見出しを押し広げないようにする */
+.lc-card__title,
+.lc-table td,
+.lc-table th,
+.lc-entry__name,
+.lc-notice__title { overflow-wrap: anywhere; }
+
+/* 数値の列は折り返さない（金額が2行になると読めない） */
+.lc-table .num { white-space: nowrap; }
+
+/* 本文が横に溢れないことを保証する。
+ * 表など幅の要るものは .lc-scroll-x の中でだけ横スクロールさせる。 */
+html, body { overflow-x: hidden; }
+.lc-scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
