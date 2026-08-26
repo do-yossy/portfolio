@@ -126,7 +126,13 @@ html('#reco', `
     </a>`).join('')}
   ${hasPreference()
     ? `<p class="lc-field__hint" style="margin-top:var(--sp-2)">保存済みの条件は <b>${esc(describe())}</b>。いまから何する？／今日だけ安い／ソロマップ／無料品レーダーに自動で引き継がれます</p>`
-    : `<p class="lc-field__hint" style="margin-top:var(--sp-2)">条件を1回設定すると、4つの機能が同時に絞り込まれます</p>`}`);
+    : `<p class="lc-field__hint" style="margin-top:var(--sp-2)">条件を1回設定すると、4つの機能が同時に絞り込まれます</p>`}
+  <p class="lc-field__hint" style="margin-top:var(--sp-2)">
+    収録は${products.filter(p => !p.isCustom).length}品目です。判定したい物が無ければ
+    <a href="app/my-items.html">自分で品目を追加</a>できます${
+      products.filter(p => p.isCustom).length
+        ? `（追加済み ${products.filter(p => p.isCustom).length}件）` : ''}
+  </p>`);
 
 html('#note', Disclaimer({
   dataNote: '各機能で表示する価格・営業時間・スコアは、業態や品目の一般的な水準にもとづく参考情報です。' +

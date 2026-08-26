@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>品目を追加｜LIFE CHOICE</title>
+<meta name="description" content="同梱の38品目に無いものを自分で追加して、買う・中古・借りるを判定できます。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="品目を追加｜LIFE CHOICE">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E➕%3C/text%3E%3C/svg%3E">
+<style>
+  .my-input {
+    width: 100%; padding: 12px 13px;
+    border: 1.5px solid var(--line); border-radius: var(--r-sm);
+    background: var(--surface); font-size: var(--fs-base);
+  }
+  .my-row { display: flex; gap: var(--sp-2); align-items: flex-end; }
+  .my-row > :first-child { flex: 1; }
+</style>
+</head>
+<body data-service="buy-check">
+
+<main class="lc-wrap lc-main">
+  <div class="lc-summary" style="margin-bottom:var(--sp-5)">
+    同梱しているのは<b id="bundled-count">38</b>品目です。ここに無いものは自分で追加できます。<br>
+    追加した品目は<b>買う前チェック・買わなくていい物レーダー・統合検索</b>のすべてに出てきます。
+  </div>
+
+  <h2 class="lc-section-title">品目を追加する</h2>
+  <div class="lc-card" id="form"></div>
+  <p id="errors"></p>
+  <button class="lc-btn" id="add" style="margin-top:var(--sp-4)">追加する</button>
+
+  <div id="preview"></div>
+
+  <h2 class="lc-section-title" style="margin-top:var(--sp-6)">追加した品目</h2>
+  <div id="list"></div>
+
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { Filter } from '../components/filter.js';
+import { EmptyState, PriceComparison } from '../components/result.js';
+import { Disclaimer } from '../components/footer.js';
+import { CATEGORIES, validate, buildCustomProduct } from '../lib/custom-products.js';
+import { evaluateBuyCheck } from '../lib/buy-check.js';
+import { rentBreakEven } from '../lib/integrated-search.js';
+import { StaticDataProvider } from '../lib/data-provider.js';
+import { loadCustomProducts, saveCustomProduct, removeCustomProduct } from '../utils/storage.js';
+import { yen } from '../utils/format.js';
+import { pick, $, html, esc } from '../utils/dom.js';
+
+mountShell('buy-check', { title: '品目を追加' });
+
+// 同梱の件数を出す（自作分を除く）
+const all = await StaticDataProvider.getProducts();
+$('#bundled-count').textContent = all.filter(p => !p.isCustom).length;
+
+html('#form', `
+  <div class="lc-field">
+    <label class="lc-field__label" for="name">品目の名前</label>
+    <input id="name" class="my-input" placeholder="例：食洗機" maxlength="40">
+  </div>
+
+  ${Filter({ name: 'cat', label: '分類', value: 'その他',
+    hint: '中古の相場や売却額は、分類ごとの目安から自動で計算します。',
+    options: CATEGORIES.map(c => ({ value: c, label: c })) })}
+
+  <div class="lc-field">
+    <label class="lc-field__label" for="price">新品の価格</label>
+    <input id="price" class="my-input" type="number" inputmode="numeric" step="1000" placeholder="例：80000">
+  </div>
+
+  <div class="lc-field">
+    <label class="lc-field__label" for="rent">レンタル料金（分かれば）</label>
+    <p class="lc-field__hint">空欄でも構いません。入れると「何回まで借りたほうが安いか」が出ます。</p>
+    <div class="my-row">
+      <input id="rent" class="my-input" type="number" inputmode="numeric" step="100" placeholder="例：3000">
+      <select id="unit" class="my-input" style="width:auto">
+        <option value="回">1回あたり</option>
+        <option value="月">1ヶ月あたり</option>
+      </select>
+    </div>
+  </div>`);
+
+html('#note', Disclaimer({
+  dataNote: '追加した品目はこの端末のブラウザ内にのみ保存されます。' +
+    '中古価格と売却額は、同梱38品目の分類ごとの中央値から算出した目安です（実際の相場ではありません）。' +
+    '設定画面から書き出しておくと、別の端末に移せます。'
+}));
+
+/* ── 入力中の下見 ── */
+['name', 'price', 'rent'].forEach(id => $('#' + id).addEventListener('input', renderPreview));
+$('#unit').addEventListener('change', renderPreview);
+document.addEventListener('change', e => { if (e.target.name === 'cat') renderPreview(); });
+
+function currentInput() {
+  return {
+    name: $('#name').value,
+    category: pick('cat'),
+    newPrice: $('#price').value,
+    rentalPrice: $('#rent').value,
+    rentalUnit: $('#unit').value
+  };
+}
+
+function renderPreview() {
+  const input = currentInput();
+  if (!input.name.trim() || !Number(input.newPrice)) { html('#preview', ''); return; }
+  const v = validate(input);
+  if (!v.ok) { html('#preview', ''); return; }
+
+  const p = buildCustomProduct(input);
+  const be = p.rentalPrice ? rentBreakEven(p, 1) : null;
+
+  html('#preview', `
+    <div class="lc-card" style="background:var(--accent-bg);border-color:var(--accent)">
+      <h3 class="lc-section-title" style="margin-top:0">この内容で追加されます</h3>
+      <table class="lc-table">
+        <tr><td>新品</td><td class="num">${yen(p.newPrice)}</td></tr>
+        <tr><td>中古（分類の目安：新品の${Math.round(p.usedPriceRate * 100)}%）</td><td class="num">${yen(p.usedPrice)}</td></tr>
+        ${p.rentalPrice ? `<tr><td>借りる（1${esc(p.rentalUnit)}）</td><td class="num">${yen(p.rentalPrice)}</td></tr>` : ''}
+      </table>
+      ${be !== null ? `<p class="lc-card__why" style="margin-top:var(--sp-3)">
+        ${be === Infinity ? '1年なら、何回使っても<b>借りるほうが安く</b>済みます'
+          : be >= 1 ? `<b>${be}回</b>までなら借りるほうが安く、それ以上使うなら買ったほうが安くなります`
+          : '1回だけの使用でも、<b>中古で買うほうが安く</b>済みます'}
+      </p>` : '<p class="lc-sub" style="margin-top:var(--sp-3)">レンタル料金を入れると、損益分岐点も出せます。</p>'}
+    </div>`);
+}
+
+/* ── 追加 ── */
+$('#add').addEventListener('click', () => {
+  const input = currentInput();
+  const v = validate(input);
+  if (!v.ok) {
+    html('#errors', v.errors.map(e =>
+      `<span class="lc-tag lc-tag--bad" style="display:block;padding:9px 12px;margin-top:var(--sp-2)">${esc(e)}</span>`).join(''));
+    return;
+  }
+  html('#errors', '');
+  saveCustomProduct(buildCustomProduct(input));
+
+  $('#name').value = ''; $('#price').value = ''; $('#rent').value = '';
+  html('#preview', '');
+  renderList();
+
+  const btn = $('#add');
+  btn.textContent = '追加しました';
+  setTimeout(() => { btn.textContent = '追加する'; }, 1800);
+});
+
+/* ── 一覧 ── */
+function renderList() {
+  const list = loadCustomProducts();
+  if (!list.length) {
+    html('#list', EmptyState({
+      title: 'まだ追加した品目はありません',
+      hint: '上のフォームから追加すると、ここに並びます'
+    }));
+    return;
+  }
+  html('#list', list.map(p => {
+    const r = evaluateBuyCheck({ product: p, price: p.newPrice, freq: 3, years: 3, need: 1 });
+    return `
+<article class="lc-card">
+  <div class="lc-card__head">
+    <h3 class="lc-card__title">${esc(p.name)}
+      <span class="lc-sub" style="font-weight:400">　${esc(p.category)}・自己入力</span>
+    </h3>
+    <span class="lc-tag lc-tag--accent">${esc(r.verdictLabel)}</span>
+  </div>
+  ${PriceComparison({ a: { label: '新品', value: p.newPrice }, b: { label: '中古', value: p.usedPrice } })}
+  <p class="lc-sub">年3回×3年で使う場合の判定です。${p.rentalPrice
+    ? '借りる：1' + esc(p.rentalUnit) + ' ' + yen(p.rentalPrice) : 'レンタル料金は未入力'}</p>
+  <div class="lc-row" style="margin-top:var(--sp-3);gap:var(--sp-2)">
+    <a class="lc-btn lc-btn--ghost lc-btn--sm" href="buy-check.html">詳しく判定する</a>
+    <button class="lc-btn lc-btn--ghost lc-btn--sm lc-del" data-id="${esc(p.id)}"
+            style="color:var(--bad);border-color:var(--bad)">削除</button>
+  </div>
+</article>`;
+  }).join(''));
+
+  document.querySelectorAll('.lc-del').forEach(b => b.addEventListener('click', () => {
+    const p = loadCustomProducts().find(x => x.id === b.dataset.id);
+    if (!confirm('「' + (p ? p.name : 'この品目') + '」を削除します。よろしいですか？')) return;
+    removeCustomProduct(b.dataset.id);
+    renderList();
+  }));
+}
+renderList();
+</script>
+</body>
+</html>

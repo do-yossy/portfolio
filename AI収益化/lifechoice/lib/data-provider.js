@@ -11,6 +11,8 @@
  *
  * @file lib/data-provider.js
  */
+import { loadCustomProducts } from '../utils/storage.js';
+import { mergeProducts } from './custom-products.js';
 
 /** 同梱JSONの配置場所（app/*.html から見た相対パス） */
 const DATA_BASE = '../data/';
@@ -31,8 +33,19 @@ async function loadJson(file) {
  * StaticDataProvider ── 同梱JSON
  * ═══════════════════════════════════════════════ */
 export const StaticDataProvider = {
+  /**
+   * 同梱の38品目に、利用者が自分で追加した品目を足して返す。
+   * ここで束ねておくことで、①②統合検索すべてに自動で反映される
+   * （各機能が個別に自作データを読みに行かなくて済む）。
+   */
   async getProducts() {
-    return loadJson('products.json');
+    const bundled = await loadJson('products.json');
+    try {
+      return mergeProducts(bundled, loadCustomProducts());
+    } catch (e) {
+      // 保存領域が使えない環境でも、同梱データだけで動かす
+      return bundled;
+    }
   },
 
   async getRentals(productId) {
