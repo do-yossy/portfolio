@@ -24,7 +24,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "キャンプ"
   },
   {
     "id": "bbq",
@@ -44,7 +45,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "BBQ"
   },
   {
     "id": "photography",
@@ -76,7 +78,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "カメラ・写真"
   },
   {
     "id": "video",
@@ -109,7 +112,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "動画撮影"
   },
   {
     "id": "golf",
@@ -129,7 +133,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "ゴルフ"
   },
   {
     "id": "fishing",
@@ -149,7 +154,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "釣り"
   },
   {
     "id": "ski",
@@ -170,7 +176,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "スキー・スノボ"
   },
   {
     "id": "hiking",
@@ -190,7 +197,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "登山・ハイキング"
   },
   {
     "id": "baby",
@@ -228,7 +236,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "出産・育児"
   },
   {
     "id": "ceremony",
@@ -270,7 +279,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "結婚式・式典"
   },
   {
     "id": "travel",
@@ -302,7 +312,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "旅行"
   },
   {
     "id": "big-cleaning",
@@ -339,7 +350,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "any"
+    "selection": "any",
+    "shortName": "大掃除"
   },
   {
     "id": "diy",
@@ -367,7 +379,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "DIY・家の修繕"
   },
   {
     "id": "music",
@@ -394,7 +407,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "any"
+    "selection": "any",
+    "shortName": "楽器"
   },
   {
     "id": "cycling",
@@ -420,7 +434,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "any"
+    "selection": "any",
+    "shortName": "自転車"
   },
   {
     "id": "home-theater",
@@ -446,7 +461,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "おうち映画・ゲーム"
   },
   {
     "id": "gardening",
@@ -473,7 +489,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "庭の手入れ"
   },
   {
     "id": "sewing",
@@ -494,7 +511,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "裁縫・ハンドメイド"
   },
   {
     "id": "bread",
@@ -514,7 +532,8 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "パン作り"
   },
   {
     "id": "beauty",
@@ -541,6 +560,7 @@
       }
     ],
     "updatedAt": "2026-08-26",
-    "selection": "all"
+    "selection": "all",
+    "shortName": "自宅美容・ケア"
   }
 ]
