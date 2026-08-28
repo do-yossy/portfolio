@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0e1526">
+<title>見て分かる授業（MVPアプリ）</title>
+<style>
+  :root{--bg:#0b1020;--panel:#131e38;--panel2:#1b2a4d;--line:#2a3c66;--ink:#eef2fb;--sub:#93a3c4;--acc:#5b8cff;--gold:#ffd76a;--good:#37d07a;--lock:#5a6a8c}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{background:#05070d;color:var(--ink);font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;line-height:1.6}
+  .app{max-width:460px;margin:0 auto;min-height:100vh;background:linear-gradient(180deg,#0e1526,#0b1020);position:relative;padding-bottom:74px;overflow:hidden}
+  .screen{display:none;padding:18px 16px 20px}.screen.on{display:block;animation:fade .25s}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .brand{font-size:.72rem;color:#a9c2ff;background:#1b2a4d;border:1px solid #2f4472;border-radius:999px;padding:3px 11px;display:inline-block;margin-bottom:10px}
+  h1{font-size:1.42rem;margin-bottom:4px}h2{font-size:1.05rem;margin:16px 0 10px}
+  .sub{color:var(--sub);font-size:.9rem}
+  .stats{display:flex;gap:8px;margin:14px 0}
+  .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 8px;text-align:center}
+  .stat .v{font-size:1.5rem;font-weight:900;color:var(--gold)}.stat .l{font-size:.7rem;color:var(--sub)}
+  .rank{background:linear-gradient(135deg,#1b2a4d,#24408a);border:1px solid #34528f;border-radius:16px;padding:14px 16px;margin:12px 0;display:flex;align-items:center;gap:12px}
+  .rank .em{font-size:2.2rem}.rank .t{font-weight:800;font-size:1.05rem}.rank .p{color:#bcd0ff;font-size:.8rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+  .lesson{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;cursor:pointer;transition:.15s}
+  .lesson:active{transform:scale(.98)}
+  .lesson.locked{opacity:.72}
+  .lesson .ic{width:52px;height:52px;border-radius:12px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:1.7rem;flex-shrink:0}
+  .lesson .m{flex:1;min-width:0}.lesson .tt{font-weight:800}.lesson .dd{color:var(--sub);font-size:.8rem}
+  .lesson .st{font-size:1.2rem}
+  .chip{font-size:.66rem;border-radius:999px;padding:2px 8px;font-weight:700}
+  .c-free{background:#12331f;color:#8ff0b5}.c-done{background:#2c3b60;color:#bcd0ff}.c-lock{background:#3a2c14;color:var(--gold)}
+  .btn{background:var(--acc);color:#fff;border:none;border-radius:12px;padding:13px;width:100%;font-size:1rem;font-weight:800;cursor:pointer}
+  .btn:active{filter:brightness(1.1)}.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+  .btn.gold{background:var(--gold);color:#3a2a00}
+  /* zukan */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .zc{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 6px;text-align:center}
+  .zc .e{font-size:2.1rem}.zc .n{font-size:.74rem;font-weight:700;margin-top:4px}
+  .zc.locked{opacity:.34;filter:grayscale(1)}
+  /* player overlay */
+  .player{position:fixed;inset:0;background:#0b1020;z-index:40;display:none;flex-direction:column;max-width:460px;margin:0 auto}
+  .player.on{display:flex}
+  .ptop{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .ptop .x{font-size:1.3rem;cursor:pointer;color:var(--sub)}
+  .ptop .bar{flex:1;height:6px;background:var(--panel2);border-radius:6px;overflow:hidden}.ptop .bar>i{display:block;height:100%;width:0;background:var(--acc);transition:width .4s}
+  .stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:22px;position:relative}
+  .before{background:#241d10;border:1px solid #5a4a20;border-radius:12px;padding:12px;margin:14px 14px 0;color:#e9dcbf;font-size:.86rem}
+  .before b{color:var(--gold)}
+  .em{font-size:5rem;animation:pop .5s}@keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1)}}
+  .stt{font-size:1.35rem;font-weight:900;margin-top:10px}.svl{color:#cfe0ff;margin-top:6px}
+  .cap{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);padding:12px 16px;text-align:left;font-size:.95rem}
+  .pctrl{padding:12px 14px;display:flex;gap:8px}
+  .quiz{padding:16px}.q{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+  .opt{display:block;width:100%;text-align:left;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:11px;margin:6px 0;font-size:.95rem;cursor:pointer}
+  .opt.correct{background:#12331f;border-color:#1f5c37;color:#8ff0b5}.opt.wrong{background:#3a1620;border-color:#5c2230;color:#ffb3bd}
+  .reward{text-align:center;padding:24px}
+  .reward .big{font-size:5rem;animation:pop .5s}
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:none;align-items:center;justify-content:center;padding:24px}
+  .modal.on{display:flex}
+  .sheet{background:#16233f;border:1px solid var(--line);border-radius:18px;padding:20px;max-width:380px;width:100%;text-align:center}
+  .sheet h3{font-size:1.15rem;margin-bottom:8px}.sheet p{color:var(--sub);font-size:.9rem;margin-bottom:14px}
+  .price{font-size:1.6rem;font-weight:900;color:var(--gold)}
+  /* tabbar */
+  .tabs{position:fixed;bottom:0;left:0;right:0;max-width:460px;margin:0 auto;background:#0d1730;border-top:1px solid var(--line);display:flex;z-index:30}
+  .tab{flex:1;padding:9px 0 8px;text-align:center;color:var(--sub);font-size:.68rem;cursor:pointer}
+  .tab.on{color:var(--acc)}.tab .i{font-size:1.35rem;display:block}
+  .muted{color:var(--sub);font-size:.82rem}
+  .toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);background:#1f7a4d;color:#fff;padding:10px 18px;border-radius:999px;font-weight:700;font-size:.9rem;z-index:60;opacity:0;transition:.3s;pointer-events:none;max-width:90%}
+  .toast.on{opacity:1}
+  .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line)}.row:last-child{border:none}
+  .sw{width:46px;height:26px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);position:relative;cursor:pointer}
+  .sw.on{background:var(--good)}.sw i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}.sw.on i{left:22px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- HOME -->
+  <section class="screen on" id="s-home">
+    <div class="brand">MVPアプリ ｜ 見て分かる授業</div>
+    <h1>こんにちは！</h1>
+    <p class="sub">歴史を"見て分かる"で楽しく。今日はどれを学ぶ？</p>
+    <div class="rank" id="rankBox"></div>
+    <div class="stats" id="homeStats"></div>
+    <button class="btn" onclick="go('learn')">▶ つづきから学ぶ</button>
+    <h2>今日のおすすめ</h2>
+    <div id="homeReco"></div>
+  </section>
+
+  <!-- LEARN -->
+  <section class="screen" id="s-learn">
+    <div class="brand">まなぶ</div>
+    <h1>歴史の授業</h1>
+    <p class="sub">教科書の「分かりにくい」を、映像で。<span id="freeNote"></span></p>
+    <div id="lessonList" style="margin-top:14px"></div>
+  </section>
+
+  <!-- ZUKAN -->
+  <section class="screen" id="s-zukan">
+    <div class="brand">ずかん</div>
+    <h1>歴史人物・できごと図鑑</h1>
+    <p class="sub">授業をクリアするとカードが集まる！<span id="zProg"></span></p>
+    <div class="grid" id="zukanGrid" style="margin-top:14px"></div>
+  </section>
+
+  <!-- PARENT -->
+  <section class="screen" id="s-parent">
+    <div class="brand">保護者</div>
+    <h1>保護者メニュー</h1>
+    <div class="card" style="margin-top:12px">
+      <h2 style="margin:0 0 8px">学習レポート</h2>
+      <div id="report"></div>
+    </div>
+    <div class="card">
+      <div class="row"><div><b>広告を非表示</b><div class="muted">有料プランの特典</div></div><div class="sw" id="swAd" onclick="toggleAd()"><i></i></div></div>
+      <div class="row"><div><b>プラン</b><div class="muted" id="planLabel"></div></div><button class="btn gold" style="width:auto;padding:8px 14px" onclick="openGate()">管理</button></div>
+    </div>
+    <button class="btn ghost" onclick="resetAll()">データをリセット（デモ用）</button>
+    <p class="muted" style="margin-top:10px">※ これはMVPデモです。決済・配信は本番で実装します。データは端末内に保存されます。</p>
+  </section>
+
+  <!-- TABS -->
+  <nav class="tabs">
+    <div class="tab on" id="t-home" onclick="go('home')"><span class="i">🏠</span>ホーム</div>
+    <div class="tab" id="t-learn" onclick="go('learn')"><span class="i">📖</span>まなぶ</div>
+    <div class="tab" id="t-zukan" onclick="go('zukan')"><span class="i">🃏</span>ずかん</div>
+    <div class="tab" id="t-parent" onclick="go('parent')"><span class="i">👨‍👩‍👧</span>保護者</div>
+  </nav>
+</div>
+
+<!-- PLAYER -->
+<div class="player" id="player">
+  <div class="ptop"><span class="x" onclick="closePlayer()">✕</span><div class="bar"><i id="pbar"></i></div><span id="pstep" class="muted"></span></div>
+  <div id="beforeBox" class="before"></div>
+  <div class="stage" id="stage">
+    <div class="em" id="pEm">📘</div><div class="stt" id="pTt"></div><div class="svl" id="pVl"></div>
+    <div class="cap" id="pCap"></div>
+  </div>
+  <div class="pctrl" id="pctrl">
+    <button class="btn ghost" style="flex:0 0 auto;width:auto;padding:12px 16px" onclick="prevScene()">◀</button>
+    <button class="btn" onclick="nextScene()" id="pNext">次へ ▶</button>
+  </div>
+  <div class="quiz" id="quizBox" style="display:none"></div>
+  <div class="reward" id="rewardBox" style="display:none"></div>
+</div>
+
+<!-- GATE MODAL -->
+<div class="modal" id="gate">
+  <div class="sheet">
+    <div style="font-size:2.6rem">🔓</div>
+    <h3>全時代を見放題にする</h3>
+    <p>無料では「関ヶ原の戦い」だけ。<br>全部の時代・図鑑コンプ・広告なしは、保護者プランで。</p>
+    <div class="price">月 480円</div>
+    <p class="muted" style="margin:6px 0 14px">※デモのため実際の課金は発生しません</p>
+    <button class="btn gold" onclick="unlockAll()">保護者が解放する（デモ）</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="closeGate()">とじる</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+// ===== data =====
+const CARDS={
+ c_ieyasu:{n:"徳川家康",e:"👑"}, c_mitsunari:{n:"石田三成",e:"🔥"},
+ c_perry:{n:"黒船",e:"🚢"}, c_kaikoku:{n:"開国",e:"📜"},
+ c_iemitsu:{n:"徳川家光",e:"🏯"}, c_sankin:{n:"参勤交代",e:"⚖️"},
+ c_yoritomo:{n:"源頼朝",e:"🏹"}, c_goon:{n:"御恩と奉公",e:"🤝"},
+ c_bunmei:{n:"文明開化",e:"🚂"}, c_meiji:{n:"明治維新",e:"🎌"},
+};
+const LESSONS=[
+ {id:"sekigahara",subj:"歴史",ic:"⚔️",title:"関ヶ原の戦い",desc:"なぜ家康が天下を取れた？",free:true,
+  textbook:"1600年、東軍(家康)と西軍(三成)が関ヶ原で戦い、小早川秀秋の裏切りで東軍が勝利。1603年、家康は江戸幕府を開いた。",
+  base:"c_ieyasu",bonus:"c_mitsunari",
+  scenes:[{e:"⚔️",t:"1600年 天下分け目",v:"東軍 vs 西軍が集結",c:"東軍(家康) VS 西軍(三成)"},
+   {e:"🏯",t:"きっかけは秀吉の死",v:"次のトップは誰？",c:"秀吉の死→天下人をめぐる対立"},
+   {e:"🗺️",t:"布陣は西軍が有利",v:"高所から家康を包囲",c:"地形は西軍有利"},
+   {e:"🔀",t:"小早川の裏切り",v:"東軍へ寝返る",c:"寝返りで西軍が総崩れ"},
+   {e:"👑",t:"家康の勝利",v:"1603年 江戸幕府へ",c:"260年の平和へ"}],
+  quiz:[{q:"関ヶ原の戦いは何年？",ch:["1600年","1192年","1853年"],a:0},{q:"勝敗を決めた裏切りは誰？",ch:["石田三成","小早川秀秋","徳川家康"],a:1}]},
+ {id:"perry",subj:"歴史",ic:"🚢",title:"ペリー来航と開国",desc:"黒船で日本はどう変わった？",free:false,
+  textbook:"1853年ペリーが来航、翌1854年に開国。約200年の鎖国が終わった。",
+  base:"c_perry",bonus:"c_kaikoku",
+  scenes:[{e:"🚢",t:"1853年 黒船が来た",v:"巨大な蒸気船4隻",c:"ペリーの黒船が来航"},
+   {e:"🔒",t:"当時は鎖国",v:"約200年 国を閉ざす",c:"閉じた国だった"},
+   {e:"💥",t:"大砲の力の差",v:"断れば攻撃の圧力",c:"軍事力に大差"},
+   {e:"📜",t:"1854年 開国",v:"下田・箱館を開港",c:"200年の鎖国が終わる"},
+   {e:"🌏",t:"時代が動く",v:"やがて明治へ",c:"4隻が歴史を動かした"}],
+  quiz:[{q:"黒船で来た人物は？",ch:["ペリー","ザビエル","家康"],a:0},{q:"開国のきっかけの年は？",ch:["1853年","1600年","1945年"],a:0}]},
+ {id:"sankin",subj:"歴史",ic:"🏯",title:"参勤交代のしくみ",desc:"なぜ大名は毎年引っ越し？",free:false,
+  textbook:"参勤交代は大名が江戸と領地を1年ごとに往復する制度。3代将軍家光が1635年に義務化。",
+  base:"c_iemitsu",bonus:"c_sankin",
+  scenes:[{e:"🏯",t:"毎年 引っ越し？",v:"江戸⇄領地を往復",c:"1年おきに往復"},
+   {e:"📏",t:"1635年 家光が制度化",v:"武家諸法度",c:"大名の義務に"},
+   {e:"💰",t:"からくり①お金",v:"莫大な費用で財力減",c:"財力が削られる"},
+   {e:"👨‍👩‍👧",t:"からくり②人質",v:"妻子は江戸に",c:"実質「人質」"},
+   {e:"⚖️",t:"戦わず支配",v:"お金＋人質",c:"260年の安定を支えた"}],
+  quiz:[{q:"制度化した将軍は？",ch:["徳川家光","源頼朝","徳川家康"],a:0},{q:"からくりは？",ch:["大名の力を削ぐ","大名を豊かに","戦争を増やす"],a:0}]},
+ {id:"kamakura",subj:"歴史",ic:"🏹",title:"鎌倉幕府の成立",desc:"武士の世はどう始まった？",free:false,
+  textbook:"1185年 源頼朝が守護・地頭を設置、1192年 征夷大将軍となり鎌倉に幕府を開いた。",
+  base:"c_yoritomo",bonus:"c_goon",
+  scenes:[{e:"⚔️",t:"貴族から武士へ",v:"源氏 vs 平氏",c:"武士が主役の時代へ"},
+   {e:"🏹",t:"1185年 源氏の勝利",v:"守護・地頭を設置",c:"支配を広げる"},
+   {e:"👑",t:"1192年 将軍に",v:"鎌倉に幕府",c:"武家政権のはじまり"},
+   {e:"🤝",t:"御恩と奉公",v:"将軍⇄御家人",c:"持ちつ持たれつ"},
+   {e:"✅",t:"まとめ",v:"武士が国を動かす",c:"約700年の武士の世へ"}],
+  quiz:[{q:"頼朝が将軍になった年は？",ch:["1185年","1192年","1600年"],a:1},{q:"領地を守る約束は？",ch:["奉公","御恩","参勤"],a:1}]},
+ {id:"meiji",subj:"歴史",ic:"🚂",title:"明治維新と文明開化",desc:"日本はどう近代化した？",free:false,
+  textbook:"開国後、1868年に江戸幕府が倒れ明治新政府が誕生。文明開化で近代化が進んだ。",
+  base:"c_bunmei",bonus:"c_meiji",
+  scenes:[{e:"🚢",t:"開国が転機に",v:"幕府がぐらつく",c:"不満が高まる"},
+   {e:"🏯",t:"1868年 明治維新",v:"新政府が誕生",c:"260年の幕府が倒れる"},
+   {e:"🚂",t:"文明開化",v:"鉄道・郵便・洋服",c:"西洋文化が流入"},
+   {e:"🏭",t:"富国強兵",v:"学制・工場・軍隊",c:"強い国をめざす"},
+   {e:"🌏",t:"近代国家へ",v:"数十年で大変身",c:"世界に並ぶ国へ"}],
+  quiz:[{q:"江戸幕府が倒れたのは？",ch:["1868年","1600年","1945年"],a:0},{q:"西洋文化が入ったことを何という？",ch:["文明開化","鎖国","参勤交代"],a:0}]},
+];
+// ===== state =====
+const KEY="mieru_app_v1";
+let S=load();
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||def()}catch(e){return def()}}
+function def(){return{done:[],perfect:[],cards:[],paid:false,adFree:false,timeSec:0}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function has(id){return S.cards.includes(id)}
+function unlocked(l){return l.free||S.paid}
+// ===== nav =====
+function go(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById('s-'+name).classList.add('on');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('t-'+name).classList.add('on');
+  render();
+}
+function rank(){
+  const n=S.cards.length;
+  if(n>=9)return{e:"🏆",t:"歴史マスター",p:"全10枚まであと"+(10-n)+"枚"};
+  if(n>=6)return{e:"🎓",t:"歴史ツウ",p:"カード"+n+"/10"};
+  if(n>=3)return{e:"📚",t:"歴史見習い",p:"カード"+n+"/10"};
+  return{e:"🌱",t:"はじめての歴史",p:"授業を受けてカードを集めよう"};
+}
+function render(){
+  const r=rank();
+  document.getElementById('rankBox').innerHTML=`<div class="em">${r.e}</div><div><div class="t">${r.t}</div><div class="p">${r.p}</div></div>`;
+  document.getElementById('homeStats').innerHTML=
+    `<div class="stat"><div class="v">${S.done.length}</div><div class="l">受けた授業</div></div>`+
+    `<div class="stat"><div class="v">${S.cards.length}</div><div class="l">集めたカード</div></div>`+
+    `<div class="stat"><div class="v">${Math.round(S.timeSec/60)}</div><div class="l">学習分</div></div>`;
+  const next=LESSONS.find(l=>!S.done.includes(l.id)&&unlocked(l))||LESSONS.find(l=>!S.done.includes(l.id))||LESSONS[0];
+  document.getElementById('homeReco').innerHTML=lessonHTML(next);
+  document.getElementById('freeNote').textContent=S.paid?"（全時代 見放題中）":"（無料は関ヶ原のみ）";
+  document.getElementById('lessonList').innerHTML=LESSONS.map(lessonHTML).join('');
+  // zukan
+  document.getElementById('zProg').textContent=` ${S.cards.length}/10`;
+  document.getElementById('zukanGrid').innerHTML=Object.entries(CARDS).map(([id,c])=>
+    `<div class="zc ${has(id)?'':'locked'}"><div class="e">${has(id)?c.e:'❓'}</div><div class="n">${has(id)?c.n:'？？？'}</div></div>`).join('');
+  // parent
+  const totalQ=S.done.reduce((a,id)=>a+(LESSONS.find(l=>l.id===id)?.quiz.length||0),0);
+  document.getElementById('report').innerHTML=
+    `<div class="row"><span>受けた授業</span><b>${S.done.length} / ${LESSONS.length}</b></div>`+
+    `<div class="row"><span>集めたカード</span><b>${S.cards.length} / 10</b></div>`+
+    `<div class="row"><span>全問正解した授業</span><b>${S.perfect.length}</b></div>`+
+    `<div class="row"><span>学習時間</span><b>約${Math.round(S.timeSec/60)}分</b></div>`;
+  document.getElementById('planLabel').textContent=S.paid?"保護者プラン（見放題）":"無料プラン";
+  document.getElementById('swAd').classList.toggle('on',S.adFree);
+}
+function lessonHTML(l){
+  const done=S.done.includes(l.id), ok=unlocked(l);
+  const chip=l.free?'<span class="chip c-free">無料</span>':(ok?'':'<span class="chip c-lock">🔒 有料</span>');
+  const st=done?'<span class="st">✅</span>':(ok?'<span class="st">▶</span>':'<span class="st">🔒</span>');
+  return `<div class="lesson ${ok?'':'locked'}" onclick="openLesson('${l.id}')">
+    <div class="ic">${l.ic}</div>
+    <div class="m"><div class="tt">${l.title} ${chip}</div><div class="dd">${l.desc}</div></div>${st}</div>`;
+}
+// ===== player =====
+let cur=null,idx=0,tmr=null;
+function openLesson(id){
+  const l=LESSONS.find(x=>x.id===id); if(!l)return;
+  if(!unlocked(l)){ openGate(); return; }
+  cur=l; idx=0;
+  document.getElementById('player').classList.add('on');
+  document.getElementById('beforeBox').innerHTML=`<b>📖 教科書だと…</b><br>${l.textbook}`;
+  document.getElementById('beforeBox').style.display='block';
+  document.getElementById('stage').style.display='none';
+  document.getElementById('pctrl').style.display='none';
+  document.getElementById('quizBox').style.display='none';
+  document.getElementById('rewardBox').style.display='none';
+  setTimeout(()=>{document.getElementById('beforeBox').style.display='block';document.getElementById('stage').style.display='flex';document.getElementById('pctrl').style.display='flex';renderScene();},400);
+}
+function renderScene(){
+  const s=cur.scenes[idx];
+  document.getElementById('pEm').textContent=s.e;
+  const em=document.getElementById('pEm');em.style.animation='none';void em.offsetWidth;em.style.animation='';
+  document.getElementById('pTt').textContent=s.t;
+  document.getElementById('pVl').textContent=s.v;
+  document.getElementById('pCap').textContent=s.c;
+  document.getElementById('pstep').textContent=`${idx+1} / ${cur.scenes.length}`;
+  document.getElementById('pbar').style.width=(idx/(cur.scenes.length))*100+'%';
+  document.getElementById('pNext').textContent=idx<cur.scenes.length-1?'次へ ▶':'クイズへ ▶';
+  S.timeSec+=4;
+}
+function nextScene(){ if(idx<cur.scenes.length-1){idx++;renderScene();} else showQuiz(); }
+function prevScene(){ if(idx>0){idx--;renderScene();} }
+let qState;
+function showQuiz(){
+  document.getElementById('stage').style.display='none';
+  document.getElementById('pctrl').style.display='none';
+  document.getElementById('beforeBox').style.display='none';
+  document.getElementById('pbar').style.width='100%';
+  qState={ans:0,ok:0,total:cur.quiz.length,done:{}};
+  const box=document.getElementById('quizBox');box.style.display='block';
+  box.innerHTML=`<h2 style="margin-top:0">クイズで確認 🎯</h2>`+cur.quiz.map((q,i)=>
+    `<div class="q"><div style="font-weight:700;margin-bottom:6px">Q${i+1}. ${q.q}</div>`+
+    q.ch.map((c,j)=>`<button class="opt" id="o${i}_${j}" onclick="answer(${i},${j})">${c}</button>`).join('')+`</div>`).join('');
+}
+function answer(i,j){
+  if(qState.done[i])return;qState.done[i]=true;
+  const q=cur.quiz[i];
+  document.getElementById(`o${i}_${q.a}`).classList.add('correct');
+  if(j!==q.a)document.getElementById(`o${i}_${j}`).classList.add('wrong');else qState.ok++;
+  qState.ans++;
+  if(qState.ans===qState.total)setTimeout(finish,700);
+}
+function finish(){
+  const gained=[];
+  if(!S.done.includes(cur.id))S.done.push(cur.id);
+  if(!has(cur.base)){S.cards.push(cur.base);gained.push(CARDS[cur.base]);}
+  const perfect=qState.ok===qState.total;
+  if(perfect){ if(!S.perfect.includes(cur.id))S.perfect.push(cur.id); if(!has(cur.bonus)){S.cards.push(cur.bonus);gained.push(CARDS[cur.bonus]);} }
+  save();
+  document.getElementById('quizBox').style.display='none';
+  const rb=document.getElementById('rewardBox');rb.style.display='block';
+  rb.innerHTML=`<div class="big">🎉</div><h2>クリア！ ${qState.ok}/${qState.total}問 正解</h2>`+
+    (gained.length?`<p class="muted">カードを${gained.length}枚ゲット！</p><div style="font-size:2.6rem">${gained.map(c=>c.e).join(' ')}</div><div class="muted">${gained.map(c=>c.n).join(' / ')}</div>`:`<p class="muted">このカードは獲得済み</p>`)+
+    (perfect?``:`<p class="muted" style="margin-top:8px">全問正解でボーナスカード！もう一度挑戦してみよう</p>`)+
+    `<button class="btn" style="margin-top:16px" onclick="closePlayer()">とじる</button>`;
+  const nx=LESSONS.find(l=>!S.done.includes(l.id));
+  if(nx){ rb.innerHTML+=`<button class="btn ghost" style="margin-top:8px" onclick="closePlayer();openLesson('${nx.id}')">次の授業へ ▶</button>`; }
+}
+function closePlayer(){ document.getElementById('player').classList.remove('on'); render(); }
+// ===== gate / parent =====
+function openGate(){document.getElementById('gate').classList.add('on');}
+function closeGate(){document.getElementById('gate').classList.remove('on');}
+function unlockAll(){S.paid=true;S.adFree=true;save();closeGate();toast('全時代が解放されました！');render();}
+function toggleAd(){ if(!S.paid){openGate();return;} S.adFree=!S.adFree;save();render(); }
+function resetAll(){ if(confirm('学習データを消してよいですか？（デモ用）')){S=def();save();render();toast('リセットしました');} }
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),1800);}
+// init
+render();
+</script>
+</body>
+</html>
