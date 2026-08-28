@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>家にあるお金｜押し入れに眠っている不用品がいくらになるか診断</title>
+<meta name="description" content="売りたい物が決まっていなくても大丈夫。場所ごとに順番に見ていくだけで、忘れていた高額品と売却見込み額が分かります。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="家にあるお金">
+<meta property="og:description" content="押し入れとクローゼットに、いくら眠っていますか。">
+<meta name="theme-color" content="#b45309">
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💰%3C/text%3E%3C/svg%3E">
+<style>
+  :root { --accent:#b45309; --accent-d:#92400e; --accent-bg:#fef3c7; }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --accent:#f59e0b; --accent-d:#fbbf24; --accent-bg:#78350f33; }
+  }
+  .h-hero { text-align:center; padding: var(--sp-8) 0 var(--sp-5); }
+  .h-hero__title { font-size: clamp(23px,6vw,34px); font-weight:800; line-height:1.25; margin-bottom: var(--sp-3); }
+  .h-hero__lead { color: var(--sub); font-size: var(--fs-md); }
+  .h-big { font-size: clamp(30px,9vw,52px); font-weight:800; line-height:1.1; color: var(--accent-d);
+           font-variant-numeric: tabular-nums; }
+  .h-card { background: var(--surface); border:1px solid var(--line); border-radius: var(--r-lg);
+            padding: var(--sp-4) var(--sp-5); }
+  .h-card + .h-card { margin-top: var(--sp-3); }
+  .h-place { display:flex; align-items:center; gap: var(--sp-3); width:100%; text-align:left;
+             background: var(--surface); border:1.5px solid var(--line); border-radius: var(--r);
+             padding: var(--sp-4); cursor:pointer; font-size: var(--fs-base); color:inherit; }
+  .h-place + .h-place { margin-top: var(--sp-2); }
+  .h-place:hover { border-color: var(--accent); }
+  .h-place__icon { font-size:26px; flex-shrink:0; }
+  .h-place__name { font-weight:700; }
+  .h-place__hint { font-size: var(--fs-sm); color: var(--sub); }
+  .h-place__done { margin-left:auto; font-size: var(--fs-sm); font-weight:700; color: var(--accent-d); white-space:nowrap; }
+  .h-item { border-top:1px solid var(--line); padding: var(--sp-4) 0; }
+  .h-item:first-of-type { border-top:none; }
+  .h-item__head { display:flex; align-items:flex-start; gap: var(--sp-3); }
+  .h-item__name { font-weight:700; flex:1; }
+  .h-item__range { font-size: var(--fs-sm); color: var(--sub); white-space:nowrap; }
+  .h-item__note { font-size: var(--fs-sm); color: var(--sub); margin-top:4px; }
+  .h-detail { margin-top: var(--sp-3); padding-left: var(--sp-3); border-left:2px solid var(--accent); }
+  .h-btn { display:block; width:100%; min-height: var(--tap); padding: var(--sp-4);
+           border:none; border-radius: var(--r); background: var(--accent); color:#fff;
+           font-size: var(--fs-md); font-weight:800; cursor:pointer; text-align:center; }
+  .h-btn:hover { background: var(--accent-d); }
+  .h-btn--ghost { background: var(--surface); color: var(--accent-d); border:1.5px solid var(--accent); }
+  .h-chips { display:flex; flex-wrap:wrap; gap: var(--sp-2); }
+  .h-chips input { position:absolute; opacity:0; width:0; height:0; }
+  .h-chips label { display:inline-flex; align-items:center; min-height:38px; padding:0 var(--sp-3);
+                   border:1.5px solid var(--line); border-radius: var(--r-full); cursor:pointer;
+                   font-size: var(--fs-sm); background: var(--surface); }
+  .h-chips input:checked + label { background: var(--accent); border-color: var(--accent); color:#fff; font-weight:700; }
+  .h-toggle { width:26px; height:26px; flex-shrink:0; accent-color: var(--accent); cursor:pointer; }
+  .h-note { font-size: var(--fs-xs); color: var(--sub); line-height:1.7; }
+  .h-bar { height:8px; background: var(--surface-2); border-radius:4px; overflow:hidden; margin-top:6px; }
+  .h-bar__fill { height:100%; background: var(--accent); }
+  table.h-t { width:100%; border-collapse:collapse; font-size: var(--fs-base); }
+  table.h-t td { padding: var(--sp-2) 0; border-bottom:1px solid var(--line); }
+  table.h-t td.num { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; }
+  .h-step { font-size: var(--fs-sm); color: var(--sub); margin-bottom: var(--sp-2); }
+</style>
+</head>
+<body>
+
+<main class="lc-wrap" style="padding-bottom:var(--sp-8)">
+  <div id="app"></div>
+</main>
+
+<script type="module">
+import { CONDITIONS, QUANTITIES, PRICE_TIERS, needsTier, estimateOne, estimateAll,
+         byPlace, sellOrder, shareText, yen, askOrder } from './lib/estimate.js';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+const [places, items] = await Promise.all([
+  fetch('data/places.json').then(r => r.json()),
+  fetch('data/items.json').then(r => r.json())
+]);
+
+/* 入力の保存。閉じても続きからやれるように */
+const KEY = 'ienaka.v1';
+let sel = load();
+function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(sel)); } catch (e) { /* noop */ } }
+
+let view = { name: 'top', placeId: null };
+
+function render() {
+  if (view.name === 'top') return renderTop();
+  if (view.name === 'place') return renderPlace(view.placeId);
+  if (view.name === 'result') return renderResult();
+}
+
+/* ═══ トップ ═══ */
+function renderTop() {
+  const r = estimateAll(items, sel);
+  const doneCount = places.filter(p => items.some(i => i.place === p.id && sel[i.id])).length;
+
+  $('#app').innerHTML = `
+<div class="h-hero">
+  <h1 class="h-hero__title">押し入れとクローゼットに、<br>いくら眠っていますか</h1>
+  <p class="h-hero__lead">売る物が決まっていなくて大丈夫です。<br>場所ごとに「ある / ない」を答えるだけです。</p>
+</div>
+
+${r.count ? `
+<div class="h-card" style="text-align:center;background:var(--accent-bg);border-color:var(--accent)">
+  <div class="h-step">現在の見込み（${r.count}点）</div>
+  <div class="h-big">${yen(r.low)}〜${yen(r.high)}</div>
+</div>` : ''}
+
+<h2 class="lc-section-title" style="margin-top:var(--sp-6)">見ていく場所を選んでください</h2>
+${places.map(p => {
+  const list = items.filter(i => i.place === p.id);
+  const picked = list.filter(i => sel[i.id]).length;
+  const sub = estimateAll(items, Object.fromEntries(
+    Object.entries(sel).filter(([id]) => list.some(i => i.id === id))));
+  return `
+  <button class="h-place" data-place="${esc(p.id)}">
+    <span class="h-place__icon" aria-hidden="true">${p.icon}</span>
+    <span style="flex:1;min-width:0">
+      <span class="h-place__name">${esc(p.name)}</span><br>
+      <span class="h-place__hint">${esc(p.hint)}</span>
+    </span>
+    <span class="h-place__done">${picked ? yen(sub.mid) : list.length + '品目'}</span>
+  </button>`;
+}).join('')}
+
+${r.count ? `<button class="h-btn" id="go-result" style="margin-top:var(--sp-5)">結果を見る（${r.count}点）</button>` : ''}
+
+<div class="h-card" style="margin-top:var(--sp-6)">
+  <p class="h-note">
+    表示する金額は<b>すべて推定</b>です。実際の買取価格は、状態・年式・ブランド・時期・お店によって
+    大きく変わります。ここで出るのは「売れば何かしらお金になる物が家にどれくらいあるか」の目安で、
+    査定額を保証するものではありません。<br>
+    入力内容はこの端末のブラウザ内にのみ保存され、どこにも送信されません。
+  </p>
+</div>`;
+
+  document.querySelectorAll('[data-place]').forEach(b =>
+    b.addEventListener('click', () => { view = { name: 'place', placeId: b.dataset.place }; render(); scrollTo(0, 0); }));
+  if ($('#go-result')) $('#go-result').addEventListener('click', () => { view = { name: 'result' }; render(); scrollTo(0, 0); });
+}
+
+/* ═══ 場所ごとの質問 ═══ */
+function renderPlace(placeId) {
+  const place = places.find(p => p.id === placeId);
+  const list = askOrder(items, placeId);
+  const idx = places.findIndex(p => p.id === placeId);
+  const next = places[idx + 1];
+
+  $('#app').innerHTML = `
+<p class="h-step" style="margin-top:var(--sp-5)">${idx + 1} / ${places.length}</p>
+<h1 class="h-hero__title" style="font-size:clamp(20px,5.4vw,28px);text-align:left">
+  ${place.icon} ${esc(place.name)}
+</h1>
+<p class="h-hero__lead" style="text-align:left;margin-bottom:var(--sp-4)">
+  ${esc(place.hint)}<br>実際に開けて確認しながらどうぞ。
+</p>
+
+<div class="h-card">
+  ${list.map(i => {
+    const s = sel[i.id];
+    return `
+  <div class="h-item" data-item="${esc(i.id)}">
+    <label class="h-item__head" style="cursor:pointer">
+      <input type="checkbox" class="h-toggle" data-check="${esc(i.id)}" ${s ? 'checked' : ''}>
+      <span class="h-item__name">${esc(i.name)}
+        <span class="h-item__note">${esc(i.note)}</span>
+      </span>
+      <span class="h-item__range">${yen(i.estLow)}〜<br>${yen(i.estHigh)}</span>
+    </label>
+    <div class="h-detail" data-detail="${esc(i.id)}" style="display:${s ? 'block' : 'none'}">
+      ${needsTier(i) ? `
+        <p class="h-step" style="margin:0 0 4px">買ったときの値段（覚えている範囲で）</p>
+        <div class="h-chips" style="margin-bottom:var(--sp-3)">
+          ${PRICE_TIERS.map((t, n) => `
+            <input type="radio" name="t-${esc(i.id)}" id="t-${esc(i.id)}-${n}" value="${t.value}"
+                   ${s && Number(s.tier) === t.value ? 'checked' : ''}>
+            <label for="t-${esc(i.id)}-${n}">${esc(t.label)}</label>`).join('')}
+        </div>` : ''}
+
+      <p class="h-step" style="margin:0 0 4px">今の状態</p>
+      <div class="h-chips">
+        ${CONDITIONS.map((c, n) => `
+          <input type="radio" name="c-${esc(i.id)}" id="c-${esc(i.id)}-${n}" value="${c.value}"
+                 ${(s && s.condition === c.value) || (!s && c.value === 'good') ? 'checked' : ''}>
+          <label for="c-${esc(i.id)}-${n}">${esc(c.label)}</label>`).join('')}
+      </div>
+
+      <details style="margin-top:var(--sp-3)">
+        <summary style="cursor:pointer;font-size:var(--fs-sm);color:var(--sub)">複数ある場合はこちら</summary>
+        <div class="h-chips" style="margin-top:var(--sp-2)">
+          ${QUANTITIES.map((q, n) => `
+            <input type="radio" name="q-${esc(i.id)}" id="q-${esc(i.id)}-${n}" value="${q.value}"
+                   ${(s && Number(s.quantity) === q.value) || (!s && q.value === 1) ? 'checked' : ''}>
+            <label for="q-${esc(i.id)}-${n}">${esc(q.label)}</label>`).join('')}
+        </div>
+      </details>
+
+      <p class="h-item__range" data-live="${esc(i.id)}"
+         style="margin-top:var(--sp-3);font-weight:700;color:var(--accent-d)"></p>
+    </div>
+  </div>`;
+  }).join('')}
+</div>
+
+<button class="h-btn" id="next" style="margin-top:var(--sp-5)">
+  ${next ? '次は「' + esc(next.name) + '」' : '結果を見る'}
+</button>
+<button class="h-btn h-btn--ghost" id="back" style="margin-top:var(--sp-3)">場所の一覧に戻る</button>`;
+
+  const sync = id => {
+    const on = document.querySelector(`[data-check="${id}"]`).checked;
+    document.querySelector(`[data-detail="${id}"]`).style.display = on ? 'block' : 'none';
+    if (!on) { delete sel[id]; save(); return; }
+    const c = document.querySelector(`input[name="c-${id}"]:checked`);
+    const q = document.querySelector(`input[name="q-${id}"]:checked`);
+    const t = document.querySelector(`input[name="t-${id}"]:checked`);
+    sel[id] = {
+      condition: c ? c.value : 'good',
+      quantity: q ? Number(q.value) : 1,
+      tier: t ? Number(t.value) : undefined
+    };
+    save();
+
+    // 選んだ直後に金額を見せる。最後まで進まないと分からない形だと途中で離脱する
+    const live = document.querySelector(`[data-live="${id}"]`);
+    if (live) {
+      const item = items.find(x => x.id === id);
+      const e = estimateOne(item, sel[id]);
+      live.textContent = (needsTier(item) && sel[id].tier === undefined)
+        ? '買ったときの値段を選ぶと、金額をもっと絞れます'
+        : '→ ' + yen(e.low) + '〜' + yen(e.high);
+    }
+  };
+
+  list.forEach(i => {
+    document.querySelector(`[data-check="${i.id}"]`).addEventListener('change', () => sync(i.id));
+    document.querySelectorAll(`input[name="c-${i.id}"], input[name="q-${i.id}"], input[name="t-${i.id}"]`)
+      .forEach(el => el.addEventListener('change', () => sync(i.id)));
+    if (sel[i.id]) sync(i.id);
+  });
+
+  $('#next').addEventListener('click', () => {
+    view = next ? { name: 'place', placeId: next.id } : { name: 'result' };
+    render(); scrollTo(0, 0);
+  });
+  $('#back').addEventListener('click', () => { view = { name: 'top' }; render(); scrollTo(0, 0); });
+}
+
+/* ═══ 結果 ═══ */
+function renderResult() {
+  const r = estimateAll(items, sel);
+  if (!r.count) { view = { name: 'top' }; render(); return; }
+
+  const perPlace = byPlace(r, places);
+  const order = sellOrder(r, 5);
+  const maxPlace = perPlace[0].mid || 1;
+  const text = shareText(r);
+
+  $('#app').innerHTML = `
+<div class="h-hero">
+  <p class="h-step">あなたの家に眠っているお金</p>
+  <div class="h-big">${yen(r.low)}〜${yen(r.high)}</div>
+  <p class="h-hero__lead" style="margin-top:var(--sp-2)">${r.count}点の合計（推定）</p>
+</div>
+
+<h2 class="lc-section-title">どこに眠っているか</h2>
+<div class="h-card">
+  ${perPlace.map(p => `
+    <div style="margin-bottom:var(--sp-3)">
+      <div style="display:flex;justify-content:space-between;gap:var(--sp-3)">
+        <span>${p.place.icon} ${esc(p.place.name)}<span class="h-place__hint">　${p.count}点</span></span>
+        <b style="white-space:nowrap">${yen(p.mid)}</b>
+      </div>
+      <div class="h-bar"><div class="h-bar__fill" style="width:${Math.round(p.mid / maxPlace * 100)}%"></div></div>
+    </div>`).join('')}
+</div>
+
+<h2 class="lc-section-title" style="margin-top:var(--sp-6)">まずこれから売ると効率が良い</h2>
+<div class="h-card">
+  <p class="h-note" style="margin-bottom:var(--sp-3)">
+    1点あたりの金額が大きい順です。手間に対する見返りがいちばん大きくなります。
+  </p>
+  <table class="h-t">
+    ${order.map((x, i) => `
+      <tr>
+        <td style="width:26px">${i + 1}</td>
+        <td>${esc(x.item.name)}<br><span class="h-place__hint">${esc(x.item.note)}</span></td>
+        <td class="num">${yen(x.low)}<br>〜${yen(x.high)}</td>
+      </tr>`).join('')}
+  </table>
+</div>
+
+<h2 class="lc-section-title" style="margin-top:var(--sp-6)">全部の内訳</h2>
+<div class="h-card">
+  <table class="h-t">
+    ${r.rows.map(x => `
+      <tr>
+        <td>${esc(x.item.name)}
+          <span class="h-place__hint">　${esc(CONDITIONS.find(c => c.value === x.input.condition).label)}
+          ・${esc((QUANTITIES.find(q => q.value === Number(x.input.quantity)) || QUANTITIES[0]).label)}</span></td>
+        <td class="num">${yen(x.low)}〜${yen(x.high)}</td>
+      </tr>`).join('')}
+  </table>
+</div>
+
+<div class="h-card" style="margin-top:var(--sp-6);background:var(--accent-bg);border-color:var(--accent)">
+  <h2 class="lc-section-title" style="margin-top:0">この結果を控えておく</h2>
+  <textarea id="share" rows="5" readonly
+    style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:var(--r-sm);
+           background:var(--surface);font-size:var(--fs-sm)">${esc(text)}</textarea>
+  <button class="h-btn h-btn--ghost" id="copy" style="margin-top:var(--sp-2)">コピーする</button>
+</div>
+
+<div class="h-card" style="margin-top:var(--sp-3)">
+  <h2 class="lc-section-title" style="margin-top:0">次にすること</h2>
+  <p style="margin-bottom:var(--sp-3)">
+    上位の品目から、買取店に査定を出してみてください。<b>査定は無料のところがほとんどで、
+    金額に納得できなければ断れます。</b>
+  </p>
+  <p class="h-note">
+    ※ 買取業者へのご案内は準備中です。現時点では特定の業者を推奨していません。<br>
+    ※ 他人から預かった物を売る場合は古物営業の許可が要ることがあります。自分の物であれば不要です。
+  </p>
+</div>
+
+<button class="h-btn h-btn--ghost" id="back" style="margin-top:var(--sp-5)">やり直す・追加する</button>
+
+<div class="h-card" style="margin-top:var(--sp-6)">
+  <p class="h-note">
+    金額はすべて推定で、査定額を保証するものではありません。<br>
+    実際の買取価格は状態・年式・ブランド・時期・お店によって大きく変わります。
+  </p>
+</div>`;
+
+  $('#copy').addEventListener('click', () => {
+    const t = $('#share');
+    t.select();
+    navigator.clipboard ? navigator.clipboard.writeText(t.value) : document.execCommand('copy');
+    $('#copy').textContent = 'コピーしました';
+    setTimeout(() => { $('#copy').textContent = 'コピーする'; }, 1800);
+  });
+  $('#back').addEventListener('click', () => { view = { name: 'top' }; render(); scrollTo(0, 0); });
+}
+
+render();
+</script>
+</body>
+</html>

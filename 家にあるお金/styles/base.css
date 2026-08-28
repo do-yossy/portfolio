@@ -1,0 +1,72 @@
+/* ═══════════════════════════════════════════════════════════
+ * LIFE CHOICE ── ベース（リセット・タイポグラフィ・レイアウト）
+ * スマホファースト。幅の広い画面は max-width で抑える。
+ * ═══════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  line-height: var(--lh);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  /* ボトムナビ＋iPhoneのホームバーぶんを確保 */
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+}
+
+img, svg { max-width: 100%; height: auto; display: block; }
+
+a { color: var(--accent); }
+
+/* フォーム要素はフォントを継承させる（iOSの自動ズーム防止に16px以上） */
+button, input, select, textarea { font: inherit; color: inherit; }
+input, select, textarea { font-size: max(16px, var(--fs-md)); }
+
+/* キーボード操作時だけフォーカスリングを出す */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── レイアウト ── */
+.lc-wrap { max-width: var(--wrap); margin-inline: auto; padding-inline: var(--sp-4); }
+
+.lc-main { padding-block: var(--sp-5) var(--sp-8); }
+
+.lc-section { margin-bottom: var(--sp-6); }
+
+.lc-section-title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--sub);
+  letter-spacing: .06em;
+  margin-bottom: var(--sp-3);
+}
+
+/* ── タイポグラフィ ── */
+.lc-h1 { font-size: var(--fs-xl); font-weight: 800; line-height: var(--lh-tight); letter-spacing: -.01em; }
+.lc-h2 { font-size: var(--fs-lg); font-weight: 700; line-height: var(--lh-tight); }
+.lc-h3 { font-size: var(--fs-md); font-weight: 700; }
+.lc-sub { font-size: var(--fs-sm); color: var(--sub); }
+.lc-num { font-variant-numeric: tabular-nums; }
+
+/* ── ユーティリティ ── */
+.lc-stack > * + * { margin-top: var(--sp-3); }
+.lc-row { display: flex; align-items: center; gap: var(--sp-2); }
+.lc-between { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); }
+.lc-hidden { display: none !important; }
+.lc-sr {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+/* 横に長い表は、その要素の中だけでスクロールさせる（本文は横スクロールさせない） */
+.lc-scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── 画面幅が広いとき ── */
+@media (min-width: 700px) {
+  :root { --fs-base: 15px; --fs-md: 16px; }
+  body { padding-bottom: 0; }          /* ボトムナビは横並びヘッダーに切り替える */
+}
