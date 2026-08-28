@@ -59,7 +59,8 @@
 | 保険の請求もれ検出 | 保険簿（"請求もれに気づけるアプリ"）が既存 |
 | 解約お助け | 需要が薄いと判断 |
 | 保証期間まもり | 有料化が難しいと判断 |
-| 内面先行マッチング | S'More（撤退）等が先行 → [`05-inner-first-matching.md`](./05-inner-first-matching.md) |
+| **外見に自信がない人 "専用" のマッチング** | 海外に UglySchmucks／The Ugly Bug Ball／Date Ugly People が既存で、**いずれも育っていない**。理由は**自己ラベリング問題**（人は「自分は容姿が良くない」というラベルのサービスに自ら登録しない＝市場を自分で狭める／登録が自己否定の追認になる）。日本に "専用" は無いが、需要は **with・マリッシュ・youbride・1on1 for Singles** 等の「内面重視／声」という前向きな入口で既に満たされている → [`05-inner-first-matching.md`](./05-inner-first-matching.md) |
+| 内面先行マッチング（上記を翻訳した形） | S'More（買収後サンセット）／Blurry／Jigsaw が先行。写真を隠すギミックだけでは継続率が弱い → [`05-inner-first-matching.md`](./05-inner-first-matching.md) |
 | 分身AI基盤（旗艦構想） | 広義の分身AIは激戦区（Delphi／オルツ／Microsoft／Google） → [`00-vision-bunshin-ai.md`](./00-vision-bunshin-ai.md) |
 | AI絵本・AI絵日記・探し物・AIカレンダー・PTA/町内会・マンション管理組合・在留外国人支援・不妊治療記録・高齢者見守り | いずれも既存プレイヤーを確認 |
 

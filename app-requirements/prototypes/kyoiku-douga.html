@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>見て分かる授業｜AI教育コンテンツ 体験デモ（歴史）</title>
+<style>
+  :root{
+    --bg:#0e1526; --panel:#16203a; --panel2:#1d2a4a; --line:#2c3b60;
+    --text:#eef2fb; --muted:#93a3c4; --accent:#5b8cff; --good:#2fbf71; --bad:#ff5d6c; --warn:#ffc44d;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;line-height:1.7}
+  .wrap{max-width:900px;margin:0 auto;padding:22px 16px 90px}
+  .badge{display:inline-block;background:#23325a;color:#a9c2ff;border:1px solid #34456b;border-radius:999px;padding:3px 12px;font-size:.76rem;margin-bottom:12px}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  .lead{color:var(--muted);margin:0 0 18px;font-size:.95rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+  h2{font-size:1.05rem;margin:0 0 12px}
+  /* filters */
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 14px;font-size:.85rem;cursor:pointer;transition:.15s}
+  .chip:hover{border-color:var(--accent)}
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  /* lesson list */
+  .lessons{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .lesson{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:15px;cursor:pointer;transition:.15s}
+  .lesson:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .subj{display:inline-block;font-size:.72rem;border-radius:999px;padding:2px 10px;background:#2c3b60;color:#bcd0ff;margin-bottom:8px}
+  .lesson .lt{font-size:1.08rem;font-weight:700}
+  .lesson .ld{color:var(--muted);font-size:.84rem;margin-top:4px}
+  .hidden{display:none}
+  /* textbook before */
+  .before{background:#241d10;border:1px solid #5a4a20;border-radius:12px;padding:14px}
+  .before .tag{color:#ffc44d;font-weight:700;font-size:.85rem;margin-bottom:6px}
+  .before p{margin:0;color:#e9dcbf;font-size:.92rem}
+  .before .small{color:#b9a67e;font-size:.8rem;margin-top:8px}
+  /* player */
+  .stage{position:relative;background:linear-gradient(160deg,#12203f,#0e1730);border:1px solid var(--line);border-radius:14px;aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px;overflow:hidden}
+  .emoji{font-size:74px;line-height:1;filter:drop-shadow(0 6px 16px rgba(0,0,0,.4));animation:pop .5s ease}
+  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  .scene-title{font-size:1.35rem;font-weight:800;margin-top:12px}
+  .scene-visual{margin-top:8px;font-size:1rem;color:#cfe0ff}
+  .caption{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);padding:12px 16px;font-size:1.02rem;text-align:left}
+  .teacher{position:absolute;top:12px;right:14px;font-size:34px}
+  .progress{height:6px;background:var(--panel2);border-radius:6px;margin-top:10px;overflow:hidden}
+  .progress > i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s linear}
+  .controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 15px;font-size:.9rem;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .steps{margin-left:auto;color:var(--muted);font-size:.82rem}
+  textarea,input[type=text]{width:100%;background:#0c1428;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit}
+  .quiz .q{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+  .quiz .q .qt{font-weight:700;margin-bottom:8px}
+  .opt{display:block;width:100%;text-align:left;margin:6px 0}
+  .opt.correct{background:#12331f;border-color:#1f5c37;color:#8ff0b5}
+  .opt.wrong{background:#3a1620;border-color:#5c2230;color:#ffb3bd}
+  .muted{color:var(--muted);font-size:.85rem}
+  .mut{color:var(--muted);font-size:.82rem;font-weight:400}
+  .draft-out{background:#0c1428;border:1px dashed #3a4a6b;border-radius:10px;padding:12px;margin-top:10px;white-space:pre-wrap;font-size:.9rem}
+  /* storyboard */
+  .sbhead{font-weight:800;margin:8px 0 10px;font-size:1rem}
+  .sbwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table.sb{border-collapse:collapse;width:100%;min-width:700px;font-size:.86rem}
+  table.sb th{background:#22335c;color:#cfe0ff;text-align:left;padding:8px 10px;white-space:nowrap}
+  table.sb td{border-top:1px solid var(--line);padding:8px 10px;vertical-align:top}
+  table.sb td.c{text-align:center;white-space:nowrap;color:var(--muted)}
+  table.sb td.tel{color:#ffe08a;font-weight:600}
+  footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:28px}
+  .back{color:var(--accent);cursor:pointer;font-size:.9rem;margin-bottom:10px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="badge">AI教育コンテンツ 体験デモ ｜ 歴史（小中学生向け）</div>
+  <h1>見て分かる授業</h1>
+  <p class="lead">教科書の「文字だと分かりにくい」歴史を、<b>映像で見て直感的に分かる</b>解説に。題材を選んで "教科書 → 映像" の違いを体験し、<b>「絵コンテ・台本を見る」</b>で "AIに渡す設計図（＝量産の仕組み）" も確認できます。<br><span class="muted">※これは体験デモです。実際の映像はAI（動画生成）で量産します。ここでは"動画風"に再現しています。</span></p>
+
+  <!-- 選択 -->
+  <div class="card" id="listView">
+    <h2>題材をえらぶ</h2>
+    <div class="filters" id="filters"></div>
+    <div class="lessons" id="lessons"></div>
+  </div>
+
+  <!-- プレイヤー -->
+  <div class="card hidden" id="playView">
+    <span class="back" onclick="toList()">← 題材一覧へ</span>
+    <div class="before" id="beforeBox">
+      <div class="tag">📖 教科書だと…（文字だけ）</div>
+      <p id="beforeText"></p>
+      <div class="small">↑ 年号や用語が並ぶだけで、小中学生には「なぜ？」「どういうこと？」が入ってこない。</div>
+    </div>
+    <div style="text-align:center;margin:14px 0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="primary" id="watchBtn" onclick="startPlay()">▶ 映像で見る</button>
+      <button id="sbBtn" onclick="toggleStoryboard()">📋 絵コンテ・台本を見る</button>
+    </div>
+
+    <div id="stageWrap" class="hidden">
+      <div class="stage" id="stage">
+        <span class="teacher" title="ふくろう先生">🦉</span>
+        <div class="emoji" id="sEmoji">📘</div>
+        <div class="scene-title" id="sTitle"></div>
+        <div class="scene-visual" id="sVisual"></div>
+        <div class="caption" id="sCaption"></div>
+      </div>
+      <div class="progress"><i id="bar"></i></div>
+      <div class="controls">
+        <button id="playBtn" onclick="togglePlay()">⏸ 一時停止</button>
+        <button onclick="prevScene()">◀ 前</button>
+        <button onclick="nextScene()">次 ▶</button>
+        <span class="steps" id="steps"></span>
+      </div>
+    </div>
+
+    <!-- 絵コンテ・台本 -->
+    <div id="storyboard" class="hidden" style="margin-top:16px"></div>
+
+    <!-- クイズ -->
+    <div id="quizView" class="hidden quiz" style="margin-top:16px">
+      <h2>クイズで確認 🎯</h2>
+      <div id="quizBox"></div>
+      <div id="quizResult" class="muted"></div>
+    </div>
+  </div>
+
+  <!-- 台本ジェネレーター -->
+  <div class="card">
+    <h2>台本ジェネレーター（量産の仕組み）</h2>
+    <p class="muted">教科書の題材を入れると、映像化の「台本の骨子」を自動でひな形化します（＝これをAI映像にかけて量産）。</p>
+    <input id="topicIn" type="text" placeholder="例）関ヶ原の戦い／明治維新／鎖国">
+    <div style="margin-top:8px"><button class="primary" onclick="genDraft()">台本の骨子をつくる</button></div>
+    <div id="draftOut" class="draft-out hidden"></div>
+  </div>
+
+  <footer>試作（プロトタイプ）｜ブラウザだけで動作。実映像はAI動画生成で量産する前提の"体験デモ"。<br>「個人×AI」事業案 #8 AI教育コンテンツ ／ 歴史の解説動画</footer>
+</div>
+
+<script>
+"use strict";
+const LESSONS = [
+  {
+    subject:"歴史", title:"関ヶ原の戦い", desc:"なぜ家康が天下を取れた？",
+    textbook:"1600年、徳川家康の東軍と石田三成の西軍が関ヶ原で戦った。小早川秀秋の裏切りにより東軍が勝利。1603年、家康は征夷大将軍となり江戸幕府を開いた。",
+    scenes:[
+      {emoji:"⚔️", title:"1600年 天下分け目", visual:"東軍 vs 西軍、十数万が関ヶ原に集結",
+       sec:12, shot:"俯瞰ドローン視点。霧の関ヶ原盆地に無数の旗指物。東（徳川＝黒白）と西（石田＝赤）が谷をはさんで対峙。夜明けの薄明かり。",
+       narration:"1600年、天下を二つに分ける戦いが関ヶ原で起きた。徳川家康の東軍と、石田三成の西軍。あわせて十数万の兵が、この盆地に集まった。",
+       caption:"東軍(家康) VS 西軍(三成)｜天下分け目の戦い"},
+      {emoji:"🏯", title:"きっかけは秀吉の死", visual:"豊臣秀吉の死→「次のトップは誰？」",
+       sec:12, shot:"豊臣秀吉の位牌に手を合わせる大名たち→画面が家康側と三成側の二つに割れる分割演出。",
+       narration:"きっかけは、天下人・豊臣秀吉の死だった。次に誰が国をまとめるのか。実力者の家康と、秀吉に忠実な三成が対立し、全国の大名が二手に分かれた。",
+       caption:"秀吉の死→「次の天下人」をめぐる対立"},
+      {emoji:"🗺️", title:"布陣図：西軍が有利…のはず", visual:"地形で見ると西軍が家康を囲む形",
+       sec:15, shot:"戦術マップ。西軍の部隊が高所から東軍を半包囲するアニメ矢印。数字で兵力を表示。ぱっと見「西軍有利」を強調。",
+       narration:"地図で見ると、じつは西軍のほうが有利だった。高い場所から家康の軍を取り囲む形。数の上でも互角以上。ふつうなら西軍が勝つはずだった。",
+       caption:"地形は西軍有利｜高所から東軍を包囲"},
+      {emoji:"🔀", title:"小早川秀秋の裏切り", visual:"西軍のはずの部隊が東軍へ寝返る",
+       sec:14, shot:"松尾山の小早川隊。赤い旗が一斉に反転して東軍側へ攻め下る矢印アニメ。西軍の陣形が崩れる。",
+       narration:"勝負を決めたのは、裏切りだった。西軍についていた小早川秀秋が、突然東軍に寝返り、味方に攻めかかる。西軍の陣形は、いっきに崩れていった。",
+       caption:"小早川秀秋が寝返り→西軍が総崩れ"},
+      {emoji:"👑", title:"家康の勝利→江戸幕府へ", visual:"1603年 家康が征夷大将軍に",
+       sec:12, shot:"勝ち名乗りの家康→画面が江戸城と日本地図に切り替わり「1603 江戸幕府」のテロップ。時間が流れる演出。",
+       narration:"こうして家康が勝利。三年後の1603年、征夷大将軍となり、江戸幕府を開いた。ここから、およそ260年続く平和な時代が始まる。関ヶ原は、その出発点だった。",
+       caption:"1603年 江戸幕府ひらく→260年の平和へ"},
+    ],
+    quiz:[
+      {q:"関ヶ原の戦いが起きた年は？", choices:["1600年","1192年","1853年"], a:0},
+      {q:"勝敗を決めた\"裏切り\"をしたのは？", choices:["石田三成","小早川秀秋","徳川家康"], a:1},
+    ]
+  },
+  {
+    subject:"歴史", title:"ペリー来航と開国", desc:"黒船で日本はどう変わった？",
+    textbook:"1853年、ペリーが浦賀に来航。翌1854年、日米和親条約が結ばれ、下田・箱館が開港。約200年続いた鎖国が終わり、日本は開国した。",
+    scenes:[
+      {emoji:"🚢", title:"1853年 黒船が来た", visual:"巨大な蒸気船4隻が浦賀に出現",
+       sec:12, shot:"江戸湾。手こぎの和船の向こうに、黒い煙を上げる巨大な蒸気軍艦4隻がぬっと現れる。大きさの対比を強調。",
+       narration:"1853年、江戸の海に、見たこともない巨大な黒い船が現れた。ペリー率いるアメリカの艦隊、通称『黒船』。煙をはき、大砲を積んだその姿に、人々は震え上がった。",
+       caption:"1853年 ペリーの黒船が浦賀に来航"},
+      {emoji:"🔒", title:"当時は「鎖国」", visual:"約200年、国を閉ざしていた",
+       sec:12, shot:"日本列島を鎖のアイコンで囲む図。長崎の出島だけに小さな窓。ほかは閉じている演出。",
+       narration:"当時の日本は『鎖国』のさなか。およそ200年ものあいだ、決められた相手以外とは貿易をしない、閉じた国だった。だから外国の巨大な軍艦は、衝撃そのものだった。",
+       caption:"当時は鎖国｜約200年、国を閉ざしていた"},
+      {emoji:"💥", title:"大砲の力の差", visual:"黒船の大砲 vs 日本の旧式の備え",
+       sec:14, shot:"黒船の砲門がずらりと開くカット→日本側の旧式の備えと並べて比較。アイコンや数字で戦力差を可視化。",
+       narration:"戦えば、勝ち目はなかった。黒船の大砲は、日本の備えをはるかに上回っていた。幕府は、断れば攻撃されるかもしれないという圧力の中で、返事を迫られる。",
+       caption:"軍事力に大差｜断れば攻撃される圧力"},
+      {emoji:"📜", title:"1854年 開国", visual:"日米和親条約→下田・箱館を開く",
+       sec:13, shot:"条約に署名するシーン→日本地図で下田と箱館(函館)の2港がぽっと光って開く。閉じていた鎖がほどける演出。",
+       narration:"翌1854年、幕府はついに条約を結び、下田と箱館の港を開いた。200年続いた鎖国が、ここで終わる。日本は、いやおうなく世界とつながっていく。",
+       caption:"1854年 日米和親条約｜下田・箱館を開港"},
+      {emoji:"🌏", title:"時代が動き出す", visual:"開国→やがて幕府の終わり→明治へ",
+       sec:12, shot:"港に外国船が増える→街が変化→『明治維新へ』のテロップへ時間が流れるモンタージュ。",
+       narration:"開国をきっかけに、日本は大きく揺れ動く。やがて幕府は倒れ、明治の新しい時代へ。たった4隻の黒船が、日本の歴史を丸ごと動かすスイッチになった。",
+       caption:"開国が引き金→やがて明治維新へ"},
+    ],
+    quiz:[
+      {q:"黒船で来航した人物は？", choices:["ペリー","ザビエル","徳川家康"], a:0},
+      {q:"1854年に結ばれ、開国のきっかけになった条約は？", choices:["日米和親条約","ポーツマス条約","大宝律令"], a:0},
+    ]
+  },
+  {
+    subject:"歴史", title:"参勤交代のしくみ", desc:"なぜ大名は毎年引っ越し？",
+    textbook:"参勤交代は、大名が江戸と領地を1年ごとに往復する制度。3代将軍徳川家光が1635年に武家諸法度で制度化。妻子は江戸に住まわせた。",
+    scenes:[
+      {emoji:"🏯", title:"なんで大名は毎年引っ越し？", visual:"大名が江戸⇄領地を往復する",
+       sec:12, shot:"日本地図。大名行列が国元から江戸へ長い列で移動するアニメ。矢印が毎年往復。",
+       narration:"江戸時代、全国の大名たちは、自分の領地と江戸を、1年ごとに行ったり来たりしていた。これが『参勤交代』。でも、なんでそんな面倒なことをしたんだろう？",
+       caption:"参勤交代＝大名が江戸と領地を1年おきに往復"},
+      {emoji:"📏", title:"1635年 家光が制度化", visual:"3代将軍・徳川家光が義務にした",
+       sec:12, shot:"徳川家光が法度を掲げるカット→ルールブックに『参勤交代』の条文が書き込まれる演出。",
+       narration:"決めたのは、3代将軍・徳川家光。1635年、武家諸法度というルールで、参勤交代を大名の義務にした。しかも大名の妻や子は、江戸に住まわせた。",
+       caption:"1635年 徳川家光が義務化（武家諸法度）"},
+      {emoji:"💰", title:"からくり①お金がかかる", visual:"大移動＝莫大な費用→財力が減る",
+       sec:14, shot:"豪華な大名行列（数百人）→横に『費用』のゲージがぐんぐん減る。大名の財布がしぼむアニメ。",
+       narration:"ここにからくりがある。何百人もの行列で長い距離を往復すれば、莫大なお金がかかる。毎年くり返せば、大名の財力はどんどん削られていく。",
+       caption:"巨大な行列＝莫大な出費｜財力が削られる"},
+      {emoji:"👨‍👩‍👧", title:"からくり②妻子は人質", visual:"家族は江戸に→反乱しにくい",
+       sec:13, shot:"江戸の屋敷に大名の妻子。国元の大名との間を鎖でつなぐ象徴演出。『裏切れない』を可視化。",
+       narration:"さらに、家族は江戸に置いたまま。もし将軍にそむけば、家族が危ない。つまり家族は“人質”。お金も減り、裏切りもできない。反乱の芽を、仕組みで摘んでいた。",
+       caption:"妻子は江戸＝実質「人質」｜反乱を防ぐ"},
+      {emoji:"⚖️", title:"戦わずに支配する知恵", visual:"お金を削る＋人質→260年の安定",
+       sec:12, shot:"天秤の一方に『大名の力』、もう一方に『幕府の安定』。参勤交代で幕府側に傾くアニメ→『260年の平和』テロップ。",
+       narration:"参勤交代は、ただの移動ではなかった。お金を減らし、家族を預からせることで、大名が幕府に逆らえないようにする巧妙な仕組み。戦わずに、260年の安定を支えたんだ。",
+       caption:"お金＋人質で反乱を封じる｜幕府安定の知恵"},
+    ],
+    quiz:[
+      {q:"参勤交代を制度化した将軍は？", choices:["徳川家光","源頼朝","徳川家康"], a:0},
+      {q:"参勤交代の\"からくり\"は？", choices:["大名の力を削ぐ","大名を豊かにする","戦争を増やす"], a:0},
+    ]
+  },
+  {
+    subject:"歴史", title:"鎌倉幕府の成立", desc:"武士の世は、どう始まった？",
+    textbook:"1185年、源頼朝は守護・地頭を設置。1192年、征夷大将軍に任じられ鎌倉に幕府を開いた。将軍と御家人は御恩と奉公の関係で結ばれた。",
+    scenes:[
+      {emoji:"⚔️", title:"貴族から武士へ", visual:"平安の終わり、源氏 vs 平氏",
+       sec:12, shot:"平安京の雅な貴族→画面が割れて武装した武士が台頭するモンタージュ。",
+       narration:"平安時代の終わり。それまで政治を動かしていたのは貴族だった。しかし各地で力をつけた武士たちが、いよいよ歴史の主役になっていく。",
+       caption:"貴族の時代が終わり、武士どうしが力を争う時代へ。"},
+      {emoji:"🏹", title:"1185年 源氏の勝利", visual:"壇ノ浦の戦いで平氏をたおす",
+       sec:13, shot:"壇ノ浦の海戦。源氏の船が平氏を追い詰める→日本地図に守護・地頭のアイコンが配置される。",
+       narration:"1185年、源頼朝の軍が、壇ノ浦の戦いで平氏をたおす。頼朝は全国に『守護』と『地頭』という役人を置き、支配を広げていった。",
+       caption:"源頼朝の軍が勝利。全国に“守護・地頭”を置いて支配を広げる。"},
+      {emoji:"👑", title:"1192年 将軍に", visual:"頼朝が征夷大将軍に",
+       sec:12, shot:"頼朝が朝廷から任命状を受け取る→鎌倉に幕府の建物が建つ。",
+       narration:"1192年、頼朝は征夷大将軍に任じられ、鎌倉に幕府という政府を開いた。武士のリーダーが、国を治める時代の始まりだ。",
+       caption:"頼朝がトップ（征夷大将軍）になり、鎌倉に政府（幕府）を開く。"},
+      {emoji:"🤝", title:"御恩と奉公", visual:"将軍⇄御家人の約束",
+       sec:13, shot:"将軍と御家人が向き合い、間に『土地』と『忠誠』が矢印で行き交う図解。",
+       narration:"幕府を支えたのは『御恩と奉公』という約束。将軍は武士の領地を守り、ほうびを与える。武士は、いざという時に命がけで戦う。持ちつ持たれつの関係だ。",
+       caption:"将軍は領地を守る（御恩）、武士は戦う（奉公）。この“ギブ＆テイク”が仕組み。"},
+      {emoji:"✅", title:"まとめ", visual:"武士による政治のはじまり",
+       sec:12, shot:"鎌倉の街並みを俯瞰→『武家政権のはじまり』のテロップ。",
+       narration:"こうして、貴族ではなく武士が国を動かす『武家政権』が誕生した。この鎌倉幕府から、約700年続く武士の世が幕を開けたんだ。",
+       caption:"貴族でなく武士が国を動かす“武家政権”がここから始まった。"},
+    ],
+    quiz:[
+      {q:"源頼朝が征夷大将軍になった年は？", choices:["1185年","1192年","1600年"], a:1},
+      {q:"将軍が武士の領地を守ることを何という？", choices:["奉公","御恩","参勤"], a:1},
+    ]
+  },
+  {
+    subject:"理科", title:"光合成", desc:"植物はどうやって養分を作る？",
+    textbook:"植物は光エネルギーを利用して、二酸化炭素と水から有機物（デンプン）を合成し、酸素を放出する。この反応を光合成という。",
+    scenes:[
+      {emoji:"🌞", title:"材料あつめ", visual:"太陽の【光】", caption:"植物は太陽の光をエネルギーとして受け取る。これがスタート。"},
+      {emoji:"🍃", title:"葉のなかの工場", visual:"葉緑体（緑のつぶ）が工場", caption:"葉の中の“葉緑体”が、光を使う小さな工場なんだ。"},
+      {emoji:"💨", title:"二酸化炭素を吸う", visual:"空気から CO₂ を取り込む", caption:"葉のあなから、空気中の二酸化炭素を吸い込む。"},
+      {emoji:"💧", title:"水を吸い上げる", visual:"根から水を吸い、葉へ", caption:"根っこからは水。工場の材料がそろった。"},
+      {emoji:"🍚", title:"養分ができる", visual:"光＋CO₂＋水 → デンプン", caption:"3つを合わせて、栄養（デンプン）を作り出す。"},
+      {emoji:"🫧", title:"酸素を出す", visual:"いらない酸素を放出", caption:"そのとき酸素ができて外へ。私たちが吸う酸素はこれ。"},
+      {emoji:"✅", title:"まとめ", visual:"光＋水＋CO₂ → デンプン＋酸素", caption:"植物は“自分でごはんを作れる”。それが光合成。"},
+    ],
+    quiz:[
+      {q:"光合成に必要ないものは？", choices:["光","二酸化炭素","塩"], a:2},
+      {q:"光合成で放出されるものは？", choices:["酸素","水素","窒素"], a:0},
+    ]
+  },
+  {
+    subject:"算数", title:"分数のわり算", desc:"なぜ「ひっくり返してかける」の？",
+    textbook:"分数のわり算は、わる数の逆数をかける。すなわち  a/b ÷ c/d = a/b × d/c  である。",
+    scenes:[
+      {emoji:"🍕", title:"問題：1/2 ÷ 1/4", visual:"「1/2 の中に 1/4 はいくつ入る？」と考える", caption:"わり算は“いくつ分あるか”を数える計算。まずはピザで考えよう。"},
+      {emoji:"🍕", title:"半分のピザ", visual:"半分（1/2）のピザを用意", caption:"これが 1/2。ここに、1/4（4分の1切れ）が何個入るかな？"},
+      {emoji:"🔪", title:"1/4 で切ってみる", visual:"1/2 のピザは 1/4 の切れが【2つ】ぶん", caption:"数えると2つ。だから 1/2 ÷ 1/4 ＝ 2 になる！"},
+      {emoji:"🔁", title:"逆数のひみつ", visual:"÷ 1/4  は  × 4  と同じ働き", caption:"「4分の1で割る」＝「4倍する」。だから“ひっくり返してかける”んだ。"},
+      {emoji:"✅", title:"まとめ", visual:"a/b ÷ c/d = a/b × d/c", caption:"わり算は逆数のかけ算。理由が分かれば、もう忘れない。"},
+    ],
+    quiz:[
+      {q:"1/2 ÷ 1/4 の答えは？", choices:["1/8","2","4"], a:1},
+      {q:"「÷ 1/4」は何と同じ働き？", choices:["×4","÷4","+4"], a:0},
+    ]
+  },
+];
+
+let cur=null, idx=0, timer=null, playing=false, filterSubj="歴史";
+
+function renderFilters(){
+  const subs=["すべて",...Array.from(new Set(LESSONS.map(l=>l.subject)))];
+  document.getElementById('filters').innerHTML = subs.map(s=>
+    `<span class="chip ${s===filterSubj?'active':''}" onclick="setFilter('${s}')">${s}</span>`).join('');
+}
+function setFilter(s){ filterSubj=s; renderFilters(); renderList(); }
+
+function renderList(){
+  const items=LESSONS.map((l,i)=>({l,i})).filter(x=> filterSubj==="すべて" || x.l.subject===filterSubj);
+  document.getElementById('lessons').innerHTML = items.map(({l,i})=>`
+    <div class="lesson" onclick="openLesson(${i})">
+      <span class="subj">${l.subject}</span>
+      <div class="lt">${l.title}</div>
+      <div class="ld">${l.desc}</div>
+    </div>`).join('');
+}
+function openLesson(i){
+  cur=LESSONS[i]; idx=0; playing=false; clearTimer();
+  document.getElementById('listView').classList.add('hidden');
+  document.getElementById('playView').classList.remove('hidden');
+  document.getElementById('beforeText').textContent = cur.textbook;
+  document.getElementById('beforeBox').classList.remove('hidden');
+  document.getElementById('stageWrap').classList.add('hidden');
+  document.getElementById('quizView').classList.add('hidden');
+  document.getElementById('watchBtn').classList.remove('hidden');
+  document.getElementById('storyboard').classList.add('hidden');
+  document.getElementById('sbBtn').textContent='📋 絵コンテ・台本を見る';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function toList(){
+  clearTimer(); playing=false;
+  document.getElementById('playView').classList.add('hidden');
+  document.getElementById('listView').classList.remove('hidden');
+}
+function startPlay(){
+  document.getElementById('watchBtn').classList.add('hidden');
+  document.getElementById('stageWrap').classList.remove('hidden');
+  idx=0; renderScene(); play();
+}
+function renderScene(){
+  const s=cur.scenes[idx];
+  document.getElementById('sEmoji').textContent=s.emoji;
+  // re-trigger pop animation
+  const e=document.getElementById('sEmoji'); e.style.animation='none'; void e.offsetWidth; e.style.animation='';
+  document.getElementById('sTitle').textContent=s.title;
+  document.getElementById('sVisual').textContent=s.visual;
+  document.getElementById('sCaption').textContent=s.caption;
+  document.getElementById('steps').textContent=`${idx+1} / ${cur.scenes.length}`;
+  document.getElementById('bar').style.width=((idx)/(cur.scenes.length-1)*100)+'%';
+}
+function play(){
+  playing=true; document.getElementById('playBtn').textContent='⏸ 一時停止';
+  schedule();
+}
+function schedule(){
+  clearTimer();
+  const dur = Math.max(3800, cur.scenes[idx].caption.length*90);
+  timer=setTimeout(()=>{
+    if(idx < cur.scenes.length-1){ idx++; renderScene(); schedule(); }
+    else { playing=false; document.getElementById('playBtn').textContent='▶ 再生'; showQuiz(); }
+  }, dur);
+}
+function togglePlay(){
+  if(playing){ playing=false; clearTimer(); document.getElementById('playBtn').textContent='▶ 再生'; }
+  else { play(); }
+}
+function nextScene(){ if(idx<cur.scenes.length-1){ idx++; renderScene(); if(playing) schedule(); } else { showQuiz(); } }
+function prevScene(){ if(idx>0){ idx--; renderScene(); if(playing) schedule(); } }
+function clearTimer(){ if(timer){ clearTimeout(timer); timer=null; } }
+
+/* ===== 絵コンテ・台本 ===== */
+function estSec(s){ return s.sec || Math.max(6, Math.round(s.caption.length/6)); }
+function toggleStoryboard(){
+  const sb=document.getElementById('storyboard');
+  if(sb.classList.contains('hidden')){
+    renderStoryboard(); sb.classList.remove('hidden');
+    document.getElementById('sbBtn').textContent='📋 絵コンテを閉じる';
+    sb.scrollIntoView({behavior:'smooth'});
+  } else {
+    sb.classList.add('hidden');
+    document.getElementById('sbBtn').textContent='📋 絵コンテ・台本を見る';
+  }
+}
+function renderStoryboard(){
+  const total=cur.scenes.reduce((a,s)=>a+estSec(s),0);
+  const rows=cur.scenes.map((s,i)=>{
+    const shot=s.shot||s.visual;
+    const nar=s.narration||s.caption;
+    return `<tr>
+      <td class="c">${i+1}</td>
+      <td class="c">${estSec(s)}秒</td>
+      <td><b>${s.title}</b><br><span class="mut">${shot}</span></td>
+      <td>${nar}</td>
+      <td class="tel">${s.caption}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('storyboard').innerHTML=`
+    <div class="sbhead">🎬 絵コンテ＋台本（AIに渡す“設計図”）　<span class="mut">尺：約${total}秒 ／ ${cur.scenes.length}カット</span></div>
+    <div class="sbwrap"><table class="sb">
+      <thead><tr><th>#</th><th>秒</th><th>画（映像イメージ）</th><th>ナレーション</th><th>テロップ</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <p class="mut" style="margin-top:8px">この表が、そのままAI動画生成の指示書になる。「画」の欄＝生成プロンプト、「ナレーション」＝音声合成、「テロップ」＝字幕。1本ぶんを短時間で量産できるのが強み。<br>※教科書の文章・図版は複製しない（事実・学習範囲からオリジナルで作図）。歴史は時代考証を人が監修する。</p>`;
+}
+
+function showQuiz(){
+  document.getElementById('bar').style.width='100%';
+  const box=document.getElementById('quizBox');
+  box.innerHTML = cur.quiz.map((q,qi)=>`
+    <div class="q">
+      <div class="qt">Q${qi+1}. ${q.q}</div>
+      ${q.choices.map((c,ci)=>`<button class="opt" id="q${qi}o${ci}" onclick="answer(${qi},${ci})">${c}</button>`).join('')}
+    </div>`).join('');
+  document.getElementById('quizResult').textContent='';
+  document.getElementById('quizView').classList.remove('hidden');
+  window._quizState={answered:0,correct:0,total:cur.quiz.length,done:{}};
+  document.getElementById('quizView').scrollIntoView({behavior:'smooth'});
+}
+function answer(qi,ci){
+  const st=window._quizState; if(st.done[qi]) return; st.done[qi]=true;
+  const q=cur.quiz[qi];
+  document.getElementById(`q${qi}o${q.a}`).classList.add('correct');
+  if(ci!==q.a){ document.getElementById(`q${qi}o${ci}`).classList.add('wrong'); } else { st.correct++; }
+  st.answered++;
+  if(st.answered===st.total){
+    document.getElementById('quizResult').innerHTML=`<b style="color:var(--good)">${st.total}問中 ${st.correct}問 正解！</b>　映像で見たあとだと、答えられるよね。`;
+  }
+}
+
+function genDraft(){
+  const t=(document.getElementById('topicIn').value||'（題材）').trim();
+  const out=`【題材】${t}（小中学生向け・約90秒の解説動画）
+
+■ 台本の骨子（各シーン：映像イメージ＋ナレーション）
+1. つかみ（問いを立てる）：「${t}って、なんで○○なの？」と身近な疑問から入る
+2. 教科書だと：年号・用語など“結論”を1枚で提示（分かりにくさを見せる）
+3. 具体例・たとえ：地図・お金・力関係など、目で見える形にイメージ化
+4. 仕組みを分解：①→②→③ の順で、映像で1ステップずつ見せる
+5. まとめ：結論をもう一度（今度は“分かった状態”で）
+6. クイズ：2問で理解を確認
+
+■ 映像の指示（AI動画生成用）
+・一貫キャラ「ふくろう先生」がナビ／明るい配色／1シーン約10〜15秒
+・地図・矢印・アニメで“動き”をつける（静止画にしない）
+・専門用語は最後に確認、まず直感優先
+
+※ 教科書の文章・図版は複製しない（事実・学ぶ範囲はオリジナルで作図）。歴史等は時代考証を人が確認。`;
+  const el=document.getElementById('draftOut'); el.textContent=out; el.classList.remove('hidden');
+}
+
+renderFilters();
+renderList();
+</script>
+</body>
+</html>
