@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LIFE CHOICE｜今ある選択肢から、最適な選択を</title>
+<meta name="description" content="個人の無駄を減らし、今ある選択肢の中から最適な選択を見つけるサービスです。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="LIFE CHOICE">
+<meta property="og:description" content="個人の無駄を減らし、今ある選択肢の中から最適な選択を見つける">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧭%3C/text%3E%3C/svg%3E">
+<style>
+  .lc-hero { text-align:center; padding: var(--sp-8) 0 var(--sp-6); }
+  .lc-hero__logo { font-size: var(--fs-sm); letter-spacing:.22em; color: var(--sub); font-weight:700; }
+  .lc-hero__title { font-size: clamp(22px,5.4vw,30px); font-weight:800; margin: var(--sp-2) 0; }
+  .lc-hero__lead { font-size: var(--fs-base); color: var(--sub); }
+  .lc-grid { display:grid; gap: var(--sp-3); }
+  @media (min-width:600px){ .lc-grid { grid-template-columns: 1fr 1fr; } }
+  .lc-entry { display:block; text-decoration:none; color:inherit; }
+  .lc-entry__icon { font-size: 22px; }
+  .lc-entry__name { font-size: var(--fs-md); font-weight:800; margin: var(--sp-1) 0 2px; }
+  .lc-entry__tag { font-size: var(--fs-sm); color: var(--sub); }
+</style>
+</head>
+<body>
+
+<main class="lc-wrap lc-main">
+  <div class="lc-hero">
+    <div class="lc-hero__logo">LIFE CHOICE</div>
+    <h1 class="lc-hero__title">今日は何をしますか？</h1>
+    <p class="lc-hero__lead">個人の無駄を減らし、今ある選択肢から最適な選択を見つけます</p>
+  </div>
+
+  <div id="prefbar"></div>
+  <div id="notice"></div>
+  <div class="lc-section" id="search-area"></div>
+  <div id="groups"></div>
+  <div class="lc-section" id="reco"></div>
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { BottomNavigation } from './components/layout.js';
+import { PreferenceBarTop } from './components/preference-bar.js';
+import { SearchBox } from './components/filter.js';
+import { Disclaimer } from './components/footer.js';
+import { GROUPS, servicesInGroup } from './lib/services.js';
+import { recommend, notificationCandidates } from './lib/recommendation.js';
+import { NoticeBar, CountBadge, countByService } from './components/notice.js';
+import { StaticDataProvider } from './lib/data-provider.js';
+import { $, html, esc } from './utils/dom.js';
+import { loadPreference, hasPreference, loadHistory } from './utils/storage.js';
+import { describe } from './lib/preference-sync.js';
+
+document.body.setAttribute('data-service', 'buy-check');
+document.body.insertAdjacentHTML('beforeend', BottomNavigation('home'));
+
+// 全機能で共有している条件（本サービスの中核）
+html('#prefbar', PreferenceBarTop());
+
+// 統合検索：やりたいことを1文で書くと、買う・中古・借りる・もらうを比べる
+html('#search-area',
+  SearchBox({ placeholder: '例：3万円くらいでキャンプを始めたい' }) +
+  `<p class="lc-field__hint" style="margin-top:var(--sp-2)">
+     やりたいことと予算を書くだけで、必要な物ごとに「買う・中古・借りる」を比べます
+   </p>`);
+$('#lc-search').addEventListener('submit', () => {
+  const q = $('#lc-search input[name=q]').value.trim();
+  if (q) location.href = 'app/search.html?q=' + encodeURIComponent(q);
+});
+
+const [stores, deals, freeItems, products, activitySets] = await Promise.all([
+  StaticDataProvider.getStores(), StaticDataProvider.getDeals(),
+  StaticDataProvider.getFreeItems(), StaticDataProvider.getProducts(),
+  StaticDataProvider.getActivitySets()
+]);
+const nowHour = new Date().getHours();
+const pref = loadPreference();
+
+// 締切のあるものだけを1か所に集める（プッシュ通知は使わない）
+const notices = notificationCandidates({ pref, nowHour, data: { deals, freeItems } });
+html('#notice', NoticeBar(notices));
+const badges = countByService(notices);
+
+// 3グループの入口
+html('#groups', GROUPS.map(g => `
+  <section class="lc-section">
+    <h2 class="lc-section-title">${esc(g.label)}</h2>
+    <div class="lc-grid">
+      ${servicesInGroup(g.id).map(s => `
+        <a class="lc-card lc-card--tap lc-entry" href="app/${s.path}" data-service="${s.id}" style="margin-top:0">
+          <div style="display:flex;align-items:center;gap:var(--sp-2)">
+            <span class="lc-entry__icon" aria-hidden="true">${s.icon}</span>
+            ${badges[s.id] ? CountBadge(badges[s.id].count, badges[s.id].isDemo) : ''}
+          </div>
+          <div class="lc-entry__name">${esc(s.name)}</div>
+          <div class="lc-entry__tag">${esc(s.tagline)}</div>
+          ${s.hasDemoData ? '<span class="lc-demo" style="margin-top:8px">DEMO データ</span>' : ''}
+        </a>`).join('')}
+    </div>
+  </section>`).join(''));
+
+// あなたへのおすすめ：共通Recommendation Engine が決める
+const recos = recommend({
+  pref,
+  hasPref: hasPreference(),
+  nowHour,
+  history: loadHistory(),
+  data: { stores, deals, freeItems, products, activitySets }
+});
+html('#reco', `
+  <h2 class="lc-section-title">あなたへのおすすめ</h2>
+  ${recos.map(r => `
+    <a class="lc-card lc-card--tap lc-entry" href="${r.href}" data-service="${esc(r.serviceId)}" style="margin-top:0">
+      <div style="display:flex;align-items:center;gap:var(--sp-2)">
+        <span class="lc-entry__icon" aria-hidden="true">${r.icon}</span>
+        <span class="lc-entry__name" style="margin:0">${esc(r.name)}</span>
+        ${r.badge ? `<span class="lc-tag lc-tag--warn">${esc(r.badge)}</span>` : ''}
+        ${r.isDemo ? '<span class="lc-demo">DEMO</span>' : ''}
+      </div>
+      <div class="lc-entry__tag" style="margin-top:4px">${esc(r.reason)}</div>
+    </a>`).join('')}
+  ${hasPreference()
+    ? `<p class="lc-field__hint" style="margin-top:var(--sp-2)">保存済みの条件は <b>${esc(describe())}</b>。いまから何する？／今日だけ安い／ソロマップ／無料品レーダーに自動で引き継がれます</p>`
+    : `<p class="lc-field__hint" style="margin-top:var(--sp-2)">条件を1回設定すると、4つの機能が同時に絞り込まれます</p>`}
+  <p class="lc-field__hint" style="margin-top:var(--sp-2)">
+    収録は${products.filter(p => !p.isCustom).length}品目です。判定したい物が無ければ
+    <a href="app/my-items.html">自分で品目を追加</a>できます${
+      products.filter(p => p.isCustom).length
+        ? `（追加済み ${products.filter(p => p.isCustom).length}件）` : ''}
+  </p>`);
+
+html('#note', Disclaimer({
+  dataNote: '各機能で表示する価格・営業時間・スコアは、業態や品目の一般的な水準にもとづく参考情報です。' +
+    '「今日だけ安い」「無料品レーダー」の掲載データはすべてサンプルで、実在の店舗・出品ではありません。'
+}));
+</script>
+</body>
+</html>

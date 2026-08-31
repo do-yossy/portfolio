@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>無料品レーダー｜近所でタダでもらえる物だけ</title>
+<meta name="description" content="0円の物だけ。歩いて取りに行ける距離と、今日受け取れるかで絞り込みます。">
+<style>
+:root{--bg:#f0fdf4;--card:#fff;--ink:#14532d;--sub:#4b6b58;--line:#d1fae5;--accent:#059669;--warn:#d97706;--bad:#dc2626}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+.wrap{max-width:760px;margin:0 auto;padding:0 18px}
+header{background:linear-gradient(135deg,#059669,#065f46);color:#fff;padding:38px 0 30px;text-align:center}
+.tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:3px 11px;border-radius:99px;font-size:11.5px;margin-bottom:12px;font-weight:700}
+header h1{font-size:clamp(22px,5vw,30px);font-weight:800}
+header p{margin-top:9px;font-size:14px;opacity:.93}
+main{padding:24px 0 60px}
+.warnbox{background:#fef2f2;border:1px solid #fecaca;border-radius:11px;padding:14px 16px;font-size:13px;margin-bottom:16px;color:#7f1d1d}
+.warnbox b{color:var(--bad)}
+.ctrl{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;margin-bottom:16px}
+.ctrl .t{font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:8px;display:block}
+.ctrl .t:not(:first-child){margin-top:16px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips input{position:absolute;opacity:0;width:0;height:0}
+.chips label{padding:8px 14px;border:1.5px solid var(--line);border-radius:99px;cursor:pointer;font-size:13.5px;background:#fff;transition:.15s}
+.chips input:checked+label{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.stat{font-size:13px;color:var(--sub);margin-bottom:13px}
+.stat b{color:var(--accent);font-size:16px}
+.it{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px 17px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start}
+.it .dist{flex-shrink:0;text-align:center;background:#ecfdf5;border-radius:10px;padding:9px 11px;min-width:64px}
+.it .dist .n{font-size:17px;font-weight:800;color:var(--accent);line-height:1.1}
+.it .dist .u{font-size:10px;color:var(--sub)}
+.it .body{flex:1;min-width:0}
+.it h3{font-size:16px;font-weight:700;margin-bottom:4px}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.m{font-size:11.5px;padding:3px 9px;border-radius:6px;background:#f0fdf4;color:var(--sub);border:1px solid var(--line)}
+.m.today{background:#fffbeb;color:var(--warn);border-color:#fde68a;font-weight:700}
+.m.walk{background:#ecfdf5;color:var(--accent);border-color:#a7f3d0;font-weight:700}
+.cond{font-size:13px;color:var(--sub);border-left:2px solid var(--accent);padding-left:10px}
+.empty{text-align:center;padding:38px;color:var(--sub)}
+.note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
+.note b{color:var(--warn)}
+</style>
+
+<!-- ═══ 配信用メタ（OGP / PWA / 正規URL） ═══ -->
+<link rel="canonical" href="https://www.social-quality.com/apps/freefind/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="無料品レーダー">
+<meta property="og:description" content="0円の物だけ。運べる大きさと距離、受け取れる時期で絞り込みます。">
+<meta property="og:url" content="https://www.social-quality.com/apps/freefind/">
+<meta property="og:site_name" content="無料品レーダー">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="無料品レーダー">
+<meta name="twitter:description" content="0円の物だけ。運べる大きさと距離、受け取れる時期で絞り込みます。">
+<meta name="theme-color" content="#059669">
+<link rel="manifest" href="freefind.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%86%93%3C%2Ftext%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<header><div class="wrap">
+<span class="tag">DEMO ／ 社内検証用</span>
+<h1>無料品レーダー</h1>
+<p>0円の物だけ。歩いて取りに行ける距離で探す</p>
+</div></header>
+
+<main class="wrap">
+<div class="warnbox">
+<b>この案は6案中で最も成立が難しいと判断しています。</b>
+無料品の情報は出品者がいないと存在せず、ジモティーという巨大な既存プレイヤーがいます。
+さらに0円取引なので<b>手数料が取れず、収益源が広告か送客しかありません</b>。UIの問題ではなく構造の問題です。
+</div>
+
+<div class="ctrl">
+  <span class="t">取りに行ける距離</span>
+  <div class="chips">
+    <input type="radio" name="d" id="d1" value="0.5"><label for="d1">徒歩5分（500m）</label>
+    <input type="radio" name="d" id="d2" value="1.5" checked><label for="d2">徒歩15分（1.5km）</label>
+    <input type="radio" name="d" id="d3" value="3"><label for="d3">自転車圏（3km）</label>
+  </div>
+  <span class="t">運べる大きさ</span>
+  <div class="chips">
+    <input type="radio" name="s" id="s1" value="1"><label for="s1">手で持てる</label>
+    <input type="radio" name="s" id="s2" value="2" checked><label for="s2">両手で運べる</label>
+    <input type="radio" name="s" id="s3" value="3"><label for="s3">車がある</label>
+  </div>
+  <span class="t">いつ取りに行ける？</span>
+  <div class="chips">
+    <input type="radio" name="w" id="w1" value="today" checked><label for="w1">今日中</label>
+    <input type="radio" name="w" id="w2" value="week"><label for="w2">今週中</label>
+  </div>
+</div>
+
+<div class="stat" id="stat"></div>
+<div id="list"></div>
+
+<p class="note">
+<b>これはデモです。</b>掲載品はすべてサンプルで、実在の出品ではありません。<br>
+本番では出品情報の供給が最大の課題になります。UIをどれだけ磨いても、出品がなければ画面は空のままです。
+</p>
+<p style="text-align:center;font-size:11.5px;padding:14px 0 26px;opacity:.7"><a href="../legal.html" style="color:inherit">利用規約・プライバシーポリシー・免責事項</a></p>
+</main>
+
+<script>
+(function(){
+// size:1=手で持てる 2=両手 3=車必要 / when:today or week
+var ITEMS=[
+ {n:"観葉植物（モンステラ）",dist:0.4,size:2,when:"today",cond:"引越しのため。鉢ごとお渡しします",cat:"インテリア"},
+ {n:"文庫本 30冊まとめて",dist:0.6,size:2,when:"today",cond:"紙袋2つ分。ジャンルは選べません",cat:"本"},
+ {n:"食器セット（未使用）",dist:0.8,size:2,when:"week",cond:"引出物の余り。箱入りのまま",cat:"生活"},
+ {n:"カラーボックス 2個",dist:1.1,size:3,when:"today",cond:"多少の傷あり。玄関前でお渡し",cat:"家具"},
+ {n:"ベビー服 まとめて",dist:1.3,size:2,when:"week",cond:"70〜80サイズ。洗濯済み",cat:"育児"},
+ {n:"デスクチェア",dist:1.4,size:3,when:"today",cond:"座面に擦れあり。動作は問題なし",cat:"家具"},
+ {n:"自転車（要整備）",dist:2.2,size:3,when:"week",cond:"タイヤ交換が必要。鍵あり",cat:"乗り物"},
+ {n:"衣装ケース 3個",dist:0.9,size:3,when:"today",cond:"引越しで不要に。中身は空です",cat:"生活"},
+ {n:"プランター・園芸用品",dist:0.3,size:2,when:"week",cond:"土は入っていません",cat:"インテリア"},
+ {n:"扇風機",dist:1.8,size:2,when:"today",cond:"買い替えのため。動作確認済み",cat:"家電"},
+ {n:"漫画 全巻セット",dist:2.6,size:3,when:"week",cond:"段ボール1箱分。日焼けあり",cat:"本"},
+ {n:"マグカップ・グラス各種",dist:0.5,size:1,when:"today",cond:"ばらばらですが未使用も混在",cat:"生活"},
+ {n:"本棚（組立式）",dist:2.9,size:3,when:"week",cond:"分解済み。ネジ一式あり",cat:"家具"},
+ {n:"ぬいぐるみ 数点",dist:0.7,size:1,when:"today",cond:"きれいな状態です",cat:"その他"}
+];
+function pick(n){return document.querySelector('input[name="'+n+'"]:checked').value;}
+function render(){
+  var d=parseFloat(pick('d')), s=parseInt(pick('s'),10), w=pick('w');
+  var res=ITEMS.filter(function(i){
+    if(i.dist>d) return false;
+    if(i.size>s) return false;
+    if(w==='today' && i.when!=='today') return false;
+    return true;
+  }).sort(function(a,b){return a.dist-b.dist;});
+  document.getElementById('stat').innerHTML='<b>'+res.length+'件</b> 見つかりました（近い順）';
+  document.getElementById('list').innerHTML=res.length?res.map(function(i){
+    var walk=Math.round(i.dist/0.08);
+    return '<div class="it"><div class="dist"><div class="n">'+(i.dist<1?Math.round(i.dist*1000)+'':i.dist)+'</div>'+
+      '<div class="u">'+(i.dist<1?'m':'km')+'</div></div><div class="body">'+
+      '<h3>'+i.n+'</h3>'+
+      '<div class="meta">'+
+        '<span class="m">'+i.cat+'</span>'+
+        (i.dist<=1?'<span class="m walk">徒歩'+walk+'分</span>':'<span class="m">自転車'+Math.round(i.dist/0.25)+'分</span>')+
+        (i.when==='today'?'<span class="m today">今日受取可</span>':'<span class="m">今週中</span>')+
+        (i.size===3?'<span class="m">車があると安心</span>':'')+
+      '</div><div class="cond">'+i.cond+'</div></div></div>';
+  }).join(''):'<div class="empty">条件に合う物がありません。<br>距離を広げるか、受取時期を今週中にしてください。</div>';
+}
+document.querySelectorAll('input[type=radio]').forEach(function(e){e.addEventListener('change',render);});
+render();
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
+</script>
+</body>
+</html>

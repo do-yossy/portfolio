@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>無料品レーダー｜LIFE CHOICE</title>
+<meta name="description" content="0円の物だけ。運べる大きさと距離、移動手段から持ち帰り可能性を判定します。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="無料品レーダー｜LIFE CHOICE">
+<meta name="theme-color" content="#059669">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🆓%3C/text%3E%3C/svg%3E">
+</head>
+<body data-service="free-items">
+
+<main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
+  <div id="demo-banner"></div>
+  <div class="lc-card" id="conds"></div>
+  <p class="lc-count" id="stat"></p>
+  <div id="list"></div>
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { PreferenceBar, noticeInherited } from '../components/preference-bar.js';
+import { toFilters, fromFilters } from '../lib/preference-sync.js';
+import { CrossLinkCard, afterFreeItems } from '../lib/cross-link.js';
+import { Filter, TransportSelector } from '../components/filter.js';
+import { ResultCard, EmptyState, DemoBanner } from '../components/result.js';
+import { Disclaimer } from '../components/footer.js';
+import { findFreeItems } from '../lib/distance.js';
+import { StaticDataProvider } from '../lib/data-provider.js';
+import { distance, TRANSPORT_LABEL } from '../utils/format.js';
+import { pick, pickNumber, html, onChange } from '../utils/dom.js';
+import { hasPreference } from '../utils/storage.js';
+
+mountShell('free-items');
+html('#prefbar', PreferenceBar());
+const items = await StaticDataProvider.getFreeItems();
+const f = toFilters('free-items');
+
+html('#demo-banner', DemoBanner(
+  '掲載品はすべてサンプルです。実在の出品ではありません。' +
+  'この機能は出品がないと画面が空になるため、供給の確保が最大の課題です。'));
+
+html('#conds',
+  Filter({ name: 'dist', label: '取りに行ける距離', value: 1.5,
+    options: [{ value: 0.5, label: '500m以内' }, { value: 1.5, label: '1.5km以内' }, { value: 3, label: '3km以内' }] }) +
+  Filter({ name: 'size', label: '運べる大きさ', value: 2,
+    options: [{ value: 1, label: '手で持てる' }, { value: 2, label: '両手で運べる' }, { value: 3, label: '大きい物もOK' }] }) +
+  Filter({ name: 'when', label: 'いつ取りに行ける？', value: 'today',
+    options: [{ value: 'today', label: '今日中' }, { value: 'week', label: '今週中' }] }) +
+  TransportSelector(f.transportation) +
+  (hasPreference() ? noticeInherited('free-items', { transportation: f.transportation }) : '')
+);
+
+html('#note', Disclaimer({
+  hasDemoData: true,
+  dataNote: '「持ち帰りおすすめ度」は、移動手段・サイズ・距離から算出しています。重量はサイズからの推定値です。'
+}));
+
+function render() {
+  const maxDistanceKm = pickNumber('dist'), maxSize = pickNumber('size');
+  const pickupEnd = pick('when'), transportation = pick('transportation') || 'walk';
+  fromFilters('free-items', { transportation });
+
+  const rows = findFreeItems(items, { maxDistanceKm, maxSize, pickupEnd, transportation });
+  html('#stat', `<b>${rows.length}件</b> 見つかりました（近い順）`);
+
+  if (!rows.length) {
+    html('#list', EmptyState({ title: '条件に合う物がありません', hint: '距離を広げるか、受取時期を今週中にしてください' }));
+    return;
+  }
+
+  html('#list', rows.map(({ item: i, carry }) => ResultCard({
+    title: i.title,
+    isDemo: i.isDemo,
+    score: { value: '★'.repeat(carry.stars) + '☆'.repeat(5 - carry.stars), label: '持ち帰り' },
+    tags: [
+      { label: i.category },
+      { label: distance(i.distanceKm) },
+      { label: TRANSPORT_LABEL[transportation] + carry.minutes + '分' },
+      { label: 'サイズ ' + carry.sizeLabel + '（約' + carry.weightKg + 'kg）' },
+      i.pickupEnd === 'today' ? { label: '今日受取可', variant: 'warn' } : { label: '今週中' }
+    ],
+    why: i.condition + '　' + carry.note
+  })).join('') + CrossLinkCard(afterFreeItems(rows.length)));
+}
+
+onChange(['dist', 'size', 'when', 'transportation'], render);
+render();
+</script>
+</body>
+</html>

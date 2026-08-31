@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>買わなくていい物レーダー｜借りたほうが得な物ランキング</title>
+<meta name="description" content="年に数回しか使わない物は、買うより借りたほうが安い。品目別に損益分岐点を出します。">
+<style>
+:root{--bg:#fafaf9;--card:#fff;--ink:#1c1917;--sub:#78716c;--line:#e7e5e4;--accent:#c2410c;--ok:#15803d;--bad:#b91c1c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+.wrap{max-width:760px;margin:0 auto;padding:0 18px}
+header{background:linear-gradient(135deg,#c2410c,#7c2d12);color:#fff;padding:38px 0 30px;text-align:center}
+.tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:3px 11px;border-radius:99px;font-size:11.5px;margin-bottom:12px;font-weight:700}
+header h1{font-size:clamp(21px,4.8vw,29px);font-weight:800}
+header p{margin-top:9px;font-size:14px;opacity:.93}
+main{padding:24px 0 60px}
+.ctrl{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;margin-bottom:18px}
+.ctrl .t{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:9px;display:block}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips input{position:absolute;opacity:0;width:0;height:0}
+.chips label{padding:8px 14px;border:1.5px solid var(--line);border-radius:99px;cursor:pointer;font-size:13.5px;background:#fff;transition:.15s}
+.chips input:checked+label{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.lead{font-size:14px;color:var(--sub);margin-bottom:14px}
+.lead b{color:var(--accent)}
+.item{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:10px}
+.item .h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:11px}
+.item h3{font-size:16.5px;font-weight:700}
+.badge{font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:7px;white-space:nowrap}
+.badge.rent{background:#fef3c7;color:#b45309}
+.badge.buy{background:#dcfce7;color:var(--ok)}
+.bars{margin-bottom:10px}
+.bar{display:flex;align-items:center;gap:9px;margin-bottom:5px;font-size:12.5px}
+.bar .lb{width:66px;color:var(--sub);flex-shrink:0}
+.bar .tr{flex:1;height:19px;background:#f5f5f4;border-radius:5px;overflow:hidden}
+.bar .fl{height:100%;border-radius:5px;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;color:#fff;font-size:11px;font-weight:700}
+.bar .fl.b{background:#57534e}
+.bar .fl.r{background:var(--accent)}
+.bp{font-size:13px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px}
+.bp b{color:var(--accent);font-size:15px}
+.cta{margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);font-size:13px}
+.cta a{color:var(--accent);font-weight:700;text-decoration:none}
+.cta a:hover{text-decoration:underline}
+.note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
+.note b{color:var(--accent)}
+</style>
+
+<!-- ═══ 配信用メタ（OGP / PWA / 正規URL） ═══ -->
+<link rel="canonical" href="https://www.social-quality.com/apps/radar/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="買わなくていい物レーダー">
+<meta property="og:description" content="何回使えば買ったほうが得か。28品目の損益分岐点を使用頻度から算出します。">
+<meta property="og:url" content="https://www.social-quality.com/apps/radar/">
+<meta property="og:site_name" content="買わなくていい物レーダー">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="買わなくていい物レーダー">
+<meta name="twitter:description" content="何回使えば買ったほうが得か。28品目の損益分岐点を使用頻度から算出します。">
+<meta name="theme-color" content="#c2410c">
+<link rel="manifest" href="radar.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%93%A1%3C%2Ftext%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<header><div class="wrap">
+<span class="tag">DEMO ／ 社内検証用</span>
+<h1>買わなくていい物レーダー</h1>
+<p>年に何回使うかを決めるだけ。買うより借りたほうが安い物が分かります</p>
+</div></header>
+
+<main class="wrap">
+<div class="ctrl">
+  <span class="t">あなたの使用頻度は？</span>
+  <div class="chips">
+    <input type="radio" name="f" id="f1" value="1" checked><label for="f1">年1回</label>
+    <input type="radio" name="f" id="f2" value="2"><label for="f2">年2回</label>
+    <input type="radio" name="f" id="f3" value="4"><label for="f3">年4回</label>
+    <input type="radio" name="f" id="f4" value="12"><label for="f4">月1回</label>
+  </div>
+  <span class="t" style="margin-top:16px">何年使う想定？</span>
+  <div class="chips">
+    <input type="radio" name="y" id="y1" value="1"><label for="y1">1年</label>
+    <input type="radio" name="y" id="y2" value="3" checked><label for="y2">3年</label>
+    <input type="radio" name="y" id="y3" value="5"><label for="y3">5年</label>
+  </div>
+</div>
+
+<p class="lead" id="lead"></p>
+<div id="list"></div>
+
+<p class="note">
+<b>データについて。</b>28品目のうち<b>14品目は実勢価格を確認済み</b>（「実勢価格」表示のあるもの）。とくに<b>ホームセンターの工具レンタルは1日500円未満</b>と極端に安く、当初の推定（3,200円）から大幅に修正しました。<br>損益分岐点は「購入価格 ÷ 1回あたりレンタル料」で算出しています（保管コスト・売却益は未算入）。<br>
+本番ではレンタル各社の実勢価格を取得し、そのまま予約ページへ送客して成果報酬を得ます。
+</p>
+<p style="text-align:center;font-size:11.5px;padding:14px 0 26px;opacity:.7"><a href="../legal.html" style="color:inherit">利用規約・プライバシーポリシー・免責事項</a></p>
+</main>
+
+<script>
+(function(){
+// ═══ 送客先の設定 ── ASP提携後ここにURLを入れるだけで本番稼働 ═══
+// ═══ アフィリエイト設定 ── ID を入れるだけで全品目のリンクが有効になる ═══
+// rakutenId : 楽天アフィリエイトID / a8Rent : A8で提携済みレンタル系の広告URL
+// ※ Amazonはサイトの事前登録が必要です
+var AFF={
+  rakutenId:"",
+  a8Rent:"",
+  rent:function(kw){
+    if(this.a8Rent) return this.a8Rent;
+    if(this.rakutenId){
+      var t="https://search.rakuten.co.jp/search/mall/"+encodeURIComponent(kw+" レンタル")+"/";
+      return "https://hb.afl.rakuten.co.jp/hgc/"+this.rakutenId+"/?pc="+encodeURIComponent(t);
+    }
+    return "";
+  }
+};
+
+// buy:新品の実勢価格帯の中央値 / rent:1回(3泊4日)のレンタル料 / src:実測=掲載価格を確認済み
+var ITEMS=[
+ // ── ホームセンター系（1日単位・極端に安い）★実測
+ {n:"電動工具（インパクト等）",buy:22000,rent:500,cat:"家周り",src:"実測"},
+ {n:"脚立・はしご",buy:15000,rent:400,cat:"家周り",src:"実測"},
+ {n:"芝刈り機・草刈り機",buy:30000,rent:1500,cat:"家周り",src:"実測"},
+ // ── 家電レンタル系 ★実測
+ {n:"高圧洗浄機",buy:32000,rent:4700,cat:"家周り",src:"実測"},
+ {n:"スチームクリーナー",buy:19000,rent:4000,cat:"家周り",src:"実測"},
+ {n:"カーペットクリーナー",buy:28000,rent:4500,cat:"家周り",src:"実測"},
+ {n:"プロジェクター",buy:65000,rent:5000,cat:"家電",src:"実測"},
+ {n:"ミラーレス一眼カメラ",buy:180000,rent:11500,cat:"カメラ",src:"実測"},
+ {n:"スーツケース（大型）",buy:38000,rent:6300,cat:"旅行",src:"実測"},
+ // ── アウトドア・スポーツ ★一式レンタルは高額（実測）
+ {n:"テント・キャンプ一式",buy:78000,rent:17000,cat:"アウトドア",src:"実測"},
+ {n:"スキー・スノーボード一式",buy:95000,rent:13000,cat:"スポーツ",src:"実測"},
+ {n:"ゴルフクラブセット",buy:80000,rent:4000,cat:"スポーツ",src:"実測"},
+ // ── 衣類 ★実測
+ {n:"礼服・喪服",buy:45000,rent:5000,cat:"衣類",src:"実測"},
+ {n:"振袖（成人式）",buy:400000,rent:150000,cat:"衣類",src:"実測"},
+ // ── 推定値
+ {n:"望遠レンズ",buy:150000,rent:8500,cat:"カメラ",src:"推定"},
+ {n:"ビデオカメラ",buy:85000,rent:8000,cat:"カメラ",src:"推定"},
+ {n:"アクションカメラ",buy:55000,rent:5500,cat:"カメラ",src:"推定"},
+ {n:"三脚・撮影機材",buy:35000,rent:3500,cat:"カメラ",src:"推定"},
+ {n:"BBQコンロ一式",buy:25000,rent:3500,cat:"アウトドア",src:"推定"},
+ {n:"登山用品一式",buy:70000,rent:6000,cat:"アウトドア",src:"推定"},
+ {n:"釣り具一式",buy:55000,rent:4500,cat:"スポーツ",src:"推定"},
+ {n:"スーツ",buy:40000,rent:6000,cat:"衣類",src:"推定"},
+ {n:"チャイルドシート",buy:35000,rent:2500,cat:"育児",src:"推定"},
+ {n:"ベビーベッド",buy:32000,rent:3000,cat:"育児",src:"推定"},
+ {n:"ミシン",buy:42000,rent:3500,cat:"家電",src:"推定"},
+ {n:"ホームベーカリー",buy:25000,rent:2500,cat:"家電",src:"推定"},
+ {n:"マッサージチェア",buy:150000,rent:6000,cat:"家電",src:"推定"},
+ {n:"ロードバイク",buy:150000,rent:8000,cat:"趣味",src:"推定"}
+];
+function pick(n){return parseFloat(document.querySelector('input[name="'+n+'"]:checked').value);}
+function yen(n){return '¥'+Math.round(n).toLocaleString('ja-JP');}
+
+function render(){
+  var f=pick('f'), y=pick('y'), uses=f*y;
+  var rows=ITEMS.map(function(it){
+    var bp=Math.ceil(it.buy/it.rent);          // 損益分岐の使用回数
+    var rentTotal=it.rent*uses;
+    var diff=it.buy-rentTotal;                  // プラスならレンタルが得
+    return {it:it,bp:bp,rentTotal:rentTotal,diff:diff,rentWins:uses<bp};
+  }).sort(function(a,b){return b.diff-a.diff;});
+
+  var rentCount=rows.filter(function(r){return r.rentWins;}).length;
+  var totalSave=rows.filter(function(r){return r.rentWins;}).reduce(function(s,r){return s+r.diff;},0);
+  document.getElementById('lead').innerHTML=
+    '通算<b>'+uses+'回</b>（年'+f+'回 × '+y+'年）使う前提だと、'+
+    '<b>'+rentCount+'品目</b>は買うよりレンタルのほうが安く済みます。'+
+    (rentCount?'全部レンタルにした場合の差額は<b>'+yen(totalSave)+'</b>。':'');
+
+  document.getElementById('list').innerHTML=rows.map(function(r){
+    var it=r.it, max=Math.max(it.buy,r.rentTotal);
+    var bw=Math.round(it.buy/max*100), rw=Math.round(r.rentTotal/max*100);
+    return '<div class="item">'+
+      '<div class="h"><h3>'+it.n+'<span style="font-size:11.5px;color:var(--sub);font-weight:400">　'+it.cat+(it.src==='実測'?' ・実勢価格':'')+'</span></h3>'+
+      '<span class="badge '+(r.rentWins?'rent':'buy')+'">'+(r.rentWins?'借りたほうが安い':'買ったほうが安い')+'</span></div>'+
+      '<div class="bars">'+
+        '<div class="bar"><span class="lb">買う</span><span class="tr"><span class="fl b" style="width:'+bw+'%">'+yen(it.buy)+'</span></span></div>'+
+        '<div class="bar"><span class="lb">借りる</span><span class="tr"><span class="fl r" style="width:'+rw+'%">'+yen(r.rentTotal)+'</span></span></div>'+
+      '</div>'+
+      '<div class="bp">損益分岐は<b>'+r.bp+'回</b>目 — '+r.bp+'回以上使うなら買ったほうが得です（今回の想定は'+uses+'回）</div>'+
+      (r.rentWins?(function(){var u=AFF.rent(it.n);return u?'<div class="cta">→ <a href="'+u+'" target="_blank" rel="noopener sponsored">'+it.n+'を借りられる店を探す</a></div>':'<div class="cta" style="opacity:.6">→ <span style="color:var(--sub)">'+it.n+'を借りられる店を探す（ID未設定）</span></div>';})():'')+
+    '</div>';
+  }).join('');
+}
+document.querySelectorAll('input[type=radio]').forEach(function(el){el.addEventListener('change',render);});
+render();
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
+</script>
+</body>
+</html>

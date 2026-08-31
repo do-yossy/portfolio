@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>買う前チェック｜買う・中古・レンタル・見送るを判定</title>
+<meta name="description" content="買う前に条件を入れるだけ。購入・中古・レンタル・見送るのどれが得か、総コストで比較します。">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16191f;--sub:#67707f;--line:#e2e6ed;--accent:#2563eb;--ok:#0d9488;--warn:#ea580c;--bad:#dc2626}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+.wrap{max-width:720px;margin:0 auto;padding:0 18px}
+header{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;padding:38px 0 30px;text-align:center}
+.tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:3px 11px;border-radius:99px;font-size:11.5px;margin-bottom:12px;font-weight:700}
+header h1{font-size:clamp(22px,5vw,30px);font-weight:800}
+header p{margin-top:9px;font-size:14px;opacity:.92}
+main{padding:24px 0 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px}
+.row{margin-bottom:19px}.row:last-of-type{margin-bottom:8px}
+.row .t{display:block;font-size:13px;font-weight:700;color:var(--sub);margin-bottom:8px}
+.row .h{font-size:12px;color:var(--sub);margin:-4px 0 8px}
+select,input[type=number]{width:100%;padding:12px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:15px;font-family:inherit;background:#fff;color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips input{position:absolute;opacity:0;width:0;height:0}
+.chips label{padding:9px 14px;border:1.5px solid var(--line);border-radius:99px;cursor:pointer;font-size:14px;background:#fff;transition:.15s}
+.chips input:checked+label{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.go{display:block;width:100%;padding:15px;background:var(--accent);color:#fff;border:none;border-radius:11px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit}
+.go:hover{background:#1d4ed8}
+#out{display:none}
+.verdict{text-align:center;padding:24px 20px;border-radius:14px;margin-bottom:16px;color:#fff}
+.verdict.buy{background:linear-gradient(135deg,#0d9488,#0f766e)}
+.verdict.used{background:linear-gradient(135deg,#2563eb,#1e40af)}
+.verdict.rent{background:linear-gradient(135deg,#ea580c,#c2410c)}
+.verdict.stop{background:linear-gradient(135deg,#dc2626,#991b1b)}
+.verdict .l{font-size:12.5px;opacity:.85;letter-spacing:.1em}
+.verdict .v{font-size:27px;font-weight:800;margin:5px 0 7px}
+.verdict .s{font-size:14.5px;opacity:.95}
+.save{background:#fff7ed;border:1px solid #fed7aa;border-radius:11px;padding:15px 17px;text-align:center;margin-bottom:16px}
+.save .n{font-size:26px;font-weight:800;color:var(--warn);font-variant-numeric:tabular-nums}
+.save .c{font-size:12.5px;color:var(--sub)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px}
+th,td{padding:11px 9px;border-bottom:1px solid var(--line);text-align:left}
+th{font-size:12px;color:var(--sub);font-weight:700}
+td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+tr.win td{background:#f0fdfa}
+tr.win td:first-child::before{content:"◎ ";color:var(--ok)}
+.why{background:#f8fafc;border:1px solid var(--line);border-radius:11px;padding:15px 17px;font-size:13.5px;margin-bottom:16px}
+.why h3{font-size:12.5px;color:var(--sub);margin-bottom:8px}
+.why li{margin-left:17px;margin-bottom:5px}
+.cta{background:#0f172a;color:#fff;border-radius:12px;padding:18px;text-align:center;font-size:14px}
+.cta a{display:inline-block;background:#fff;color:#0f172a;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700;margin:10px 5px 0;font-size:14px}
+.share{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:14px}
+.sh-t{font-size:12.5px;color:var(--sub);font-weight:700;margin-bottom:9px}
+.sh-box{font-size:13px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-bottom:10px;line-height:1.7}
+.sh-btns{display:flex;gap:8px;flex-wrap:wrap}
+.sh-b{flex:1;min-width:130px;padding:11px;border:1.5px solid var(--accent);background:#fff;color:var(--accent);border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;text-align:center;text-decoration:none;display:block}
+.sh-b:hover{background:#eff6ff}
+.sh-b.x{background:#0f172a;border-color:#0f172a;color:#fff}
+.sh-b.x:hover{background:#1e293b}
+.again{display:block;width:100%;padding:13px;background:#fff;color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;font-size:15px;cursor:pointer;font-family:inherit;margin-top:14px;font-weight:700}
+.note{font-size:12px;color:var(--sub);line-height:1.85;border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
+.note b{color:var(--warn)}
+</style>
+
+<!-- ═══ 配信用メタ（OGP / PWA / 正規URL） ═══ -->
+<link rel="canonical" href="https://www.social-quality.com/apps/kaumae/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="買う前チェック">
+<meta property="og:description" content="買う・中古・レンタル・見送るを総コストで判定。年間使用回数から1回あたりの負担額を出します。">
+<meta property="og:url" content="https://www.social-quality.com/apps/kaumae/">
+<meta property="og:site_name" content="買う前チェック">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="買う前チェック">
+<meta name="twitter:description" content="買う・中古・レンタル・見送るを総コストで判定。年間使用回数から1回あたりの負担額を出します。">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="kaumae.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%A7%AE%3C%2Ftext%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<header><div class="wrap">
+<span class="tag">DEMO ／ 社内検証用</span>
+<h1>買う前チェック</h1>
+<p>買う・中古・レンタル・見送る。総コストで判定します</p>
+</div></header>
+
+<main class="wrap">
+<div class="card" id="form">
+  <div class="row">
+    <span class="t">何を買おうとしていますか？</span>
+    <select id="item"></select>
+  </div>
+  <div class="row">
+    <span class="t">新品の価格</span>
+    <input type="number" id="price" value="89800" step="1000">
+  </div>
+  <div class="row">
+    <span class="t">年に何回くらい使いますか？</span>
+    <p class="h">ここがいちばん重要です。正直に。</p>
+    <div class="chips">
+      <input type="radio" name="freq" id="f1" value="1" checked><label for="f1">年1回</label>
+      <input type="radio" name="freq" id="f2" value="3"><label for="f2">年2〜3回</label>
+      <input type="radio" name="freq" id="f3" value="8"><label for="f3">年5〜10回</label>
+      <input type="radio" name="freq" id="f4" value="24"><label for="f4">月2回以上</label>
+      <input type="radio" name="freq" id="f5" value="150"><label for="f5">ほぼ毎日</label>
+    </div>
+  </div>
+  <div class="row">
+    <span class="t">何年くらい使うつもりですか？</span>
+    <div class="chips">
+      <input type="radio" name="years" id="y1" value="1"><label for="y1">1年</label>
+      <input type="radio" name="years" id="y2" value="3" checked><label for="y2">3年</label>
+      <input type="radio" name="years" id="y3" value="5"><label for="y3">5年</label>
+      <input type="radio" name="years" id="y4" value="10"><label for="y4">10年以上</label>
+    </div>
+  </div>
+  <div class="row">
+    <span class="t">今、それがないと困りますか？</span>
+    <div class="chips">
+      <input type="radio" name="need" id="n1" value="2"><label for="n1">今すぐ必要</label>
+      <input type="radio" name="need" id="n2" value="1" checked><label for="n2">あると便利</label>
+      <input type="radio" name="need" id="n3" value="0"><label for="n3">なんとなく欲しい</label>
+    </div>
+  </div>
+  <button class="go" id="go">判定する</button>
+</div>
+
+<div id="out">
+  <div class="verdict" id="verdict"></div>
+  <div class="save" id="save"></div>
+  <table id="tbl"></table>
+  <div class="why" id="why"></div>
+  <div class="cta" id="cta"></div>
+  <div class="share" id="share"></div>
+  <button class="again" id="again">条件を変えて再判定</button>
+</div>
+
+<p class="note">
+<b>データについて。</b>38品目のうち<b>22品目は実勢価格を確認済み</b>（Rentio・ホームセンター各社・レンタル各社の掲載価格、および買取相場の公開情報）。判定根拠の欄に実測か推定かと、その出典を表示しています。<br>本番では商品URLを解析して実勢価格を取得します。<br>
+<b>構造上の注意</b>：「買わなくていい」と判定するほどEC送客収益は減ります。この利益相反をどう扱うかが、このサービス最大の設計課題です（→ 企画書参照）。
+</p>
+<p style="text-align:center;font-size:11.5px;padding:14px 0 26px;opacity:.7"><a href="../legal.html" style="color:inherit">利用規約・プライバシーポリシー・免責事項</a></p>
+</main>
+
+<script>
+(function(){
+// ═══════════════════════════════════════════════════════════════
+// アフィリエイト設定 ── ここに ID を入れるだけで全品目のリンクが有効になる
+//
+//   amazonTag : AmazonアソシエイトのトラッキングID（例 "yourname-22"）
+//   rakutenId : 楽天アフィリエイトID（例 "1a2b3c4d.5e6f7g8h"）
+//   a8Rent    : A8で提携済みのレンタル系プログラムの広告URL（固定リンク）
+//   a8Used    : A8で提携済みの中古・買取系プログラムの広告URL（固定リンク）
+//
+// ※ Amazonは「リンクを貼るサイトのURL」を事前にアソシエイト・セントラルへ
+//    登録する必要があります。未登録サイトでの利用は規約違反になります。
+// ═══════════════════════════════════════════════════════════════
+var AFF={
+  amazonTag:"",
+  rakutenId:"",
+  a8Rent:"",
+  a8Used:"",
+
+  // 商品名から検索リンクを組み立てる
+  amazon:function(kw){
+    if(!this.amazonTag) return "";
+    return "https://www.amazon.co.jp/s?k="+encodeURIComponent(kw)+"&tag="+this.amazonTag;
+  },
+  rakuten:function(kw){
+    if(!this.rakutenId) return "";
+    var target="https://search.rakuten.co.jp/search/mall/"+encodeURIComponent(kw)+"/";
+    return "https://hb.afl.rakuten.co.jp/hgc/"+this.rakutenId+"/?pc="+encodeURIComponent(target);
+  },
+
+  // 判定種別 → 送客先の候補リスト（設定済みのものだけ返す）
+  links:function(kind,kw){
+    var out=[];
+    if(kind==="buy"||kind==="stop"){
+      if(this.amazon(kw)) out.push({label:"Amazonで探す",url:this.amazon(kw)});
+      if(this.rakuten(kw)) out.push({label:"楽天で探す",url:this.rakuten(kw)});
+    }
+    if(kind==="used"){
+      if(this.amazon(kw+" 中古")) out.push({label:"Amazonの中古を見る",url:this.amazon(kw+" 中古")});
+      if(this.rakuten(kw+" 中古")) out.push({label:"楽天の中古を見る",url:this.rakuten(kw+" 中古")});
+      if(this.a8Used) out.push({label:"買取・中古専門店を見る",url:this.a8Used});
+    }
+    if(kind==="rent"){
+      if(this.a8Rent) out.push({label:"レンタルできる店を探す",url:this.a8Rent});
+      if(this.rakuten(kw+" レンタル")) out.push({label:"楽天でレンタルを探す",url:this.rakuten(kw+" レンタル")});
+    }
+    return out;
+  },
+  ready:function(){return !!(this.amazonTag||this.rakutenId||this.a8Rent||this.a8Used);}
+};
+var SHARE_TAG="#買う前チェック";
+
+// used:中古相場率 / rent:1回(3泊4日)または1ヶ月あたりのレンタル料 / unit:'回' or '月' / life:標準的な使用可能年数
+// src:'実測'=Rentio等の掲載価格を確認したもの / '推定'=同カテゴリの水準からの推定値
+var ITEMS=[
+ // ── カメラ・映像
+ {n:"ミラーレス一眼カメラ",used:.55,rent:11500,unit:"回",life:6,src:"実測",note:"Rentio 3泊4日 9,090〜14,980円"},
+ {n:"望遠レンズ",used:.55,rent:8500,unit:"回",life:10,src:"推定"},
+ {n:"ビデオカメラ",used:.45,rent:8000,unit:"回",life:6,src:"推定"},
+ {n:"アクションカメラ（GoPro等）",used:.5,rent:5500,unit:"回",life:4,src:"推定"},
+ {n:"三脚・撮影機材",used:.4,rent:3500,unit:"回",life:10,src:"推定"},
+ {n:"プロジェクター",used:.45,rent:5000,unit:"回",life:5,src:"実測",note:"Rentio 月額2,100〜9,000円／14泊15日 4,780〜11,480円"},
+ // ── 家周り ★ホームセンターのレンタルが極端に安い
+ {n:"高圧洗浄機",used:.5,rent:4700,unit:"回",life:7,src:"実測",note:"Rentio 3泊4日 3,888〜7,182円"},
+ {n:"スチームクリーナー",used:.4,rent:4000,unit:"回",life:7,src:"実測",note:"Rentio 7泊8日 4,752〜5,022円"},
+ {n:"カーペットクリーナー",used:.4,rent:4500,unit:"回",life:8,src:"実測",note:"Rentio 7泊8日 4,482〜7,182円"},
+ {n:"電動工具（インパクトドライバー等）",used:.55,rent:500,unit:"回",life:8,src:"実測",note:"ホームセンター 1日200〜3,000円・多くは500円未満（電動ドライバー約265円/日）"},
+ {n:"脚立・はしご",used:.4,rent:400,unit:"回",life:15,src:"実測",note:"ホームセンターのレンタル工具（多くは1日500円未満）"},
+ {n:"芝刈り機・草刈り機",used:.45,rent:1500,unit:"回",life:8,src:"実測",note:"コメリ・DCM等でレンタル可（〜3,000円/日）"},
+ // ── 旅行
+ {n:"スーツケース（大型）",used:.45,rent:6300,unit:"回",life:8,src:"実測",note:"Rentio 3泊4日 5,300〜7,300円"},
+ {n:"スーツケース（機内持込）",used:.4,rent:4200,unit:"回",life:8,src:"推定"},
+ // ── アウトドア ★一式レンタルは高額
+ {n:"テント・キャンプ一式",used:.4,rent:17000,unit:"回",life:8,src:"実測",note:"そらのした 1泊2日 3人用16,478円／4人用19,228円"},
+ {n:"BBQコンロ一式",used:.35,rent:3500,unit:"回",life:6,src:"推定"},
+ {n:"スキー・スノーボード一式",used:.4,rent:13000,unit:"回",life:8,src:"実測",note:"板・ブーツ4,500〜7,000円＋ウェア3,000〜4,500円、フルセット約13,000円/日"},
+ {n:"ゴルフクラブセット",used:.4,rent:4000,unit:"回",life:10,src:"実測",note:"ゴルフ場1回3,000円前後／ネットレンタル3,000〜5,000円"},
+ {n:"釣り具一式",used:.45,rent:4500,unit:"回",life:10,src:"推定"},
+ {n:"登山用品一式",used:.4,rent:6000,unit:"回",life:8,src:"推定"},
+ // ── 衣類
+ {n:"礼服・喪服",used:.3,rent:5000,unit:"回",life:10,src:"実測",note:"ネットレンタル3,960〜5,280円（3泊4日）／店舗7,700円〜"},
+ {n:"スーツ",used:.25,rent:6000,unit:"回",life:5,src:"推定"},
+ {n:"ブランドバッグ",used:.6,rent:9000,unit:"月",life:15,src:"実測",note:"ブランド品の買取相場は定価の約60%"},
+ {n:"振袖（成人式）",used:.2,rent:150000,unit:"回",life:20,src:"実測",note:"全国平均20〜25万円（5万〜25万円の幅）"},
+ // ── 家電
+ {n:"ロボット掃除機",used:.5,rent:2500,unit:"月",life:5,src:"実測",note:"Rentio ルンバ 月額1,180円〜"},
+ {n:"美容家電（脱毛器・美顔器）",used:.4,rent:2900,unit:"月",life:4,src:"実測",note:"Rentio 月額1,600〜5,300円"},
+ {n:"マッサージチェア",used:.35,rent:6000,unit:"月",life:8,src:"推定"},
+ {n:"ホームベーカリー・調理家電",used:.35,rent:2500,unit:"月",life:6,src:"推定"},
+ {n:"ミシン",used:.4,rent:3500,unit:"月",life:12,src:"推定"},
+ // ── 育児
+ {n:"ベビーカー",used:.4,rent:4450,unit:"月",life:3,src:"実測",note:"Rentio 月額4,300〜4,600円"},
+ {n:"チャイルドシート",used:.35,rent:2500,unit:"月",life:4,src:"推定"},
+ {n:"ベビーベッド",used:.3,rent:3000,unit:"月",life:3,src:"推定"},
+ {n:"ベビースケール",used:.3,rent:2000,unit:"月",life:5,src:"実測",note:"Rentio 月額1,800〜2,200円"},
+ // ── 趣味
+ {n:"ギター・キーボード",used:.55,rent:2000,unit:"月",life:15,src:"実測",note:"スターペグミュージック 月1,149円〜"},
+ {n:"電子ドラム",used:.5,rent:22330,unit:"月",life:10,src:"実測",note:"ヤマハ音レント 月22,330円（最短1ヶ月）"},
+ {n:"ゲーム機",used:.6,rent:3000,unit:"月",life:6,src:"推定"},
+ {n:"自転車（シティ・クロス）",used:.4,rent:4000,unit:"月",life:8,src:"実測",note:"自転車の買取相場は定価の約40%"},
+ {n:"ロードバイク",used:.45,rent:8000,unit:"月",life:10,src:"推定"}
+];
+var sel=document.getElementById('item');
+ITEMS.forEach(function(it,i){sel.add(new Option(it.n,i));});
+sel.value=3;
+
+function pick(n){var e=document.querySelector('input[name="'+n+'"]:checked');return e?parseFloat(e.value):0;}
+function yen(n){return '¥'+Math.round(n).toLocaleString('ja-JP');}
+
+document.getElementById('go').addEventListener('click',function(){
+  var it=ITEMS[parseInt(sel.value,10)];
+  var price=parseFloat(document.getElementById('price').value)||0;
+  var freq=pick('freq'), years=pick('years'), need=pick('need');
+
+  var uses=freq*years;                       // 総使用回数
+  var usedPrice=price*it.used;               // 中古購入価格
+  var resale=price*it.used*0.6;              // 使用後の売却見込み
+  var rentTotal=it.unit==="回" ? it.rent*uses : it.rent*Math.min(years*12,Math.ceil(uses/2));
+  var buyNet=price-resale;                   // 購入の実質負担
+  var usedNet=usedPrice-(resale*0.7);        // 中古購入の実質負担
+
+  var opts=[
+    {k:'buy', n:'新品を買う', total:price, net:buyNet, per:buyNet/uses},
+    {k:'used',n:'中古を買う', total:usedPrice, net:usedNet, per:usedNet/uses},
+    {k:'rent',n:'レンタルする', total:rentTotal, net:rentTotal, per:rentTotal/uses}
+  ].sort(function(a,b){return a.net-b.net;});
+
+  var best=opts[0], worst=opts[opts.length-1];
+  var kind=best.k, label, sub;
+
+  // 「見送る」判定：欲しいだけ かつ 使用回数が極端に少ない
+  if(need===0 && uses<=3){
+    kind='stop'; label='今は見送る'; sub='年'+freq+'回 × '+years+'年 ＝ 通算'+uses+'回。必要になってからで間に合います';
+  } else {
+    label={buy:'新品を買う',used:'中古を買う',rent:'レンタルする'}[kind];
+    sub='通算'+uses+'回使う前提だと、これが最も安く済みます';
+  }
+
+  var saveAmt = kind==='stop' ? price : (worst.net-best.net);
+  var saveCap = kind==='stop' ? '買わなければ使わずに済む金額' : '最も高い選択肢との差額';
+
+  var v=document.getElementById('verdict');
+  v.className='verdict '+kind;
+  v.innerHTML='<div class="l">AI判定</div><div class="v">'+label+'</div><div class="s">'+sub+'</div>';
+
+  document.getElementById('save').innerHTML=
+    '<div class="n">'+yen(saveAmt)+'</div><div class="c">'+saveCap+'</div>';
+
+  var rows=opts.map(function(o){
+    return '<tr class="'+(o.k===best.k&&kind!=='stop'?'win':'')+'"><td>'+o.n+'</td>'+
+      '<td class="num">'+yen(o.total)+'</td>'+
+      '<td class="num">'+yen(o.net)+'</td>'+
+      '<td class="num">'+yen(o.per)+'</td></tr>';
+  }).join('');
+  document.getElementById('tbl').innerHTML=
+    '<tr><th>選択肢</th><th style="text-align:right">支払額</th><th style="text-align:right">実質負担<br><span style="font-weight:400">（売却分を引いた額）</span></th><th style="text-align:right">1回あたり</th></tr>'+rows;
+
+  var reasons=[];
+  reasons.push('通算の使用回数は<b>'+uses+'回</b>（年'+freq+'回 × '+years+'年）');
+  if(freq<=3) reasons.push('年'+freq+'回は<b>使用頻度が低い</b>部類。所有すると保管場所のコストもかかります');
+  if(freq>=24) reasons.push('使用頻度が高いので、<b>所有したほうが1回あたりの負担が下がります</b>');
+  reasons.push('この品目の中古相場は新品の<b>約'+Math.round(it.used*100)+'%</b>。売却時は購入額の約'+Math.round(it.used*60)+'%が戻る想定');
+  if(it.src==='実測'&&it.note) reasons.push('レンタル料の根拠：<b>'+it.note+'</b>（実勢価格を確認済み）');
+  else reasons.push('レンタル料は同カテゴリの水準からの<b>推定値</b>です。実際の見積もりで確認してください');
+  if(years>it.life) reasons.push('想定使用年数が一般的な寿命（約'+it.life+'年）を超えています。<b>買い替えが発生する前提</b>で考えてください');
+  if(need===0) reasons.push('「なんとなく欲しい」段階です。<b>1週間置いてまだ欲しければ</b>買う、で間に合います');
+  if(need===2) reasons.push('今すぐ必要とのことなので、<b>入手までの時間</b>も考慮してください（レンタルは配送に数日かかります）');
+  document.getElementById('why').innerHTML='<h3>この判定の根拠</h3><ul><li>'+reasons.join('</li><li>')+'</li></ul>';
+
+  // ── 送客リンク（AFFにIDが入っていれば自動生成、無ければ準備中表示）
+  var links=AFF.links(kind,it.n);
+  var ctaHead={buy:'新品を買うなら',used:'中古を探すなら',rent:'借りるなら',stop:'それでも欲しくなったら'}[kind];
+  document.getElementById('cta').innerHTML= links.length
+    ? '<div>'+ctaHead+'</div>'+links.map(function(l){
+        return '<a href="'+l.url+'" target="_blank" rel="noopener sponsored">'+l.label+'</a>';
+      }).join('')
+    : '<div>'+ctaHead+'</div><a href="#" onclick="alert(\'アフィリエイトIDが未設定です。\\n\\nスクリプト冒頭の AFF に AmazonトラッキングID・楽天アフィリエイトID・A8の広告URLを入れると、全品目のリンクが自動で有効になります。\');return false;" style="opacity:.55">リンク準備中（IDを設定してください）</a>';
+
+  // ── シェア用テキスト
+  var kindWord={buy:'新品を買う',used:'中古を買う',rent:'レンタルする',stop:'今は見送る'}[kind];
+  var shareText=it.n+'を買おうか迷ったので調べたら、'+
+    '年'+freq+'回×'+years+'年なら「'+kindWord+'」が'+yen(saveAmt)+'お得という判定でした。'+SHARE_TAG;
+  var shareEl=document.getElementById('share');
+  shareEl.innerHTML=
+    '<div class="sh-t">この結果をシェアする</div>'+
+    '<div class="sh-box" id="shTxt">'+shareText+'</div>'+
+    '<div class="sh-btns">'+
+      '<button class="sh-b" id="shCopy">テキストをコピー</button>'+
+      '<a class="sh-b x" href="https://twitter.com/intent/tweet?text='+encodeURIComponent(shareText)+'" target="_blank" rel="noopener">Xに投稿</a>'+
+    '</div>';
+  document.getElementById('shCopy').addEventListener('click',function(){
+    var b=this;
+    if(navigator.clipboard){navigator.clipboard.writeText(shareText).then(function(){b.textContent='コピーしました';setTimeout(function(){b.textContent='テキストをコピー';},1600);});}
+    else{var r=document.createRange();r.selectNode(document.getElementById('shTxt'));window.getSelection().removeAllRanges();window.getSelection().addRange(r);}
+  });
+
+  document.getElementById('form').style.display='none';
+  document.getElementById('out').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+document.getElementById('again').addEventListener('click',function(){
+  document.getElementById('out').style.display='none';
+  document.getElementById('form').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
+</script>
+</body>
+</html>

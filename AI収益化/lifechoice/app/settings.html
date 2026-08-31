@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>設定｜LIFE CHOICE</title>
+<meta name="description" content="1回設定すれば、関係する機能すべてに反映されます。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="設定｜LIFE CHOICE">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚙️%3C/text%3E%3C/svg%3E">
+</head>
+<body data-service="buy-check">
+
+<main class="lc-wrap lc-main">
+  <div class="lc-summary" style="margin-bottom:var(--sp-5)">
+    ここで設定した条件は<b>関係する機能すべてに引き継がれます</b>。<br>
+    「大阪・ひとり・3,000円」を1回入れておけば、次からは条件を入れ直さずに済みます。
+  </div>
+
+  <h2 class="lc-section-title">条件</h2>
+  <div class="lc-card" id="form"></div>
+
+  <h2 class="lc-section-title" style="margin-top:var(--sp-6)">興味のある分野</h2>
+  <div class="lc-card" id="interests"></div>
+
+  <button class="lc-btn" id="save" style="margin-top:var(--sp-4)">保存する</button>
+
+  <h2 class="lc-section-title" style="margin-top:var(--sp-6)">この設定が効く機能</h2>
+  <div class="lc-card" id="effect"></div>
+
+  <h2 class="lc-section-title" style="margin-top:var(--sp-6)">最近見たもの</h2>
+  <div class="lc-card" id="history"></div>
+
+  <h2 class="lc-section-title" style="margin-top:var(--sp-6)">設定の持ち出し</h2>
+  <div class="lc-card" id="backup"></div>
+
+  <h2 class="lc-section-title" style="margin-top:var(--sp-6)">消去</h2>
+  <div class="lc-card">
+    <p class="lc-sub" style="margin-bottom:var(--sp-3)">保存した内容はこの端末のブラウザ内にのみあります。</p>
+    <button class="lc-btn lc-btn--ghost" id="reset">設定をリセット</button>
+    <button class="lc-btn lc-btn--ghost" id="clear-history" style="margin-top:var(--sp-3)">履歴だけ消す</button>
+  </div>
+
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { Filter, MultiFilter, LocationSelector, TransportSelector } from '../components/filter.js';
+import { Disclaimer } from '../components/footer.js';
+import { EmptyState } from '../components/result.js';
+import { getService } from '../lib/services.js';
+import { AFFECTED_SERVICES, describe } from '../lib/preference-sync.js';
+import { StaticDataProvider } from '../lib/data-provider.js';
+import {
+  loadPreference, savePreference, clearPreference,
+  loadHistory, clearHistory, exportData, importData
+} from '../utils/storage.js';
+import { pick, pickNumber, pickAll, $, html, esc, copyText } from '../utils/dom.js';
+
+mountShell('buy-check', { title: '設定' });
+const pref = loadPreference();
+const activitySets = await StaticDataProvider.getActivitySets();
+
+/* ── 条件 ── */
+html('#form',
+  LocationSelector({ value: pref.location.areaName }) +
+  Filter({ name: 'budget', label: '普段の予算', value: pref.budget,
+    options: [{ value: 1000, label: '〜1,000円' }, { value: 2000, label: '〜2,000円' },
+              { value: 3000, label: '〜3,000円' }, { value: 5000, label: '〜5,000円' },
+              { value: 10000, label: '〜10,000円' }] }) +
+  TransportSelector(pref.transportation) +
+  Filter({ name: 'solo', label: '一人で行動することが多い？', value: pref.soloPreference,
+    options: [{ value: 5, label: 'ほとんど一人' }, { value: 3, label: 'どちらも' }, { value: 1, label: '誰かと一緒が多い' }] }) +
+  Filter({ name: 'conv', label: 'お店で話しかけられるのは？', value: pref.conversationPreference,
+    options: [{ value: 5, label: '避けたい' }, { value: 3, label: '気にしない' }, { value: 1, label: 'むしろ歓迎' }] }) +
+  Filter({ name: 'resv', label: '予約が必要なお店は？', value: pref.reservationPreference,
+    options: [{ value: 5, label: '面倒なので避けたい' }, { value: 3, label: '気にしない' }, { value: 1, label: '予約したほうが安心' }] })
+);
+
+/* ── 興味のある分野（おすすめの並びに効く） ── */
+html('#interests',
+  MultiFilter({
+    name: 'interests', label: '関心のあること', hint: 'いくつでも選べます。おすすめの並び順に反映されます。',
+    values: pref.preferredCategories,
+    options: activitySets.map(s => ({ value: s.id, label: s.shortName || s.name }))
+  })
+);
+
+/* ── どの設定がどの機能に効くか ── */
+function renderEffect() {
+  const rows = [
+    ['予算', AFFECTED_SERVICES.budget],
+    ['移動手段', AFFECTED_SERVICES.transportation],
+    ['一人行動', AFFECTED_SERVICES.soloPreference],
+    ['会話', AFFECTED_SERVICES.conversationPreference],
+    ['予約', AFFECTED_SERVICES.reservationPreference],
+    ['エリア', AFFECTED_SERVICES.location]
+  ];
+  html('#effect', `
+    <table class="lc-table">
+      ${rows.map(([label, ids]) => `
+        <tr>
+          <td style="width:32%">${esc(label)}</td>
+          <td>${ids.length
+            ? ids.map(id => esc(getService(id).name)).join('、')
+            : '<span class="lc-sub">現在は未対応</span>'}</td>
+        </tr>`).join('')}
+      <tr><td>関心のあること</td><td>トップページのおすすめ</td></tr>
+    </table>
+    <p class="lc-sub" style="margin-top:var(--sp-3)">
+      エリアが未対応なのは、収録している店舗が業態単位（「カフェ」「図書館」など）で、
+      個別店舗の座標を持っていないためです。実在しない位置を作ることはしていません。
+    </p>`);
+}
+renderEffect();
+
+/* ── 履歴 ── */
+const SERVICE_LABEL = id => {
+  if (id === 'search') return '統合検索';
+  const s = getService(id);
+  return s ? s.name : id;
+};
+function renderHistory() {
+  const list = loadHistory();
+  if (!list.length) {
+    html('#history', EmptyState({ title: 'まだ履歴はありません', hint: '各機能を使うとここに残ります' }));
+    return;
+  }
+  html('#history', `
+    <table class="lc-table">
+      ${list.slice(0, 15).map(h => `
+        <tr>
+          <td style="width:38%">${esc(SERVICE_LABEL(h.service))}</td>
+          <td>${esc(h.query || h.productId || (h.count !== undefined ? h.count + '件' : '') || '')}</td>
+          <td class="lc-sub" style="width:26%;white-space:nowrap">${esc(when(h.at))}</td>
+        </tr>`).join('')}
+    </table>
+    ${list.length > 15 ? `<p class="lc-sub" style="margin-top:var(--sp-2)">ほか${list.length - 15}件</p>` : ''}`);
+}
+function when(ts) {
+  if (!ts) return '';
+  const d = Math.floor((Date.now() - ts) / 86400000);
+  if (d === 0) return '今日';
+  if (d === 1) return '昨日';
+  if (d < 7) return d + '日前';
+  return new Date(ts).toLocaleDateString('ja-JP');
+}
+renderHistory();
+
+/* ── 書き出し・読み込み ── */
+html('#backup', `
+  <p style="margin-bottom:var(--sp-3)">設定はこの端末のブラウザ内にのみ保存されます。
+  別の端末やブラウザで使う場合は、この内容をコピーして貼り付けてください。</p>
+  <textarea id="dump" rows="6" readonly
+    style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:var(--r-sm);
+           background:var(--surface-2);font-family:var(--mono, monospace);font-size:var(--fs-xs)"></textarea>
+  <button class="lc-btn lc-btn--ghost lc-btn--sm" id="copy" style="margin-top:var(--sp-2)">コピーする</button>
+
+  <p style="margin:var(--sp-5) 0 var(--sp-2)">読み込む場合はここに貼り付けます。</p>
+  <textarea id="load" rows="4" placeholder="書き出した内容を貼り付け"
+    style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:var(--r-sm);
+           background:var(--surface);font-family:var(--mono, monospace);font-size:var(--fs-xs)"></textarea>
+  <button class="lc-btn lc-btn--ghost lc-btn--sm" id="do-import" style="margin-top:var(--sp-2)">読み込む</button>
+  <p id="import-msg" class="lc-field__hint" style="margin-top:var(--sp-2)"></p>`);
+
+function refreshDump() { $('#dump').value = exportData(); }
+refreshDump();
+
+$('#copy').addEventListener('click', () => {
+  copyText($('#dump').value, () => {
+    const b = $('#copy');
+    b.textContent = 'コピーしました';
+    setTimeout(() => { b.textContent = 'コピーする'; }, 1800);
+  });
+});
+
+$('#do-import').addEventListener('click', () => {
+  const r = importData($('#load').value);
+  $('#import-msg').textContent = r.message;
+  $('#import-msg').style.color = r.ok ? 'var(--ok)' : 'var(--bad)';
+  if (r.ok) setTimeout(() => location.reload(), 900);
+});
+
+html('#note', Disclaimer({
+  dataNote: '設定はこの端末のブラウザ内にのみ保存され、サーバーには送信されません。' +
+    'プライベートブラウジングなど保存できない環境では、そのセッション中のみ有効になります。'
+}));
+
+/* ── 現在地（許可されない前提。失敗しても手動選択で進める） ── */
+$('#lc-geo').addEventListener('click', () => {
+  if (!navigator.geolocation) { alert('この端末では現在地を取得できません。エリアを選んでください。'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      savePreference({ location: { lat: pos.coords.latitude, lng: pos.coords.longitude, areaName: '現在地' } });
+      refreshDump();
+      alert('現在地を保存しました。\n※ 店舗を業態単位で持っているため、距離での絞り込みには現在使っていません。');
+    },
+    () => alert('現在地を取得できませんでした。エリアを選んでください。')
+  );
+});
+
+/* ── 保存・消去 ── */
+$('#save').addEventListener('click', () => {
+  const area = $('#lc-area').value;
+  const next = savePreference({
+    budget: pickNumber('budget'),
+    transportation: pick('transportation'),
+    soloPreference: pickNumber('solo'),
+    conversationPreference: pickNumber('conv'),
+    reservationPreference: pickNumber('resv'),
+    preferredCategories: pickAll('interests'),
+    location: area ? { areaName: area } : {}
+  });
+  refreshDump();
+  const btn = $('#save');
+  btn.textContent = '保存しました（' + describe(next) + '）';
+  setTimeout(() => { btn.textContent = '保存する'; }, 2200);
+});
+
+$('#reset').addEventListener('click', () => {
+  if (!confirm('保存した条件をすべて消します。よろしいですか？')) return;
+  clearPreference();
+  location.reload();
+});
+
+$('#clear-history').addEventListener('click', () => {
+  if (!confirm('閲覧履歴を消します。設定は残ります。よろしいですか？')) return;
+  clearHistory();
+  renderHistory();
+  refreshDump();
+});
+</script>
+</body>
+</html>

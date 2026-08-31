@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>買う前チェック｜LIFE CHOICE</title>
+<meta name="description" content="買う・中古・レンタル・見送るを総コストで判定。年間使用回数から1回あたりの負担額を出します。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="買う前チェック｜LIFE CHOICE">
+<meta property="og:description" content="本当に買うべきか、総コストで判定します。">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/base.css">
+<link rel="stylesheet" href="../styles/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧮%3C/text%3E%3C/svg%3E">
+</head>
+<body data-service="buy-check">
+
+<main class="lc-wrap lc-main">
+  <div id="prefbar"></div>
+  <div id="form" class="lc-card">
+    <div class="lc-field">
+      <label class="lc-field__label" for="item">何を買おうとしていますか？</label>
+      <select id="item" style="width:100%;padding:12px 13px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--surface)"></select>
+    </div>
+    <div class="lc-field">
+      <label class="lc-field__label" for="price">新品の価格</label>
+      <input id="price" type="number" step="1000" inputmode="numeric"
+             style="width:100%;padding:12px 13px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--surface)">
+    </div>
+    <p class="lc-field__hint" style="margin-top:-6px;margin-bottom:var(--sp-4)">
+      探している物が無ければ <a href="my-items.html">自分で品目を追加</a> できます
+    </p>
+    <div id="conds"></div>
+    <button class="lc-btn" id="go" style="margin-top:var(--sp-4)">判定する</button>
+  </div>
+
+  <div id="out" class="lc-hidden"></div>
+  <div id="note"></div>
+</main>
+
+<script type="module">
+import { mountShell } from '../components/layout.js';
+import { PreferenceBar } from '../components/preference-bar.js';
+import { CrossLinkCard, afterBuyCheck } from '../lib/cross-link.js';
+import { Filter } from '../components/filter.js';
+import { ShareBox, bindShare, Cta, Disclaimer } from '../components/footer.js';
+import { evaluateBuyCheck, buildShareText } from '../lib/buy-check.js';
+import { linksFor, PENDING_NOTE } from '../lib/affiliate.js';
+import { StaticDataProvider } from '../lib/data-provider.js';
+import { yen, newPriceSource } from '../utils/format.js';
+import { pickNumber, $, html, esc, scrollTop } from '../utils/dom.js';
+import { pushHistory } from '../utils/storage.js';
+
+mountShell('buy-check');
+html('#prefbar', PreferenceBar());
+
+const products = await StaticDataProvider.getProducts();
+
+// 品目セレクト
+$('#item').innerHTML = products
+  .map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+
+// 条件フィルタ
+html('#conds',
+  Filter({ name: 'freq', label: '年に何回くらい使いますか？', hint: 'ここがいちばん重要です。正直に。', value: 1,
+    options: [
+      { value: 1, label: '年1回' }, { value: 3, label: '年2〜3回' }, { value: 8, label: '年5〜10回' },
+      { value: 24, label: '月2回以上' }, { value: 150, label: 'ほぼ毎日' }
+    ] }) +
+  Filter({ name: 'years', label: '何年くらい使うつもりですか？', value: 3,
+    options: [{ value: 1, label: '1年' }, { value: 3, label: '3年' }, { value: 5, label: '5年' }, { value: 10, label: '10年以上' }] }) +
+  Filter({ name: 'need', label: '今、それがないと困りますか？', value: 1,
+    options: [{ value: 2, label: '今すぐ必要' }, { value: 1, label: 'あると便利' }, { value: 0, label: 'なんとなく欲しい' }] })
+);
+
+html('#note', Disclaimer({
+  dataNote: `全${products.length}品目のうち<b>${products.filter(p => newPriceSource(p) === '実測').length}品目は新品価格を確認済み</b>、残りは市場の中位帯からの推定です。レンタル価格は${products.filter(p => p.source === '実測').length}品目で各社の掲載価格を確認しています。`
+}));
+
+function syncPrice() {
+  const p = products[$('#item').value];
+  $('#price').value = p.newPrice || 50000;
+}
+$('#item').addEventListener('change', syncPrice);
+syncPrice();
+
+$('#go').addEventListener('click', () => {
+  const p = products[$('#item').value];
+  const freq = pickNumber('freq'), years = pickNumber('years'), need = pickNumber('need');
+  const price = Number($('#price').value) || p.newPrice;
+  const r = evaluateBuyCheck({ product: p, price, freq, years, need });
+
+  const rows = r.options.map(o => `
+    <tr class="${o.kind === r.verdict ? 'win' : ''}">
+      <td>${esc(o.label)}</td>
+      <td class="num">${yen(o.total)}</td>
+      <td class="num">${yen(o.net)}</td>
+      <td class="num">${yen(o.perUse)}</td>
+    </tr>`).join('');
+
+  const links = linksFor(r.verdict, p.name);
+  const shareText = buildShareText(p, r, freq, years, yen);
+
+  html('#out', `
+    <div class="lc-card" style="text-align:center;background:var(--accent);color:#fff;border:none">
+      <div style="font-size:var(--fs-sm);opacity:.85;letter-spacing:.1em">AI判定</div>
+      <div style="font-size:26px;font-weight:800;margin:6px 0">${esc(r.verdictLabel)}</div>
+      <div style="font-size:var(--fs-md)">${esc(r.verdictReason)}</div>
+    </div>
+
+    <div class="lc-card" style="text-align:center;background:var(--warn-bg);border-color:var(--warn)">
+      <div style="font-size:26px;font-weight:800;color:var(--warn)" class="lc-num">${yen(r.saveAmount)}</div>
+      <div class="lc-sub">${esc(r.saveCaption)}</div>
+    </div>
+
+    <div class="lc-card lc-scroll-x">
+      <table class="lc-table">
+        <tr><th>選択肢</th><th style="text-align:right">支払額</th>
+            <th style="text-align:right">実質負担<br><span style="font-weight:400">売却分を引いた額</span></th>
+            <th style="text-align:right">1回あたり</th></tr>
+        ${rows}
+      </table>
+    </div>
+
+    <div class="lc-card">
+      <h3 class="lc-section-title">この判定の根拠</h3>
+      <ul style="margin-left:18px">${r.reasons.map(x => `<li style="margin-bottom:5px">${x}</li>`).join('')}</ul>
+    </div>
+
+    ${Cta({ heading: 'この判定に沿って進める場合はこちら', links, pendingLabel: 'リンク準備中', pendingNote: PENDING_NOTE })}
+    ${CrossLinkCard(afterBuyCheck(r.verdict, p.name))}
+    ${ShareBox(shareText)}
+    <button class="lc-btn lc-btn--ghost" id="again" style="margin-top:var(--sp-4)">条件を変えて再判定</button>
+  `);
+
+  bindShare(shareText);
+  $('#again').addEventListener('click', () => {
+    $('#out').classList.add('lc-hidden');
+    $('#form').classList.remove('lc-hidden');
+    scrollTop();
+  });
+
+  pushHistory({ service: 'buy-check', productId: p.id, verdict: r.verdict });
+  $('#form').classList.add('lc-hidden');
+  $('#out').classList.remove('lc-hidden');
+  scrollTop();
+});
+</script>
+</body>
+</html>

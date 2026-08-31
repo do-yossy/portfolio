@@ -1,0 +1,566 @@
+[
+  {
+    "id": "camping",
+    "name": "キャンプを始めたい",
+    "keywords": [
+      "キャンプ",
+      "camping",
+      "アウトドア",
+      "テント",
+      "野営",
+      "ソロキャンプ"
+    ],
+    "typicalUsesPerYear": 3,
+    "items": [
+      {
+        "productId": "camping-set",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "bbq-set",
+        "priority": 2,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "キャンプ"
+  },
+  {
+    "id": "bbq",
+    "name": "BBQをしたい",
+    "keywords": [
+      "BBQ",
+      "バーベキュー",
+      "焼肉",
+      "ばーべきゅー"
+    ],
+    "typicalUsesPerYear": 3,
+    "items": [
+      {
+        "productId": "bbq-set",
+        "priority": 1,
+        "essential": true
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "BBQ"
+  },
+  {
+    "id": "photography",
+    "name": "カメラ・写真を始めたい",
+    "keywords": [
+      "カメラ",
+      "写真",
+      "撮影",
+      "一眼",
+      "ミラーレス",
+      "望遠"
+    ],
+    "typicalUsesPerYear": 12,
+    "items": [
+      {
+        "productId": "mirrorless-camera",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "tripod",
+        "priority": 2,
+        "essential": false
+      },
+      {
+        "productId": "telephoto-lens",
+        "priority": 3,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "カメラ・写真"
+  },
+  {
+    "id": "video",
+    "name": "動画を撮りたい",
+    "keywords": [
+      "動画",
+      "ビデオ",
+      "YouTube",
+      "ユーチューブ",
+      "vlog",
+      "アクションカメラ",
+      "GoPro"
+    ],
+    "typicalUsesPerYear": 12,
+    "items": [
+      {
+        "productId": "video-camera",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "action-camera",
+        "priority": 2,
+        "essential": false
+      },
+      {
+        "productId": "tripod",
+        "priority": 3,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "動画撮影"
+  },
+  {
+    "id": "golf",
+    "name": "ゴルフを始めたい",
+    "keywords": [
+      "ゴルフ",
+      "golf",
+      "ラウンド",
+      "クラブ"
+    ],
+    "typicalUsesPerYear": 8,
+    "items": [
+      {
+        "productId": "golf-clubs",
+        "priority": 1,
+        "essential": true
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "ゴルフ"
+  },
+  {
+    "id": "fishing",
+    "name": "釣りを始めたい",
+    "keywords": [
+      "釣り",
+      "フィッシング",
+      "海釣り",
+      "釣具"
+    ],
+    "typicalUsesPerYear": 6,
+    "items": [
+      {
+        "productId": "fishing-set",
+        "priority": 1,
+        "essential": true
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "釣り"
+  },
+  {
+    "id": "ski",
+    "name": "スキー・スノボに行きたい",
+    "keywords": [
+      "スキー",
+      "スノボ",
+      "スノーボード",
+      "ゲレンデ",
+      "ski"
+    ],
+    "typicalUsesPerYear": 3,
+    "items": [
+      {
+        "productId": "ski-set",
+        "priority": 1,
+        "essential": true
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "スキー・スノボ"
+  },
+  {
+    "id": "hiking",
+    "name": "登山・ハイキングを始めたい",
+    "keywords": [
+      "登山",
+      "ハイキング",
+      "トレッキング",
+      "山登り"
+    ],
+    "typicalUsesPerYear": 4,
+    "items": [
+      {
+        "productId": "hiking-set",
+        "priority": 1,
+        "essential": true
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "登山・ハイキング"
+  },
+  {
+    "id": "baby",
+    "name": "出産・育児の準備",
+    "keywords": [
+      "出産",
+      "育児",
+      "赤ちゃん",
+      "ベビー",
+      "新生児",
+      "子育て",
+      "ベビーカー"
+    ],
+    "typicalUsesPerYear": 150,
+    "items": [
+      {
+        "productId": "stroller",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "baby-crib",
+        "priority": 2,
+        "essential": true
+      },
+      {
+        "productId": "child-seat",
+        "priority": 3,
+        "essential": false
+      },
+      {
+        "productId": "baby-scale",
+        "priority": 4,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "出産・育児"
+  },
+  {
+    "id": "ceremony",
+    "name": "結婚式・式典に出る",
+    "keywords": [
+      "結婚式",
+      "式典",
+      "冠婚葬祭",
+      "フォーマル",
+      "礼服",
+      "成人式",
+      "振袖",
+      "スーツ",
+      "喪服",
+      "バッグ",
+      "ドレス"
+    ],
+    "typicalUsesPerYear": 1,
+    "items": [
+      {
+        "productId": "formal-wear",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "suit",
+        "priority": 2,
+        "essential": false
+      },
+      {
+        "productId": "furisode",
+        "priority": 3,
+        "essential": false
+      },
+      {
+        "productId": "brand-bag",
+        "priority": 4,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "結婚式・式典"
+  },
+  {
+    "id": "travel",
+    "name": "旅行の準備",
+    "keywords": [
+      "旅行",
+      "旅",
+      "海外",
+      "スーツケース",
+      "出張",
+      "キャリーケース"
+    ],
+    "typicalUsesPerYear": 2,
+    "items": [
+      {
+        "productId": "suitcase-large",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "suitcase-carryon",
+        "priority": 2,
+        "essential": false
+      },
+      {
+        "productId": "mirrorless-camera",
+        "priority": 3,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "旅行"
+  },
+  {
+    "id": "big-cleaning",
+    "name": "大掃除をしたい",
+    "keywords": [
+      "大掃除",
+      "掃除",
+      "カーペット",
+      "高圧洗浄",
+      "クリーナー",
+      "洗浄"
+    ],
+    "typicalUsesPerYear": 2,
+    "items": [
+      {
+        "productId": "carpet-cleaner",
+        "priority": 1,
+        "essential": false
+      },
+      {
+        "productId": "pressure-washer",
+        "priority": 2,
+        "essential": false
+      },
+      {
+        "productId": "steam-cleaner",
+        "priority": 3,
+        "essential": false
+      },
+      {
+        "productId": "robot-vacuum",
+        "priority": 4,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "any",
+    "shortName": "大掃除"
+  },
+  {
+    "id": "diy",
+    "name": "DIY・家の修繕",
+    "keywords": [
+      "DIY",
+      "修繕",
+      "日曜大工",
+      "工具",
+      "棚",
+      "インパクト",
+      "組み立て"
+    ],
+    "typicalUsesPerYear": 4,
+    "items": [
+      {
+        "productId": "power-tool",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "ladder",
+        "priority": 2,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "DIY・家の修繕"
+  },
+  {
+    "id": "music",
+    "name": "楽器を始めたい",
+    "keywords": [
+      "楽器",
+      "ギター",
+      "ドラム",
+      "音楽",
+      "バンド",
+      "電子ドラム"
+    ],
+    "typicalUsesPerYear": 50,
+    "items": [
+      {
+        "productId": "guitar",
+        "priority": 1,
+        "essential": false
+      },
+      {
+        "productId": "e-drums",
+        "priority": 2,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "any",
+    "shortName": "楽器"
+  },
+  {
+    "id": "cycling",
+    "name": "自転車に乗りたい",
+    "keywords": [
+      "自転車",
+      "サイクリング",
+      "ロードバイク",
+      "チャリ",
+      "ポタリング"
+    ],
+    "typicalUsesPerYear": 50,
+    "items": [
+      {
+        "productId": "road-bike",
+        "priority": 1,
+        "essential": false
+      },
+      {
+        "productId": "bicycle",
+        "priority": 2,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "any",
+    "shortName": "自転車"
+  },
+  {
+    "id": "home-theater",
+    "name": "おうちで映画・ゲーム",
+    "keywords": [
+      "映画",
+      "プロジェクター",
+      "ホームシアター",
+      "ゲーム",
+      "上映"
+    ],
+    "typicalUsesPerYear": 24,
+    "items": [
+      {
+        "productId": "projector",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "game-console",
+        "priority": 2,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "おうち映画・ゲーム"
+  },
+  {
+    "id": "gardening",
+    "name": "庭の手入れ",
+    "keywords": [
+      "庭",
+      "草刈り",
+      "芝",
+      "剪定",
+      "ガーデニング",
+      "芝刈り"
+    ],
+    "typicalUsesPerYear": 4,
+    "items": [
+      {
+        "productId": "lawn-mower",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "ladder",
+        "priority": 2,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "庭の手入れ"
+  },
+  {
+    "id": "sewing",
+    "name": "裁縫・ハンドメイド",
+    "keywords": [
+      "裁縫",
+      "ミシン",
+      "ハンドメイド",
+      "手芸",
+      "縫う"
+    ],
+    "typicalUsesPerYear": 6,
+    "items": [
+      {
+        "productId": "sewing-machine",
+        "priority": 1,
+        "essential": true
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "裁縫・ハンドメイド"
+  },
+  {
+    "id": "bread",
+    "name": "パンを焼きたい",
+    "keywords": [
+      "パン",
+      "ホームベーカリー",
+      "手作りパン",
+      "ベーカリー"
+    ],
+    "typicalUsesPerYear": 100,
+    "items": [
+      {
+        "productId": "home-bakery",
+        "priority": 1,
+        "essential": true
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "パン作り"
+  },
+  {
+    "id": "beauty",
+    "name": "自宅で美容・ケア",
+    "keywords": [
+      "美容",
+      "脱毛",
+      "エステ",
+      "美顔",
+      "マッサージ",
+      "リラックス"
+    ],
+    "typicalUsesPerYear": 50,
+    "items": [
+      {
+        "productId": "beauty-appliance",
+        "priority": 1,
+        "essential": true
+      },
+      {
+        "productId": "massage-chair",
+        "priority": 2,
+        "essential": false
+      }
+    ],
+    "updatedAt": "2026-08-26",
+    "selection": "all",
+    "shortName": "自宅美容・ケア"
+  }
+]
