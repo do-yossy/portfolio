@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * 掲載プラン一括生成（2026-09-02版）
- * ユーザー指定の「媒体×会社×職種構成」に合わせて求人を新規作成する。
- *  - Indeed / 求人ボックス / engage を target_media で振り分け。
+ * 掲載プラン一括生成（2026-09-02版・求人ボックス専用）
+ * ユーザー指定の「会社×職種構成」に合わせて求人ボックス向け求人を新規作成する（Indeed/engageはユーザー側で作成）。
+ *  - target_media = ['求人ボックス'] 固定。職種カテゴリごとに画像(imageUrl)を自動割当。
  *  - 【重要】現在掲載中の求人は一切編集・削除しない。この新構成は「今後新規に作る求人」だけに適用。
  *  - 追加のみ（既存はそのまま）。同一タイトルが既にあればスキップ＝冪等（再実行しても増殖しない）。
  *  - 給与・本文は職種カテゴリ別の妥当な既定値（※要調整。数字はタイトル/本文に明記）。
@@ -72,6 +72,20 @@ const DESC = {
   special:(t,a)=>`【仕事内容】\n${a}を中心に、${t}に関わる業務をお任せします。未経験の方も歓迎、丁寧にサポートします。\n\n【応募資格】\n未経験歓迎・学歴不問（普通自動車免許があれば尚可）\n\n【待遇・福利厚生】\n各種社会保険完備／交通費支給／研修あり／昇給あり\n\n【勤務】\n実働8時間・週休2日／転勤なし`,
 };
 
+// 職種カテゴリ → 画像（public/images）。※warehouse/eventは暫定（専用写真に差し替え推奨）
+const IMG = {
+  driver: '/images/haisou-fleet.jpg',
+  warehouse: '/images/logistics-warehouse.jpg',   // ★要追加（暫定fallbackを下で適用）
+  mfg: '/images/kikai-operator-kombinat.jpg',
+  sales: '/images/it-office.jpg',
+  office: '/images/it-office.jpg',
+  event: '/images/event-staff.jpg',               // ★要追加（暫定fallbackを下で適用）
+  special: '/images/haisou-fleet.jpg',
+};
+const IMG_FALLBACK = { warehouse: '/images/kikai-operator-kombinat.jpg', event: '/images/it-office.jpg' };
+const EXISTING_IMAGES = new Set(['/images/haisou-fleet.jpg','/images/it-office.jpg','/images/kikai-operator-kombinat.jpg','/images/ec-haisou-driver.jpg']);
+const imageFor = cat => EXISTING_IMAGES.has(IMG[cat]) ? IMG[cat] : (IMG_FALLBACK[cat] || '/images/haisou-fleet.jpg');
+
 function buildJob(co, type){
   const cat = TYPE_CAT[type] || 'office';
   const { area, location } = nextArea(co);
@@ -82,24 +96,18 @@ function buildJob(co, type){
   return {
     title, location, salary: salaryDetail(cat), jobType: type, employmentType: '正社員',
     description: DESC[cat](type, area), tags: ['未経験歓迎','正社員',type, sl,'週休2日','社会保険完備'],
-    catchcopy, imageUrl: '', isPublished: true, publishedAt: NOW, targetMedia: null, company: co,
+    catchcopy, imageUrl: imageFor(cat), isPublished: true, publishedAt: NOW, targetMedia: null, company: co,
   };
 }
 
 // ── 掲載プラン（media は target_media 値、keep は削除も再作成もしない職種） ──
+// 求人ボックスのみ（Indeed / engage はユーザー側で作成するため対象外）
 const PLAN = [
-  // Indeed
-  { media:'Indeed', co:'st', mix:{'イベント配送':2,'展示会配送':1,'送迎':3,'ec配送':2,'営業':1,'軽作業':4} },
-  { media:'Indeed', co:'nl', mix:{'送迎':3,'配送':3,'イベントスタッフ':2,'営業':1,'軽作業':4} },
-  // 求人ボックス
   { media:'求人ボックス', co:'sq', mix:{'配送':6,'送迎':5,'中型ドライバー':6,'メンテナンス':1,'IT営業':1,'ITサポート':1,'製造':1,'品質管理':1,'軽作業':1,'梱包':1,'組み立て':1,'ピッキング':1} },
   { media:'求人ボックス', co:'bg', mix:{'配送':5,'送迎':5,'中型ドライバー':5,'メンテナンス':1,'ルート営業':1,'事務':1,'品質管理':1,'軽作業':1,'梱包':1,'組み立て':1,'ピッキング':1,'検品':1,'物流倉庫':1} },
   { media:'求人ボックス', co:'st', mix:{'送迎':5,'配送':5,'中型ドライバー':5,'技術':1,'メンテナンス':1,'ルート営業':1,'事務':1,'品質管理':1,'軽作業':1,'梱包':1,'検品':1,'ピッキング':1,'物流倉庫':1} },
   { media:'求人ボックス', co:'nl', mix:{'送迎':5,'配送':5,'中型ドライバー':5,'イベント設営':1,'イベント企画':1,'イベント販売':1,'ルート営業':1,'メンテナンス':1,'組み立て':1,'事務':1,'品質管理':1,'軽作業':1,'梱包':1} },
   { media:'求人ボックス', co:'bi', mix:{'送迎':6,'配送':6,'中型ドライバー':6,'コンサル営業':1,'企画':1,'イベント営業':1,'メンテナンス':1,'ITサポート':1,'軽作業':1,'技術':1} },
-  // engage
-  { media:'engage', co:'nx', mix:{'企業配送':1,'中型ドライバー':1,'梱包':1,'メンテナンス':1,'運行管理':1}, keep:['昼アゲ様用'] },
-  { media:'engage', co:'nl', mix:{'送迎':5,'イベント設営':2,'イベント配送':5,'メンテナンス':1,'事務':1,'既存顧客営業':1} },
 ];
 
 async function main(){
