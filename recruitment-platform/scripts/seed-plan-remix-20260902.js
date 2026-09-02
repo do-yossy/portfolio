@@ -72,17 +72,20 @@ const DESC = {
   special:(t,a)=>`【仕事内容】\n${a}を中心に、${t}に関わる業務をお任せします。未経験の方も歓迎、丁寧にサポートします。\n\n【応募資格】\n未経験歓迎・学歴不問（普通自動車免許があれば尚可）\n\n【待遇・福利厚生】\n各種社会保険完備／交通費支給／研修あり／昇給あり\n\n【勤務】\n実働8時間・週休2日／転勤なし`,
 };
 
-// 職種カテゴリ → 画像（public/images）。倉庫/製造/事務/イベントは生成した専用写真、ドライバーは既存fleet写真。
-const IMG = {
-  driver: '/images/haisou-fleet.jpg',       // 既存：配送車両（社名の写り込みなし）
-  warehouse: '/images/jobcat-factory.jpg',  // 生成：整った工場/作業場
-  mfg: '/images/jobcat-factory.jpg',        // 生成：整った工場/作業場
-  sales: '/images/jobcat-office.jpg',       // 生成：明るいオフィス
-  office: '/images/jobcat-office.jpg',      // 生成：明るいオフィス
-  event: '/images/jobcat-event.jpg',        // 生成：展示会/イベント設営
-  special: '/images/haisou-fleet.jpg',
+// 画像は「会社（アカウント）ごとに固有」。10枚すべて社をまたいで重複しない。
+//  driver … ドライバー系職種（配送/送迎/中型/ec配送/企業配送）に使う車両写真（会社別）
+//  other  … それ以外（倉庫/製造/営業/事務/イベント）に使う職場写真（会社別）
+const IMG_CO = {
+  sq: { driver: '/images/haisou-fleet.jpg',        other: '/images/jobcat-factory.jpg' },
+  bg: { driver: '/images/cosme-haisou.jpg',        other: '/images/jobcat-office.jpg' },
+  st: { driver: '/images/st-haisou-driver.jpg',    other: '/images/kikai-operator-kombinat.jpg' },
+  nl: { driver: '/images/nl-movingsales.jpg',      other: '/images/jobcat-event.jpg' },
+  bi: { driver: '/images/bi-secretary-driver.jpg', other: '/images/it-office.jpg' },
 };
-const imageFor = cat => IMG[cat] || '/images/haisou-fleet.jpg';
+const imageFor = (co, cat) => {
+  const set = IMG_CO[co] || IMG_CO.sq;
+  return (cat === 'driver' || cat === 'special') ? set.driver : set.other;
+};
 
 function buildJob(co, type){
   const cat = TYPE_CAT[type] || 'office';
@@ -94,7 +97,7 @@ function buildJob(co, type){
   return {
     title, location, salary: salaryDetail(cat), jobType: type, employmentType: '正社員',
     description: DESC[cat](type, area), tags: ['未経験歓迎','正社員',type, sl,'週休2日','社会保険完備'],
-    catchcopy, imageUrl: imageFor(cat), isPublished: true, publishedAt: NOW, targetMedia: null, company: co,
+    catchcopy, imageUrl: imageFor(co, cat), isPublished: true, publishedAt: NOW, targetMedia: null, company: co,
   };
 }
 
