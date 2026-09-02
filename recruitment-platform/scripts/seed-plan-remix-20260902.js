@@ -72,19 +72,17 @@ const DESC = {
   special:(t,a)=>`【仕事内容】\n${a}を中心に、${t}に関わる業務をお任せします。未経験の方も歓迎、丁寧にサポートします。\n\n【応募資格】\n未経験歓迎・学歴不問（普通自動車免許があれば尚可）\n\n【待遇・福利厚生】\n各種社会保険完備／交通費支給／研修あり／昇給あり\n\n【勤務】\n実働8時間・週休2日／転勤なし`,
 };
 
-// 職種カテゴリ → 画像（public/images）。※warehouse/eventは暫定（専用写真に差し替え推奨）
+// 職種カテゴリ → 画像（public/images）。倉庫/製造/事務/イベントは生成した専用写真、ドライバーは既存fleet写真。
 const IMG = {
-  driver: '/images/haisou-fleet.jpg',
-  warehouse: '/images/logistics-warehouse.jpg',   // ★要追加（暫定fallbackを下で適用）
-  mfg: '/images/kikai-operator-kombinat.jpg',
-  sales: '/images/it-office.jpg',
-  office: '/images/it-office.jpg',
-  event: '/images/event-staff.jpg',               // ★要追加（暫定fallbackを下で適用）
+  driver: '/images/haisou-fleet.jpg',       // 既存：配送車両（社名の写り込みなし）
+  warehouse: '/images/jobcat-factory.jpg',  // 生成：整った工場/作業場
+  mfg: '/images/jobcat-factory.jpg',        // 生成：整った工場/作業場
+  sales: '/images/jobcat-office.jpg',       // 生成：明るいオフィス
+  office: '/images/jobcat-office.jpg',      // 生成：明るいオフィス
+  event: '/images/jobcat-event.jpg',        // 生成：展示会/イベント設営
   special: '/images/haisou-fleet.jpg',
 };
-const IMG_FALLBACK = { warehouse: '/images/kikai-operator-kombinat.jpg', event: '/images/it-office.jpg' };
-const EXISTING_IMAGES = new Set(['/images/haisou-fleet.jpg','/images/it-office.jpg','/images/kikai-operator-kombinat.jpg','/images/ec-haisou-driver.jpg']);
-const imageFor = cat => EXISTING_IMAGES.has(IMG[cat]) ? IMG[cat] : (IMG_FALLBACK[cat] || '/images/haisou-fleet.jpg');
+const imageFor = cat => IMG[cat] || '/images/haisou-fleet.jpg';
 
 function buildJob(co, type){
   const cat = TYPE_CAT[type] || 'office';
