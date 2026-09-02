@@ -58,6 +58,29 @@ https://www.social-quality.com/
   return send({ to, subject: '【株式会社Social Quality】お問い合わせありがとうございます', text });
 }
 
+// 社内向け：お問い合わせ内容の転送メール（LPフォーム→/api/contact 受信時）。
+//   宛先は INQUIRY_TO_EMAIL（未設定なら sq-support@social-quality.com）。Resend 未設定なら {skipped:true}。
+function sendInquiryAlert({ inquiry = {}, dealId = '' } = {}) {
+  const to = process.env.INQUIRY_TO_EMAIL || 'sq-support@social-quality.com';
+  const name = inquiry.お名前 || inquiry.会社名 || '（未入力）';
+  const type = inquiry.依頼内容 || inquiry.type || '';
+  const lines = Object.entries({
+    お名前: inquiry.お名前, 会社名: inquiry.会社名, メール: inquiry.メール || inquiry.email,
+    業種: inquiry.業種, 依頼内容: type, 目的: inquiry.目的,
+    予算: inquiry.予算, 納期: inquiry.納期, 必要機能: inquiry.必要機能, 素材: inquiry.素材,
+    参考サイト: inquiry.参考サイト, ご相談内容: inquiry.ご相談内容 || inquiry.message
+  }).filter(([, v]) => v).map(([k, v]) => `【${k}】${v}`).join('\n');
+  const text =
+`ホームページのお問い合わせフォームより新規のお問い合わせが届きました。
+
+${lines}
+
+──────────────────────
+管制塔で確認・返信：https://sq-sales-tanto20.fly.dev/admin${dealId ? `（案件ID: ${dealId}）` : ''}
+──────────────────────`;
+  return send({ to, subject: `【お問い合わせ】${type || 'ご相談'} ${name}`, text });
+}
+
 // 自分への売上アラート（Brain/Tips/note等でコンテンツが売れたとき）。
 //   宛先は NOTIFY_EMAIL（無ければ MAIL_REPLY_TO）。Resend 未設定なら {skipped:true}。
 function sendSaleAlert({ product = 'コンテンツ', amount = 0, platform = '', buyer = '', body = '' } = {}) {
@@ -77,4 +100,4 @@ ${body ? `\n──── 元メール抜粋 ────\n${String(body).slice(0
   return send({ to, subject: `🎉【売上】${platform || 'コンテンツ'} ¥${yen}：${product}`, text });
 }
 
-module.exports = { send, sendAck, sendSaleAlert };
+module.exports = { send, sendAck, sendInquiryAlert, sendSaleAlert };

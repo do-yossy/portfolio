@@ -55,13 +55,17 @@ async function autoReply(deal, b) {
   try { quote = L.quote({ type: deal.type, rush: /即日|1週間/.test(b.納期 || '') }); } catch { /* noop */ }
   let mr = { skipped: true };
   try { mr = await mail.sendAck({ to: customer, inquiry: b }); } catch (e) { mr = { ok: false, error: e.message }; }
+  let ir = { skipped: true };
+  try { ir = await mail.sendInquiryAlert({ inquiry: b, dealId: deal.id }); } catch (e) { ir = { ok: false, error: e.message }; }
   let draft = '';
   try { draft = await claude.draftReply(b, quote); }
   catch (e) { draft = `（AIドラフト生成スキップ：${e.message}）`; }
   try { Deals.update(deal.id, { proposal: draft, amount: (quote && quote.total) || deal.amount || 0 }); } catch { /* noop */ }
   const qline = quote && quote.total ? `概算の目安：¥${quote.total.toLocaleString()}（税別）` : '概算：要ヒアリング';
   const ack = mr.skipped ? '受付メール：未設定(未送信)' : mr.ok ? '受付メール：送信済' : `受付メール：失敗(${mr.status || mr.error || ''})`;
-  notify('LP問い合わせ＋AI返信ドラフト', `${deal.title}\n顧客：${customer}\n${ack}\n${qline}\n\n──── 返信ドラフト（確認のうえ送信）────\n${draft}`);
+  const inq = ir.skipped ? '社内転送：未設定(未送信)' : ir.ok ? '社内転送：送信済' : `社内転送：失敗(${ir.status || ir.error || ''})`;
+  if (ir.ok === false && !ir.skipped) Logs.create('inquiry_mail', 'error', `社内転送メール失敗: ${ir.status || ir.error || ''}`);
+  notify('LP問い合わせ＋AI返信ドラフト', `${deal.title}\n顧客：${customer}\n${ack}\n${inq}\n${qline}\n\n──── 返信ドラフト（確認のうえ送信）────\n${draft}`);
 }
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
