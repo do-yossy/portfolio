@@ -2,14 +2,14 @@
 'use strict';
 /**
  * 掲載プラン一括生成（2026-09-02版）
- * ユーザー指定の「媒体×会社×職種構成」に合わせて求人を作成する。
+ * ユーザー指定の「媒体×会社×職種構成」に合わせて求人を新規作成する。
  *  - Indeed / 求人ボックス / engage を target_media で振り分け。
- *  - 各(会社×媒体)は新構成に「置き換え」：既存の公開求人を削除→新構成を作成（冪等・再実行可）。
- *  - keepTypes(例: nxの'昼アゲ様用')は削除せず保持し、その職種は再作成しない。
+ *  - 【重要】現在掲載中の求人は一切編集・削除しない。この新構成は「今後新規に作る求人」だけに適用。
+ *  - 追加のみ（既存はそのまま）。同一タイトルが既にあればスキップ＝冪等（再実行しても増殖しない）。
  *  - 給与・本文は職種カテゴリ別の妥当な既定値（※要調整。数字はタイトル/本文に明記）。
  *
  * 実行: node --experimental-sqlite scripts/seed-plan-remix-20260902.js          （DRY-RUN・作成内容を表示）
- *        node --experimental-sqlite scripts/seed-plan-remix-20260902.js --apply （実際に置き換え）
+ *        node --experimental-sqlite scripts/seed-plan-remix-20260902.js --apply （実際に新規追加）
  */
 const path = require('path');
 const fs = require('fs');
@@ -30,10 +30,18 @@ const OSAKA = ['大阪市北区','大阪市中央区','大阪市西区','大阪�
   '大阪市浪速区','大阪市西成区','大阪市住之江区','大阪市港区','大阪市大正区','大阪市此花区','大阪市福島区','堺市堺区','堺市北区',
   '東大阪市','吹田市','豊中市','高槻市','茨木市','枚方市','八尾市','寝屋川市','守口市','門真市'];
 const TOKYO = ['世田谷区','目黒区','品川区','大田区','港区','渋谷区','新宿区','中野区','杉並区','豊島区','江東区','板橋区','練馬区','中央区','文京区'];
-const POOL = { sq:OSAKA, bg:OSAKA, st:OSAKA, nl:OSAKA, nx:OSAKA, bi:[...TOKYO,...OSAKA] };
-const PREF = a => a.startsWith('大阪') ? '大阪府' : (a.startsWith('堺') ? '大阪府' : (a.startsWith('東大阪')||a.endsWith('市') ? '大阪府' : '東京都'));
-const areaIdx = {};
-function nextArea(co){ const p=POOL[co]; const i=(areaIdx[co]||0)%p.length; areaIdx[co]=(areaIdx[co]||0)+1; const a=p[i]; const pref=co==='bi'?(TOKYO.includes(a)?'東京都':'大阪府'):(a.startsWith('大阪')?'大阪府':'大阪府'); return { area:a, pref, location: `${pref}${a}` }; }
+// 大阪勢(sq/bg/st/nl/nx)は共通カウンタでエリアを全社通して一意化（タイトルに会社名が入らないため衝突回避）。
+// biは東京プールで分離。2周目以降は丁目を付けて必ず一意にする。
+const areaIdx = { osaka: 0, tokyo: 0 };
+function nextArea(co){
+  const isBi = co === 'bi';
+  const p = isBi ? TOKYO : OSAKA; const L = p.length;
+  const key = isBi ? 'tokyo' : 'osaka';
+  const idx = areaIdx[key]++; const ward = p[idx % L]; const cycle = Math.floor(idx / L);
+  const area = cycle === 0 ? ward : `${ward}${cycle + 1}丁目`;
+  const pref = isBi ? '東京都' : '大阪府';
+  return { area, pref, location: `${pref}${area}` };
+}
 
 // ── 職種カテゴリ（給与レンジは万円） ──
 const CAT = {
@@ -94,31 +102,29 @@ const PLAN = [
   { media:'engage', co:'nl', mix:{'送迎':5,'イベント設営':2,'イベント配送':5,'メンテナンス':1,'事務':1,'既存顧客営業':1} },
 ];
 
-const parseMedia = j => { try { return JSON.parse(j.target_media || '[]'); } catch { return []; } };
-
 async function main(){
   console.log(`\n=== 掲載プラン ${APPLY?'反映(--apply)':'DRY-RUN'} / ${NOW.slice(0,10)} ===`);
+  console.log('※ 現在掲載中の求人は編集・削除しません。新規のみ追加します（同一タイトルはスキップ）。');
   const existing = await Jobs.findAll();
-  let created=0, deleted=0;
+  const existingTitles = new Set(existing.map(j => j.title));
+  let created=0, skipped=0;
   for (const p of PLAN) {
-    const keep = p.keep || [];
-    // 置き換え：該当会社×媒体の公開求人を削除（keep職種は残す）
-    const toDelete = existing.filter(j => j.company===p.co && j.is_published===1 && parseMedia(j).includes(p.media) && !keep.includes(j.job_type));
     const total = Object.values(p.mix).reduce((a,b)=>a+b,0);
-    console.log(`\n[${p.media}] ${CONAME[p.co]}(${p.co})  削除 ${toDelete.length}件 → 新規 ${total}件${keep.length?`（保持: ${keep.join('/')}）`:''}`);
-    if (APPLY) for (const j of toDelete) { await Jobs.delete(j.id); deleted++; }
-    else deleted += toDelete.length;
+    console.log(`\n[${p.media}] ${CONAME[p.co]}(${p.co})  新規追加 ${total}件`);
     for (const [type,count] of Object.entries(p.mix)) {
+      let made=0;
       for (let i=0;i<count;i++){
         const job = buildJob(p.co, type); job.targetMedia = [p.media];
+        if (existingTitles.has(job.title)) { skipped++; continue; }
+        existingTitles.add(job.title);
         if (APPLY) await Jobs.create(job);
-        created++;
-        if (i===0) console.log(`   ・${type} ×${count}  例: ${job.title.slice(0,44)}`);
+        created++; made++;
+        if (made===1) console.log(`   ・${type} ×${count}  例: ${job.title.slice(0,46)}`);
       }
     }
   }
-  console.log(`\n${APPLY?'完了':'（DRY-RUN・未反映）'}: 削除 ${deleted}件 / 作成 ${created}件`);
+  console.log(`\n${APPLY?'完了':'（DRY-RUN・未反映）'}: 新規作成 ${created}件 / スキップ(既存同名) ${skipped}件`);
   if (!APPLY) console.log('→ 反映するには: node --experimental-sqlite scripts/seed-plan-remix-20260902.js --apply');
-  console.log('※ 給与は職種カテゴリ別の既定値です。会社/職種ごとに調整したい場合はお知らせください。\n');
+  console.log('※ 既存求人は一切変更していません。給与/本文の調整が必要ならお知らせください。\n');
 }
 main().catch(e=>{ console.error(e); process.exit(1); });
