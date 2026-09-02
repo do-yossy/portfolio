@@ -72,19 +72,20 @@ const DESC = {
   special:(t,a)=>`【仕事内容】\n${a}を中心に、${t}に関わる業務をお任せします。未経験の方も歓迎、丁寧にサポートします。\n\n【応募資格】\n未経験歓迎・学歴不問（普通自動車免許があれば尚可）\n\n【待遇・福利厚生】\n各種社会保険完備／交通費支給／研修あり／昇給あり\n\n【勤務】\n実働8時間・週休2日／転勤なし`,
 };
 
-// 画像は「会社（アカウント）ごとに固有」。10枚すべて社をまたいで重複しない。
-//  driver … ドライバー系職種（配送/送迎/中型/ec配送/企業配送）に使う車両写真（会社別）
-//  other  … それ以外（倉庫/製造/営業/事務/イベント）に使う職場写真（会社別）
-const IMG_CO = {
-  sq: { driver: '/images/haisou-fleet.jpg',        other: '/images/jobcat-factory.jpg' },
-  bg: { driver: '/images/cosme-haisou.jpg',        other: '/images/jobcat-office.jpg' },
-  st: { driver: '/images/st-haisou-driver.jpg',    other: '/images/kikai-operator-kombinat.jpg' },
-  nl: { driver: '/images/nl-movingsales.jpg',      other: '/images/jobcat-event.jpg' },
-  bi: { driver: '/images/bi-secretary-driver.jpg', other: '/images/it-office.jpg' },
+// 画像は「会社（アカウント）× 職種カテゴリ」ごとに固有。27枚すべて別画像＝
+//   ・同じ会社でも職種で写真が変わる ・同じ職種でも会社が違えば写真が変わる（社跨ぎ重複ゼロ）。
+// driver は自社の既存写真（配送車両。ブランド写り込みなし）、その他はPexelsのフリーStock（商用可・表記不要）。
+const IMG_CELL = {
+  sq: { driver:'/images/haisou-fleet.jpg',        warehouse:'/images/pex-31043129.jpg', mfg:'/images/kikai-operator-kombinat.jpg', sales:'/images/pex-8555673.jpg',  office:'/images/jobcat-office.jpg' },
+  bg: { driver:'/images/cosme-haisou.jpg',        warehouse:'/images/pex-5156696.jpg',  mfg:'/images/jobcat-factory.jpg',          sales:'/images/pex-18935245.jpg', office:'/images/it-office.jpg' },
+  st: { driver:'/images/st-haisou-driver.jpg',    warehouse:'/images/pex-27111449.jpg', mfg:'/images/pex-31352672.jpg',            sales:'/images/pex-8171200.jpg',  office:'/images/pex-31198914.jpg' },
+  nl: { driver:'/images/nl-movingsales.jpg',      warehouse:'/images/pex-4487360.jpg',  mfg:'/images/pex-8973132.jpg',             sales:'/images/pex-6592668.jpg',  office:'/images/pex-92628.jpg',   event:'/images/jobcat-event.jpg' },
+  bi: { driver:'/images/bi-secretary-driver.jpg', warehouse:'/images/pex-4487361.jpg',  mfg:'/images/pex-8973680.jpg',             sales:'/images/pex-7550538.jpg',  office:'/images/pex-8606292.jpg', event:'/images/pex-7648050.jpg' },
 };
 const imageFor = (co, cat) => {
-  const set = IMG_CO[co] || IMG_CO.sq;
-  return (cat === 'driver' || cat === 'special') ? set.driver : set.other;
+  const c = IMG_CELL[co] || IMG_CELL.sq;
+  const key = (cat === 'special') ? 'driver' : cat;
+  return c[key] || c.driver;
 };
 
 function buildJob(co, type){
