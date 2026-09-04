@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * 掲載プラン一括生成（2026-09-02版・求人ボックス専用）
- * ユーザー指定の「会社×職種構成」に合わせて求人ボックス向け求人を新規作成する（Indeed/engageはユーザー側で作成）。
+ * 掲載プラン一括生成（2026-09-04版・求人ボックス専用）
+ * seed-plan-remix-20260902.js の続き。会社×職種構成・画像割当は同一のまま、
+ * エリアの起点だけ前回消費分（大阪101件・東京25件）より後ろにずらして重複を避ける。
  *  - target_media = ['求人ボックス'] 固定。職種カテゴリごとに画像(imageUrl)を自動割当。
  *  - 【重要】現在掲載中の求人は一切編集・削除しない。この新構成は「今後新規に作る求人」だけに適用。
  *  - 追加のみ（既存はそのまま）。同一タイトルが既にあればスキップ＝冪等（再実行しても増殖しない）。
  *  - 給与・本文は職種カテゴリ別の妥当な既定値（※要調整。数字はタイトル/本文に明記）。
  *
- * 実行: node --experimental-sqlite scripts/seed-plan-remix-20260902.js          （DRY-RUN・作成内容を表示）
- *        node --experimental-sqlite scripts/seed-plan-remix-20260902.js --apply （実際に新規追加）
+ * 実行: node --experimental-sqlite scripts/seed-plan-remix-20260904.js          （DRY-RUN・作成内容を表示）
+ *        node --experimental-sqlite scripts/seed-plan-remix-20260904.js --apply （実際に新規追加）
  */
 const path = require('path');
 const fs = require('fs');
@@ -32,7 +33,9 @@ const OSAKA = ['大阪市北区','大阪市中央区','大阪市西区','大阪�
 const TOKYO = ['世田谷区','目黒区','品川区','大田区','港区','渋谷区','新宿区','中野区','杉並区','豊島区','江東区','板橋区','練馬区','中央区','文京区'];
 // 大阪勢(sq/bg/st/nl/nx)は共通カウンタでエリアを全社通して一意化（タイトルに会社名が入らないため衝突回避）。
 // biは東京プールで分離。2周目以降は丁目を付けて必ず一意にする。
-const areaIdx = { osaka: 0, tokyo: 0 };
+// ※20260902版は大阪101件・東京25件を消費（大阪は3周目の33件目、東京は2周目の10件目まで）。
+//   ここでは安全マージンを見て、大阪は4周目の頭(102=34*3)、東京は3周目の頭(30=15*2)から開始する。
+const areaIdx = { osaka: 34 * 3, tokyo: 15 * 2 };
 function nextArea(co){
   const isBi = co === 'bi';
   const p = isBi ? TOKYO : OSAKA; const L = p.length;
@@ -75,8 +78,8 @@ const DESC = {
 // 画像は「会社（アカウント）× 職種カテゴリ」ごとに固有（driverを除く）。
 //   ・同じ会社でも職種で写真が変わる ・同じ職種でも会社が違えば写真が変わる（社跨ぎ重複ゼロ）。
 // driver は全社共通で自社の既存写真（配送車両。ブランド写り込みなし）を使用。
-//   ※以前 cosme-haisou.jpg / st-haisou-driver.jpg / nl-movingsales.jpg / bi-secretary-driver.jpg を
-//     割り当てていたが、いずれも public/images に実体が無く404になるバグがあったため haisou-fleet.jpg に統一した。
+//   ※20260902版で cosme-haisou.jpg / st-haisou-driver.jpg / nl-movingsales.jpg / bi-secretary-driver.jpg が
+//     public/images に実体が無く404になるバグを修正した経緯があるため、最初から haisou-fleet.jpg に統一。
 // driver以外はPexelsのフリーStock（商用可・表記不要）。
 const IMG_CELL = {
   sq: { driver:'/images/haisou-fleet.jpg', warehouse:'/images/pex-31043129.jpg', mfg:'/images/kikai-operator-kombinat.jpg', sales:'/images/pex-8555673.jpg',  office:'/images/jobcat-office.jpg' },
@@ -105,8 +108,8 @@ function buildJob(co, type){
   };
 }
 
-// ── 掲載プラン（media は target_media 値、keep は削除も再作成もしない職種） ──
-// 求人ボックスのみ（Indeed / engage はユーザー側で作成するため対象外）
+// ── 掲載プラン（media は target_media 値） ──
+// 求人ボックスのみ（Indeed / engage はユーザー側で作成するため対象外）。20260902版と同一の会社×職種構成。
 const PLAN = [
   { media:'求人ボックス', co:'sq', mix:{'配送':6,'送迎':5,'中型ドライバー':6,'メンテナンス':1,'IT営業':1,'ITサポート':1,'製造':1,'品質管理':1,'軽作業':1,'梱包':1,'組み立て':1,'ピッキング':1} },
   { media:'求人ボックス', co:'bg', mix:{'配送':5,'送迎':5,'中型ドライバー':5,'メンテナンス':1,'ルート営業':1,'事務':1,'品質管理':1,'軽作業':1,'梱包':1,'組み立て':1,'ピッキング':1,'検品':1,'物流倉庫':1} },
@@ -137,7 +140,8 @@ async function main(){
     }
   }
   console.log(`\n${APPLY?'完了':'（DRY-RUN・未反映）'}: 新規作成 ${created}件 / スキップ(既存同名) ${skipped}件`);
-  if (!APPLY) console.log('→ 反映するには: node --experimental-sqlite scripts/seed-plan-remix-20260902.js --apply');
+  if (skipped > 0) console.log('※ スキップが多い場合は areaIdx の初期値をさらに大きくして再実行してください。');
+  if (!APPLY) console.log('→ 反映するには: node --experimental-sqlite scripts/seed-plan-remix-20260904.js --apply');
   console.log('※ 既存求人は一切変更していません。給与/本文の調整が必要ならお知らせください。\n');
 }
 main().catch(e=>{ console.error(e); process.exit(1); });
