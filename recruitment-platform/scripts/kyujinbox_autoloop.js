@@ -29,6 +29,7 @@ const APP_DIR = path.join(__dirname, '..');
 })();
 
 const optimizer = require(path.join(APP_DIR, 'lib', 'optimizer.js'));
+const insights = require(path.join(APP_DIR, 'lib', 'insights.js'));
 const { COMPANIES } = require(path.join(APP_DIR, 'db.js'));
 
 // ── 引数 ──
@@ -37,8 +38,10 @@ const getArg = (name, def) => { const i = args.indexOf(name); return i >= 0 && a
 const APPLY = args.includes('--apply');
 const PUSH = args.includes('--push');            // 改善内容を求人ボックス掲載へ反映（既定はドライラン）
 const PUSH_SAVE = args.includes('--push-save');  // 反映時に実際に保存する（未指定＝入力＋スクショのみ）
+const ENRICH = args.includes('--enrich');        // 新規求人を掲載実績の学びで先回り最適化する
 const COMPANY = getArg('--company', 'all');
 const LIMIT = parseInt(getArg('--limit', '20'), 10);
+const ENRICH_DAYS = parseInt(getArg('--enrich-days', '1'), 10);
 
 // ── 会社別の求人ボックス認証情報を解決（server.js と同じ規則）──
 function credsForCompany(id) {
@@ -145,6 +148,38 @@ async function runCompany(pyCmd, id) {
     }
   } else if (PUSH && appliedJobs.length === 0) {
     console.log('  （反映対象なし。--push は --apply と併用し、求人番号が紐付いた求人が対象です）');
+  }
+
+  // ── 新規求人を掲載実績の学びで先回り最適化（--enrich） ──
+  if (ENRICH) {
+    const ins = insights.buildInsights(id);
+    if (!ins.hasSignal) {
+      console.log('\n  🆕 新規求人の実績反映: 応募実績がまだ無いためスキップ');
+    } else {
+      const summary = insights.summarize(ins);
+      const since = new Date(Date.now() - ENRICH_DAYS * 86400000).toISOString();
+      const newer = db.prepare(`
+        SELECT * FROM jobs
+        WHERE company = ? AND is_published = 1 AND target_media LIKE '%求人ボックス%'
+          AND COALESCE(optimize_count, 0) = 0 AND created_at >= ?
+        ORDER BY created_at DESC LIMIT ?
+      `).all(id, since, LIMIT);
+      console.log(`\n  🆕 新規求人を実績で最適化: ${newer.length}件${APPLY ? '（適用）' : '（ドライラン）'}`);
+      let en = 0, ef = 0;
+      for (const job of newer) {
+        console.log(`    ▸ ${job.title.slice(0, 40)}…`);
+        try {
+          const improved = await optimizer.rewriteNewJob(job, summary);
+          console.log(`      ${improved.note || '実績に最適化'} → ${improved.title.slice(0, 40)}…`);
+          if (APPLY) { optimizer.applyImprovement(job.id, improved); en++; }
+        } catch (e) {
+          ef++;
+          console.log(`      ❌ ${e.message}`);
+          if (/ANTHROPIC_API_KEY/.test(e.message)) break;
+        }
+      }
+      console.log(`  新規最適化 完了: 対象${newer.length}件 / 適用${en}件 / 失敗${ef}件`);
+    }
   }
 }
 
