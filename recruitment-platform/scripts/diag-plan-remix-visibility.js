@@ -62,4 +62,20 @@ for (const r of mpRecent) console.log(`  [${r.company_id}/${r.media}] ${r.job_ti
 
 console.log('\n※ ①②で108件が is_published=1 で見えていれば、DB自体は正常です。');
 console.log('※ ③の件数が増えていれば「掲載管理トップの件数表」には反映されています（=クロス集計は生きているjobsを見る）。');
-console.log('※ ④のmedia_postsは「実際に投稿ボタンを押して投稿した記録」なので、投稿前は0件のままで正常です。\n');
+console.log('※ ④のmedia_postsは「実際に投稿ボタンを押して投稿した記録」なので、投稿前は0件のままで正常です。');
+
+console.log('\n⑤「🚀 求人ボックスに投稿する」ボタンと全く同じロジックで、会社別の投稿済み/未投稿を再現');
+console.log('   （判定は media_posts ではなく jobs.kyujinbox_posted_at 列で行われている）');
+for (const co of co5) {
+  const allJobs = db.prepare(`SELECT id, title, target_media, kyujinbox_posted_at FROM jobs WHERE is_published=1 AND company=?`).all(co);
+  const kbJobs = allJobs.filter(j => {
+    let m = []; try { m = JSON.parse(j.target_media || '[]'); } catch {}
+    return m.includes('求人ボックス') || m.includes('kyujinbox');
+  });
+  const already = kbJobs.filter(j => j.kyujinbox_posted_at).length;
+  const unposted = kbJobs.length - already;
+  console.log(`  ${co}: 求人ボックス対象=${kbJobs.length}件 / 投稿済み=${already}件 / 未投稿=${unposted}件`);
+}
+console.log('\n※ ⑤の「未投稿」が、ボタンを押したときに実際に投稿される件数です。');
+console.log('※ 重要: 1回のボタン押下で投稿されるのは会社ごとに最大25件（バッチ上限）。');
+console.log('　未投稿が25件を超える会社は、ボタンを複数回押す（または画面の投稿件数指定を増やす）必要があります。\n');
