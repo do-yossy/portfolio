@@ -1,13 +1,11 @@
 @echo off
-chcp 65001 >nul
-REM 求人ボックス新規求人の提案（generate-kyujinbox-from-performance.js・DRY-RUN）を実行し、
-REM logs\kyujinbox-suggestions\ に日付付きで保存する。
-REM 【重要】ここでは --apply を付けない。実際に求人を作成するかどうかは、この提案を見た上で
-REM 人が判断して手動で --apply 実行する（既存の掲載中求人と同様、自動では反映しない）。
-REM
-REM daily-funnel-report.js のgit同期（3:00〜）→ クラウド側ルーティンの解釈レポートpush の後に
-REM 実行したいので、install-kyujinbox-suggestions.ps1 では3:30に登録している。
-REM 手動実行も可能: scripts\run-kyujinbox-suggestions.bat
+REM Runs the kyujinbox new-job suggestion generator (generate-kyujinbox-from-performance.js,
+REM DRY-RUN only) and saves the output under logs\kyujinbox-suggestions\.
+REM IMPORTANT: no --apply here. Whether to actually create jobs is a manual decision after
+REM reviewing this output (existing published jobs are never touched automatically).
+REM Scheduled for 3:30 (after the 3:00 funnel report sync and the cloud routine's analysis
+REM have time to finish) via install-kyujinbox-suggestions.ps1.
+REM Manual run: scripts\run-kyujinbox-suggestions.bat
 
 cd /d "%~dp0\.."
 
@@ -17,4 +15,4 @@ for /f %%i in ('powershell -NoProfile -Command "(Get-Date).ToString(''yyyy-MM-dd
 
 node --experimental-sqlite scripts\generate-kyujinbox-from-performance.js > "logs\kyujinbox-suggestions\%REPORT_DATE%.txt" 2>&1
 
-echo 完了: logs\kyujinbox-suggestions\%REPORT_DATE%.txt （--applyでの反映は内容確認後に手動で行ってください）
+echo Done: logs\kyujinbox-suggestions\%REPORT_DATE%.txt (review before running --apply manually)
