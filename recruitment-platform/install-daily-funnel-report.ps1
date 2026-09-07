@@ -1,4 +1,4 @@
-# 採用ファネル日次レポート（scripts/daily-funnel-report.js）を
+﻿# 採用ファネル日次レポート（scripts/daily-funnel-report.js）を
 # 「毎朝3:00（このPCのローカル時刻）」に自動実行するタスクを登録します。
 # 結果は logs\funnel-reports\YYYY-MM-DD.txt に保存されます（.gitignore済み・コミットされません）。
 #

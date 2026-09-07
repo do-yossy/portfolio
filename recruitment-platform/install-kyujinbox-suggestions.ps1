@@ -1,4 +1,4 @@
-# 求人ボックス新規求人の提案（scripts/generate-kyujinbox-from-performance.js・DRY-RUN）を
+﻿# 求人ボックス新規求人の提案（scripts/generate-kyujinbox-from-performance.js・DRY-RUN）を
 # 「毎朝3:30（このPCのローカル時刻）」に自動実行するタスクを登録します。
 # 3:00の採用ファネル日次レポート（と、その後のクラウド側ルーティンの市場分析push）に
 # 十分な余裕を持たせるため、30分後に設定しています。
