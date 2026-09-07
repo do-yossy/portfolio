@@ -154,14 +154,33 @@ for (const r of mediaAppRows) {
     if (r.status === '対応中') byTitle[t].inprog++;
   }
 }
-const titleRanking = Object.entries(byTitle).sort((a, b) => b[1].valid - a[1].valid).slice(0, 10);
-if (titleRanking.length === 0) {
-  console.log('  該当なし');
-} else {
-  console.log('  ' + pad('応募時の求人タイトル(自由記述)', 42) + padL('応募', 6) + padL('有効応募', 9) + padL('対応中', 8));
-  for (const [title, r] of titleRanking) console.log('  ' + pad(title.slice(0, 40), 42) + padL(r.total, 6) + padL(r.valid, 9) + padL(r.inprog, 8));
-  console.log('  ※ jobs.title と完全一致しない場合は同一求人でも別行に分かれることがある（媒体側の表記ゆれのため）。');
+const titleEntries = Object.entries(byTitle).map(([title, v]) => ({
+  title, ...v, validRate: v.total > 0 ? v.valid / v.total : -1, progressRate: v.valid > 0 ? v.inprog / v.valid : -1,
+}));
+// 率ベースのランキングはサンプルが少ないと極端な値（0%/100%）が上位を占めてしまうため、最低件数を設ける。
+const MIN_FOR_RATE_TOTAL = 5;   // 有効応募率ランキングの最低「応募数」
+const MIN_FOR_RATE_VALID = 3;   // 対応移行率ランキングの最低「有効応募数」
+function printRanking(label, entries, sortKey, noteIfEmpty) {
+  console.log(`\n  【${label}】`);
+  if (entries.length === 0) { console.log(`    ${noteIfEmpty}`); return; }
+  console.log('    ' + pad('求人タイトル(自由記述)', 42) + padL('応募', 6) + padL('有効応募', 9) + padL('有効応募率', 11) + padL('対応中', 8) + padL('対応移行率', 11));
+  for (const r of entries.slice(0, 10)) {
+    console.log('    ' + pad(r.title.slice(0, 40), 42) + padL(r.total, 6) + padL(r.valid, 9) + padL(pct(r.valid, r.total), 11) + padL(r.inprog, 8) + padL(pct(r.inprog, r.valid), 11));
+  }
 }
+printRanking('有効応募数 TOP10', [...titleEntries].sort((a, b) => b.valid - a.valid), null, '該当なし');
+printRanking('対応中数 TOP10', [...titleEntries].sort((a, b) => b.inprog - a.inprog), null, '該当なし');
+printRanking(
+  `有効応募率 TOP10（応募${MIN_FOR_RATE_TOTAL}件以上のみ対象・サンプル不足除外）`,
+  [...titleEntries].filter(r => r.total >= MIN_FOR_RATE_TOTAL).sort((a, b) => b.validRate - a.validRate),
+  null, `該当なし（応募${MIN_FOR_RATE_TOTAL}件以上の求人が無い）`
+);
+printRanking(
+  `対応移行率 TOP10（有効応募${MIN_FOR_RATE_VALID}件以上のみ対象・サンプル不足除外）`,
+  [...titleEntries].filter(r => r.valid >= MIN_FOR_RATE_VALID).sort((a, b) => b.progressRate - a.progressRate),
+  null, `該当なし（有効応募${MIN_FOR_RATE_VALID}件以上の求人が無い）`
+);
+if (titleEntries.length > 0) console.log('\n  ※ jobs.title と完全一致しない場合は同一求人でも別行に分かれることがある（媒体側の表記ゆれのため）。');
 
 // ⑤ 職種カテゴリ別（job_title のキーワード推定・直近30日）
 const CAT_KEYWORDS = [
@@ -180,7 +199,7 @@ function categorize(title) {
   return 'その他/分類不能';
 }
 const allTitled = db.prepare(
-  `SELECT job_title, is_duplicate, status FROM applicants WHERE ${D} >= ? AND ${D} <= ? AND job_title != ''${coCond}`
+  `SELECT job_title, media, is_duplicate, status FROM applicants WHERE ${D} >= ? AND ${D} <= ? AND job_title != ''${coCond}`
 ).all(sinceN30, TODAY);
 const byCat = {};
 for (const r of allTitled) {
@@ -198,8 +217,31 @@ for (const [cat, r] of Object.entries(byCat).sort((a, b) => b[1].valid - a[1].va
   console.log('  ' + pad(cat, 20) + padL(r.total, 6) + padL(r.valid, 9) + padL(pct(r.valid, r.total), 11) + padL(r.inprog, 8) + padL(pct(r.inprog, r.valid), 11));
 }
 
+// ⑥ 職種カテゴリ × 媒体 クロス集計（「どの職種ならどの媒体が強いか」の判断材料。直近30日・有効応募数ベース）
+const byCatMedia = {};
+for (const r of allTitled) {
+  const c = categorize(r.job_title);
+  const m = r.media || '';
+  byCatMedia[c] = byCatMedia[c] || {};
+  byCatMedia[c][m] = byCatMedia[c][m] || { total: 0, valid: 0, inprog: 0 };
+  byCatMedia[c][m].total++;
+  if (r.is_duplicate === 0) {
+    byCatMedia[c][m].valid++;
+    if (r.status === '対応中') byCatMedia[c][m].inprog++;
+  }
+}
+const catMediaMedias = [...new Set(allTitled.map(r => r.media || ''))];
+console.log(`\n■⑥ 職種カテゴリ × 媒体 クロス集計（直近30日・有効応募数／「どの職種にどの媒体が強いか」の判断材料・参考値）`);
+console.log('  ' + pad('カテゴリ', 20) + catMediaMedias.map(m => padL((MEDIA_NAME[m] ?? m) || '(未設定)', 12)).join('') + padL('計', 8));
+for (const [cat, byM] of Object.entries(byCatMedia).sort((a, b) => (Object.values(b[1]).reduce((s, v) => s + v.valid, 0)) - (Object.values(a[1]).reduce((s, v) => s + v.valid, 0)))) {
+  const row = catMediaMedias.map(m => (byM[m] || {}).valid || 0);
+  const sum = row.reduce((a, b) => a + b, 0);
+  console.log('  ' + pad(cat, 20) + row.map(v => padL(v, 12)).join('') + padL(sum, 8));
+}
+console.log('  ※ セルの数値はどれも「参考値」。特定のセルが1桁など少数の場合は断定せず「現時点では仮説」として扱うこと。');
+
 console.log('\n※ 制約：');
 console.log('  ・閲覧数/表示数は求人ボックスのみ取得可能（job_metrics）。Indeed/engageの掲載パフォーマンスは無し（別途 scripts/kyujinbox-stats.js を参照）。');
-console.log('  ・④-Bと⑤の職種分類は文字列推定のため参考値。断定的な意思決定には④-A・実データの目視確認を併用すること。');
+console.log('  ・④-B・⑤・⑥の職種分類は文字列推定のため参考値。断定的な意思決定には④-A・実データの目視確認を併用すること。');
 console.log('  ・過去の一部データ（media空欄で保存された古いレコード）はengageがstanby扱いになっている可能性あり。');
 console.log('  ・「内定」「入社」等のデータは本システムに存在しないため、このレポートに一切含まない。\n');
