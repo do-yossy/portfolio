@@ -12,10 +12,18 @@
  * 【重要】給与・エリアは既存の seed-plan-remix-20260906.js と同じテンプレート（カテゴリ別レンジ）を流用。
  *         実在しない条件を創作しているわけではないが、実際の給与テーブルと違う場合は要確認。
  *
+ * 【市場データの反映】ルーティン（採用ファネル日次分析）が reports/funnel-data ブランチに保存した
+ * 最新の解釈レポート（<日付>-analysis.md、直近7日以内）を読み、「⑤伸ばすべき求人」「⑦新規求人提案」
+ * セクションで言及されているカテゴリに小さな加点（既定+5/回、実績データの1件分より軽い重み）をする。
+ * あくまで実績データ（応募数・有効応募・対応中）が主でこれは補助的なタイブレークであり、
+ * 市場データだけでカテゴリ順位が逆転することは無いよう重みを抑えている。
+ * 取得できない場合（オフライン・レポート未生成等）は実績データのみで判断し、失敗しても止まらない。
+ *
  * 使い方（recruitment-platform フォルダで）:
  *   node --experimental-sqlite scripts/generate-kyujinbox-from-performance.js                 // 全社DRY-RUN
  *   node --experimental-sqlite scripts/generate-kyujinbox-from-performance.js --company sq
  *   node --experimental-sqlite scripts/generate-kyujinbox-from-performance.js --top 2 --count 3
+ *   node --experimental-sqlite scripts/generate-kyujinbox-from-performance.js --no-market      // 市場データの加点を無効化
  *   node --experimental-sqlite scripts/generate-kyujinbox-from-performance.js --apply          // 実際に追加
  */
 const path = require('path');
@@ -24,18 +32,22 @@ const fs = require('fs');
   fs.readFileSync(f,'utf8').split('\n').forEach(l=>{l=l.trim(); if(!l||l.startsWith('#'))return; const i=l.indexOf('='); if(i<0)return; const k=l.slice(0,i).trim(),v=l.slice(i+1).trim(); if(k&&!(k in process.env))process.env[k]=v;});
 })();
 
+const { execSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
 const { Jobs } = require('../db-factory');
 
 const argv = process.argv.slice(2);
 const APPLY = argv.includes('--apply');
+const NO_MARKET = argv.includes('--no-market');
 const val = (f, d) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : d; };
 const CO_FILTER = val('--company', null);
 const DAYS = parseInt(val('--days', '30'), 10);
 const TOP_N = parseInt(val('--top', '1'), 10);
 const COUNT = parseInt(val('--count', '2'), 10);
 const MIN_VALID = parseInt(val('--min-valid', '3'), 10);
+const MARKET_BOOST_WEIGHT = parseInt(val('--market-weight', '5'), 10);
 const NOW = new Date().toISOString();
+const REPO_ROOT = path.join(__dirname, '..', '..');
 
 const DB_PATH = process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'recruitment.db') : path.join(__dirname, '..', 'data', 'recruitment.db');
 const db = new DatabaseSync(DB_PATH);
@@ -120,8 +132,60 @@ function guessCat(title) {
   return null;
 }
 
+// ── 市場データ（ルーティンが保存した直近の解釈レポート）からカテゴリ加点を作る ──
+function fetchLatestAnalysis() {
+  const jst = ms => new Date(Date.now() + 9 * 3600 * 1000 + ms).toISOString().slice(0, 10);
+  try {
+    execSync('git fetch origin reports/funnel-data', { cwd: REPO_ROOT, stdio: 'pipe' });
+  } catch {
+    return null; // ネットワーク不通・ブランチ未取得等。市場加点なしで続行。
+  }
+  for (let i = 0; i < 7; i++) {
+    const date = jst(-i * 86400000);
+    try {
+      const text = execSync(
+        `git show origin/reports/funnel-data:recruitment-platform/reports/funnel/${date}-analysis.md`,
+        { cwd: REPO_ROOT, stdio: 'pipe', encoding: 'utf8' }
+      );
+      return { date, text };
+    } catch { /* その日付は無い。より古い日付を試す */ }
+  }
+  return null;
+}
+
+function extractCategoryBoost(analysisText) {
+  const boost = {};
+  if (!analysisText) return boost;
+  // 「⑤伸ばすべき求人」〜「⑥」、「⑦新規求人提案」〜「⑧」の間だけを対象にする
+  const sections = [
+    analysisText.match(/⑤[\s\S]*?(?=⑥|$)/),
+    analysisText.match(/⑦[\s\S]*?(?=⑧|$)/),
+  ].filter(Boolean).map(m => m[0]);
+  for (const section of sections) {
+    for (const [re, cat] of KEYWORD_TO_CAT) {
+      const matches = section.match(new RegExp(re.source, 'g'));
+      if (matches) boost[cat] = (boost[cat] || 0) + matches.length;
+    }
+  }
+  return boost;
+}
+
 async function main() {
   console.log(`\n=== 求人ボックス新規求人 提案${APPLY ? '（--apply・実際に作成）' : '（DRY-RUN）'} / 直近${DAYS}日の実績ベース ===\n`);
+
+  let marketBoost = {};
+  if (!NO_MARKET) {
+    const analysis = fetchLatestAnalysis();
+    if (analysis) {
+      marketBoost = extractCategoryBoost(analysis.text);
+      const boostStr = Object.entries(marketBoost).map(([c, n]) => `${c}+${n * MARKET_BOOST_WEIGHT}`).join(', ') || 'なし';
+      console.log(`市場データ反映: ${analysis.date}分の解釈レポート（reports/funnel-data）を使用。カテゴリ加点: ${boostStr}`);
+    } else {
+      console.log('市場データ反映: 直近7日分の解釈レポートが見つからないため、実績データのみでランキングします。');
+    }
+  } else {
+    console.log('市場データ反映: --no-market指定のため無効化。実績データのみでランキングします。');
+  }
 
   const jst = ms => new Date(Date.now() + 9 * 3600 * 1000 + ms).toISOString().slice(0, 10);
   const since = jst(-(DAYS - 1) * 86400000);
@@ -189,11 +253,13 @@ async function main() {
         if (r.status === '対応中') byCat[cat].inprog++;
       }
     }
-    // サンプル不足を除外し、有効応募数→対応移行率の順でランキング
+    // サンプル不足を除外し、（有効応募数＋市場データ加点）→対応移行率の順でランキング
+    // 市場加点はあくまで僅かな重み（既定+5/回）で、実績データの大きな差を逆転させない範囲に抑えている。
+    const scoreOf = (cat, v) => v.valid + (marketBoost[cat] || 0) * MARKET_BOOST_WEIGHT;
     const ranked = Object.entries(byCat)
       .filter(([, v]) => v.valid >= MIN_VALID)
       .filter(([cat]) => typesByCoCat[co] && typesByCoCat[co][cat]) // 自社が実際に掲載したことのあるカテゴリのみ
-      .sort((a, b) => (b[1].valid - a[1].valid) || ((b[1].inprog / (b[1].valid || 1)) - (a[1].inprog / (a[1].valid || 1))));
+      .sort((a, b) => (scoreOf(b[0], b[1]) - scoreOf(a[0], a[1])) || ((b[1].inprog / (b[1].valid || 1)) - (a[1].inprog / (a[1].valid || 1))));
 
     console.log(`\n[${CONAME[co] || co}] 直近${DAYS}日のカテゴリ別実績（有効応募${MIN_VALID}件未満・自社未掲載カテゴリは対象外）`);
     if (ranked.length === 0) {
@@ -202,7 +268,8 @@ async function main() {
     }
     for (const [cat, v] of ranked) {
       const pr = v.valid ? (100 * v.inprog / v.valid).toFixed(1) : '−';
-      console.log(`  ${cat.padEnd(10)} 応募${v.total} 有効${v.valid} 対応中${v.inprog}（対応移行率${pr}%）`);
+      const mb = marketBoost[cat] ? `  市場加点+${marketBoost[cat] * MARKET_BOOST_WEIGHT}` : '';
+      console.log(`  ${cat.padEnd(10)} 応募${v.total} 有効${v.valid} 対応中${v.inprog}（対応移行率${pr}%）${mb}`);
     }
 
     const picks = ranked.slice(0, TOP_N);
