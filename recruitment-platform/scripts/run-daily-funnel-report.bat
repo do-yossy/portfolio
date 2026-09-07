@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 REM 採用ファネル日次レポートを実行し、logs\funnel-reports\ に日付付きで保存する。
 REM さらに専用ブランチ reports/funnel-data へ自動push し、クラウド側の日次分析ルーティンが
 REM 貼り付けなしで当日分を読めるようにする（sync-funnel-report-to-git.js。失敗してもここは無視される）。

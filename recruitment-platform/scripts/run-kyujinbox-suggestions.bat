@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 REM 求人ボックス新規求人の提案（generate-kyujinbox-from-performance.js・DRY-RUN）を実行し、
 REM logs\kyujinbox-suggestions\ に日付付きで保存する。
 REM 【重要】ここでは --apply を付けない。実際に求人を作成するかどうかは、この提案を見た上で
