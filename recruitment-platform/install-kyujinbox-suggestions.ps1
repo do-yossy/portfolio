@@ -31,7 +31,7 @@ if (-not (Test-Path $batPath)) {
 }
 
 $action   = New-ScheduledTaskAction -Execute $batPath -WorkingDirectory $here
-$trigger  = New-ScheduledTaskTrigger -Daily -At 3:30am
+$trigger  = New-ScheduledTaskTrigger -Daily -At '3:30AM'
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd -WakeToRun
 
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
