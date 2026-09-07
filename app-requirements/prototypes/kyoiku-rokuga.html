@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>見て分かる授業｜録画モード（Higgsfield不要・¥0制作）</title>
+<style>
+  :root{
+    --bg:#0b1020; --stage1:#12203f; --stage2:#0e1730; --ink:#eef2fb; --sub:#9db0d6;
+    --accent:#5b8cff; --gold:#ffd76a; --good:#37d07a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#05070d;color:var(--ink);font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;line-height:1.7}
+  /* ===== menu ===== */
+  .menu{max-width:900px;margin:0 auto;padding:26px 18px 80px}
+  .badge{display:inline-block;background:#1b2a4d;color:#a9c2ff;border:1px solid #2f4472;border-radius:999px;padding:4px 13px;font-size:.78rem;margin-bottom:12px}
+  h1{font-size:1.7rem;margin-bottom:6px}
+  .lead{color:var(--sub);margin-bottom:20px}
+  .panel{background:#101a33;border:1px solid #24345c;border-radius:16px;padding:18px;margin-bottom:16px}
+  .panel h2{font-size:1.05rem;margin-bottom:12px}
+  .lessons{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .lesson{background:#16233f;border:1px solid #2a3c66;border-radius:12px;padding:15px;cursor:pointer;transition:.15s}
+  .lesson:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .lesson .lt{font-weight:800;font-size:1.06rem}
+  .lesson .ld{color:var(--sub);font-size:.85rem;margin-top:4px}
+  .lesson .lm{color:#6f82ab;font-size:.78rem;margin-top:6px}
+  .modes{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .mode{flex:1;min-width:220px;background:#16233f;border:1px solid #2a3c66;border-radius:12px;padding:12px 14px;cursor:pointer}
+  .mode.on{border-color:var(--accent);background:#1a2b52}
+  .mode b{display:block}
+  .mode span{color:var(--sub);font-size:.82rem}
+  .help{color:var(--sub);font-size:.9rem}
+  .help li{margin:6px 0 6px 18px}
+  .kbd{background:#1c2b4d;border:1px solid #34456b;border-radius:6px;padding:1px 7px;font-size:.85rem}
+  details summary{cursor:pointer;font-weight:700;margin-bottom:8px}
+  .warn{color:#ffcf6a;font-size:.85rem;margin-top:8px}
+  /* ===== player ===== */
+  .player{position:fixed;inset:0;background:#000;display:none;align-items:center;justify-content:center;z-index:50}
+  .player.show{display:flex}
+  .frame{position:relative;width:100vw;height:100vh;max-width:calc(100vh*16/9);max-height:calc(100vw*9/16);background:#000;overflow:hidden}
+  .stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6% 8%;
+    background:radial-gradient(120% 120% at 50% 30%,var(--stage1),var(--stage2) 70%,#080d18)}
+  .kb{position:absolute;inset:0;animation:kenburns 14s ease-out forwards}
+  @keyframes kenburns{from{transform:scale(1.04)}to{transform:scale(1.14)}}
+  .emoji{font-size:12vh;line-height:1;filter:drop-shadow(0 10px 30px rgba(0,0,0,.55));animation:pop .7s ease}
+  @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+  .stitle{font-size:4.6vh;font-weight:900;margin-top:2.4vh;text-shadow:0 3px 14px rgba(0,0,0,.6)}
+  .svisual{font-size:2.5vh;color:#cfe0ff;margin-top:1.4vh;max-width:80%}
+  .telop{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,rgba(0,0,0,.82),rgba(0,0,0,.35) 70%,transparent);
+    padding:4.5vh 7% 5.5vh;font-size:3.1vh;font-weight:700;text-align:left}
+  .telop .tl-mark{color:var(--gold);font-size:2vh;font-weight:800;letter-spacing:.1em;display:block;margin-bottom:.6vh}
+  .topbar{position:absolute;top:2.4vh;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 4%;font-size:2vh}
+  .topbar .ttl{color:#cfe0ff;font-weight:800}
+  .topbar .ch{color:var(--sub)}
+  .prog{position:absolute;top:0;left:0;height:.7vh;background:var(--accent);width:0;transition:width .4s linear;z-index:3}
+  /* intro / outro cards */
+  .card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    background:radial-gradient(120% 120% at 50% 40%,#16264c,#0a1226);animation:fade .6s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .card .k{font-size:2.4vh;color:var(--gold);letter-spacing:.2em;font-weight:800}
+  .card .big{font-size:6vh;font-weight:900;margin:2vh 0}
+  .card .s{font-size:2.6vh;color:var(--sub)}
+  .stop{position:absolute;top:2vh;right:2.4vh;z-index:9;background:rgba(255,255,255,.06);color:#9db0d6;border:1px solid #2a3c66;
+    border-radius:8px;padding:5px 10px;font-size:1.7vh;cursor:pointer}
+  .stop:hover{color:#fff;border-color:#ff6d7a}
+  .startbtn{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px 26px;font-size:1.05rem;font-weight:800;cursor:pointer}
+  .startbtn:hover{filter:brightness(1.08)}
+  .ghost{background:#16233f;color:var(--ink);border:1px solid #2a3c66;border-radius:12px;padding:14px 22px;font-size:1rem;cursor:pointer}
+</style>
+</head>
+<body>
+
+<!-- ============ MENU ============ -->
+<div class="menu" id="menu">
+  <div class="badge">録画モード ｜ Higgsfield不要・¥0で動画化</div>
+  <h1>見て分かる授業｜録画用プレーヤー</h1>
+  <p class="lead">下の題材を選ぶと、<b>16:9で自動再生＋ナレーション自動読み上げ＋テロップ</b>が流れます。<br>この画面を<b>画面録画</b>すれば、そのまま<b>¥0でYouTube動画の第1弾</b>になります。</p>
+
+  <div class="panel">
+    <h2>1. ナレーションの出し方をえらぶ</h2>
+    <div class="modes">
+      <div class="mode on" id="mVoice" onclick="setMode('voice')">
+        <b>🔊 音声つきで再生（おすすめ）</b>
+        <span>ブラウザ内蔵の音声合成が自動で読み上げ。録画時に「システム音声」も録れば完成。</span>
+      </div>
+      <div class="mode" id="mSilent" onclick="setMode('silent')">
+        <b>🔇 音声なしで再生</b>
+        <span>映像＋テロップだけ。あとで自分の声やVOICEVOX等で吹き替えたい人向け。</span>
+      </div>
+    </div>
+    <div class="warn" id="voiceWarn"></div>
+  </div>
+
+  <div class="panel">
+    <h2>2. 題材をえらんで再生（＝録画開始）</h2>
+    <div class="lessons" id="lessons"></div>
+  </div>
+
+  <div class="panel">
+    <details>
+      <summary>📹 録画のやり方（Windows・¥0）</summary>
+      <ul class="help">
+        <li><b>いちばん簡単：</b><span class="kbd">Win</span>+<span class="kbd">Alt</span>+<span class="kbd">R</span>（Xbox Game Bar）で画面録画開始 → 題材を再生 → 終わったら同じキーで停止。</li>
+        <li><b>音声つきモード</b>は内蔵音声で読み上げます。録画に声を入れるには、Game Barやスクリーン録画で<b>「システム音声」をON</b>にしてください（OBSなら「デスクトップ音声」を追加）。</li>
+        <li><b>もっと高品質にしたい</b>：音声なしモードで録画 → VOICEVOX等の無料音声合成、または自分の声で後から吹き替え。</li>
+        <li><b>フル画面がきれい</b>：ブラウザを最大化（<span class="kbd">F11</span>で全画面）してから再生すると、16:9でぴったり録れます。</li>
+        <li>できた動画は編集不要でそのままアップロード可。まずはShorts用に「山場の30秒」だけ切り出すのも◎。</li>
+      </ul>
+      <div class="warn">※ブラウザ内蔵の音声は機械的な声です。無料で"まず出す"には十分。反応が良ければ後で高品質化（自分の声／VOICEVOX／将来Higgsfield）。</div>
+    </details>
+  </div>
+</div>
+
+<!-- ============ PLAYER ============ -->
+<div class="player" id="player">
+  <div class="frame" id="frame">
+    <div class="prog" id="prog"></div>
+    <div class="stop" onclick="stopPlay()">■ 停止（メニューへ）</div>
+    <div id="screen"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const LESSONS = {
+  sekigahara:{ title:"関ヶ原の戦い", sub:"なぜ家康が天下を取れた？", scenes:[
+    {emoji:"⚔️",title:"1600年 天下分け目",visual:"東軍 vs 西軍、十数万が関ヶ原に集結",cap:"東軍(家康) VS 西軍(三成)｜天下分け目の戦い",nar:"1600年、天下を二つに分ける戦いが関ヶ原で起きた。徳川家康の東軍と、石田三成の西軍。あわせて十数万の兵が、この盆地に集まった。"},
+    {emoji:"🏯",title:"きっかけは秀吉の死",visual:"豊臣秀吉の死 → 次のトップは誰？",cap:"秀吉の死 → 「次の天下人」をめぐる対立",nar:"きっかけは、天下人・豊臣秀吉の死だった。次に誰が国をまとめるのか。実力者の家康と、秀吉に忠実な三成が対立し、全国の大名が二手に分かれた。"},
+    {emoji:"🗺️",title:"布陣図：西軍が有利…のはず",visual:"地形で見ると西軍が家康を囲む形",cap:"地形は西軍有利｜高所から東軍を包囲",nar:"地図で見ると、じつは西軍のほうが有利だった。高い場所から家康の軍を取り囲む形。数の上でも互角以上。ふつうなら西軍が勝つはずだった。"},
+    {emoji:"🔀",title:"小早川秀秋の裏切り",visual:"西軍のはずの部隊が東軍へ寝返る",cap:"小早川秀秋が寝返り → 西軍が総崩れ",nar:"勝負を決めたのは、裏切りだった。西軍についていた小早川秀秋が、突然東軍に寝返り、味方に攻めかかる。西軍の陣形は、いっきに崩れていった。"},
+    {emoji:"👑",title:"家康の勝利 → 江戸幕府へ",visual:"1603年 家康が征夷大将軍に",cap:"1603年 江戸幕府ひらく → 260年の平和へ",nar:"こうして家康が勝利。三年後の1603年、征夷大将軍となり、江戸幕府を開いた。ここから、およそ260年続く平和な時代が始まる。関ヶ原は、その出発点だった。"},
+  ]},
+  perry:{ title:"ペリー来航と開国", sub:"黒船で日本はどう変わった？", scenes:[
+    {emoji:"🚢",title:"1853年 黒船が来た",visual:"巨大な蒸気船4隻が浦賀に出現",cap:"1853年 ペリーの黒船が浦賀に来航",nar:"1853年、江戸の海に、見たこともない巨大な黒い船が現れた。ペリー率いるアメリカの艦隊、通称『黒船』。煙をはき、大砲を積んだその姿に、人々は震え上がった。"},
+    {emoji:"🔒",title:"当時は「鎖国」",visual:"約200年、国を閉ざしていた",cap:"当時は鎖国｜約200年、国を閉ざしていた",nar:"当時の日本は『鎖国』のさなか。およそ200年ものあいだ、決められた相手以外とは貿易をしない、閉じた国だった。だから外国の巨大な軍艦は、衝撃そのものだった。"},
+    {emoji:"💥",title:"大砲の力の差",visual:"黒船の大砲 vs 日本の旧式の備え",cap:"軍事力に大差｜断れば攻撃される圧力",nar:"戦えば、勝ち目はなかった。黒船の大砲は、日本の備えをはるかに上回っていた。幕府は、断れば攻撃されるかもしれないという圧力の中で、返事を迫られる。"},
+    {emoji:"📜",title:"1854年 開国",visual:"日米和親条約 → 下田・箱館を開く",cap:"1854年 日米和親条約｜下田・箱館を開港",nar:"翌1854年、幕府はついに条約を結び、下田と箱館の港を開いた。200年続いた鎖国が、ここで終わる。日本は、いやおうなく世界とつながっていく。"},
+    {emoji:"🌏",title:"時代が動き出す",visual:"開国 → やがて幕府の終わり → 明治へ",cap:"開国が引き金 → やがて明治維新へ",nar:"開国をきっかけに、日本は大きく揺れ動く。やがて幕府は倒れ、明治の新しい時代へ。たった4隻の黒船が、日本の歴史を丸ごと動かすスイッチになった。"},
+  ]},
+  sankin:{ title:"参勤交代のしくみ", sub:"なぜ大名は毎年引っ越し？", scenes:[
+    {emoji:"🏯",title:"なんで大名は毎年引っ越し？",visual:"大名が江戸 ⇄ 領地を往復する",cap:"参勤交代＝大名が江戸と領地を1年おきに往復",nar:"江戸時代、全国の大名たちは、自分の領地と江戸を、1年ごとに行ったり来たりしていた。これが『参勤交代』。でも、なんでそんな面倒なことをしたんだろう？"},
+    {emoji:"📏",title:"1635年 家光が制度化",visual:"3代将軍・徳川家光が義務にした",cap:"1635年 徳川家光が義務化（武家諸法度）",nar:"決めたのは、3代将軍・徳川家光。1635年、武家諸法度というルールで、参勤交代を大名の義務にした。しかも大名の妻や子は、江戸に住まわせた。"},
+    {emoji:"💰",title:"からくり① お金がかかる",visual:"大移動＝莫大な費用 → 財力が減る",cap:"巨大な行列＝莫大な出費｜財力が削られる",nar:"ここにからくりがある。何百人もの行列で長い距離を往復すれば、莫大なお金がかかる。毎年くり返せば、大名の財力はどんどん削られていく。"},
+    {emoji:"👨‍👩‍👧",title:"からくり② 妻子は人質",visual:"家族は江戸に → 反乱しにくい",cap:"妻子は江戸＝実質「人質」｜反乱を防ぐ",nar:"さらに、家族は江戸に置いたまま。もし将軍にそむけば、家族が危ない。つまり家族は人質。お金も減り、裏切りもできない。反乱の芽を、仕組みで摘んでいた。"},
+    {emoji:"⚖️",title:"戦わずに支配する知恵",visual:"お金を削る ＋ 人質 → 260年の安定",cap:"お金＋人質で反乱を封じる｜幕府安定の知恵",nar:"参勤交代は、ただの移動ではなかった。お金を減らし、家族を預からせることで、大名が幕府に逆らえないようにする巧妙な仕組み。戦わずに、260年の安定を支えたんだ。"},
+  ]},
+  kamakura:{ title:"鎌倉幕府の成立", sub:"武士の世は、どう始まった？", scenes:[
+    {emoji:"⚔️",title:"貴族から武士へ",visual:"平安の終わり、源氏 vs 平氏",cap:"貴族の時代が終わり、武士が力を争う時代へ",nar:"平安時代の終わり。それまで政治を動かしていたのは貴族だった。しかし各地で力をつけた武士たちが、いよいよ歴史の主役になっていく。"},
+    {emoji:"🏹",title:"1185年 源氏の勝利",visual:"壇ノ浦の戦いで平氏をたおす",cap:"守護・地頭を全国に置き支配を広げる",nar:"1185年、源頼朝の軍が、壇ノ浦の戦いで平氏をたおす。頼朝は全国に『守護』と『地頭』という役人を置き、支配を広げていった。"},
+    {emoji:"👑",title:"1192年 将軍に",visual:"頼朝が征夷大将軍に",cap:"鎌倉に政府（幕府）を開く",nar:"1192年、頼朝は征夷大将軍に任じられ、鎌倉に幕府という政府を開いた。武士のリーダーが、国を治める時代の始まりだ。"},
+    {emoji:"🤝",title:"御恩と奉公",visual:"将軍 ⇄ 御家人の約束",cap:"領地を守る（御恩）／戦う（奉公）",nar:"幕府を支えたのは『御恩と奉公』という約束。将軍は武士の領地を守り、ほうびを与える。武士は、いざという時に命がけで戦う。持ちつ持たれつの関係だ。"},
+    {emoji:"✅",title:"まとめ",visual:"武士による政治のはじまり",cap:"武家政権がここから始まった",nar:"こうして、貴族ではなく武士が国を動かす『武家政権』が誕生した。この鎌倉幕府から、約700年続く武士の世が幕を開けたんだ。"},
+  ]},
+};
+
+let MODE="voice", jaVoice=null, curKey=null, scenes=[], idx=0, advanced=false, timer=null, phase="idle";
+
+function setMode(m){ MODE=m;
+  document.getElementById('mVoice').classList.toggle('on',m==='voice');
+  document.getElementById('mSilent').classList.toggle('on',m==='silent');
+}
+function renderMenu(){
+  document.getElementById('lessons').innerHTML = Object.entries(LESSONS).map(([k,l])=>`
+    <div class="lesson" onclick="startLesson('${k}')">
+      <div class="lt">${l.title}</div>
+      <div class="ld">${l.sub}</div>
+      <div class="lm">全${l.scenes.length}シーン ・ ▶ 選ぶと再生（＝録画開始）</div>
+    </div>`).join('');
+}
+function pickVoice(){
+  const vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  jaVoice = vs.find(v=>/ja(-|_)?JP/i.test(v.lang)) || vs.find(v=>/Japanese|日本/i.test(v.name)) || null;
+}
+function checkVoice(){
+  const w=document.getElementById('voiceWarn');
+  if(!('speechSynthesis' in window)){ w.textContent="※このブラウザは音声合成に対応していません。『音声なし』で録画→後から吹き替えを推奨。"; return; }
+  pickVoice();
+  w.textContent = jaVoice ? ("使用する音声："+jaVoice.name) : "※日本語の音声が見つかりません。Edge/Chrome推奨。無ければ『音声なし』で。";
+}
+
+const screen=()=>document.getElementById('screen');
+const frameEl=()=>document.getElementById('frame');
+function setProg(p){ document.getElementById('prog').style.width=(p*100)+"%"; }
+
+function startLesson(key){
+  curKey=key; scenes=LESSONS[key].scenes; idx=0; phase="intro";
+  document.getElementById('menu').style.display="none";
+  document.getElementById('player').classList.add('show');
+  try{ if(frameEl().requestFullscreen) frameEl().requestFullscreen(); }catch(e){}
+  pickVoice();
+  showIntro();
+}
+function showIntro(){
+  setProg(0);
+  screen().innerHTML = `<div class="card"><div class="k">見て分かる授業</div>
+    <div class="big">${LESSONS[curKey].title}</div>
+    <div class="s">${LESSONS[curKey].sub}</div></div>`;
+  const intro = "見て分かる授業。今日のテーマは、"+LESSONS[curKey].title+"。"+LESSONS[curKey].sub;
+  runStep(intro, 3000, ()=>{ phase="scene"; idx=0; showScene(); });
+}
+function showScene(){
+  const s=scenes[idx];
+  setProg((idx)/(scenes.length));
+  screen().innerHTML = `
+    <div class="kb">
+      <div class="stage">
+        <div class="topbar"><span class="ttl">${LESSONS[curKey].title}</span><span class="ch">${idx+1} / ${scenes.length}</span></div>
+        <div class="emoji">${s.emoji}</div>
+        <div class="stitle">${s.title}</div>
+        <div class="svisual">${s.visual}</div>
+        <div class="telop"><span class="tl-mark">POINT</span>${s.cap}</div>
+      </div>
+    </div>`;
+  const dur = Math.max(4200, s.nar.length*135);
+  runStep(s.nar, dur, ()=>{
+    if(idx < scenes.length-1){ idx++; showScene(); }
+    else { phase="outro"; showOutro(); }
+  });
+}
+function showOutro(){
+  setProg(1);
+  screen().innerHTML = `<div class="card"><div class="k">まとめ</div>
+    <div class="big">${LESSONS[curKey].title}</div>
+    <div class="s">文字だと分かりにくい歴史も、映像なら"見て分かる"。<br>チャンネルで他の時代も配信中！</div></div>`;
+  const outro = "というわけで、"+LESSONS[curKey].title+"でした。文字だと分かりにくい歴史も、映像なら見て分かる。ぜひ、他の時代もチェックしてね。";
+  runStep(outro, 4200, ()=>{
+    screen().innerHTML += `<div class="stop" style="position:absolute;left:50%;bottom:6vh;top:auto;transform:translateX(-50%)" onclick="stopPlay()">■ 録画を停止してメニューへ</div>`;
+  });
+}
+// speak (if voice mode) and advance after speech end OR fallback timer
+function runStep(text, fallbackMs, done){
+  advanced=false;
+  const go=()=>{ if(advanced) return; advanced=true; if(timer){clearTimeout(timer);timer=null;} done(); };
+  if(MODE==="voice" && ('speechSynthesis' in window)){
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang="ja-JP"; u.rate=0.98; u.pitch=1.02;
+      if(jaVoice) u.voice=jaVoice;
+      u.onend=()=>{ setTimeout(go, 650); };
+      u.onerror=()=>{ /* fall back to timer */ };
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  // fallback timer always armed (covers silent mode, no-voice, or onend not firing / audio-not-captured)
+  timer=setTimeout(go, fallbackMs);
+}
+function stopPlay(){
+  if(timer){clearTimeout(timer);timer=null;}
+  advanced=true; phase="idle";
+  try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
+  try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+  document.getElementById('player').classList.remove('show');
+  document.getElementById('menu').style.display="block";
+}
+document.addEventListener('keydown',e=>{ if(e.key==="Escape") stopPlay(); });
+if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=()=>{ pickVoice(); checkVoice(); }; }
+renderMenu(); checkVoice();
+</script>
+</body>
+</html>

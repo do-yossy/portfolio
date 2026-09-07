@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>AI教育コンテンツ アプリ 機能マップ</title>
+<style>
+  @page { size: A4 landscape; margin: 10mm 11mm; }
+  :root{
+    --ink:#1c2430; --sub:#5a6a82; --line:#cfd8e6; --line2:#e6ebf3;
+    --navy:#1f3a5f; --navy-bg:#eef3fa; --accent:#2f6df0;
+    --free:#1f7a4d; --free-bg:#e7f5ee; --paid:#b8791a; --paid-bg:#fbf0da;
+    --future:#6b7688; --future-bg:#eef1f5;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"IPAPGothic","Noto Sans JP",sans-serif;color:var(--ink);font-size:8.6pt;line-height:1.5;background:#fff}
+  .doc{max-width:277mm;margin:0 auto}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid var(--navy);padding-bottom:5px;margin-bottom:7px}
+  .title{font-size:16pt;font-weight:800;color:var(--navy);letter-spacing:.04em}
+  .sub{font-size:8pt;color:var(--sub);text-align:right;line-height:1.5}
+  /* flow */
+  .flow{display:flex;align-items:stretch;gap:0;margin-bottom:8px}
+  .flow .st{flex:1;background:var(--navy-bg);border:1px solid #d6e2f2;padding:4px 6px;text-align:center;position:relative}
+  .flow .st b{color:var(--navy);font-size:8.4pt}
+  .flow .st span{display:block;color:var(--sub);font-size:7pt}
+  .flow .st:not(:last-child){margin-right:9px}
+  .flow .st:not(:last-child):after{content:"▶";position:absolute;right:-8px;top:50%;transform:translateY(-50%);color:var(--accent);font-size:8pt}
+  .flow .st.paid{background:var(--paid-bg);border-color:#eeD9a8}
+  /* grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  .card{border:1px solid var(--line);border-radius:6px;overflow:hidden;page-break-inside:avoid}
+  .card .ct{background:var(--navy);color:#fff;font-weight:700;font-size:8.8pt;padding:3px 8px}
+  .card ul{list-style:none;margin:0;padding:5px 8px}
+  .card li{display:flex;justify-content:space-between;gap:6px;align-items:baseline;padding:1.5px 0;border-bottom:1px dashed var(--line2)}
+  .card li:last-child{border-bottom:none}
+  .fx{flex:1}
+  .tags{white-space:nowrap;flex-shrink:0}
+  .chip{display:inline-block;font-size:6.4pt;border-radius:999px;padding:0 5px;font-weight:700;margin-left:2px;line-height:1.5}
+  .c-free{background:var(--free-bg);color:var(--free)}
+  .c-paid{background:var(--paid-bg);color:var(--paid)}
+  .c-mvp{background:#e8eefc;color:var(--accent)}
+  .c-fu{background:var(--future-bg);color:var(--future)}
+  /* bottom */
+  .bottom{display:grid;grid-template-columns:1.1fr 1.1fr 1fr 1.1fr;gap:7px;margin-top:8px}
+  .pl{border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+  .pl .h{font-weight:800;font-size:8.6pt;margin-bottom:2px}
+  .pl.free .h{color:var(--free)} .pl.paid .h{color:var(--paid)} .pl.buy .h{color:var(--navy)} .pl.rule .h{color:var(--ink)}
+  .pl ul{margin:0;padding-left:1.1em}
+  .pl li{margin:1px 0}
+  .price{font-weight:800;color:var(--paid);font-size:9.6pt}
+  .legend{font-size:7.2pt;color:var(--sub);margin-top:6px;text-align:center}
+  .ok{color:var(--free);font-weight:700}.ng{color:#b23a48;font-weight:700}
+  .mvpband{margin-top:7px;border:1px dashed var(--accent);background:#f5f8ff;border-radius:6px;padding:5px 9px;font-size:8.2pt}
+  .mvpband b{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="doc">
+  <div class="head">
+    <div class="title">AI教育コンテンツ アプリ ｜ 機能マップ</div>
+    <div class="sub">小中学生向け・映画風の解説動画（歴史→暗記科目）<br>子どもは熱中／親が払う ・ マルチデバイス＋親アカウント ・ フリーミアム</div>
+  </div>
+
+  <!-- flow -->
+  <div class="flow">
+    <div class="st"><b>入口</b><span>無料動画/Shorts・LP</span></div>
+    <div class="st"><b>題材えらぶ</b><span>時代/単元/学年</span></div>
+    <div class="st"><b>映画風で見る</b><span>教科書→映像</span></div>
+    <div class="st"><b>クイズ</b><span>正解でカード獲得</span></div>
+    <div class="st"><b>図鑑/城が埋まる</b><span>収集・時代が解放</span></div>
+    <div class="st paid"><b>全時代 見放題</b><span>ここが課金の壁</span></div>
+    <div class="st"><b>保護者レポート</b><span>進捗＝払う価値</span></div>
+  </div>
+
+  <!-- grid -->
+  <div class="grid">
+    <div class="card">
+      <div class="ct">A. 視聴・学習（コア）</div>
+      <ul>
+        <li><span class="fx">映画風の解説動画（時代/単元別）</span><span class="tags"><span class="chip c-free">無料入口</span><span class="chip c-paid">有料全</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">教科書「文章→映像」の対比</span><span class="tags"><span class="chip c-free">無料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">題材フィルタ（時代/単元/学年）</span><span class="tags"><span class="chip c-free">無料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">先生キャラのナビ</span><span class="tags"><span class="chip c-free">無料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">字幕/速度/チャプター/続き再生</span><span class="tags"><span class="chip c-free">無料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">オフライン保存</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-fu">将来</span></span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="ct">B. 理解・定着</div>
+      <ul>
+        <li><span class="fx">各動画のクイズ</span><span class="tags"><span class="chip c-free">無料基本</span><span class="chip c-paid">有料全</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">復習・弱点の再提示</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-fu">将来</span></span></li>
+        <li><span class="fx">進捗（単元/正答率/時間）</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">年表・地図で横断</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-fu">将来</span></span></li>
+        <li><span class="fx">人物図鑑・用語集</span><span class="tags"><span class="chip c-free">無料一部</span><span class="chip c-paid">有料全</span><span class="chip c-mvp">MVP</span></span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="ct">C. 熱中（ゲーミフィケーション）</div>
+      <ul>
+        <li><span class="fx">人物カード収集・図鑑コンプ</span><span class="tags"><span class="chip c-free">無料一部</span><span class="chip c-paid">有料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">タイムトラベル進行（時代解放）</span><span class="tags"><span class="chip c-free">無料入口</span><span class="chip c-paid">有料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">レベル/称号/バッジ/連続学習</span><span class="tags"><span class="chip c-free">無料</span><span class="chip c-fu">将来</span></span></li>
+        <li><span class="fx">クイズバトル・ランキング</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-fu">将来</span></span></li>
+        <li><span class="fx">博物館・城づくり</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-fu">将来</span></span></li>
+        <li><span class="fx">分岐体験（もし家康なら？）</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-fu">将来</span></span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="ct">D. 保護者向け（親アカウント）</div>
+      <ul>
+        <li><span class="fx">進捗レポート（見た/正答/時間）</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">広告なし</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">視聴時間管理・年齢/学年設定</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">家族・兄弟プロフィール</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-fu">将来</span></span></li>
+        <li><span class="fx">決済・プラン管理・解約</span><span class="tags"><span class="chip c-paid">有料</span><span class="chip c-mvp">MVP</span></span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="ct">E. 配信・デバイス</div>
+      <ul>
+        <li><span class="fx">マルチデバイス（スマホ/タブレット/TV/Web）</span><span class="tags"><span class="chip c-free">無料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">YouTube/Shorts連携（無料集客）</span><span class="tags"><span class="chip c-free">無料</span><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">塾・学校/GIGA端末配信</span><span class="tags"><span class="chip c-fu">将来B2B</span></span></li>
+      </ul>
+      <div class="ct" style="margin-top:0;background:#3a4a63">F. 運営・量産（裏側／自社用）</div>
+      <ul>
+        <li><span class="fx">AI量産WF（台本→ナレ→映像→字幕）</span><span class="tags"><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">監修フロー（時代考証・公開前確認）</span><span class="tags"><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">コンテンツ管理（学習指導要領タグ）</span><span class="tags"><span class="chip c-mvp">MVP</span></span></li>
+        <li><span class="fx">分析（視聴維持/正答率/転換/チャーン）</span><span class="tags"><span class="chip c-mvp">MVP</span></span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="ct" style="background:var(--accent)">MVP（検証フェーズで作る最小セット）</div>
+      <ul>
+        <li><span class="fx">① 映画風動画の視聴 ＋ 題材えらぶ</span></li>
+        <li><span class="fx">② クイズ ＋ カード獲得・簡易図鑑</span></li>
+        <li><span class="fx">③ 無料↔有料の1段ゲート（入口無料→全時代有料）</span></li>
+        <li><span class="fx">④ 親アカウント（決済・広告なし・進捗閲覧）</span></li>
+        <li><span class="fx">⑤ マルチデバイス ＋ YouTube/Shortsで集客</span></li>
+      </ul>
+      <div style="padding:4px 8px;font-size:7.4pt;color:var(--sub)">※まずYouTube/Shorts＋LPで"刺さるか"を検証 → アプリは反応が出てから作り込む。</div>
+    </div>
+  </div>
+
+  <!-- bottom: free/paid split -->
+  <div class="bottom">
+    <div class="pl free">
+      <div class="h">無料（フリーミアムの入口）</div>
+      <ul>
+        <li>各時代の入口エピソード</li>
+        <li>基本クイズ・カード数枚</li>
+        <li>広告あり・1デバイス</li>
+      </ul>
+      <div style="text-align:center;font-weight:800;color:var(--free)">0円</div>
+    </div>
+    <div class="pl paid">
+      <div class="h">有料（月額サブスク）</div>
+      <ul>
+        <li>全時代・全単元 見放題</li>
+        <li>広告なし・オフライン</li>
+        <li>図鑑コンプ・進捗・家族</li>
+      </ul>
+      <div style="text-align:center"><span class="price">月480〜980円</span><br><span style="font-size:7pt;color:var(--sub)">体系化で〜1,980円</span></div>
+    </div>
+    <div class="pl buy">
+      <div class="h">買い切り／将来B2B</div>
+      <ul>
+        <li>「時代パック」都度販売</li>
+        <li>塾・学校へライブラリ配信</li>
+        <li>GIGA端末で低学年にも到達</li>
+      </ul>
+      <div style="text-align:center;font-size:7.4pt;color:var(--sub)">1校 月数万円（将来）</div>
+    </div>
+    <div class="pl rule">
+      <div class="h">課金の壁の原則</div>
+      <ul>
+        <li><span class="ok">⭕置く：</span>広さ・快適さ・完成（図鑑）・親の安心</li>
+        <li><span class="ng">⚠️置かない：</span>FOMO・射幸ガチャ</li>
+        <li><span class="ng">⚠️置かない：</span>本編を人質・時間ぶつ切り</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="legend">
+    凡例：<span class="chip c-free">無料</span> 無料で使える ／ <span class="chip c-paid">有料</span> 課金の壁の内側 ／ <span class="chip c-mvp">MVP</span> 検証フェーズで作る ／ <span class="chip c-fu">将来</span> 拡大フェーズ　｜　払うのは親（親アカウント）／ 監修・著作権・時代考証を厳守 ／ 2026年8月時点・要検証
+  </div>
+</div>
+</body>
+</html>

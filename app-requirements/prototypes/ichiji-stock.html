@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>一次情報ストック｜AI×一次情報 試作</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171d2b; --panel2:#1e2637; --line:#2a3346;
+    --text:#e8ecf4; --muted:#93a0b8; --accent:#4c8dff; --good:#2fbf71; --warn:#ffb020;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;line-height:1.65}
+  .wrap{max-width:820px;margin:0 auto;padding:24px 16px 80px}
+  header h1{font-size:1.5rem;margin:0 0 4px}
+  header p{color:var(--muted);margin:0 0 14px;font-size:.92rem}
+  .badge{display:inline-block;background:#25314a;color:#a9c2ff;border:1px solid #34456b;border-radius:999px;padding:3px 12px;font-size:.78rem;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+  h2{font-size:1.02rem;margin:0 0 12px}
+  label{display:block;color:var(--muted);font-size:.8rem;margin:0 0 4px}
+  select,input[type=text],textarea{width:100%;background:#0d1220;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font:inherit;margin-bottom:12px}
+  textarea{min-height:80px;resize:vertical}
+  .cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .cat{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:999px;padding:5px 12px;font-size:.82rem;cursor:pointer}
+  .cat.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 15px;font-size:.88rem;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .toolbar input{flex:1;min-width:150px;margin:0}
+  .stat{color:var(--muted);font-size:.82rem;margin-left:auto}
+  .entry{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:10px}
+  .entry .meta{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+  .pill{font-size:.72rem;border-radius:999px;padding:2px 9px;background:#2a3346;color:#a9c2ff}
+  .entry .txt{white-space:pre-wrap}
+  .entry .acts{display:flex;gap:6px;margin-top:10px}
+  .entry .acts button{padding:4px 10px;font-size:.8rem}
+  .tags{margin-top:6px}
+  .tag{font-size:.74rem;color:var(--good);margin-right:8px}
+  .draft{background:#0d1220;border:1px dashed #3a4a6b;border-radius:10px;padding:12px;margin-top:10px;white-space:pre-wrap;font-size:.88rem}
+  .empty{color:var(--muted);text-align:center;padding:20px}
+  .muted{color:var(--muted);font-size:.82rem}
+  footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:30px}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="badge">AI×一次情報 試作 ｜ 個人×AI の事業案より</div>
+    <h1>一次情報ストック</h1>
+    <p>AIが汎用文を無限に作れる時代、価値が残るのは「あなたにしか書けない一次情報」。日々の実務で拾って、資産にして、発信の骨子に変えます。</p>
+  </header>
+
+  <!-- 入力 -->
+  <div class="card">
+    <h2>今日の一次情報を1つ入れる</h2>
+    <label>種類</label>
+    <div class="cats" id="cats"></div>
+    <label>内容（実際にあった事実・数字・やり取りを、そのまま）</label>
+    <textarea id="txt" placeholder="例）採用媒体Aに5万円で出稿→応募12件・面接3件・採用1件。単価は他媒体の半分だった。"></textarea>
+    <div class="row">
+      <div><label>タグ（カンマ区切り・任意）</label><input id="tags" type="text" placeholder="採用, 媒体, 単価"></div>
+    </div>
+    <button class="primary" onclick="addEntry()">＋ ストックする</button>
+    <button onclick="loadSample()">サンプルを入れる</button>
+  </div>
+
+  <!-- 一覧 -->
+  <div class="card">
+    <div class="toolbar">
+      <input id="q" type="text" placeholder="検索（内容・タグ）" oninput="renderList()">
+      <button onclick="exportAll()">まとめて書き出し</button>
+      <span class="stat" id="count"></span>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <footer>
+    試作（プロトタイプ）｜ブラウザだけで動作・データは端末内（localStorage）のみ<br>
+    「個人×AI」から着想した事業案 #7 AI×一次情報 の試作
+  </footer>
+</div>
+
+<script>
+"use strict";
+const CATS = ["数字・実績","失敗・学び","お客様の声","気づき・仮説","手順・ノウハウ"];
+let sel = CATS[0];
+let items = load();
+
+function load(){ try{ return JSON.parse(localStorage.getItem('ichiji')||'[]'); }catch(e){ return []; } }
+function save(){ localStorage.setItem('ichiji', JSON.stringify(items)); }
+
+function renderCats(){
+  document.getElementById('cats').innerHTML = CATS.map(c=>
+    `<span class="cat ${c===sel?'on':''}" onclick="sel='${c}';renderCats()">${c}</span>`).join('');
+}
+function addEntry(){
+  const txt = document.getElementById('txt').value.trim();
+  if(!txt){ document.getElementById('txt').focus(); return; }
+  const tags = document.getElementById('tags').value.split(/[,、]/).map(s=>s.trim()).filter(Boolean);
+  const now = new Date();
+  const ts = now.getFullYear()+'/'+(now.getMonth()+1)+'/'+now.getDate();
+  items.unshift({id:Date.now(), ts, cat:sel, txt, tags});
+  save();
+  document.getElementById('txt').value=''; document.getElementById('tags').value='';
+  renderList();
+}
+function del(id){ items = items.filter(x=>x.id!==id); save(); renderList(); }
+
+// 一次情報 → 投稿の骨子（AI不要のテンプレ生成）
+function toDraft(it){
+  const T = {
+    "数字・実績": `【実際の数字】${it.txt}\n\n▷ なぜこの数字になったか：\n▷ ここから言えること（再現できる法則）：\n\n※ 数字は一次情報の中で最も強い。憶測を混ぜず事実だけ載せる。`,
+    "失敗・学び": `【しくじり】${it.txt}\n\n▷ 何が原因だったか：\n▷ 次はこうする：\n\n※ 失敗談は共感と信頼を生む。カッコつけないほど刺さる。`,
+    "お客様の声": `【現場のリアルな声】${it.txt}\n\n▷ この声の裏にある本当のニーズ：\n▷ だからこう動いた／動くべき：\n\n※ 一次の声は誰もパクれない資産。`,
+    "気づき・仮説": `【現場で気づいたこと】${it.txt}\n\n▷ なぜそう思ったか（根拠）：\n▷ 検証するとしたら：\n\n※ 仮説は「まだ答えが出てない問い」として出すと議論が生まれる。`,
+    "手順・ノウハウ": `【実際にやっている手順】${it.txt}\n\n▷ つまずきやすい所：\n▷ これをやると差がつく1点：\n\n※ 手を動かした人だけが書ける。抽象論にしない。`
+  };
+  return T[it.cat] || it.txt;
+}
+function draft(id){
+  const it = items.find(x=>x.id===id);
+  const box = document.getElementById('d'+id);
+  if(box.dataset.open==='1'){ box.style.display='none'; box.dataset.open='0'; return; }
+  box.textContent = toDraft(it);
+  box.style.display='block'; box.dataset.open='1';
+}
+function copyDraft(id){
+  const it = items.find(x=>x.id===id);
+  navigator.clipboard && navigator.clipboard.writeText(toDraft(it));
+  const b = document.getElementById('c'+id); if(b){ const o=b.textContent; b.textContent='コピー済'; setTimeout(()=>b.textContent=o,1200); }
+}
+
+function renderList(){
+  const q = document.getElementById('q').value.trim();
+  let arr = items;
+  if(q){ arr = items.filter(it=> (it.txt+ ' '+it.tags.join(' ')+' '+it.cat).includes(q)); }
+  document.getElementById('count').textContent = `全${items.length}件` + (q?`／該当${arr.length}件`:'');
+  if(arr.length===0){ document.getElementById('list').innerHTML = `<div class="empty">${items.length===0?'まだありません。上から1つ入れてみてください。':'該当なし'}</div>`; return; }
+  document.getElementById('list').innerHTML = arr.map(it=>`
+    <div class="entry">
+      <div class="meta"><span class="pill">${it.cat}</span><span class="muted">${it.ts}</span></div>
+      <div class="txt">${esc(it.txt)}</div>
+      ${it.tags.length?`<div class="tags">${it.tags.map(t=>`<span class="tag">#${esc(t)}</span>`).join('')}</div>`:''}
+      <div class="acts">
+        <button onclick="draft(${it.id})">投稿ネタに変換</button>
+        <button id="c${it.id}" onclick="copyDraft(${it.id})">骨子をコピー</button>
+        <button onclick="del(${it.id})" style="margin-left:auto;color:#ff5d6c">削除</button>
+      </div>
+      <div class="draft" id="d${it.id}" data-open="0" style="display:none"></div>
+    </div>`).join('');
+}
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function exportAll(){
+  if(!items.length) return;
+  const text = items.map(it=>`■ [${it.cat}] ${it.ts}\n${it.txt}${it.tags.length?'\nタグ: '+it.tags.map(t=>'#'+t).join(' '):''}`).join('\n\n');
+  const blob = new Blob([text],{type:'text/plain'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='一次情報ストック.txt'; a.click();
+}
+
+function loadSample(){
+  const s = [
+    {cat:"数字・実績", txt:"採用媒体Aに5万円で出稿→応募12件・面接3件・採用1件。1採用あたり5万円で、他媒体の約半分だった。", tags:["採用","媒体","単価"]},
+    {cat:"失敗・学び", txt:"求人票の給与を『応相談』にしたら応募がほぼゼロ。翌週レンジで明記したら応募が3倍に。", tags:["求人票","改善"]},
+    {cat:"お客様の声", txt:"社長が『求人にお金かけるより、辞めない仕組みが欲しい』と。採用より定着に本音のニーズがある。", tags:["定着","本音"]},
+  ];
+  const now=new Date(); const ts=now.getFullYear()+'/'+(now.getMonth()+1)+'/'+now.getDate();
+  const base=Date.now();
+  s.reverse().forEach((x,i)=>items.unshift({id:base+i, ...x, ts}));
+  save(); renderList();
+}
+
+renderCats();
+renderList();
+</script>
+</body>
+</html>
