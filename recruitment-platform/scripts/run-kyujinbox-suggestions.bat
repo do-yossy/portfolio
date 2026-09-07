@@ -11,7 +11,9 @@ cd /d "%~dp0\.."
 
 if not exist "logs\kyujinbox-suggestions" mkdir "logs\kyujinbox-suggestions"
 
-for /f %%i in ('powershell -NoProfile -Command "(Get-Date).ToString(''yyyy-MM-dd'')"') do set REPORT_DATE=%%i
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd')"`) do set "REPORT_DATE=%%i"
+
+echo REPORT_DATE=%REPORT_DATE%
 
 node --experimental-sqlite scripts\generate-kyujinbox-from-performance.js > "logs\kyujinbox-suggestions\%REPORT_DATE%.txt" 2>&1
 

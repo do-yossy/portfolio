@@ -9,7 +9,9 @@ cd /d "%~dp0\.."
 
 if not exist "logs\funnel-reports" mkdir "logs\funnel-reports"
 
-for /f %%i in ('powershell -NoProfile -Command "(Get-Date).ToString(''yyyy-MM-dd'')"') do set REPORT_DATE=%%i
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd')"`) do set "REPORT_DATE=%%i"
+
+echo REPORT_DATE=%REPORT_DATE%
 
 node --experimental-sqlite scripts\daily-funnel-report.js > "logs\funnel-reports\%REPORT_DATE%.txt" 2>&1
 
