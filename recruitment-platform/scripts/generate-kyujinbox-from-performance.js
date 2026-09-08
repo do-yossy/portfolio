@@ -83,8 +83,8 @@ const CAT = {
   sales:     { s:[280000,500000] }, office:{ s:[230000,330000] }, event:{ s:[250000,360000] }, special:{ s:[300000,450000] },
 };
 const TYPE_CAT = {
-  '配送':'driver','中型ドライバー':'driver','ec配送':'driver','イベント配送':'driver','展示会配送':'driver','企業配送':'driver',
-  '送迎':'chauffeur',
+  '配送':'driver','中型ドライバー':'driver','ec配送':'driver','イベント配送':'driver','展示会配送':'driver','企業配送':'driver','配送ドライバー':'driver',
+  '送迎':'chauffeur','送迎ドライバー':'chauffeur','秘書兼ドライバー':'chauffeur',
   '軽作業':'warehouse','梱包':'warehouse','組み立て':'warehouse','ピッキング':'warehouse','検品':'warehouse','物流倉庫':'warehouse',
   '製造':'mfg','品質管理':'mfg',
   '技術':'technician','メンテナンス':'technician',
