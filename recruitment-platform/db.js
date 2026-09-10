@@ -667,6 +667,8 @@ const COMPANIES = [
   { id: 'st', name: '有限会社Style501',        short: 'ST', label: 'Style501' },
   { id: 'bi', name: 'Brand ideaL合同会社',     short: 'BI', label: 'Brand ideaL' },
   { id: 'nl', name: '株式会社NOWLIVE',         short: 'NL', label: 'NOWLIVE' },
+  { id: 'sl', name: '合同会社スマイルライフ',   short: 'SL', label: 'スマイルライフ' },
+  { id: 'am', name: 'AMBITION合同会社',        short: 'AM', label: 'AMBITION' },
 ];
 const MEDIA = [
   { id: 'indeed',   name: 'Indeed' },
