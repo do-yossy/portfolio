@@ -10,6 +10,8 @@ const COMPANIES = {
   st: { label: 'Style501',       full: '有限会社Style501',        color: '#ca8a04' },
   bi: { label: 'Brand ideaL',    full: 'Brand ideaL合同会社',     color: '#4338ca' },
   nl: { label: 'NOWLIVE',        full: '株式会社NOWLIVE',         color: '#b91c1c' },
+  sl: { label: 'スマイルライフ',   full: '合同会社スマイルライフ',   color: '#059669' },
+  am: { label: 'AMBITION',       full: 'AMBITION合同会社',        color: '#9333ea' },
 };
 
 // 運用管理の媒体マスタ
