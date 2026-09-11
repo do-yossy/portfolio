@@ -35,6 +35,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
 const { Jobs } = require('../db-factory');
+const { hashSeed } = require('./lib/kyujinbox-vary');
 
 const argv = process.argv.slice(2);
 const APPLY = argv.includes('--apply');
@@ -78,7 +79,7 @@ const POOL_LEN = KANSAI.length;
 
 // ── 職種カテゴリ定義（seed-plan-remix-20260906.js と同一） ──
 const CAT = {
-  driver:    { s:[300000,450000] }, chauffeur:{ s:[300000,450000] },
+  driver:    { s:[350000,450000] }, chauffeur:{ s:[350000,450000] },
   warehouse: { s:[220000,300000] }, mfg:{ s:[260000,380000] }, technician:{ s:[270000,400000] },
   sales:     { s:[280000,500000] }, office:{ s:[230000,330000] }, event:{ s:[250000,360000] }, special:{ s:[300000,450000] },
 };
@@ -221,16 +222,40 @@ async function main() {
     const area = `${item.ward}${cycle + 1}丁目`;
     return { area, pref: item.pref, location: `${item.pref}${area}` };
   }
+  // タイトル・書き出し文言のバリエーション（大量作成時の実質重複を避けるため）
+  const TITLE_SUFFIX = [
+    '｜未経験歓迎・正社員',
+    '（正社員）｜未経験OK',
+    '｜正社員募集・未経験歓迎',
+  ];
+  const OPEN_LINE = {
+    driver: [
+      a => `${a}を中心に、決まったルート・エリアでの配送業務をお任せします。`,
+      a => `${a}エリアが担当エリアの配送ドライバー募集です。未経験の方も安心してスタートできます。`,
+      a => `${a}周辺を担当エリアとして、荷物のお届けをお任せします。`,
+    ],
+    chauffeur: [
+      a => `${a}を中心に、お客様・スタッフの送迎をお任せします。`,
+      a => `${a}エリアで、乗用車での送迎業務を担当していただきます。`,
+      a => `${a}周辺を担当エリアとして、丁寧な送迎対応をお任せします。`,
+    ],
+  };
+  function pickVariant(pool, area, salt) { return pool[hashSeed(`${salt}|${area}`) % pool.length]; }
   function buildJob(co, type) {
     const cat = TYPE_CAT[type] || 'office';
     const { area, location } = nextArea();
     const sl = salaryLabel(cat);
     const isDriver = cat === 'driver' || cat === 'chauffeur' || cat === 'special';
-    const title = `【${area}】${type}｜${sl}・未経験歓迎・正社員${isDriver ? '・普通免許OK' : ''}`;
+    const suffix = pickVariant(TITLE_SUFFIX, area, `${co}:${type}:title`);
+    const title = `【${area}】${type}｜${sl}${suffix}${isDriver ? '・普通免許OK' : ''}`;
     const catchcopy = `${type}（${area}）｜${sl}・未経験歓迎の正社員募集。${isDriver ? '普通免許でOK。' : 'マニュアル・研修があり安心。'}週休2日・各種社会保険完備。`;
+    const openPool = OPEN_LINE[cat];
+    const description = openPool
+      ? `${pickVariant(openPool, area, `${co}:${type}:open`)(area)}\n\n${DESC[cat](type, area)}`
+      : DESC[cat](type, area);
     return {
       title, location, salary: salaryDetail(cat), jobType: type, employmentType: '正社員',
-      description: DESC[cat](type, area), tags: ['未経験歓迎', '正社員', type, sl, '週休2日', '社会保険完備'],
+      description, tags: ['未経験歓迎', '正社員', type, sl, '週休2日', '社会保険完備'],
       catchcopy, imageUrl: imageFor(cat), isPublished: true, publishedAt: NOW, targetMedia: ['求人ボックス'], company: co,
     };
   }
