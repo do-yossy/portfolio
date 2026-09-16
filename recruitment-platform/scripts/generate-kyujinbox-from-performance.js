@@ -55,27 +55,56 @@ const db = new DatabaseSync(DB_PATH);
 
 const CONAME = { sq:'SQ', bg:'ビッグ(Bigeyes)', st:'Style501', nl:'NOWLIVE', bi:'BrandideaL', nx:'ネクサス' };
 
-// ── 関西エリアプール（seed-plan-remix-20260906.js と同一定義） ──
+// ── 関西エリアプール（実在する町名レベル。2026-09-16、架空の「XX丁目」連番をやめ実在地名に修正） ──
 const KANSAI = [
-  { ward:'大阪市北区',pref:'大阪府' },{ ward:'大阪市中央区',pref:'大阪府' },{ ward:'大阪市西区',pref:'大阪府' },
-  { ward:'大阪市淀川区',pref:'大阪府' },{ ward:'大阪市東淀川区',pref:'大阪府' },{ ward:'大阪市都島区',pref:'大阪府' },
-  { ward:'大阪市城東区',pref:'大阪府' },{ ward:'大阪市鶴見区',pref:'大阪府' },{ ward:'大阪市旭区',pref:'大阪府' },
-  { ward:'大阪市天王寺区',pref:'大阪府' },{ ward:'大阪市阿倍野区',pref:'大阪府' },{ ward:'大阪市住吉区',pref:'大阪府' },
-  { ward:'大阪市東住吉区',pref:'大阪府' },{ ward:'大阪市平野区',pref:'大阪府' },{ ward:'大阪市生野区',pref:'大阪府' },
-  { ward:'大阪市東成区',pref:'大阪府' },{ ward:'大阪市浪速区',pref:'大阪府' },{ ward:'大阪市西成区',pref:'大阪府' },
-  { ward:'大阪市住之江区',pref:'大阪府' },{ ward:'大阪市港区',pref:'大阪府' },{ ward:'大阪市大正区',pref:'大阪府' },
-  { ward:'大阪市此花区',pref:'大阪府' },{ ward:'大阪市福島区',pref:'大阪府' },{ ward:'堺市堺区',pref:'大阪府' },
-  { ward:'堺市北区',pref:'大阪府' },{ ward:'東大阪市',pref:'大阪府' },{ ward:'吹田市',pref:'大阪府' },
-  { ward:'豊中市',pref:'大阪府' },{ ward:'高槻市',pref:'大阪府' },{ ward:'茨木市',pref:'大阪府' },
-  { ward:'枚方市',pref:'大阪府' },{ ward:'八尾市',pref:'大阪府' },{ ward:'寝屋川市',pref:'大阪府' },
-  { ward:'守口市',pref:'大阪府' },{ ward:'門真市',pref:'大阪府' },
-  { ward:'尼崎市',pref:'兵庫県' },{ ward:'西宮市',pref:'兵庫県' },{ ward:'伊丹市',pref:'兵庫県' },
-  { ward:'宝塚市',pref:'兵庫県' },{ ward:'川西市',pref:'兵庫県' },{ ward:'芦屋市',pref:'兵庫県' },
-  { ward:'京都市伏見区',pref:'京都府' },{ ward:'京都市南区',pref:'京都府' },{ ward:'向日市',pref:'京都府' },
-  { ward:'長岡京市',pref:'京都府' },{ ward:'八幡市',pref:'京都府' },{ ward:'京田辺市',pref:'京都府' },
-  { ward:'乙訓郡大山崎町',pref:'京都府' },
+  { area:'梅田',       ward:'大阪市北区',   pref:'大阪府' }, { area:'茶屋町',     ward:'大阪市北区',   pref:'大阪府' },
+  { area:'中崎西',     ward:'大阪市北区',   pref:'大阪府' }, { area:'天神橋',     ward:'大阪市北区',   pref:'大阪府' },
+  { area:'心斎橋',     ward:'大阪市中央区', pref:'大阪府' }, { area:'難波',       ward:'大阪市中央区', pref:'大阪府' },
+  { area:'谷町',       ward:'大阪市中央区', pref:'大阪府' }, { area:'本町',       ward:'大阪市中央区', pref:'大阪府' },
+  { area:'靭本町',     ward:'大阪市西区',   pref:'大阪府' }, { area:'新町',       ward:'大阪市西区',   pref:'大阪府' },
+  { area:'阿波座',     ward:'大阪市西区',   pref:'大阪府' },
+  { area:'悲田院町',   ward:'大阪市天王寺区', pref:'大阪府' }, { area:'上本町',   ward:'大阪市天王寺区', pref:'大阪府' },
+  { area:'難波中',     ward:'大阪市浪速区', pref:'大阪府' }, { area:'恵美須西',   ward:'大阪市浪速区', pref:'大阪府' },
+  { area:'西中島',     ward:'大阪市淀川区', pref:'大阪府' }, { area:'十三本町',   ward:'大阪市淀川区', pref:'大阪府' },
+  { area:'豊里',       ward:'大阪市東淀川区', pref:'大阪府' }, { area:'瑞光',     ward:'大阪市東淀川区', pref:'大阪府' },
+  { area:'都島本通',   ward:'大阪市都島区', pref:'大阪府' },
+  { area:'今福西',     ward:'大阪市城東区', pref:'大阪府' }, { area:'蒲生',       ward:'大阪市城東区', pref:'大阪府' },
+  { area:'今津中',     ward:'大阪市鶴見区', pref:'大阪府' },
+  { area:'大宮',       ward:'大阪市旭区',   pref:'大阪府' },
+  { area:'阪南町',     ward:'大阪市阿倍野区', pref:'大阪府' }, { area:'昭和町', ward:'大阪市阿倍野区', pref:'大阪府' },
+  { area:'帝塚山東',   ward:'大阪市住吉区', pref:'大阪府' },
+  { area:'駒川',       ward:'大阪市東住吉区', pref:'大阪府' },
+  { area:'平野本町',   ward:'大阪市平野区', pref:'大阪府' },
+  { area:'中川',       ward:'大阪市生野区', pref:'大阪府' },
+  { area:'玉津',       ward:'大阪市東成区', pref:'大阪府' },
+  { area:'岸里',       ward:'大阪市西成区', pref:'大阪府' },
+  { area:'南港',       ward:'大阪市住之江区', pref:'大阪府' },
+  { area:'磯路',       ward:'大阪市港区',   pref:'大阪府' },
+  { area:'三軒家東',   ward:'大阪市大正区', pref:'大阪府' },
+  { area:'春日出中',   ward:'大阪市此花区', pref:'大阪府' },
+  { area:'野田',       ward:'大阪市福島区', pref:'大阪府' },
+  { area:'宿院町',     ward:'堺市堺区',     pref:'大阪府' }, { area:'新金岡町', ward:'堺市北区',     pref:'大阪府' },
+  { area:'鳳東町',     ward:'堺市西区',     pref:'大阪府' },
+  { area:'長田',       ward:'東大阪市',     pref:'大阪府' }, { area:'江坂町',   ward:'吹田市',       pref:'大阪府' },
+  { area:'曽根東町',   ward:'豊中市',       pref:'大阪府' }, { area:'城北町',   ward:'高槻市',       pref:'大阪府' },
+  { area:'駅前町',     ward:'茨木市',       pref:'大阪府' }, { area:'岡東町',   ward:'枚方市',       pref:'大阪府' },
+  { area:'若林町',     ward:'八尾市',       pref:'大阪府' }, { area:'早子町',   ward:'寝屋川市',     pref:'大阪府' },
+  { area:'金田町',     ward:'守口市',       pref:'大阪府' }, { area:'速見町',   ward:'門真市',       pref:'大阪府' },
+  { area:'阿保',       ward:'松原市',       pref:'大阪府' }, { area:'岡',       ward:'藤井寺市',     pref:'大阪府' },
+  { area:'栄本町',     ward:'池田市',       pref:'大阪府' }, { area:'萱野',     ward:'箕面市',       pref:'大阪府' },
+  { area:'塚口本町',   ward:'尼崎市',       pref:'兵庫県' }, { area:'甲子園町', ward:'西宮市',       pref:'兵庫県' },
+  { area:'中央',       ward:'伊丹市',       pref:'兵庫県' }, { area:'逆瀬川',   ward:'宝塚市',       pref:'兵庫県' },
+  { area:'栄町',       ward:'川西市',       pref:'兵庫県' }, { area:'業平町',   ward:'芦屋市',       pref:'兵庫県' },
+  { area:'白金',       ward:'川辺郡猪名川町', pref:'兵庫県' },
+  { area:'深草',       ward:'京都市伏見区', pref:'京都府' }, { area:'上鳥羽',   ward:'京都市南区',   pref:'京都府' },
+  { area:'烏丸',       ward:'京都市中京区', pref:'京都府' }, { area:'四条',     ward:'京都市下京区', pref:'京都府' },
+  { area:'椥辻',       ward:'京都市山科区', pref:'京都府' },
+  { area:'宇治',       ward:'宇治市',       pref:'京都府' }, { area:'長岡',     ward:'長岡京市',     pref:'京都府' },
+  { area:'欽明台',     ward:'八幡市',       pref:'京都府' }, { area:'興戸',     ward:'京田辺市',     pref:'京都府' },
+  { area:'観音堂',     ward:'城陽市',       pref:'京都府' }, { area:'梅美台',   ward:'木津川市',     pref:'京都府' },
 ];
 const POOL_LEN = KANSAI.length;
+
 
 // ── 職種カテゴリ定義（seed-plan-remix-20260906.js と同一） ──
 const CAT = {
@@ -213,13 +242,16 @@ async function main() {
 
   // 既存タイトル（重複作成防止）と、エリア採番の開始位置（既存の「N丁目」求人数＋バッファ）
   const existingTitles = new Set(allJobs.map(j => j.title));
-  const areaTitleRe = /\d+丁目/;
-  let areaIdx = allJobs.filter(j => areaTitleRe.test(j.title)).length + 10;
+  // 実在する町名プールを順番に使う（会社をまたいで少しずらして開始位置を変え、被りを減らす）
+  let areaIdx = (allJobs.length % POOL_LEN);
   function nextArea() {
     const idx = areaIdx++;
     const cycle = Math.floor(idx / POOL_LEN);
     const item = KANSAI[idx % POOL_LEN];
-    const area = `${item.ward}${cycle + 1}丁目`;
+    // 1周目はそのまま実在の町名。2周目以降は同じ町内の実在しやすい小さい丁目番号(1〜3)を付与し、
+    // 架空の大きい連番（旧: 36丁目など）は使わない。
+    const suffix = cycle === 0 ? '' : `${((cycle - 1) % 3) + 1}丁目`;
+    const area = `${item.ward}${item.area}${suffix}`;
     return { area, pref: item.pref, location: `${item.pref}${area}` };
   }
   // タイトル・書き出し文言のバリエーション（大量作成時の実質重複を避けるため）
