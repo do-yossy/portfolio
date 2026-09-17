@@ -27,6 +27,7 @@ const args = process.argv.slice(2);
 const getArg = (n, d) => { const i = args.indexOf(n); return i >= 0 && args[i + 1] ? args[i + 1] : d; };
 const ALL = args.includes('--all');
 const COMPANY = getArg('--company', null);
+const LIMIT = parseInt(getArg('--limit', '0'), 10) || 0;
 const PYTHON = getArg('--python', 'C:\\Users\\sqtan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe');
 
 function credsFor(co) {
@@ -41,7 +42,8 @@ function credsFor(co) {
 function runOne(co) {
   const queuePath = path.join(APP_DIR, 'logs', `reflect-queue-${co}.json`);
   if (!fs.existsSync(queuePath)) { console.log(`[${co}] キューファイルが無いためスキップ: ${queuePath}`); return; }
-  const jobs = JSON.parse(fs.readFileSync(queuePath, 'utf8'));
+  const jobs0 = JSON.parse(fs.readFileSync(queuePath, 'utf8'));
+  const jobs = LIMIT > 0 ? jobs0.slice(0, LIMIT) : jobs0;
   if (jobs.length === 0) { console.log(`[${co}] 対象0件`); return; }
   const creds = credsFor(co);
   if (!creds.KYUJINBOX_EMAIL || !creds.KYUJINBOX_PASSWORD || !creds.KYUJINBOX_GROUP_ID) {
