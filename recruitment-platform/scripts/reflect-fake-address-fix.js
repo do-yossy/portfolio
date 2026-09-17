@@ -28,6 +28,8 @@ const getArg = (n, d) => { const i = args.indexOf(n); return i >= 0 && args[i + 
 const ALL = args.includes('--all');
 const COMPANY = getArg('--company', null);
 const LIMIT = parseInt(getArg('--limit', '0'), 10) || 0;
+const OFFSET = parseInt(getArg('--offset', '0'), 10) || 0;
+const ONLY = getArg('--only', null); // カンマ区切りの求人番号を指定して、その求人だけ再試行する
 const PYTHON = getArg('--python', 'C:\\Users\\sqtan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe');
 
 function credsFor(co) {
@@ -43,7 +45,14 @@ function runOne(co) {
   const queuePath = path.join(APP_DIR, 'logs', `reflect-queue-${co}.json`);
   if (!fs.existsSync(queuePath)) { console.log(`[${co}] キューファイルが無いためスキップ: ${queuePath}`); return; }
   const jobs0 = JSON.parse(fs.readFileSync(queuePath, 'utf8'));
-  const jobs = LIMIT > 0 ? jobs0.slice(0, LIMIT) : jobs0;
+  let jobs = jobs0;
+  if (ONLY) {
+    const nums = new Set(ONLY.split(',').map(s => s.trim()));
+    jobs = jobs0.filter(j => nums.has(j.jobNumber));
+  } else {
+    const sliced = OFFSET > 0 ? jobs0.slice(OFFSET) : jobs0;
+    jobs = LIMIT > 0 ? sliced.slice(0, LIMIT) : sliced;
+  }
   if (jobs.length === 0) { console.log(`[${co}] 対象0件`); return; }
   const creds = credsFor(co);
   if (!creds.KYUJINBOX_EMAIL || !creds.KYUJINBOX_PASSWORD || !creds.KYUJINBOX_GROUP_ID) {
