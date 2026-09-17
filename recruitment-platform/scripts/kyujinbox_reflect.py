@@ -32,7 +32,7 @@ def rand_delay(a=0.6, b=1.4):
 
 
 SETVAL = r"""
-(sel, val) => {
+({ sel, val }) => {
   const el = document.querySelector(sel);
   if (!el) return false;
   const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -41,7 +41,14 @@ SETVAL = r"""
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
   el.dispatchEvent(new Event('blur', { bubbles: true }));
-  return true;
+  return el.value === val;
+}
+"""
+
+READVAL = r"""
+(sel) => {
+  const el = document.querySelector(sel);
+  return el ? el.value : null;
 }
 """
 
@@ -128,14 +135,19 @@ def main():
                     'textarea[name="rewarding"]': job.get("rewarding"),
                 }
                 applied_fields = []
+                failed_fields = []
                 for sel, val in set_map.items():
                     if not val: continue
+                    field_name = sel.split('"')[1]
                     try:
-                        r = page.evaluate(SETVAL, [sel, val])
-                        if r: applied_fields.append(sel.split('"')[1])
+                        r = page.evaluate(SETVAL, {"sel": sel, "val": val})
+                        if r: applied_fields.append(field_name)
+                        else: failed_fields.append(field_name)
                     except Exception:
-                        pass
+                        failed_fields.append(field_name)
                 progress(f"  ✏️ 入力しました: {', '.join(applied_fields) or '(なし)'}", "info")
+                if failed_fields:
+                    progress(f"  ⚠️ 入力に失敗した項目: {', '.join(failed_fields)}", "warn")
                 save_shot(page, f"{num}_filled")
 
                 if not apply_save:
@@ -152,18 +164,61 @@ def main():
                             cls = (btn.get_attribute('class') or '').lower()
                             if 'disab' in cls: continue
                             btn.scroll_into_view_if_needed(); btn.click()
-                            page.wait_for_load_state('networkidle', timeout=15000)
-                            rand_delay(1.0, 2.0)
+                            rand_delay(0.8, 1.4)
                             clicked = True
-                            progress(f"  💾 「{kw}」で保存しました", "success")
+                            progress(f"  ✏️ 「{kw}」をクリックしました", "info")
                             break
                     except Exception:
                         pass
-                save_shot(page, f"{num}_saved")
                 if not clicked:
                     progress("  ⚠️ 保存ボタンが見つかりませんでした（画面をご確認ください）", "warn")
-                reflected(num, clicked)
-                if clicked: ok += 1
+                    reflected(num, False)
+                    rand_delay(1.0, 2.0)
+                    continue
+
+                # 「更新する」は確認モーダル(is-openクラス付きの.c-modal__wrap)を開くだけで、
+                # そのモーダル内の「OK」を押すまでは実際には保存されない
+                confirmed = False
+                try:
+                    modal = page.locator('.c-modal__wrap.is-open').last
+                    modal.wait_for(state='visible', timeout=8000)
+                    agree_box = modal.locator('input[type="checkbox"]')
+                    if agree_box.count() > 0 and not agree_box.first.is_checked():
+                        agree_box.first.check()
+                    ok_btn = modal.locator('button:has-text("OK")').last
+                    ok_btn.click()
+                    page.wait_for_load_state('networkidle', timeout=15000)
+                    rand_delay(1.0, 2.0)
+                    confirmed = True
+                    progress("  💾 確認モーダルの「OK」で保存しました", "success")
+                except Exception as e:
+                    progress(f"  ⚠️ 確認モーダルの処理に失敗: {e}", "warn")
+                save_shot(page, f"{num}_saved")
+                if not confirmed:
+                    reflected(num, False)
+                    rand_delay(1.0, 2.0)
+                    continue
+
+                # 保存クリック成功の自己申告を信用せず、編集ページを開き直して実際に反映されたか確認する
+                persisted = True
+                try:
+                    page.goto(url, timeout=30000)
+                    page.wait_for_load_state('networkidle', timeout=15000)
+                    page.wait_for_selector('textarea[name="description"]', timeout=15000)
+                    for sel, val in set_map.items():
+                        if not val: continue
+                        cur = page.evaluate(READVAL, sel)
+                        if cur != val:
+                            persisted = False
+                            progress(f"  ❌ 保存後の確認で不一致: {sel.split(chr(34))[1]}（実際の反映は行われていません）", "error")
+                except Exception as e:
+                    persisted = False
+                    progress(f"  ❌ 保存後の確認に失敗: {e}", "error")
+
+                if persisted:
+                    progress("  ✅ 保存後の確認OK（実際に反映されています）", "success")
+                reflected(num, persisted)
+                if persisted: ok += 1
                 rand_delay(1.0, 2.0)
         finally:
             try: browser.close()
