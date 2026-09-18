@@ -2070,16 +2070,29 @@ def fill_kyujinbox_form(page, job, company_name):
         chosen_val = None
         chosen_txt = None
 
-        # ① ドライバー系キーワードで優先マッチ
-        DRIVER_KEYWORDS = ['ドライバー', '配送', '運送', '軽貨物', '宅配', '配達', 'デリバリー']
-        for kw in DRIVER_KEYWORDS:
-            for v, t in option_list:
-                if v and kw in t:
-                    chosen_val = v
-                    chosen_txt = t
+        # ① 求人自体の職種(job_type)を、実際の仕事内容に対応するカテゴリへマッチ。
+        #    以前は「ドライバー系キーワード」を全求人に無条件優先していたため、
+        #    ピッキング・事務・営業等の非ドライバー求人まで一律「配送・物流・交通」に
+        #    誤って割り当てられていた。job_type自体がそのカテゴリに該当する場合のみ
+        #    選ぶよう、2026-09-18に仕事内容ベースの対応表へ修正した。
+        CATEGORY_KEYWORDS = [
+            (['ドライバー', '配送', '運送', '軽貨物', '宅配', '配達', 'デリバリー', '送迎'], '配送・物流・交通'),
+            (['ピッキング', '梱包', '組み立て', '検品', '軽作業', '物流倉庫', '倉庫'], '軽作業・倉庫作業'),
+            (['製造', '品質管理'], '工場・製造'),
+            (['技術', 'メンテナンス', '点検'], '警備・清掃・点検'),
+            (['営業', 'コールセンター'], '営業・コールセンター'),
+            (['事務', 'サポート', '運行管理', '受付'], '事務・受付'),
+            (['イベント', '企画'], 'レジャー・イベント・スポーツ'),
+        ]
+        if job_type:
+            for keywords, label_kw in CATEGORY_KEYWORDS:
+                if any(kw in job_type for kw in keywords):
+                    for v, t in option_list:
+                        if v and label_kw in t:
+                            chosen_val = v
+                            chosen_txt = t
+                            break
                     break
-            if chosen_val:
-                break
 
         # ② DBのjobTypeラベルで一致を試みる
         if not chosen_val and job_type:
