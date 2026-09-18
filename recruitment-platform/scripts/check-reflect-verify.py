@@ -57,10 +57,17 @@ with sync_playwright() as p:
             desc_val = page.locator('textarea[name="description"]').input_value(timeout=5000)
         except Exception as e:
             desc_val = f"(取得失敗: {e})"
+        try:
+            job_type_text = page.evaluate(
+                "() => { const el = document.querySelector('select[name=\"jobType\"]'); "
+                "if (!el) return null; const o = el.options[el.selectedIndex]; return o ? o.textContent.trim() : null; }")
+        except Exception as e:
+            job_type_text = f"(取得失敗: {e})"
         print(json.dumps({
             "jobNumber": num,
             "finalUrl": cur_url,
             "title": title_val,
             "descriptionHead": (desc_val or "")[:200],
+            "jobType": job_type_text,
         }, ensure_ascii=False))
     browser.close()

@@ -30,6 +30,7 @@ const COMPANY = getArg('--company', null);
 const LIMIT = parseInt(getArg('--limit', '0'), 10) || 0;
 const OFFSET = parseInt(getArg('--offset', '0'), 10) || 0;
 const ONLY = getArg('--only', null); // カンマ区切りの求人番号を指定して、その求人だけ再試行する
+const QUEUE_PREFIX = getArg('--queue-prefix', 'reflect-queue'); // logs/<prefix>-<co>.json を使う
 const PYTHON = getArg('--python', 'C:\\Users\\sqtan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe');
 
 function credsFor(co) {
@@ -42,7 +43,7 @@ function credsFor(co) {
 }
 
 function runOne(co) {
-  const queuePath = path.join(APP_DIR, 'logs', `reflect-queue-${co}.json`);
+  const queuePath = path.join(APP_DIR, 'logs', `${QUEUE_PREFIX}-${co}.json`);
   if (!fs.existsSync(queuePath)) { console.log(`[${co}] キューファイルが無いためスキップ: ${queuePath}`); return; }
   const jobs0 = JSON.parse(fs.readFileSync(queuePath, 'utf8'));
   let jobs = jobs0;

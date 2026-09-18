@@ -2,9 +2,11 @@
 """
 求人ボックス 掲載反映スクリプト（AI改善内容を既存掲載へ反映）
 Node.js から subprocess として呼び出される。標準入力からJSON配列を受け取る:
-  [{ "jobNumber": "5922-7577-1618", "title": "...", "description": "...", "rewarding": "..." }, ...]
+  [{ "jobNumber": "5922-7577-1618", "title": "...", "description": "...", "rewarding": "...",
+     "jobTypeLabel": "軽作業・倉庫作業" }, ...]
 各求人の編集ページ /jobs/edit/<jobNumber> を開き、Vueフォームの
-title / description / rewarding を新しい値に置き換える。
+title / description / rewarding / jobType（職種区分セレクト。jobTypeLabelはオプション名の
+部分一致で選ぶ）を新しい値に置き換える。
   環境変数 APPLY=1 のときだけ保存（公開）する。既定はドライラン（入力＋スクショのみ・保存しない）。
   HEADLESS=0 でブラウザを可視化（初回の supervised 実行用）。
 会社別認証(KYUJINBOX_*_<CO>)はサーバー/CLIが env で注入する。
@@ -51,6 +53,38 @@ READVAL = r"""
   return el ? el.value : null;
 }
 """
+
+READ_SELECT_TEXT = r"""
+(sel) => {
+  const el = document.querySelector(sel);
+  if (!el) return null;
+  const opt = el.options[el.selectedIndex];
+  return opt ? opt.textContent.trim() : null;
+}
+"""
+
+
+def select_job_type(page, label_kw):
+    """select[name="jobType"] から、テキストに label_kw を含む option を選ぶ。成功したら選んだテキストを返す。"""
+    sel = 'select[name="jobType"]'
+    try:
+        options = page.evaluate(
+            "(sel) => { const el = document.querySelector(sel); if (!el) return null; "
+            "return Array.from(el.options).map(o => ({value: o.value, text: (o.textContent||'').trim()})); }",
+            sel)
+    except Exception:
+        return None
+    if not options:
+        return None
+    for opt in options:
+        if opt['value'] and label_kw in opt['text']:
+            try:
+                page.locator(sel).select_option(value=opt['value'])
+                rand_delay(0.3, 0.6)
+                return opt['text']
+            except Exception:
+                return None
+    return None
 
 
 def save_shot(page, name):
@@ -145,6 +179,15 @@ def main():
                         else: failed_fields.append(field_name)
                     except Exception:
                         failed_fields.append(field_name)
+                job_type_label = job.get("jobTypeLabel")
+                job_type_selected_text = None
+                if job_type_label:
+                    job_type_selected_text = select_job_type(page, job_type_label)
+                    if job_type_selected_text:
+                        applied_fields.append('jobType')
+                    else:
+                        failed_fields.append('jobType')
+
                 progress(f"  ✏️ 入力しました: {', '.join(applied_fields) or '(なし)'}", "info")
                 if failed_fields:
                     progress(f"  ⚠️ 入力に失敗した項目: {', '.join(failed_fields)}", "warn")
@@ -211,6 +254,11 @@ def main():
                         if cur != val:
                             persisted = False
                             progress(f"  ❌ 保存後の確認で不一致: {sel.split(chr(34))[1]}（実際の反映は行われていません）", "error")
+                    if job_type_label:
+                        cur_jt_text = page.evaluate(READ_SELECT_TEXT, 'select[name="jobType"]')
+                        if not cur_jt_text or job_type_label not in cur_jt_text:
+                            persisted = False
+                            progress(f"  ❌ 保存後の確認で不一致: jobType（現在値='{cur_jt_text}'、実際の反映は行われていません）", "error")
                 except Exception as e:
                     persisted = False
                     progress(f"  ❌ 保存後の確認に失敗: {e}", "error")
