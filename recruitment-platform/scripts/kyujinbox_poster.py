@@ -2738,6 +2738,65 @@ def collect_draft_urls(page, group_id, max_pages=70):
     return draft_urls
 
 
+def run_list_drafts():
+    """下書き状態の求人の求人番号・タイトルを一覧で標準出力にJSON出力する(読み取り専用)。
+    投稿処理後に「公開するまで到達しなかった下書き」を検知するために使う。"""
+    email    = os.environ.get("KYUJINBOX_EMAIL", "")
+    password = os.environ.get("KYUJINBOX_PASSWORD", "")
+    group_id = os.environ.get("KYUJINBOX_GROUP_ID", "").strip()
+    headless = os.environ.get("HEADLESS", "1").strip() not in ("0", "false", "no")
+
+    if not email or not password or not group_id:
+        print(json.dumps({"type": "drafts", "items": [], "error": "missing credentials"}))
+        return
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        print(json.dumps({"type": "drafts", "items": [], "error": str(e)}))
+        return
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=headless, args=[
+            '--disable-blink-features=AutomationControlled', '--no-sandbox',
+            '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            viewport={"width": 1440, "height": 900}, locale="ja-JP", timezone_id="Asia/Tokyo")
+        page = ctx.new_page()
+        items = []
+        try:
+            goto_login(page)
+            email_sel = find_input(page, 'input[name="login[email]"]', 'input[type="email"]', 'input[name="email"]')
+            human_type(page, email_sel, email)
+            pass_sel = find_input(page, 'input[name="login[password]"]', 'input[type="password"]', 'input[name="password"]')
+            human_type(page, pass_sel, password)
+            page.click('button[type="submit"], input[type="submit"], form button')
+            try: page.wait_for_url(lambda u: 'login' not in u.lower(), timeout=15000)
+            except Exception: page.wait_for_load_state('domcontentloaded', timeout=10000)
+
+            draft_urls = collect_draft_urls(page, group_id)
+            for u in draft_urls:
+                m = re.search(r'/jobs/edit/([\w-]+)', u)
+                num = m.group(1) if m else None
+                title = None
+                try:
+                    row_title = page.evaluate(
+                        """(href) => { const a = document.querySelector(`a[href*="${href.split('/jobs/edit/')[1]}"]`);
+                        return a ? (a.textContent||'').trim() : null; }""", u)
+                    title = row_title
+                except Exception:
+                    pass
+                if num:
+                    items.append({"jobNumber": num, "title": title})
+        except Exception as e:
+            print(json.dumps({"type": "drafts", "items": items, "error": str(e)}))
+            browser.close()
+            return
+        browser.close()
+    print(json.dumps({"type": "drafts", "items": items}))
+
+
 def run_publish_drafts():
     """既存の下書き求人を巡回し、写真を後付けして公開する専用モード。"""
     email    = os.environ.get("KYUJINBOX_EMAIL", "")
@@ -2835,6 +2894,12 @@ def main():
     # 既存下書きの公開モード: stdin が {"mode": "publish_drafts"} の場合
     if isinstance(parsed, dict) and parsed.get('mode') == 'publish_drafts':
         run_publish_drafts()
+        return
+
+    # 下書き一覧取得モード: stdin が {"mode": "list_drafts"} の場合。
+    # 公開まで到達しなかった下書きを外部(Node)から検知・後処理するために使う。
+    if isinstance(parsed, dict) and parsed.get('mode') == 'list_drafts':
+        run_list_drafts()
         return
 
     jobs = parsed if isinstance(parsed, list) else []

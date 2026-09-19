@@ -2760,6 +2760,30 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
         const ok = await runOne(entry);
         if (!ok) allOk = false;
       }
+
+      // 投稿処理は稀に「公開する」の確認モーダルまで到達せず下書き止まりになることがある
+      // (2026-09-19確認)。会社ごとに下書き残りを検知し、動作実績のあるkyujinbox_reflect.py
+      // 経由で自動的に公開まで反映する安全網。
+      const { spawnSync } = require('child_process');
+      for (const entry of perCompany) {
+        const { hasCreds } = kyujinboxEnvForCompany(entry.co);
+        if (!hasCreds) continue;
+        pushLog(`🔍 ${companyFullName(entry.co)}: 公開まで反映されたか確認しています...`, 'info');
+        try {
+          const sweepPath = path.join(SCRIPTS_DIR, 'publish-stuck-drafts.js');
+          const rs = spawnSync(process.execPath, [sweepPath, '--company', entry.co], {
+            cwd: __dirname, env: { ...process.env }, encoding: 'utf8',
+            maxBuffer: 64 * 1024 * 1024, timeout: 30 * 60 * 1000,
+          });
+          for (const line of (rs.stdout || '').split('\n')) {
+            if (line.trim()) pushLog(`  ${line.trim()}`, 'info');
+          }
+          if (rs.stderr && rs.stderr.trim()) pushLog(`  ⚠️ ${rs.stderr.trim().slice(0, 500)}`, 'warn');
+        } catch (e) {
+          pushLog(`  ⚠️ ${companyFullName(entry.co)}: 公開確認処理でエラー: ${e.message}`, 'warn');
+        }
+      }
+
       const msg = allOk ? '✅ 求人ボックス投稿完了' : '❌ 求人ボックス投稿に一部失敗';
       await Logs.create('kyujinbox_post', allOk ? 'success' : 'error', msg);
       notify(msg, { emoji: allOk ? ':rocket:' : ':x:' }).catch(() => {});
