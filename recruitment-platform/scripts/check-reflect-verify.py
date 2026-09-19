@@ -63,11 +63,32 @@ with sync_playwright() as p:
                 "if (!el) return null; const o = el.options[el.selectedIndex]; return o ? o.textContent.trim() : null; }")
         except Exception as e:
             job_type_text = f"(取得失敗: {e})"
+        try:
+            rewarding_val = page.locator('textarea[name="rewarding"]').input_value(timeout=5000)
+        except Exception as e:
+            rewarding_val = f"(取得失敗: {e})"
+        try:
+            photo_src = page.evaluate(
+                "() => { const img = document.querySelector('img.p-photo__img'); "
+                "return img ? img.src : null; }")
+        except Exception as e:
+            photo_src = f"(取得失敗: {e})"
+        try:
+            status_text = page.evaluate(
+                "() => { const el = Array.from(document.querySelectorAll('*')).find(e => "
+                "['公開中','下書き','審査中','非公開','掲載終了'].includes((e.textContent||'').trim())); "
+                "return el ? el.textContent.trim() : null; }")
+        except Exception as e:
+            status_text = f"(取得失敗: {e})"
         print(json.dumps({
             "jobNumber": num,
             "finalUrl": cur_url,
             "title": title_val,
             "descriptionHead": (desc_val or "")[:200],
             "jobType": job_type_text,
+            "rewarding": rewarding_val,
+            "rewardingLen": len(rewarding_val or ""),
+            "photoSrc": photo_src,
+            "status": status_text,
         }, ensure_ascii=False))
     browser.close()

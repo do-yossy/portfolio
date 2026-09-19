@@ -12,6 +12,12 @@
  *
  * 冪等化: 自分のタイトル（company='sl'）のみ削除してから投入。
  *
+ * 2026-09-19、実際の掲載内容の不具合を発見し修正:
+ *   1) 送迎ドライバー（乗用車でのお客様送迎）にも配送トラック車列の画像を使っていたため、
+ *      送迎向けの画像に分けた。
+ *   2) rewarding（この仕事のやりがい）を設定していなかったため、投稿時にdescriptionの
+ *      先頭100字がそのまま流用され、文の途中で切れていた。130字以内の自然な文章を追加。
+ *
  * 実行: node --experimental-sqlite scripts/seed-sl-osaka-driver-kyujinbox.js
  */
 
@@ -40,7 +46,12 @@ const NOW          = new Date().toISOString();
 const TARGET_MEDIA = ['求人ボックス'];
 const EMP_TYPE     = '正社員';
 const SALARY       = '月給360,000円〜（基本給）';
-const IMAGE_URL    = '/images/haisou-fleet.jpg';
+const DRIVER_IMAGE    = '/images/haisou-fleet.jpg';
+const CHAUFFEUR_IMAGE = '/images/bi-secretary-driver.jpg';
+const REWARDING = {
+  driver: '決まった拠点からの配送なので覚えやすく、未経験からでも安心してスタートできます。基本給36万円〜としっかりした固定給で、安定して働けることが魅力です。',
+  chauffeur: 'お客様やスタッフの送迎を通じて「ありがとう」を直接いただける、やりがいのあるお仕事です。基本給36万円〜としっかりした固定給で、安定して働けます。',
+};
 
 const AREAS = [
   { area: '大阪市西区靭本町', city: '大阪府大阪市西区靭本町', jobType: '配送ドライバー' },
@@ -145,9 +156,11 @@ const JOBS = AREAS.map(a => {
   return {
     title, location: a.city, salary: SALARY, jobType: a.jobType, employmentType: EMP_TYPE,
     description: buildDescription(a, kind),
+    rewarding: REWARDING[kind],
     tags: ['未経験歓迎', '正社員', '普通免許OK', a.jobType === '配送ドライバー' ? '配送' : '送迎'],
     catchcopy: `未経験歓迎｜${a.jobType}（${a.area}）｜月給36万円〜・正社員｜普通免許OK`,
-    imageUrl: IMAGE_URL, isPublished: true, publishedAt: NOW, targetMedia: TARGET_MEDIA, company: COMPANY,
+    imageUrl: kind === 'driver' ? DRIVER_IMAGE : CHAUFFEUR_IMAGE,
+    isPublished: true, publishedAt: NOW, targetMedia: TARGET_MEDIA, company: COMPANY,
   };
 });
 

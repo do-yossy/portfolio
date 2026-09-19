@@ -589,13 +589,24 @@ def click_submit_button(page):
     except Exception:
         pass
 
-    # まず「公開する」ボタンが有効か確認
+    # まず「公開する」ボタンが有効か確認。
+    # Vue reactiveの反映が入力直後は間に合っていないことがあるため、即座に諦めず
+    # 最大10秒待ってから判定する（publish_draft()の再公開処理と同じ考え方）。
     publish_disabled = False
     try:
         pub_loc = page.locator('button:has-text("公開する")')
         if pub_loc.count() > 0:
             pub_el = pub_loc.last
             if pub_el.is_visible():
+                try:
+                    page.wait_for_function("""() => {
+                        const btns = Array.from(document.querySelectorAll('button'));
+                        const pub = btns.find(b => (b.textContent||'').trim() === '公開する');
+                        if (!pub) return false;
+                        return !(pub.className||'').includes('is-disab') && !pub.disabled;
+                    }""", timeout=10000)
+                except Exception:
+                    pass
                 cls = pub_el.get_attribute('class') or ''
                 publish_disabled = 'is-disab' in cls or pub_el.get_attribute('disabled') is not None
     except Exception:

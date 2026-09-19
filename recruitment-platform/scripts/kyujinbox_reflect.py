@@ -87,6 +87,103 @@ def select_job_type(page, label_kw):
     return None
 
 
+def confirm_crop_if_open(page, max_attempts=8):
+    """「選択した写真をトリミングします。」モーダルが開いていれば「設定」等で確定する。"""
+    for _ in range(max_attempts):
+        try:
+            present = page.evaluate("""() => {
+                const txt = document.body.innerText || '';
+                const hasCrop = txt.includes('トリミング') || txt.includes('切り抜き');
+                const btns = Array.from(document.querySelectorAll('button'));
+                const hasSet = btns.some(b => {
+                    const t = (b.textContent || '').trim();
+                    const r = b.getBoundingClientRect();
+                    return ['設定','設定する','決定','確定'].includes(t) && r.width > 0 && r.height > 0;
+                });
+                return hasCrop && hasSet;
+            }""")
+        except Exception:
+            present = False
+        if not present:
+            return
+        clicked = False
+        for label in ['設定', '設定する', '決定', '確定']:
+            try:
+                btn = page.get_by_role('button', name=label, exact=True).last
+                if btn.count() == 0 or not btn.is_visible(): continue
+                btn.scroll_into_view_if_needed()
+                btn.click(force=True, timeout=3000)
+                clicked = True
+                break
+            except Exception:
+                pass
+        if not clicked:
+            return
+        rand_delay(1.0, 1.6)
+
+
+def confirm_delete_photo_if_open(page, max_attempts=5):
+    """「こちらの写真を削除しますか？」確認ダイアログが開いていれば「OK」を押す。"""
+    for _ in range(max_attempts):
+        try:
+            present = page.evaluate("""() => {
+                const txt = document.body.innerText || '';
+                return txt.includes('写真を削除しますか');
+            }""")
+        except Exception:
+            present = False
+        if not present:
+            return
+        try:
+            btn = page.get_by_role('button', name='OK', exact=True).last
+            if btn.count() == 0 or not btn.is_visible():
+                return
+            btn.click(force=True, timeout=3000)
+        except Exception:
+            return
+        rand_delay(0.6, 1.0)
+
+
+def replace_photo(page, img_path):
+    """写真欄の既存写真を削除し、新しい写真をアップロードする。成功したらTrueを返す。"""
+    if not img_path or not os.path.exists(img_path):
+        return False
+    try:
+        # 既存写真の削除ボタン(.c-delete)をクリック(複数あれば全て)。
+        # クリック後に出る「こちらの写真を削除しますか？」確認ダイアログもOKで確定する。
+        for _ in range(5):
+            del_btn = page.locator('img.p-photo__img').locator('xpath=ancestor::*[self::div or self::li][1]').locator('button.c-delete')
+            if del_btn.count() == 0:
+                # フォールバック: p-photo__img自体の近傍にあるc-deleteを広く探す
+                imgs = page.locator('img.p-photo__img')
+                if imgs.count() == 0:
+                    break
+                del_btn = page.locator('button.c-delete').first
+            if del_btn.count() == 0 or not del_btn.first.is_visible():
+                break
+            del_btn.first.click()
+            rand_delay(0.4, 0.7)
+            confirm_delete_photo_if_open(page)
+            rand_delay(0.3, 0.6)
+        # 「写真を追加する」ボタンで file input を出現させる
+        for label in ['写真を追加する', '写真を追加', '写真を登録']:
+            btn = page.locator(f'button:has-text("{label}")').first
+            if btn.count() > 0 and btn.is_visible():
+                btn.scroll_into_view_if_needed()
+                btn.click()
+                rand_delay(0.6, 1.0)
+                break
+        file_inputs = page.query_selector_all('input[type="file"]')
+        if not file_inputs:
+            return False
+        file_inputs[0].set_input_files(img_path)
+        rand_delay(2.0, 3.0)
+        confirm_crop_if_open(page)
+        return True
+    except Exception:
+        return False
+
+
 def save_shot(page, name):
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -188,6 +285,13 @@ def main():
                     else:
                         failed_fields.append('jobType')
 
+                image_path = job.get("imagePath")
+                if image_path:
+                    if replace_photo(page, image_path):
+                        applied_fields.append('photo')
+                    else:
+                        failed_fields.append('photo')
+
                 progress(f"  ✏️ 入力しました: {', '.join(applied_fields) or '(なし)'}", "info")
                 if failed_fields:
                     progress(f"  ⚠️ 入力に失敗した項目: {', '.join(failed_fields)}", "warn")
@@ -259,6 +363,14 @@ def main():
                         if not cur_jt_text or job_type_label not in cur_jt_text:
                             persisted = False
                             progress(f"  ❌ 保存後の確認で不一致: jobType（現在値='{cur_jt_text}'、実際の反映は行われていません）", "error")
+                    if image_path:
+                        cur_photo_src = page.evaluate(
+                            "() => { const img = document.querySelector('img.p-photo__img'); return img ? img.src : null; }")
+                        if not cur_photo_src:
+                            persisted = False
+                            progress("  ❌ 保存後の確認で不一致: photo（写真が見つかりません）", "error")
+                        else:
+                            progress(f"  📷 保存後の写真URL: {cur_photo_src}", "info")
                 except Exception as e:
                     persisted = False
                     progress(f"  ❌ 保存後の確認に失敗: {e}", "error")
