@@ -272,6 +272,21 @@ async function main() {
       a => `${a}周辺を担当エリアとして、丁寧な送迎対応をお任せします。`,
     ],
   };
+  // 求人ボックスの「この仕事のやりがい」(rewarding)欄。未設定のまま投稿すると、投稿処理側の
+  // フォールバックでdescription冒頭100字がそのまま使われ、文の途中で切れてしまうため設定する
+  // (2026-09-19にsl/amで発見・修正した不具合と同じパターン。130字制限に収まる完結した文章にする)。
+  const REWARDING = {
+    driver: '決まったルート・エリアでの配送なので覚えやすく、未経験からでも安心してスタートできます。安定した固定給で長く働けることが魅力です。',
+    chauffeur: 'お客様やスタッフの送迎を通じて「ありがとう」を直接いただける、やりがいのあるお仕事です。丁寧な対応を大切にする環境で働けます。',
+    warehouse: 'かんたんな軽作業が中心で、未経験の方も無理なく始められます。黙々と作業に集中できる環境で、コツコツ取り組みたい方に向いています。',
+    mfg: '手順やマニュアルがあり、未経験からでも段階的に習得できます。ものづくりの現場でスキルを身につけながら長く働ける環境です。',
+    technician: '設備・機器の点検やチェックが中心で、手順に沿って段階的に習得できます。未経験から専門知識を身につけられるお仕事です。',
+    sales: '決められた商品を売るだけでなく、お客様の課題に寄り添う提案営業です。既存のお客様中心で、ノルマに追われず働けます。',
+    office: '基本的なPC操作ができればOKで、未経験・ブランクのある方も歓迎です。落ち着いた環境でコツコツ取り組める事務のお仕事です。',
+    event: '現場ごとに新しい出会いがあり、活気ある環境で働けます。人と接するのが好きな方にはやりがいを感じやすいお仕事です。',
+    special: '未経験の方も歓迎、丁寧にサポートします。無理のないペースで新しい仕事に挑戦できる環境です。',
+  };
+
   function pickVariant(pool, area, salt) { return pool[hashSeed(`${salt}|${area}`) % pool.length]; }
   function buildJob(co, type) {
     const cat = TYPE_CAT[type] || 'office';
@@ -288,7 +303,8 @@ async function main() {
     return {
       title, location, salary: salaryDetail(cat), jobType: type, employmentType: '正社員',
       description, tags: ['未経験歓迎', '正社員', type, sl, '週休2日', '社会保険完備'],
-      catchcopy, imageUrl: imageFor(cat), isPublished: true, publishedAt: NOW, targetMedia: ['求人ボックス'], company: co,
+      catchcopy, imageUrl: imageFor(cat), rewarding: REWARDING[cat] || REWARDING.special,
+      isPublished: true, publishedAt: NOW, targetMedia: ['求人ボックス'], company: co,
     };
   }
 
