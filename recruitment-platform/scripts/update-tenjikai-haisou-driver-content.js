@@ -80,10 +80,13 @@ async function main() {
     const newTitle = buildTitle(area);
     const newDescription = buildDescription(area);
 
+    const alreadyApplied = j.title === newTitle && j.salary === SALARY;
+
     console.log(`  [${j.company}] ${j.title}`);
     console.log(`    旧給与: ${j.salary}`);
     console.log(`    新給与: ${SALARY}`);
     console.log(`    新タイトル: ${newTitle}`);
+    console.log(`    判定: ${alreadyApplied ? '★反映済み（変更なし）' : '未反映（title/salaryが改善版と不一致）'}`);
     console.log(`    ${APPLY ? '更新しました' : '(DRY-RUN・未反映)'}`);
     console.log('');
 
