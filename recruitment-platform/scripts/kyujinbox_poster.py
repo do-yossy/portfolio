@@ -2738,6 +2738,71 @@ def collect_draft_urls(page, group_id, max_pages=70):
     return draft_urls
 
 
+def collect_draft_items(page, group_id, max_pages=70):
+    """求人一覧を巡回して、ステータスが「下書き」の求人の(URL, タイトル)を一緒に集める。
+    collect_draft_urls()と違い、ページ送りで内容が入れ替わる前にタイトルも同時に取得する
+    (後からタイトルだけ取り直すと、既にページが進んでいて取得できないため)。"""
+    if not group_id:
+        return []
+    list_url = f"https://saiyo.kyujinbox.com/company/groups/{group_id}/jobs"
+    try:
+        page.goto(list_url, timeout=30000)
+        page.wait_for_load_state('networkidle', timeout=15000)
+        rand_delay(1.5, 2.5)
+    except Exception:
+        return []
+
+    items = []
+    seen = set()
+    prev_sig = None
+    for _pg in range(max_pages):
+        try:
+            result = page.evaluate("""() => {
+                const drafts = [];
+                const all = [];
+                const rows = document.querySelectorAll('tr, li, article, div');
+                for (const row of rows) {
+                    const a = row.querySelector && row.querySelector('a[href*="/jobs/edit/"]');
+                    if (!a || !a.href) continue;
+                    all.push(a.href);
+                    const txt = (row.textContent || '');
+                    if (txt.includes('下書き')) {
+                        drafts.push({ href: a.href, title: (a.textContent || '').trim() });
+                    }
+                }
+                return {drafts, sig: Array.from(new Set(all)).slice(0,5).join('|')};
+            }""")
+        except Exception:
+            break
+        for d in result.get('drafts', []):
+            if d['href'] not in seen:
+                seen.add(d['href'])
+                items.append(d)
+        sig = result.get('sig', '')
+        if sig and sig == prev_sig:
+            break
+        prev_sig = sig
+        moved = False
+        for kw in ['次へ', '次の', '＞', '>']:
+            try:
+                nxt = page.locator(f'a:has-text("{kw}"), button:has-text("{kw}")').first
+                if nxt.count() > 0 and nxt.is_visible():
+                    cls = nxt.get_attribute('class') or ''
+                    if 'disab' in cls.lower():
+                        break
+                    nxt.scroll_into_view_if_needed()
+                    nxt.click()
+                    page.wait_for_load_state('networkidle', timeout=10000)
+                    rand_delay(1.0, 2.0)
+                    moved = True
+                    break
+            except Exception:
+                pass
+        if not moved:
+            break
+    return items
+
+
 def run_list_drafts():
     """下書き状態の求人の求人番号・タイトルを一覧で標準出力にJSON出力する(読み取り専用)。
     投稿処理後に「公開するまで到達しなかった下書き」を検知するために使う。"""
@@ -2775,20 +2840,12 @@ def run_list_drafts():
             try: page.wait_for_url(lambda u: 'login' not in u.lower(), timeout=15000)
             except Exception: page.wait_for_load_state('domcontentloaded', timeout=10000)
 
-            draft_urls = collect_draft_urls(page, group_id)
-            for u in draft_urls:
-                m = re.search(r'/jobs/edit/([\w-]+)', u)
+            draft_items = collect_draft_items(page, group_id)
+            for d in draft_items:
+                m = re.search(r'/jobs/edit/([\w-]+)', d['href'])
                 num = m.group(1) if m else None
-                title = None
-                try:
-                    row_title = page.evaluate(
-                        """(href) => { const a = document.querySelector(`a[href*="${href.split('/jobs/edit/')[1]}"]`);
-                        return a ? (a.textContent||'').trim() : null; }""", u)
-                    title = row_title
-                except Exception:
-                    pass
                 if num:
-                    items.append({"jobNumber": num, "title": title})
+                    items.append({"jobNumber": num, "title": d.get('title')})
         except Exception as e:
             print(json.dumps({"type": "drafts", "items": items, "error": str(e)}))
             browser.close()
