@@ -240,8 +240,88 @@ for (const [cat, byM] of Object.entries(byCatMedia).sort((a, b) => (Object.value
 }
 console.log('  ※ セルの数値はどれも「参考値」。特定のセルが1桁など少数の場合は断定せず「現時点では仮説」として扱うこと。');
 
+// ⑦ 年齢層別（直近30日・有効応募）
+const PREF_RE = [
+  ['大阪府', /大阪/], ['京都府', /京都/], ['兵庫県', /兵庫/], ['奈良県', /奈良/],
+  ['滋賀県', /滋賀/], ['和歌山県', /和歌山/], ['東京都', /東京/],
+];
+function guessPref(text) {
+  if (!text) return '不明';
+  for (const [name, re] of PREF_RE) if (re.test(text)) return name;
+  return 'その他';
+}
+function ageBand(age) {
+  if (!age || age <= 0) return '不明';
+  if (age < 20) return '10代以下';
+  if (age < 30) return '20代';
+  if (age < 40) return '30代';
+  if (age < 50) return '40代';
+  if (age < 60) return '50代';
+  return '60代以上';
+}
+const ageRows = db.prepare(
+  `SELECT age, is_duplicate, status FROM applicants WHERE ${D} >= ? AND ${D} <= ?${coCond}`
+).all(sinceN30, TODAY);
+const byAge = {};
+for (const r of ageRows) {
+  if (r.is_duplicate !== 0) continue; // 年齢層は有効応募のみを対象にする
+  const b = ageBand(r.age);
+  byAge[b] = byAge[b] || { valid: 0, inprog: 0 };
+  byAge[b].valid++;
+  if (r.status === '対応中') byAge[b].inprog++;
+}
+const AGE_ORDER = ['10代以下', '20代', '30代', '40代', '50代', '60代以上', '不明'];
+const totalValidAge = Object.values(byAge).reduce((s, v) => s + v.valid, 0);
+console.log(`\n■⑦ 年齢層別（直近30日・有効応募ベース／年齢未入力の応募者は「不明」に集計）`);
+console.log('  ' + pad('年齢層', 10) + padL('有効応募', 9) + padL('構成比', 9) + padL('対応中', 8) + padL('対応移行率', 11));
+for (const band of AGE_ORDER) {
+  const v = byAge[band];
+  if (!v) continue;
+  console.log('  ' + pad(band, 10) + padL(v.valid, 9) + padL(pct(v.valid, totalValidAge), 9) + padL(v.inprog, 8) + padL(pct(v.inprog, v.valid), 11));
+}
+console.log(`  ※ 49歳以下/50歳以上で見る場合: 49歳以下=10代以下+20代+30代+40代の合計、50歳以上=50代+60代以上の合計（不明を除く）。`);
+
+// ⑧ エリア別（直近30日・有効応募。applicants.work_location＝媒体側の「希望勤務地」自由記述）
+const areaRows = db.prepare(
+  `SELECT work_location, is_duplicate, status FROM applicants WHERE ${D} >= ? AND ${D} <= ? AND work_location != ''${coCond}`
+).all(sinceN30, TODAY);
+console.log(`\n■⑧-A エリア別（都道府県レベル・直近30日・有効応募ベース／work_locationの自由記述から推定・参考値）`);
+if (areaRows.length === 0) {
+  console.log('  該当なし（work_locationが入力されている応募が無い）');
+} else {
+  const byPref = {};
+  for (const r of areaRows) {
+    if (r.is_duplicate !== 0) continue;
+    const p = guessPref(r.work_location);
+    byPref[p] = byPref[p] || { valid: 0, inprog: 0 };
+    byPref[p].valid++;
+    if (r.status === '対応中') byPref[p].inprog++;
+  }
+  const totalValidPref = Object.values(byPref).reduce((s, v) => s + v.valid, 0);
+  console.log('  ' + pad('都道府県', 10) + padL('有効応募', 9) + padL('構成比', 9) + padL('対応中', 8) + padL('対応移行率', 11));
+  for (const [pref, v] of Object.entries(byPref).sort((a, b) => b[1].valid - a[1].valid)) {
+    console.log('  ' + pad(pref, 10) + padL(v.valid, 9) + padL(pct(v.valid, totalValidPref), 9) + padL(v.inprog, 8) + padL(pct(v.inprog, v.valid), 11));
+  }
+
+  console.log(`\n■⑧-B エリア別（work_location自由記述そのまま・上位10件・直近30日・有効応募ベース／表記ゆれのため参考値）`);
+  const byRawArea = {};
+  for (const r of areaRows) {
+    if (r.is_duplicate !== 0) continue;
+    const a = r.work_location;
+    byRawArea[a] = byRawArea[a] || { valid: 0, inprog: 0 };
+    byRawArea[a].valid++;
+    if (r.status === '対応中') byRawArea[a].inprog++;
+  }
+  console.log('  ' + pad('work_location(自由記述)', 42) + padL('有効応募', 9) + padL('対応中', 8) + padL('対応移行率', 11));
+  for (const [area, v] of Object.entries(byRawArea).sort((a, b) => b[1].valid - a[1].valid).slice(0, 10)) {
+    console.log('  ' + pad(area.slice(0, 40), 42) + padL(v.valid, 9) + padL(v.inprog, 8) + padL(pct(v.inprog, v.valid), 11));
+  }
+}
+console.log(`  ※ work_locationは媒体フォームの「希望勤務地」自由記述で、未入力の応募者はこの集計から除外される（母数が①②の全体値と一致しない）。`);
+
 console.log('\n※ 制約：');
 console.log('  ・閲覧数/表示数は求人ボックスのみ取得可能（job_metrics）。Indeed/engageの掲載パフォーマンスは無し（別途 scripts/kyujinbox-stats.js を参照）。');
 console.log('  ・④-B・⑤・⑥の職種分類は文字列推定のため参考値。断定的な意思決定には④-A・実データの目視確認を併用すること。');
 console.log('  ・過去の一部データ（media空欄で保存された古いレコード）はengageがstanby扱いになっている可能性あり。');
-console.log('  ・「内定」「入社」等のデータは本システムに存在しないため、このレポートに一切含まない。\n');
+console.log('  ・「内定」「入社」等のデータは本システムに存在しないため、このレポートに一切含まない。');
+console.log('  ・⑦年齢層・⑧エリアは媒体フォームの入力項目（age/work_location）依存のため、未入力の応募者は集計から漏れる（母数が①〜⑥と一致しないことがある）。個人を特定できる形（氏名・生年月日そのもの等）は出力しない。\n');
