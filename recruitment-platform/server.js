@@ -1745,6 +1745,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
       callCount: body.call_count !== undefined ? body.call_count : body.callCount,
       status:    body.status,
       notes:     body.notes,
+      age:       body.age,
     });
     sendJSON(res, 200, updated || { ok: true });
     return;

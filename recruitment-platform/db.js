@@ -686,13 +686,14 @@ const Ops = {
   // 架電状況の更新（架電回数・ステータス・メモ）
   // skipAutoArchive=true の場合、ステータスに応じた is_archived 自動切替を行わない
   // （スプレッドシート取込時に応募者を架電リストに残したい場合に使用）
-  updateCall(id, { callCount, status, notes, skipAutoArchive = false } = {}) {
+  updateCall(id, { callCount, status, notes, age, skipAutoArchive = false } = {}) {
     const ts = now();
     const fields = [];
     const vals = [];
     if (callCount !== undefined) { fields.push('call_count = ?'); vals.push(parseInt(callCount) || 0); }
     if (status !== undefined)    { fields.push('status = ?');     vals.push(status); }
     if (notes !== undefined)     { fields.push('notes = ?');      vals.push(notes); }
+    if (age !== undefined)       { fields.push('age = ?');        vals.push(age === '' ? null : parseInt(age) || null); }
     if (callCount !== undefined && (parseInt(callCount) || 0) > 0) {
       fields.push('last_called_at = ?'); vals.push(ts);
     }

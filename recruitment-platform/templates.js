@@ -2586,7 +2586,7 @@ function callsPage({ co = 'sq', media = 'indeed', applicants = [], statusFilter 
       <td>${esc(a.email || '')}</td>
       <td>${esc(a.gender || '')}</td>
       <td style="white-space:nowrap">${esc(a.birth_date || '')}</td>
-      <td class="num">${a.age || ''}</td>
+      <td><input type="number" class="call-age" value="${esc(a.age || '')}" min="15" max="99" style="width:56px" onblur="callUpdate('${esc(a.id)}','age',this.value)"></td>
       <td>${esc(a.address || '')}</td>
       <td>${esc(a.current_job || '')}</td>
       <td>${esc(a.job_title || '')}</td>
