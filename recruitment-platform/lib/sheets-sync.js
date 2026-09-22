@@ -467,7 +467,12 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
             .run(String(sheetLast).trim(), new Date().toISOString(), id);
         }
       }
-      // 不通/対応中/終了 → 同一電話・メールのレコードをまとめてアーカイブ
+      // 不通/対応中/終了 → 同一電話・メールのレコードをまとめてアーカイブ。
+      // ただし、相手がまだ「新規」かつ未架電（call_count=0）の場合は対象から除外する。
+      // 2026-09-22判明: 同一人物の重複応募（同じ電話番号で複数行）があると、片方を
+      // 「終了」にしただけで、まだ一度も架電していない「新規」のもう片方まで巻き込んで
+      // アーカイブされ、架電リストから消えてしまう不具合があった（実例567件を確認）。
+      // 明示的にステータスを更新した本人の行(id一致)は従来どおり必ずアーカイブする。
       if (['不通', '対応中', '終了'].includes(normalizedStatus)) {
         const ts = new Date().toISOString();
         const nPhone = existing.normalized_phone || '';
@@ -476,8 +481,10 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
           UPDATE applicants SET is_archived=1, updated_at=?
           WHERE is_archived=0
             AND ( id=?
-              OR (normalized_phone != '' AND normalized_phone = ?)
-              OR (normalized_email != '' AND normalized_email = ?) )
+              OR (
+                ((normalized_phone != '' AND normalized_phone = ?) OR (normalized_email != '' AND normalized_email = ?))
+                AND NOT (status = '新規' AND call_count = 0)
+              ) )
         `).run(ts, id, nPhone, nEmail);
       }
       updated++;
