@@ -177,8 +177,18 @@ def replace_photo(page, img_path):
         if not file_inputs:
             return False
         file_inputs[0].set_input_files(img_path)
-        rand_delay(2.0, 3.0)
+        rand_delay(1.0, 1.5)
         confirm_crop_if_open(page)
+        # 「アップロード中...」表示が消える（=実際のアップロードが完了する）まで待つ。
+        # ここで待たずに保存すると、アップロード未完了のまま更新されて写真が付かない
+        # (2026-09-23、st/biで複数回再現して確認)。
+        try:
+            page.wait_for_function(
+                "() => !document.body.innerText.includes('アップロード中')",
+                timeout=20000)
+        except Exception:
+            pass
+        rand_delay(0.5, 1.0)
         return True
     except Exception:
         return False
