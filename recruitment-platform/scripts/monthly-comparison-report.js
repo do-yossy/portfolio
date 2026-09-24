@@ -58,9 +58,11 @@ function ageBand(age) {
 }
 const AGE_ORDER = ['10代以下', '20代', '30代', '40代', '50代', '60代以上', '不明'];
 
+const MEDIA_NAME = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 'スタンバイ/engage(旧データ混在の可能性)', google: 'Googleしごと', engage: 'engage', seniorjob: 'シニアジョブ', '': '(未設定)' };
+
 function report(ym) {
   const rows = db.prepare(
-    `SELECT is_duplicate, status, age FROM applicants WHERE substr(applied_at,1,7) = ?`
+    `SELECT is_duplicate, status, age, media FROM applicants WHERE substr(applied_at,1,7) = ?`
   ).all(ym);
   const total = rows.length;
   const valid = rows.filter(r => r.is_duplicate === 0).length;
@@ -74,7 +76,33 @@ function report(ym) {
     byAge[b].valid++;
     if (r.status === '対応中') byAge[b].inprog++;
   }
-  return { ym, total, valid, inprog, byAge };
+
+  const byMedia = {};
+  for (const r of rows) {
+    const m = r.media || '';
+    byMedia[m] = byMedia[m] || { total: 0, valid: 0, inprog: 0 };
+    byMedia[m].total++;
+    if (r.is_duplicate === 0) {
+      byMedia[m].valid++;
+      if (r.status === '対応中') byMedia[m].inprog++;
+    }
+  }
+
+  const titleRows = db.prepare(
+    `SELECT job_title, is_duplicate, status FROM applicants WHERE substr(applied_at,1,7) = ? AND job_title != ''`
+  ).all(ym);
+  const byTitle = {};
+  for (const r of titleRows) {
+    const t = r.job_title;
+    byTitle[t] = byTitle[t] || { total: 0, valid: 0, inprog: 0 };
+    byTitle[t].total++;
+    if (r.is_duplicate === 0) {
+      byTitle[t].valid++;
+      if (r.status === '対応中') byTitle[t].inprog++;
+    }
+  }
+
+  return { ym, total, valid, inprog, byAge, byMedia, byTitle };
 }
 
 const isCurrentMonth = ym => ym === thisMonth;
@@ -100,6 +128,28 @@ for (const band of AGE_ORDER) {
   if (va.valid === 0 && vb.valid === 0) continue;
   console.log('  ' + pad(band, 10) + padL(va.valid, 10) + padL(pct(va.inprog, va.valid), 11) + padL(vb.valid, 10) + padL(pct(vb.inprog, vb.valid), 11));
 }
+
+console.log('\n■③ 媒体別ファネル');
+for (const r of [a, b]) {
+  console.log(`\n  [${r.ym}${isCurrentMonth(r.ym) ? '・今月途中' : ''}]`);
+  console.log('  ' + pad('媒体', 30) + padL('応募数', 8) + padL('有効応募', 9) + padL('有効応募率', 11) + padL('対応中', 8) + padL('対応移行率', 11));
+  const sorted = Object.entries(r.byMedia).sort((x, y) => y[1].valid - x[1].valid);
+  for (const [m, v] of sorted) {
+    console.log('  ' + pad(MEDIA_NAME[m] ?? m, 30) + padL(v.total, 8) + padL(v.valid, 9) + padL(pct(v.valid, v.total), 11) + padL(v.inprog, 8) + padL(pct(v.inprog, v.valid), 11));
+  }
+}
+
+console.log('\n■④ 職種別（job_title・有効応募数トップ10、月ごと）');
+for (const r of [a, b]) {
+  console.log(`\n  [${r.ym}${isCurrentMonth(r.ym) ? '・今月途中' : ''}]`);
+  console.log('  ' + pad('求人タイトル(自由記述)', 42) + padL('応募', 6) + padL('有効応募', 9) + padL('有効応募率', 11) + padL('対応中', 8) + padL('対応移行率', 11));
+  const sorted = Object.entries(r.byTitle).sort((x, y) => y[1].valid - x[1].valid).slice(0, 10);
+  if (sorted.length === 0) console.log('    該当なし');
+  for (const [title, v] of sorted) {
+    console.log('  ' + pad(title.slice(0, 40), 42) + padL(v.total, 6) + padL(v.valid, 9) + padL(pct(v.valid, v.total), 11) + padL(v.inprog, 8) + padL(pct(v.inprog, v.valid), 11));
+  }
+}
+console.log('  ※ job_titleは自由記述のため、同一求人でも表記ゆれで別行に分かれることがある。');
 
 console.log(`\n※ ${isCurrentMonth(a.ym) || isCurrentMonth(b.ym) ? '今月分は月の途中までのデータのため、完了月と単純比較すると少なく見える点に注意。' : ''}`);
 console.log('※ 年齢は媒体フォームの入力・架電リストでの手入力に依存するため、未入力の応募者は「不明」に集計される。\n');
