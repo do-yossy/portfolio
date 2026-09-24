@@ -62,7 +62,7 @@ const MEDIA_NAME = { indeed: 'Indeed', kyujinbox: '求人ボックス', stanby: 
 
 function report(ym) {
   const rows = db.prepare(
-    `SELECT is_duplicate, status, age, media FROM applicants WHERE substr(applied_at,1,7) = ?`
+    `SELECT is_duplicate, status, age, media, job_title FROM applicants WHERE substr(applied_at,1,7) = ?`
   ).all(ym);
   const total = rows.length;
   const valid = rows.filter(r => r.is_duplicate === 0).length;
@@ -88,9 +88,7 @@ function report(ym) {
     }
   }
 
-  const titleRows = db.prepare(
-    `SELECT job_title, is_duplicate, status FROM applicants WHERE substr(applied_at,1,7) = ? AND job_title != ''`
-  ).all(ym);
+  const titleRows = rows.filter(r => r.job_title);
   const byTitle = {};
   for (const r of titleRows) {
     const t = r.job_title;
@@ -102,7 +100,33 @@ function report(ym) {
     }
   }
 
-  return { ym, total, valid, inprog, byAge, byMedia, byTitle };
+  // 媒体×職種クロス
+  const byMediaTitle = {};
+  for (const r of titleRows) {
+    const m = r.media || '';
+    byMediaTitle[m] = byMediaTitle[m] || {};
+    const t = r.job_title;
+    byMediaTitle[m][t] = byMediaTitle[m][t] || { total: 0, valid: 0, inprog: 0 };
+    byMediaTitle[m][t].total++;
+    if (r.is_duplicate === 0) {
+      byMediaTitle[m][t].valid++;
+      if (r.status === '対応中') byMediaTitle[m][t].inprog++;
+    }
+  }
+
+  // 媒体×年齢層クロス（有効応募ベース）
+  const byMediaAge = {};
+  for (const r of rows) {
+    if (r.is_duplicate !== 0) continue;
+    const m = r.media || '';
+    const bnd = ageBand(r.age);
+    byMediaAge[m] = byMediaAge[m] || {};
+    byMediaAge[m][bnd] = byMediaAge[m][bnd] || { valid: 0, inprog: 0 };
+    byMediaAge[m][bnd].valid++;
+    if (r.status === '対応中') byMediaAge[m][bnd].inprog++;
+  }
+
+  return { ym, total, valid, inprog, byAge, byMedia, byTitle, byMediaTitle, byMediaAge };
 }
 
 const isCurrentMonth = ym => ym === thisMonth;
@@ -150,6 +174,43 @@ for (const r of [a, b]) {
   }
 }
 console.log('  ※ job_titleは自由記述のため、同一求人でも表記ゆれで別行に分かれることがある。');
+
+const MIN_MEDIA_VALID = 3; // 媒体別セクションに載せる最低有効応募数（サンプル過少な媒体は省略）
+console.log('\n■⑤ 媒体×職種クロス（媒体ごとに職種別トップ5、月ごと）');
+for (const r of [a, b]) {
+  console.log(`\n  [${r.ym}${isCurrentMonth(r.ym) ? '・今月途中' : ''}]`);
+  const medias = Object.entries(r.byMediaTitle)
+    .map(([m, titles]) => [m, Object.values(titles).reduce((s, v) => s + v.valid, 0)])
+    .filter(([, v]) => v >= MIN_MEDIA_VALID)
+    .sort((x, y) => y[1] - x[1]);
+  if (medias.length === 0) console.log('    該当なし（サンプル不足）');
+  for (const [m] of medias) {
+    console.log(`\n  ◆ ${MEDIA_NAME[m] ?? m}`);
+    console.log('    ' + pad('求人タイトル(自由記述)', 40) + padL('応募', 6) + padL('有効応募', 9) + padL('対応中', 8) + padL('対応移行率', 11));
+    const top = Object.entries(r.byMediaTitle[m]).sort((x, y) => y[1].valid - x[1].valid).slice(0, 5);
+    for (const [title, v] of top) {
+      console.log('    ' + pad(title.slice(0, 38), 40) + padL(v.total, 6) + padL(v.valid, 9) + padL(v.inprog, 8) + padL(pct(v.inprog, v.valid), 11));
+    }
+  }
+}
+console.log('  ※ 応募数が少ない媒体×職種の組み合わせは1〜2件のセルも多く、比率は参考程度に見ること。');
+
+console.log('\n■⑥ 媒体×年齢層クロス（有効応募ベース、月ごと）');
+for (const r of [a, b]) {
+  console.log(`\n  [${r.ym}${isCurrentMonth(r.ym) ? '・今月途中' : ''}]`);
+  const medias = Object.entries(r.byMedia).filter(([, v]) => v.valid >= MIN_MEDIA_VALID).sort((x, y) => y[1].valid - x[1].valid);
+  if (medias.length === 0) console.log('    該当なし（サンプル不足）');
+  for (const [m] of medias) {
+    console.log(`\n  ◆ ${MEDIA_NAME[m] ?? m}`);
+    console.log('    ' + pad('年齢層', 10) + padL('有効応募', 9) + padL('対応移行率', 11));
+    for (const band of AGE_ORDER) {
+      const v = (r.byMediaAge[m] || {})[band];
+      if (!v || v.valid === 0) continue;
+      console.log('    ' + pad(band, 10) + padL(v.valid, 9) + padL(pct(v.inprog, v.valid), 11));
+    }
+  }
+}
+console.log('  ※ 媒体×職種×年齢の3軸クロスはセルが1〜2件になり過ぎて参考にならないため出していない。特定の媒体・職種を絞って年齢を見たい場合は指定してほしい。');
 
 console.log(`\n※ ${isCurrentMonth(a.ym) || isCurrentMonth(b.ym) ? '今月分は月の途中までのデータのため、完了月と単純比較すると少なく見える点に注意。' : ''}`);
 console.log('※ 年齢は媒体フォームの入力・架電リストでの手入力に依存するため、未入力の応募者は「不明」に集計される。\n');
