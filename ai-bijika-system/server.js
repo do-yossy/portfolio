@@ -3,13 +3,19 @@
 // - 購入者アカウント（メール+パスワード）、90日/GATE進捗の保存
 // - AIプロンプト実行は購入者自身のAPIキーを都度受け取って中継するのみ。
 //   キーはサーバー側に保存しない（lib/aiproxy.js を参照）。
-'use strict';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 
 const APP_DIR = __dirname;
+const PUBLIC_DIR = path.join(APP_DIR, 'public');
+const STATIC_FILES = {
+  '/manifest.json': { file: 'manifest.json', type: 'application/manifest+json; charset=utf-8' },
+  '/sw.js': { file: 'sw.js', type: 'application/javascript; charset=utf-8' },
+  '/icon-192.png': { file: 'icon-192.png', type: 'image/png' },
+  '/icon-512.png': { file: 'icon-512.png', type: 'image/png' },
+};
 
 // ── .env 読み込み（自作。dotenv 等の依存は使わない）──
 function loadEnvFile(file) {
@@ -42,41 +48,79 @@ const PORT = parseInt(process.env.PORT || '3300', 10);
 // ── 共通レイアウト ──
 function layout(title, bodyHtml, { userEmail } = {}) {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${escapeHtml(title)}｜AI商品化実践システム</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="theme-color" content="#1F4E5F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI商品化">
 <style>
-*{box-sizing:border-box}body{font-family:'Meiryo','Yu Gothic',sans-serif;margin:0;background:#F4F6F5;color:#1F2A33}
-header{background:#1F4E5F;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
-header a{color:#fff;text-decoration:none;font-weight:700}
-nav a{color:#DCE7E4;text-decoration:none;margin-left:16px;font-size:13px}
-main{max-width:880px;margin:0 auto;padding:24px 20px 60px}
-h1{font-size:20px;color:#1F4E5F;margin:0 0 6px}
-h2{font-size:15px;color:#2E7D6B;margin:24px 0 8px}
-.card{background:#fff;border:1px solid #D8DDE2;border-radius:8px;padding:16px 18px;margin-bottom:14px}
+:root{--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Meiryo','Yu Gothic',sans-serif;margin:0;background:#F4F6F5;color:#1F2A33;
+  padding-top:calc(52px + var(--safe-t));padding-bottom:calc(60px + var(--safe-b))}
+header{position:fixed;top:0;left:0;right:0;z-index:10;background:#1F4E5F;color:#fff;
+  padding:calc(12px + var(--safe-t)) 16px 12px;display:flex;justify-content:space-between;align-items:center}
+header a.brand{color:#fff;text-decoration:none;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header .who{color:#DCE7E4;font-size:11px;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+main{max-width:720px;margin:0 auto;padding:16px 16px 24px}
+h1{font-size:19px;color:#1F4E5F;margin:0 0 6px}
+h2{font-size:14.5px;color:#2E7D6B;margin:22px 0 8px}
+.card{background:#fff;border:1px solid #D8DDE2;border-radius:10px;padding:14px 16px;margin-bottom:12px}
 .muted{color:#6B6B6B;font-size:12.5px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{border:1px solid #D8DDE2;padding:8px 10px;text-align:left;vertical-align:top}
 th{background:#2E7D6B;color:#fff;font-weight:700}
 tr:nth-child(even) td{background:#F4F6F5}
-.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700}
 .GREEN{background:#E5F3E8;color:#1E7D32}
 .YELLOW{background:#FFF3E0;color:#8A4B00}
 .RED{background:#FDECEA;color:#8A1F11}
 .PENDING{background:#EEE;color:#666}
-input,textarea,select{width:100%;padding:9px;border:1px solid #D5DCE3;border-radius:6px;font-size:14px;margin-top:4px}
-button{padding:9px 16px;background:#2E7D6B;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}
+input,textarea,select{width:100%;padding:11px;border:1px solid #D5DCE3;border-radius:8px;font-size:16px;margin-top:4px}
+button{padding:12px 18px;background:#2E7D6B;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;min-height:44px}
 button.secondary{background:#6B6B6B}
 form{margin:0}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .row>*{flex:1;min-width:160px}
 a.link{color:#2E7D6B}
-.warn{background:#FFF3E0;color:#8A4B00;padding:10px 12px;border-radius:6px;font-size:12.5px;margin-bottom:14px}
+.warn{background:#FFF3E0;color:#8A4B00;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px}
+.gate-list{display:flex;flex-direction:column;gap:10px}
+.gate-item{background:#fff;border:1px solid #D8DDE2;border-radius:10px;padding:12px 14px}
+.gate-item .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.gate-item .top strong{font-size:14px}
+.gate-item .top span.muted{font-size:11.5px}
+.gate-item form{display:flex;gap:8px}
+.gate-item select{margin-top:0;flex:1}
+.gate-item button{padding:10px 14px;font-size:13px;min-height:40px}
+.day-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px}
+.daycell{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:10.5px;padding:8px 2px;border:1px solid #D8DDE2;border-radius:8px;background:#fff;min-height:44px}
+.daycell.done{background:#E5F3E8;border-color:#8FCB9C}
+.daycell input{width:auto;margin:0 0 3px}
+nav.bottombar{position:fixed;bottom:0;left:0;right:0;z-index:10;background:#fff;
+  border-top:1px solid #D8DDE2;display:flex;padding-bottom:var(--safe-b)}
+nav.bottombar a{flex:1;text-align:center;padding:10px 4px 8px;color:#6B6B6B;text-decoration:none;font-size:11px}
+nav.bottombar a.active{color:#2E7D6B;font-weight:700}
+nav.bottombar .ico{display:block;font-size:19px;margin-bottom:2px}
+@media (min-width:600px){main{padding:24px 20px 40px}}
 </style></head><body>
-<header><a href="/">AI商品化実践システム</a>
-<nav>${userEmail ? `<span style="color:#DCE7E4;font-size:13px">${escapeHtml(userEmail)}</span>
-<a href="/dashboard">ダッシュボード</a><a href="/prompts">プロンプト</a><a href="/logout">ログアウト</a>`
-    : `<a href="/login">ログイン</a><a href="/signup">アカウント作成</a>`}</nav></header>
+<header><a class="brand" href="${userEmail ? '/dashboard' : '/'}">AI商品化実践システム</a>
+${userEmail ? `<span class="who">${escapeHtml(userEmail)}</span>` : `<span></span>`}</header>
 <main>${bodyHtml}</main>
+${userEmail ? `<nav class="bottombar">
+  <a href="/dashboard"><span class="ico">📊</span>ダッシュボード</a>
+  <a href="/prompts"><span class="ico">💬</span>プロンプト</a>
+  <a href="/logout"><span class="ico">🚪</span>ログアウト</a>
+</nav>` : ''}
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+}
+</script>
 </body></html>`;
 }
 
@@ -147,43 +191,46 @@ function authForm(kind, error) {
 function dashboardPage(user) {
   const gates = GateProgress.listForUser(user.id);
   const doneDays = DayProgress.listForUser(user.id);
-  const rows = gates.map((g) => {
+  const items = gates.map((g) => {
     const def = gateDefs.find((d) => d.no === g.gate_no);
-    return `<tr>
-      <td>GATE${g.gate_no}</td><td>${escapeHtml(def.name)}</td><td>${escapeHtml(def.phase)}</td>
-      <td><span class="badge ${g.status}">${g.status}</span></td>
-      <td>
-        <form method="POST" action="/api/gate/${g.gate_no}" style="display:flex;gap:6px">
-          <select name="status">
-            ${['PENDING', 'GREEN', 'YELLOW', 'RED'].map((s) => `<option value="${s}" ${s === g.status ? 'selected' : ''}>${s}</option>`).join('')}
-          </select>
-          <button type="submit">更新</button>
-        </form>
-      </td>
-    </tr>`;
+    return `<div class="gate-item">
+      <div class="top">
+        <strong>GATE${g.gate_no}　${escapeHtml(def.name)}</strong>
+        <span class="badge ${g.status}">${g.status}</span>
+      </div>
+      <span class="muted">${escapeHtml(def.phase)}</span>
+      <form method="POST" action="/api/gate/${g.gate_no}" style="margin-top:8px">
+        <select name="status">
+          ${['PENDING', 'GREEN', 'YELLOW', 'RED'].map((s) => `<option value="${s}" ${s === g.status ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+        <button type="submit">更新</button>
+      </form>
+    </div>`;
   }).join('');
   return layout('ダッシュボード', `
     <h1>ダッシュボード</h1>
     <p class="muted">DAY進捗：${doneDays.size} / 90 完了</p>
     <h2>GATE進捗</h2>
-    <table><tr><th>GATE</th><th>工程</th><th>PHASE</th><th>判定</th><th></th></tr>${rows}</table>
+    <div class="gate-list">${items}</div>
     <h2>90日チェックリスト</h2>
     <div class="card">${dayGrid(doneDays)}</div>
   `, { userEmail: user.email });
 }
 
 function dayGrid(doneDays) {
-  let html = '<div class="row" style="flex-wrap:wrap">';
+  let html = '<div class="day-grid">';
   for (let d = 1; d <= 90; d++) {
     const checked = doneDays.has(d) ? 'checked' : '';
-    html += `<label style="flex:0 0 auto;min-width:0;font-size:11px;margin:2px;padding:4px 6px;border:1px solid #D8DDE2;border-radius:4px;background:${doneDays.has(d) ? '#E5F3E8' : '#fff'}">
-      <input type="checkbox" data-day="${d}" ${checked} style="width:auto;vertical-align:middle"> DAY${d}
+    const done = doneDays.has(d) ? ' done' : '';
+    html += `<label class="daycell${done}" data-cell="${d}">
+      <input type="checkbox" data-day="${d}" ${checked}>DAY${d}
     </label>`;
   }
-  html += '</div><p class="muted" style="margin-top:8px">チェックすると自動で保存されます。</p>';
+  html += '</div><p class="muted" style="margin-top:10px">タップすると自動で保存されます。</p>';
   html += `<script>
     document.querySelectorAll('input[data-day]').forEach(cb => {
       cb.addEventListener('change', async () => {
+        cb.closest('.daycell').classList.toggle('done', cb.checked);
         await fetch('/api/day/' + cb.dataset.day, {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ done: cb.checked })
@@ -267,6 +314,15 @@ const server = http.createServer(async (req, res) => {
     const pathname = url.pathname;
     const userId = auth.currentUserId(req);
     const user = userId ? Users.findById(userId) : null;
+
+    // ── PWA静的ファイル（認証不要）──
+    if (STATIC_FILES[pathname] && method === 'GET') {
+      const asset = STATIC_FILES[pathname];
+      const filePath = path.join(PUBLIC_DIR, asset.file);
+      if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end('not found'); }
+      res.writeHead(200, { 'Content-Type': asset.type, 'Cache-Control': 'public, max-age=3600' });
+      return fs.createReadStream(filePath).pipe(res);
+    }
 
     // ── 認証不要 ──
     if (pathname === '/' && method === 'GET') {
