@@ -1,0 +1,11 @@
+{
+  "name": "ai-bijika-system",
+  "version": "0.1.0",
+  "description": "AI商品化実践システム 購入者向けWebアプリ（MVP・依存ゼロ）",
+  "private": true,
+  "scripts": {
+    "start": "node --experimental-sqlite --env-file=.env server.js",
+    "dev": "node --experimental-sqlite --env-file=.env --watch server.js"
+  },
+  "engines": { "node": ">=22" }
+}
