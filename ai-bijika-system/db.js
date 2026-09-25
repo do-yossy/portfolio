@@ -81,7 +81,7 @@ db.exec(`
 // 購入者属性（オンボーディングで選択）。既存DB向けに冪等ALTERで追加
 try { db.exec("ALTER TABLE users ADD COLUMN persona TEXT DEFAULT ''"); } catch {}
 
-// ── product_profile（購入者が作っている商品の基本情報＋決済・振込先。1購入者1件）──
+// ── product_profile（購入者が作っている商品の基本情報＋お客様からの代金の受け取り方。1購入者1件）──
 db.exec(`
   CREATE TABLE IF NOT EXISTS product_profile (
     user_id TEXT PRIMARY KEY,
@@ -103,9 +103,15 @@ db.exec(`
   );
 `);
 
+// お客様（購入者の商品を買う人）からの代金の受け取りに関する追加項目。既存DB向けに冪等ALTERで追加
+for (const col of ['sale_price', 'pay_deadline', 'pay_url_card', 'pay_url_paypal', 'pay_url_platform', 'pay_other_note']) {
+  try { db.exec(`ALTER TABLE product_profile ADD COLUMN ${col} TEXT DEFAULT ''`); } catch {}
+}
+
 const PROFILE_FIELDS = [
   'product_name', 'product_format', 'product_type', 'target', 'pain', 'channel', 'price_band',
-  'payment_method', 'bank_name', 'bank_branch', 'account_type', 'account_number', 'account_holder', 'transfer_note',
+  'sale_price', 'payment_method', 'bank_name', 'bank_branch', 'account_type', 'account_number', 'account_holder',
+  'transfer_note', 'pay_deadline', 'pay_url_card', 'pay_url_paypal', 'pay_url_platform', 'pay_other_note',
 ];
 
 const Users = {

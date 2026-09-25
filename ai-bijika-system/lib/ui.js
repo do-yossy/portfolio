@@ -307,6 +307,12 @@ details.fold[open]>summary .chev{transform:rotate(90deg)}
 .kv dd{margin:0;font-weight:600;word-break:break-all}
 .pw-wrap{display:flex;gap:8px}
 .pw-wrap input{flex:1}
+.pay-block{border-top:1px solid var(--line-2);padding-top:16px;margin-top:6px;margin-bottom:6px}
+.pay-block-title{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13.5px;color:var(--primary-ink);margin-bottom:12px;letter-spacing:.05em}
+.pay-block-title::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--gold)}
+.yen-wrap{display:flex;align-items:center;gap:10px}
+.yen-wrap input{max-width:200px}
+.yen-wrap span{font-weight:700;color:var(--ink-2)}
 pre.template{white-space:pre-wrap;font:inherit;font-size:13px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:12px;padding:14px;margin:10px 0 0}
 
 /* landing */
