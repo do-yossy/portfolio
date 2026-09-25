@@ -44,7 +44,7 @@ module.exports = {
   9: { スタンプ名: { kind: 'text', label: 'スタンプ名', placeholder: '例：ゆるねこの毎日あいさつ' }, ターゲット: target },
   10: { 商品: productName, ターゲット: target, 悩み: pain },
   11: { 商品: productName, ターゲット: target },
-  12: { 商品名: productName, 決済方法: P('payment_method', '決済方法', '未定') },
+  12: { 商品名: productName, 販売価格: P('sale_price_label', '販売価格', '未定'), 決済方法: P('payment_method', 'お客様の決済方法', '未定') },
   13: { 本文: paste('変換したいコンテンツ', 'ブログ記事や投稿文を貼り付け') },
   14: { 商品: productName, 経路: P('channel', '集客経路') },
   15: {

@@ -1,7 +1,7 @@
 'use strict';
 // AI商品化実践システム｜購入者向けWebアプリ
 // - 購入者アカウント（メール+パスワード）、購入者属性に合わせた進め方、90日/GATE進捗の保存
-// - マイ商品（商品の基本情報・決済方法・振込先）を一度登録すると、各プロンプトに自動入力される
+// - マイ商品（商品の基本情報・お客様からの代金の受け取り方）を一度登録すると、各プロンプトに自動入力される
 // - AIプロンプト実行は購入者自身のAPIキーを都度受け取って中継するのみ。
 //   キーはサーバー側に保存しない（lib/aiproxy.js を参照）。
 const http = require('http');
@@ -52,6 +52,9 @@ Prompts.sync(promptSeeds);
 const PORT = parseInt(process.env.PORT || '3300', 10);
 const STATUS_LABEL = { PENDING: '未着手', GREEN: '合格', YELLOW: '要修正', RED: 'やり直し' };
 const TROUBLE_PROMPTS = [18, 28, 23, 24];
+
+const splitList = (v) => String(v || '').split('、').filter(Boolean);
+const yen = (v) => `${Number(v).toLocaleString('ja-JP')}円`;
 
 function sendHtml(res, status, html) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -177,7 +180,7 @@ function onboardingPage(user, isChange) {
 }
 
 // ── ページ: ダッシュボード ──
-function heroHtml(pg, titles) {
+function heroHtml(pg, titles, profile) {
   const pct = pg.greenCount / 10;
   const C = 2 * Math.PI * 38;
   const ring = `<div class="ring"><svg width="92" height="92" viewBox="0 0 92 92">
@@ -196,7 +199,10 @@ function heroHtml(pg, titles) {
   }
   const d = pg.nextDef;
   const steps = d.steps.map((n, i) => `<a class="${i === 0 ? 'first' : ''}" href="/prompts/${n}"><span class="n">${i + 1}</span>No.${n} ${escapeHtml(titles[n] || '')}</a>`).join('');
-  const extra = d.setupLink ? `<a class="first" href="${d.setupLink.href}">${escapeHtml(d.setupLink.text)}</a>` : '';
+  const payReady = !!profile.payment_method;
+  const extra = d.setupLink && (!payReady || !d.steps.length)
+    ? `<a class="${d.steps.length ? '' : 'first'}" href="${d.setupLink.href}">${escapeHtml(payReady ? 'お客様からの代金の受け取り方を確認する' : d.setupLink.text)}</a>`
+    : '';
   return `<section class="hero">
     <div class="hero-top">${ring}<div class="hero-next"><div class="eyebrow">NEXT ・ ${escapeHtml(d.phase)}</div>
       <div class="gate">GATE${d.no}　${escapeHtml(d.name)}</div>
@@ -206,7 +212,7 @@ function heroHtml(pg, titles) {
   </section>`;
 }
 
-function roadmapHtml(pg, persona, titles, openNo) {
+function roadmapHtml(pg, persona, titles, openNo, profile) {
   const byNo = new Map(pg.gates.map((g) => [g.gate_no, g]));
   const nextNo = pg.nextGate ? pg.nextGate.gate_no : null;
   const stages = gateDefs.STAGES.map((st, si) => {
@@ -221,7 +227,8 @@ function roadmapHtml(pg, persona, titles, openNo) {
         <span class="nm">${escapeHtml(titles[n] || '')}</span>${reviews.has(n) ? '<span class="tag">GATE判定</span>' : ''}
         ${(d.extra || []).includes(n) ? '<span class="tag">必要な人だけ</span>' : ''}${icon('chevron', 16)}</a></li>`).join('');
       const ext = d.external ? `<li><div class="ext">${icon('lock', 16)}「${escapeHtml(d.external)}」はアプリ未収録です。購入時にお渡しした資料をご覧ください。</div></li>` : '';
-      const setup = d.setupLink ? `<li><a href="${d.setupLink.href}"><span class="no">${icon('bank', 14)}</span><span class="nm">${escapeHtml(d.setupLink.text)}</span>${icon('chevron', 16)}</a></li>` : '';
+      const setup = d.setupLink ? `<li><a href="${d.setupLink.href}"><span class="no">${icon('bank', 14)}</span><span class="nm">${escapeHtml(d.setupLink.text)}</span>
+        <span class="tag">${profile.payment_method ? '設定済み' : '未設定'}</span>${icon('chevron', 16)}</a></li>` : '';
       const tips = tipsFor(persona, no).map((t) => `<div class="tip">${icon('bulb', 18)}<div><b>${escapeHtml(t.tag)}</b>${escapeHtml(t.text)}</div></div>`).join('');
       const seg = ['GREEN', 'YELLOW', 'RED', 'PENDING'].map((s) => `<button type="submit" name="status" value="${s}" class="s-${s} ${g.status === s ? 'on' : ''}">${STATUS_LABEL[s]}</button>`).join('');
       const open = no === nextNo || no === openNo;
@@ -295,12 +302,12 @@ function dashboardPage(user, openNo) {
       <div><div class="eyebrow">DASHBOARD</div><h1 style="margin:0">今日も一歩ずつ</h1></div>
       <a href="/onboarding?change=1" class="badge st-PENDING" style="text-decoration:none">${escapeHtml(persona.label)}</a>
     </div>
-    ${heroHtml(pg, titles)}
+    ${heroHtml(pg, titles, profile)}
     ${prepHtml}
     ${profileNudge}
     <h2>${icon('map', 20)}ロードマップ</h2>
     <p class="muted">各GATEをタップすると、使うプロンプトと進め方のヒントが開きます。順番は強制ではありませんが、上から進めるのがおすすめです。</p>
-    ${roadmapHtml(pg, user.persona, titles, openNo)}
+    ${roadmapHtml(pg, user.persona, titles, openNo, profile)}
     <h2>${icon('box', 20)}商品ラインナップ</h2>
     <p class="muted">1つめの商品を売り始めたら、その学びを次の商品へつなげます。</p>
     ${lineupHtml(pg, profile)}
@@ -355,6 +362,7 @@ function promptsPage(user) {
 function promptDetailPage(user, p) {
   const pg = progressOf(user);
   const profile = ProductProfile.get(user.id);
+  profile.sale_price_label = profile.sale_price ? `${yen(profile.sale_price)}（税込）` : '';
   const persona = PERSONAS[user.persona];
   const { occ, fields } = planFields(p.body, promptFields[p.no] || {});
   const ctx = { profile, auto: pg.auto };
@@ -380,6 +388,7 @@ function promptDetailPage(user, p) {
       <textarea id="promptBody" class="pb-out" rows="10" aria-label="完成したプロンプト"></textarea>
       <div id="missMsg" class="miss"></div>
       <p class="hint">上の項目を変更すると、この欄は作り直されます。細かい修正は最後にこの欄で行ってください。</p>
+      <div class="notice info" style="margin-top:10px">${icon('external', 16)}<div>「ChatGPTで開く」を押すと、このプロンプトは自動でコピーされます。スマホにChatGPTアプリが入っているとアプリが開き、入力欄が空のことがあります。そのときは入力欄を長押しして「ペースト」を押すだけでOKです（打ち込む必要はありません）。</div></div>
       ${p.note && p.note !== '―' ? `<div class="notice warn" style="margin-top:10px">${icon('flag', 16)}<div>注意：${escapeHtml(p.note)}</div></div>` : ''}
     </div>
 
@@ -406,28 +415,46 @@ function promptDetailPage(user, p) {
     <script type="application/json" id="pb-data">${jsonForScript({ body: p.body, occ, preamble: persona ? persona.preamble : '' })}</script>
     <script>${CLIENT_JS}</script>
     <script>
-      const CHATGPT_URL_LIMIT = 1500; // これを超える長さはURL方式が不安定になりうるため、コピーのみ案内する
+      const CHATGPT_URL_LIMIT = 1500; // これを超える長さはURL方式が不安定になりうるため、URLには載せずコピーで渡す
+      // 同期コピー（ボタンを押した瞬間に完了させる。直後に別タブ・別アプリへ移っても確実にクリップボードへ入るように）
+      function copySync(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;font-size:12pt';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, text.length);
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        return ok;
+      }
+      async function copyText(text) {
+        if (copySync(text)) return true;
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
+      }
+      const PASTE_HELP = 'ChatGPTアプリが開いて入力欄が空のときは、入力欄を長押し→「ペースト」で貼り付けて送信してください。';
       document.getElementById('copyBtn').addEventListener('click', async () => {
         const text = document.getElementById('promptBody').value;
         const msgEl = document.getElementById('copyMsg');
-        try {
-          await navigator.clipboard.writeText(text);
-          msgEl.textContent = 'コピーしました。ChatGPTに貼り付けてください。';
-        } catch (e) {
-          msgEl.textContent = 'コピーできませんでした。プロンプト欄を長押しして全選択→コピーしてください。';
-        }
+        msgEl.textContent = (await copyText(text))
+          ? 'コピーしました。ChatGPTの入力欄を長押し→「ペースト」で貼り付けてください。'
+          : 'コピーできませんでした。プロンプト欄を長押しして全選択→コピーしてください。';
       });
-      document.getElementById('openChatGptBtn').addEventListener('click', async () => {
+      document.getElementById('openChatGptBtn').addEventListener('click', () => {
         const text = document.getElementById('promptBody').value;
         const msgEl = document.getElementById('copyMsg');
-        if (text.length > CHATGPT_URL_LIMIT) {
-          try { await navigator.clipboard.writeText(text); } catch (e) {}
-          msgEl.textContent = 'プロンプトが長いため自動入力できません。コピー済みなので、ChatGPTの入力欄に貼り付けてください。';
-          window.open('https://chatgpt.com/', '_blank', 'noopener');
-          return;
-        }
-        window.open('https://chatgpt.com/?q=' + encodeURIComponent(text), '_blank', 'noopener');
-        msgEl.textContent = '新しいタブでChatGPTを開きました（自動入力されない場合は「コピー」→貼り付けてください）。';
+        const copied = copySync(text);
+        const tooLong = text.length > CHATGPT_URL_LIMIT;
+        window.open(tooLong ? 'https://chatgpt.com/' : 'https://chatgpt.com/?q=' + encodeURIComponent(text), '_blank', 'noopener');
+        const done = function(ok){
+          msgEl.textContent = ok
+            ? (tooLong ? 'プロンプトが長いため自動入力はされません。コピー済みなので、' : 'プロンプトをコピーしました。') + PASTE_HELP
+            : 'ChatGPTを開きました。入力欄が空の場合は、この画面に戻って「コピー」を押し、貼り付けてください。';
+        };
+        if (copied || !navigator.clipboard) { done(copied); return; }
+        navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });
       });
       const KEY_STORE = 'ai-bijika:apiKey:';
       const providerSel = document.getElementById('provider');
@@ -458,7 +485,7 @@ function promptDetailPage(user, p) {
   `, { user, active: 'prompts' });
 }
 
-// ── ページ: マイ商品（商品の基本情報・決済方法・振込先）──
+// ── ページ: マイ商品（商品の基本情報・お客様からの代金の受け取り方）──
 function chipsInput(name, options, current, { multi = false, other = false } = {}) {
   const type = multi ? 'checkbox' : 'radio';
   const cur = new Set(multi ? String(current || '').split('、').filter(Boolean) : [current]);
@@ -469,33 +496,55 @@ function chipsInput(name, options, current, { multi = false, other = false } = {
   return `<div class="chips">${chips}${otherChip}</div>${otherInput}`;
 }
 
-function transferTemplate(pf) {
-  if (!(pf.bank_name && pf.account_number && pf.account_holder)) return '';
+// お客様（あなたの商品を買う人）へ送る「お支払い方法のご案内」。保存済みの内容から組み立てる
+function paymentGuide(pf) {
+  const methods = new Set(splitList(pf.payment_method));
+  const P = O.PAY;
+  const sections = [];
+  if (methods.has(P.BANK) && pf.bank_name && pf.account_number && pf.account_holder) {
+    sections.push([
+      '■銀行振込',
+      `銀行名：${pf.bank_name}`,
+      `支店名：${pf.bank_branch || '（支店名）'}`,
+      `口座種別：${pf.account_type || '普通'}`,
+      `口座番号：${pf.account_number}`,
+      `口座名義：${pf.account_holder}`,
+      ...(pf.pay_deadline && pf.pay_deadline !== '指定しない' ? [`お振込期限：${pf.pay_deadline}`] : []),
+      `※${pf.transfer_note || O.TRANSFER_NOTES[0]}`,
+    ].join('\n'));
+  }
+  if (methods.has(P.CARD) && pf.pay_url_card) sections.push(['■クレジットカード', '下記のお支払いページからお手続きください。', pf.pay_url_card].join('\n'));
+  if (methods.has(P.PAYPAL) && pf.pay_url_paypal) sections.push(['■PayPal', '下記のリンクからお支払いください。', pf.pay_url_paypal].join('\n'));
+  if (methods.has(P.PLATFORM) && pf.pay_url_platform) sections.push(['■販売サイトでのご購入', '下記のページからご購入手続きをお願いいたします。', pf.pay_url_platform].join('\n'));
+  if (methods.has(P.OTHER) && pf.pay_other_note) sections.push(['■その他のお支払い方法', pf.pay_other_note].join('\n'));
+  if (!sections.length) return '';
+  // 販売サイト経由だけなら入金確認・お届けは販売サイト側で行われるため、その一文は付けない
+  const direct = sections.some((sec) => !sec.startsWith('■販売サイト'));
   return [
-    '【お振込先のご案内】',
-    'このたびはお申し込みいただき、ありがとうございます。',
-    '下記の口座へ代金のお振込みをお願いいたします。',
+    '【お支払い方法のご案内】',
+    `このたびは${pf.product_name ? `「${pf.product_name}」に` : ''}お申し込みいただき、ありがとうございます。`,
+    ...(pf.sale_price ? [`お支払い金額：${yen(pf.sale_price)}（税込）`] : []),
+    sections.length > 1 ? '以下のいずれかの方法でお支払いをお願いいたします。' : '以下の方法でお支払いをお願いいたします。',
     '',
-    `銀行名：${pf.bank_name}`,
-    `支店名：${pf.bank_branch || '（支店名）'}`,
-    `口座種別：${pf.account_type || '普通'}`,
-    `口座番号：${pf.account_number}`,
-    `口座名義：${pf.account_holder}`,
-    '',
-    `※${pf.transfer_note || '振込手数料はお客様のご負担でお願いいたします。'}`,
-    '※ご入金を確認でき次第、商品のお届けについてご連絡いたします。',
+    sections.join('\n\n'),
+    ...(direct ? ['', '※ご入金を確認でき次第、商品のお届けについてご連絡いたします。'] : []),
   ].join('\n');
 }
 
 function productPage(user, { welcome, saved } = {}) {
   const pf = ProductProfile.get(user.id);
-  const isBank = pf.payment_method === '銀行振込';
-  const tpl = transferTemplate(pf);
+  const methods = new Set(splitList(pf.payment_method));
+  const guide = paymentGuide(pf);
   const masked = pf.account_number ? `••••${pf.account_number.slice(-3)}` : '';
+  const block = (method, title, inner) => `<div class="pay-block ${methods.has(method) ? '' : 'hide'}" data-pay-block="${escapeHtml(method)}">
+      <div class="pay-block-title">${escapeHtml(title)}</div>${inner}</div>`;
+  const urlField = (name, label, placeholder, hint) => `<div class="field"><label class="lbl" for="${name}">${label}</label>
+      <input id="${name}" type="url" name="${name}" value="${escapeHtml(pf[name])}" maxlength="300" placeholder="${placeholder}" autocomplete="off">
+      <div class="hint">${hint}</div></div>`;
   return layout('マイ商品', `
     ${welcome ? '<div class="stepper"><i class="on"></i><i class="on"></i></div><div class="eyebrow">STEP 2 / 2</div>' : '<div class="eyebrow">MY PRODUCT</div>'}
     <h1>マイ商品</h1>
-    <p class="lead">ここで登録した内容は、各プロンプトに自動で入ります。決まっていない項目は空欄のままで大丈夫です。</p>
+    <p class="lead">あなたが作って売る商品の情報です。ここで登録した内容は各プロンプトに自動で入ります。決まっていない項目は空欄のままで大丈夫です。</p>
     ${saved ? `<div class="notice info" style="margin:12px 0">${icon('check', 16)}<div>保存しました。</div></div>` : ''}
     <form method="POST" action="/api/product" id="productForm">
       <input type="hidden" name="welcome" value="${welcome ? '1' : ''}">
@@ -514,12 +563,16 @@ function productPage(user, { welcome, saved } = {}) {
         <div class="field"><label class="lbl">価格帯（予定）</label>${chipsInput('price_band', O.PRICE_BANDS, pf.price_band)}</div>
       </div>
 
-      <h2 id="payment">${icon('bank', 20)}決済方法・振込先</h2>
+      <h2 id="payment">${icon('bank', 20)}お客様からの代金の受け取り方</h2>
+      <p class="muted">あなたの商品を買ってくれたお客様に、代金を支払ってもらうための設定です（このアプリの利用料の支払いとは関係ありません）。</p>
       <div class="card">
-        <div class="field"><label class="lbl">お客様からの代金の受け取り方</label>${chipsInput('payment_method', O.PAYMENT_METHODS, pf.payment_method)}
-          <div class="hint">販売ページのプロンプト（No.12）に自動で反映されます。口座番号などはAIには送りません。</div></div>
-        <div id="bankFields" class="${isBank ? '' : 'hide'}">
-          <div class="notice gold" style="margin-bottom:14px">${icon('lock', 16)}<div>振込先はあなたのアカウントでのみ表示され、AIへ送るプロンプトには含まれません。下の「振込案内文」をコピーして、購入者へのメールなどに使えます。</div></div>
+        <div class="field"><label class="lbl" for="sale_price">販売価格（税込）</label>
+          <div class="yen-wrap"><input id="sale_price" type="text" name="sale_price" inputmode="numeric" value="${escapeHtml(pf.sale_price)}" maxlength="11" placeholder="例：2980"><span>円</span></div>
+          <div class="hint">決まっていなければ空欄でOK。販売ページのプロンプト（No.12）とお支払い案内文に入ります。</div></div>
+        <div class="field"><label class="lbl">お客様のお支払い方法<span class="req-badge">複数選択可</span></label>${chipsInput('payment_method', O.PAYMENT_METHODS, pf.payment_method, { multi: true })}
+          <div class="hint">選んだ方法は販売ページのプロンプト（No.12）に自動で反映されます。口座番号やURLはAIには送りません。</div></div>
+        ${block(O.PAY.BANK, '銀行振込の振込先（あなたの口座）', `
+          <div class="notice gold" style="margin-bottom:14px">${icon('lock', 16)}<div>振込先はあなたのアカウントでのみ表示され、AIへ送るプロンプトには含まれません。</div></div>
           <div class="field"><label class="lbl" for="bank_name">銀行名</label>
             <input id="bank_name" type="text" name="bank_name" list="bankList" value="${escapeHtml(pf.bank_name)}" maxlength="40" placeholder="タップして候補から選択">
             <datalist id="bankList">${O.BANKS.map((b) => `<option value="${escapeHtml(b)}">`).join('')}</datalist></div>
@@ -531,13 +584,23 @@ function productPage(user, { welcome, saved } = {}) {
             <button type="button" class="btn btn-ghost btn-sm" id="toggleAcct">表示</button></div></div>
           <div class="field"><label class="lbl" for="account_holder">口座名義（カナ）</label>
             <input id="account_holder" type="text" name="account_holder" value="${escapeHtml(pf.account_holder)}" maxlength="60" placeholder="例：ヤマダ タロウ"></div>
-          <div class="field"><label class="lbl">振込手数料</label>${chipsInput('transfer_note', ['振込手数料はお客様のご負担でお願いいたします。', '振込手数料は当方で負担いたします。'], pf.transfer_note)}</div>
-          ${tpl ? `<details class="fold" style="margin-top:6px"><summary><span>振込案内文を表示（コピーして使えます）</span>${icon('chevron', 18, 'chev')}</summary>
-            <pre class="template" id="tplText">${escapeHtml(tpl)}</pre>
-            <button type="button" class="btn btn-ghost btn-sm" id="copyTpl" style="margin-top:10px">${icon('copy', 16)}案内文をコピー</button>
-            <span id="tplMsg" class="muted"></span></details>` : '<p class="hint">銀行名・口座番号・口座名義を保存すると、購入者向けの振込案内文が作られます。</p>'}
-          <div class="notice warn" style="margin-top:14px">${icon('flag', 16)}<div>インターネットで商品を販売するときは「特定商取引法に基づく表記」の掲載が必要です。販売ページとあわせて準備してください。</div></div>
-        </div>
+          <div class="field"><label class="lbl">振込手数料</label>${chipsInput('transfer_note', O.TRANSFER_NOTES, pf.transfer_note)}</div>
+          <div class="field"><label class="lbl">お振込期限</label>${chipsInput('pay_deadline', O.PAY_DEADLINES, pf.pay_deadline || '指定しない')}</div>`)}
+        ${block(O.PAY.CARD, 'クレジットカード決済', urlField('pay_url_card', 'お支払いページのURL', 'https://buy.stripe.com/...', 'Stripeの「Payment Links」など、決済サービスで作ったお支払いページのURLを貼り付けます。'))}
+        ${block(O.PAY.PAYPAL, 'PayPal', urlField('pay_url_paypal', 'PayPalのお支払いリンク', 'https://www.paypal.me/...', 'PayPal.Meのリンクなど、お客様が支払いに使うリンクを貼り付けます。'))}
+        ${block(O.PAY.PLATFORM, '販売プラットフォーム', urlField('pay_url_platform', '商品ページのURL', 'https://...', 'note・Brain・BASE・STORESなどに出品した、あなたの商品ページのURLを貼り付けます。'))}
+        ${block(O.PAY.OTHER, 'その他の方法', `<div class="field"><label class="lbl" for="pay_other_note">お支払い方法の説明</label>
+          <input id="pay_other_note" type="text" name="pay_other_note" value="${escapeHtml(pf.pay_other_note)}" maxlength="120" placeholder="例：対面でのお支払い（現金）"></div>`)}
+        <div class="notice warn" style="margin-top:14px">${icon('flag', 16)}<div>インターネットで商品を販売するときは「特定商取引法に基づく表記」の掲載が必要です。販売ページとあわせて準備してください。</div></div>
+      </div>
+
+      <h2 id="guide">${icon('copy', 20)}お客様へ送るお支払い案内</h2>
+      <div class="card">
+        ${guide ? `<p class="muted">お申し込みがあったお客様に、メールやDMでそのまま送れる文章です。保存した内容から自動で作られます。</p>
+          <pre class="template" id="tplText">${escapeHtml(guide)}</pre>
+          <button type="button" class="btn btn-ghost btn-sm" id="copyTpl" style="margin-top:10px">${icon('copy', 16)}案内文をコピー</button>
+          <span id="tplMsg" class="muted"></span>`
+        : '<p class="muted" style="margin:0">お支払い方法を選び、振込先やお支払いページのURLを入れて保存すると、お客様へ送る案内文がここに自動で作られます。</p>'}
       </div>
 
       <div class="sticky-actions">
@@ -553,8 +616,8 @@ function productPage(user, { welcome, saved } = {}) {
             const on = !!form.querySelector('input[data-other-for="' + inp.dataset.otherInput + '"]:checked');
             inp.classList.toggle('hide', !on);
           });
-          const pm = form.querySelector('input[name=payment_method]:checked');
-          document.getElementById('bankFields').classList.toggle('hide', !(pm && pm.value === '銀行振込'));
+          const chosen = new Set(Array.from(form.querySelectorAll('input[name=payment_method]:checked')).map(function(i){ return i.value; }));
+          document.querySelectorAll('[data-pay-block]').forEach(function(b){ b.classList.toggle('hide', !chosen.has(b.dataset.payBlock)); });
         }
         form.addEventListener('change', sync);
         sync();
@@ -576,31 +639,40 @@ function productPage(user, { welcome, saved } = {}) {
 
 // 入力値の検証・正規化（選択肢はリストにあるものだけを受け付ける）
 function normalizeProfile(body) {
-  const one = (v) => String(Array.isArray(v) ? v[0] : (v ?? '')).normalize('NFKC').trim();
+  // 選択肢の照合は送られてきた値そのままで行う（NFKCをかけると全角の（）や＋が半角になり、選択肢と一致しなくなるため）。
+  // NFKC（全角数字・半角カナの統一）は自由入力の項目だけにかける。
+  const raw = (v) => String(Array.isArray(v) ? v[0] : (v ?? '')).trim();
+  const one = (v) => raw(v).normalize('NFKC');
   const text = (v, max) => one(v).slice(0, max);
-  const pick = (v, list) => { const s = one(v); return list.includes(s) ? s : ''; };
+  const pick = (v, list) => { const s = raw(v); return list.includes(s) ? s : ''; };
   const pickOrOther = (v, otherV, list) => {
-    const s = one(v);
+    const s = raw(v);
     if (s === '__other') return text(otherV, 120);
     return list.includes(s) ? s : '';
   };
-  const channels = [].concat(body.channel || []).map((c) => one(c)).filter((c) => O.CHANNELS.includes(c));
-  const notes = ['振込手数料はお客様のご負担でお願いいたします。', '振込手数料は当方で負担いたします。'];
+  const many = (v, list) => { const chosen = new Set([].concat(v || []).map((x) => String(x).trim())); return list.filter((x) => chosen.has(x)).join('、'); };
+  const url = (v) => { const s = one(v).slice(0, 300); return /^https?:\/\/[^\s"'<>]+$/i.test(s) ? s : ''; };
   return {
     product_name: text(body.product_name, 80),
     product_format: pick(body.product_format, O.PRODUCT_FORMATS),
     product_type: pick(body.product_type, O.PRODUCT_TYPES),
     target: pickOrOther(body.target, body.target_other, O.TARGETS),
     pain: text(body.pain, 120),
-    channel: channels.join('、'),
+    channel: many(body.channel, O.CHANNELS),
     price_band: pick(body.price_band, O.PRICE_BANDS),
-    payment_method: pick(body.payment_method, O.PAYMENT_METHODS),
+    sale_price: one(body.sale_price).replace(/\D/g, '').replace(/^0+/, '').slice(0, 9),
+    payment_method: many(body.payment_method, O.PAYMENT_METHODS),
     bank_name: text(body.bank_name, 40),
     bank_branch: text(body.bank_branch, 40),
     account_type: pick(body.account_type, O.ACCOUNT_TYPES),
     account_number: one(body.account_number).replace(/\D/g, '').slice(0, 8),
     account_holder: text(body.account_holder, 60),
-    transfer_note: pick(body.transfer_note, notes),
+    transfer_note: pick(body.transfer_note, O.TRANSFER_NOTES),
+    pay_deadline: pick(body.pay_deadline, O.PAY_DEADLINES),
+    pay_url_card: url(body.pay_url_card),
+    pay_url_paypal: url(body.pay_url_paypal),
+    pay_url_platform: url(body.pay_url_platform),
+    pay_other_note: text(body.pay_other_note, 120),
   };
 }
 
