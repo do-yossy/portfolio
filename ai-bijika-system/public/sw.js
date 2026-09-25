@@ -1,6 +1,6 @@
 // 最小限のService Worker。静的アセットのみキャッシュし、
 // ダッシュボード等の動的ページは常にネットワークから取得する（進捗の古い表示を防ぐ）。
-const CACHE = 'ai-bijika-static-v2';
+const CACHE = 'ai-bijika-static-v3';
 const STATIC_ASSETS = ['/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
