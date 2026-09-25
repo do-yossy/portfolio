@@ -42,6 +42,7 @@ const promptSeeds = require('./seeds/prompts');
 const gateDefs = require('./seeds/gates');
 
 Prompts.seedIfEmpty(promptSeeds);
+const promptNoSet = new Set(promptSeeds.map((p) => p.no));
 
 const PORT = parseInt(process.env.PORT || '3300', 10);
 
@@ -96,6 +97,11 @@ a.link{color:#2E7D6B}
 .gate-item form{display:flex;gap:8px}
 .gate-item select{margin-top:0;flex:1}
 .gate-item button{padding:10px 14px;font-size:13px;min-height:40px}
+.gate-item.next{border-color:#2E7D6B;box-shadow:inset 0 0 0 1px #2E7D6B}
+.gate-item .use-prompt{font-size:12.5px;margin:2px 0 8px}
+.next-banner{background:#EAF4F1;border:1px solid #BFE0D6;border-radius:10px;padding:14px 16px;margin-bottom:16px}
+.next-banner .label{color:#2E7D6B;font-weight:700;font-size:12px;margin-bottom:4px}
+.next-banner .action{font-size:14px;margin-top:2px}
 .day-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px}
 .daycell{display:flex;flex-direction:column;align-items:center;justify-content:center;
   font-size:10.5px;padding:8px 2px;border:1px solid #D8DDE2;border-radius:8px;background:#fff;min-height:44px}
@@ -128,6 +134,15 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+// GATEの「使うプロンプト」表記（例: "No.26 / No.27"）中の No.N を、実在するプロンプトへのリンクに変換する。
+// No.N を含まない参照（例: "市場検証・収益モデルガイド"）はアプリに未収録のため、その旨を明示する。
+function renderUsePrompt(text) {
+  const linked = escapeHtml(text).replace(/No\.(\d+)/g, (m, n) => (
+    promptNoSet.has(parseInt(n, 10)) ? `<a class="link" href="/prompts/${n}">${m}</a>` : m
+  ));
+  return /<a /.test(linked) ? linked : `${linked}（アプリ未収録の参考資料）`;
 }
 
 function sendHtml(res, status, html) {
@@ -191,15 +206,28 @@ function authForm(kind, error) {
 function dashboardPage(user) {
   const gates = GateProgress.listForUser(user.id);
   const doneDays = DayProgress.listForUser(user.id);
+  const nextGate = gates.find((g) => g.status !== 'GREEN');
+  const nextDef = nextGate && gateDefs.find((d) => d.no === nextGate.gate_no);
+  const nextBanner = nextDef ? `
+    <div class="next-banner">
+      <div class="label">次にやること</div>
+      <div class="action">GATE${nextDef.no}　${escapeHtml(nextDef.name)}　→　${renderUsePrompt(nextDef.usePrompt)}</div>
+    </div>` : `
+    <div class="next-banner">
+      <div class="label">次にやること</div>
+      <div class="action">GATE1〜10がすべてGREENです。お疲れさまでした。</div>
+    </div>`;
   const items = gates.map((g) => {
     const def = gateDefs.find((d) => d.no === g.gate_no);
-    return `<div class="gate-item">
+    const isNext = nextGate && g.gate_no === nextGate.gate_no;
+    return `<div class="gate-item${isNext ? ' next' : ''}">
       <div class="top">
         <strong>GATE${g.gate_no}　${escapeHtml(def.name)}</strong>
         <span class="badge ${g.status}">${g.status}</span>
       </div>
       <span class="muted">${escapeHtml(def.phase)}</span>
-      <form method="POST" action="/api/gate/${g.gate_no}" style="margin-top:8px">
+      <div class="use-prompt muted">使うプロンプト：${renderUsePrompt(def.usePrompt)}</div>
+      <form method="POST" action="/api/gate/${g.gate_no}">
         <select name="status">
           ${['PENDING', 'GREEN', 'YELLOW', 'RED'].map((s) => `<option value="${s}" ${s === g.status ? 'selected' : ''}>${s}</option>`).join('')}
         </select>
@@ -210,7 +238,9 @@ function dashboardPage(user) {
   return layout('ダッシュボード', `
     <h1>ダッシュボード</h1>
     <p class="muted">DAY進捗：${doneDays.size} / 90 完了</p>
+    ${nextBanner}
     <h2>GATE進捗</h2>
+    <p class="muted">GATEの順番は強制されません。ステータスは自分で更新してください。</p>
     <div class="gate-list">${items}</div>
     <h2>90日チェックリスト</h2>
     <div class="card">${dayGrid(doneDays)}</div>
