@@ -78,6 +78,36 @@ db.exec(`
   );
 `);
 
+// 購入者属性（オンボーディングで選択）。既存DB向けに冪等ALTERで追加
+try { db.exec("ALTER TABLE users ADD COLUMN persona TEXT DEFAULT ''"); } catch {}
+
+// ── product_profile（購入者が作っている商品の基本情報＋決済・振込先。1購入者1件）──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS product_profile (
+    user_id TEXT PRIMARY KEY,
+    product_name TEXT DEFAULT '',
+    product_format TEXT DEFAULT '',
+    product_type TEXT DEFAULT '',
+    target TEXT DEFAULT '',
+    pain TEXT DEFAULT '',
+    channel TEXT DEFAULT '',
+    price_band TEXT DEFAULT '',
+    payment_method TEXT DEFAULT '',
+    bank_name TEXT DEFAULT '',
+    bank_branch TEXT DEFAULT '',
+    account_type TEXT DEFAULT '',
+    account_number TEXT DEFAULT '',
+    account_holder TEXT DEFAULT '',
+    transfer_note TEXT DEFAULT '',
+    updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+`);
+
+const PROFILE_FIELDS = [
+  'product_name', 'product_format', 'product_type', 'target', 'pain', 'channel', 'price_band',
+  'payment_method', 'bank_name', 'bank_branch', 'account_type', 'account_number', 'account_holder', 'transfer_note',
+];
+
 const Users = {
   create({ email, passwordHash, passwordSalt, displayName }) {
     const id = generateId();
@@ -90,6 +120,31 @@ const Users = {
   },
   findById(id) {
     return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  },
+  setPersona(id, persona) {
+    db.prepare('UPDATE users SET persona = ? WHERE id = ?').run(persona, id);
+  },
+};
+
+const ProductProfile = {
+  FIELDS: PROFILE_FIELDS,
+  get(userId) {
+    const row = db.prepare('SELECT * FROM product_profile WHERE user_id = ?').get(userId);
+    if (row) return row;
+    return Object.fromEntries([['user_id', userId], ...PROFILE_FIELDS.map((f) => [f, ''])]);
+  },
+  // values に含まれるキーだけを更新する（部分更新）
+  update(userId, values) {
+    const cur = ProductProfile.get(userId);
+    const next = { ...cur };
+    for (const f of PROFILE_FIELDS) if (f in values) next[f] = values[f];
+    const cols = PROFILE_FIELDS.join(', ');
+    const qs = PROFILE_FIELDS.map(() => '?').join(', ');
+    const upd = PROFILE_FIELDS.map((f) => `${f}=excluded.${f}`).join(', ');
+    db.prepare(`
+      INSERT INTO product_profile (user_id, ${cols}, updated_at) VALUES (?, ${qs}, ?)
+      ON CONFLICT(user_id) DO UPDATE SET ${upd}, updated_at=excluded.updated_at
+    `).run(userId, ...PROFILE_FIELDS.map((f) => next[f] || ''), now());
   },
 };
 
@@ -134,10 +189,13 @@ const Prompts = {
   get(no) {
     return db.prepare('SELECT * FROM prompts WHERE no = ?').get(no);
   },
-  seedIfEmpty(list) {
-    const count = db.prepare('SELECT COUNT(*) AS c FROM prompts').get().c;
-    if (count > 0) return;
-    const stmt = db.prepare('INSERT INTO prompts (no, phase, title, timing, body, note) VALUES (?, ?, ?, ?, ?, ?)');
+  // マスタデータなので起動のたびに seeds/prompts.js の内容へ同期する（本文の修正を本番DBにも反映させるため）
+  sync(list) {
+    const stmt = db.prepare(`
+      INSERT INTO prompts (no, phase, title, timing, body, note) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(no) DO UPDATE SET phase=excluded.phase, title=excluded.title, timing=excluded.timing,
+        body=excluded.body, note=excluded.note
+    `);
     for (const p of list) stmt.run(p.no, p.phase, p.title, p.timing || '', p.body, p.note || '');
   },
 };
@@ -155,4 +213,4 @@ const AiRuns = {
   },
 };
 
-module.exports = { db, Users, GateProgress, DayProgress, Prompts, AiRuns, generateId, now };
+module.exports = { db, Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, generateId, now };
