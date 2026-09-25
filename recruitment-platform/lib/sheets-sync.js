@@ -336,6 +336,7 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
       email:       fc('メールアドレス'),
       gender:      fc('性別'),
       birthDate:   fc('生年月日'),
+      age:         fc('年齢'),
       address:     fc('居住地'),
       currentJob:  fc('現在の職業'),
       jobTitle:    fc('求人タイトル'),
@@ -374,6 +375,7 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
           email:         emailVal,
           gender:        colIdx.gender      >= 0 ? (row[colIdx.gender]      || '') : '',
           birth_date:    colIdx.birthDate   >= 0 ? (row[colIdx.birthDate]   || '') : '',
+          age:           colIdx.age         >= 0 ? (parseInt(row[colIdx.age]) || null) : null,
           address:       colIdx.address     >= 0 ? (row[colIdx.address]     || '') : '',
           current_job:   colIdx.currentJob  >= 0 ? (row[colIdx.currentJob]  || '') : '',
           job_title:     colIdx.jobTitle    >= 0 ? (row[colIdx.jobTitle]    || '') : '',
@@ -429,6 +431,16 @@ async function pullFromSheets({ gsheets, Ops, Applicants, Logs }) {
         if (sheetBirth !== undefined && String(sheetBirth).trim() !== '') {
           db.prepare('UPDATE applicants SET birth_date=?, updated_at=? WHERE id=?')
             .run(String(sheetBirth).trim(), new Date().toISOString(), id);
+        }
+      }
+      // 年齢をDBに同期（年齢列は生年月日からの数式だが、手入力で上書きされた場合も含めて取り込む。
+      // 2026-09-24判明: この同期自体が抜けており、Indeed等シート上で年齢が見えていてもDBのageは
+      // 常に空のままになっていた）
+      if (colIdx.age >= 0) {
+        const sheetAge = parseInt(row[colIdx.age]);
+        if (Number.isFinite(sheetAge) && sheetAge > 0) {
+          db.prepare('UPDATE applicants SET age=?, updated_at=? WHERE id=?')
+            .run(sheetAge, new Date().toISOString(), id);
         }
       }
       // 性別をDBに同期（Indeedは性別なし→シートで手入力した値を取り込む）

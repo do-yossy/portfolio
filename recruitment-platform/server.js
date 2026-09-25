@@ -360,10 +360,14 @@ function parseCSV(text) {
 
 // Map CSV columns to applicant fields (flexible column names)
 function mapCSVRow(row) {
+  // ヘッダーの大文字小文字ゆれ（"Age"等）を吸収するため、正規化(trim+lowercase)済みキーで引けるようにする
+  const rowKeysNorm = {};
+  for (const rk of Object.keys(row)) rowKeysNorm[rk.trim().toLowerCase()] = rk;
   const col = (keys) => {
     for (const k of keys) {
-      const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
-      if (v && v.trim()) return v.trim();
+      const rk = rowKeysNorm[k.trim().toLowerCase()];
+      const v = rk ? row[rk] : undefined;
+      if (v && String(v).trim()) return String(v).trim();
     }
     // 完全一致しない場合、列名にキーを含む列を探す（例: 「架電回数カデンカイスウ」「年齢ネンレイ」等のふりがな付きヘッダ）
     for (const k of keys) {
@@ -443,10 +447,13 @@ function mapCSVRow(row) {
 // 運用管理用CSVマッパー（会社・媒体を指定、Indeed/engage分割氏名にも対応）
 function mapOpsCSVRow(row, company, media) {
   const base = mapCSVRow(row);
+  const rowKeysNorm = {};
+  for (const rk of Object.keys(row)) rowKeysNorm[rk.trim().toLowerCase()] = rk;
   const col = (keys) => {
     for (const k of keys) {
-      const v = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
-      if (v && v.trim()) return v.trim();
+      const rk = rowKeysNorm[k.trim().toLowerCase()];
+      const v = rk ? row[rk] : undefined;
+      if (v && String(v).trim()) return String(v).trim();
     }
     for (const k of keys) {
       if (!/[ぁ-んァ-ヶ一-龯]/.test(k)) continue;
