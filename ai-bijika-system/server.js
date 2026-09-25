@@ -264,7 +264,16 @@ function promptDetailPage(user, p, providers) {
       ${p.note ? `<p class="muted">注意：${escapeHtml(p.note)}</p>` : ''}
     </div>
     <div class="card">
-      <h2>AIに実行させる</h2>
+      <h2>ふだん使っているChatGPTで使う</h2>
+      <p class="muted">APIキーが無くても、Free/Plusなど通常契約のChatGPTでそのまま使えます。</p>
+      <div class="row">
+        <button id="copyBtn" type="button">コピーする</button>
+        <button id="openChatGptBtn" type="button" class="secondary">ChatGPTで開く</button>
+      </div>
+      <p id="copyMsg" class="muted" style="margin-top:6px"></p>
+    </div>
+    <div class="card">
+      <h2>AIに実行させる（このアプリ内でAPIキーを使って自動実行）</h2>
       <div class="warn">APIキーはこのブラウザにのみ保存され、実行のたびにサーバーへ中継されるだけで保存されません。
       ご自身のOpenAIまたはAnthropicのAPIキーをご用意ください（利用料はお客様のご契約に基づき発生します）。</div>
       <div class="row">
@@ -277,6 +286,28 @@ function promptDetailPage(user, p, providers) {
       <div id="result" style="margin-top:14px;white-space:pre-wrap;font-size:13px"></div>
     </div>
     <script>
+      const CHATGPT_URL_LIMIT = 1500; // これを超える長さのプロンプトはURL方式が不安定になりうるため、コピーのみ案内する
+      document.getElementById('copyBtn').addEventListener('click', async () => {
+        const text = document.getElementById('promptBody').value;
+        const msgEl = document.getElementById('copyMsg');
+        try {
+          await navigator.clipboard.writeText(text);
+          msgEl.textContent = 'コピーしました。ChatGPTに貼り付けてください。';
+        } catch (e) {
+          msgEl.textContent = 'コピーできませんでした。プロンプト本文を選択して手動でコピーしてください。';
+        }
+      });
+      document.getElementById('openChatGptBtn').addEventListener('click', () => {
+        const text = document.getElementById('promptBody').value;
+        const msgEl = document.getElementById('copyMsg');
+        if (text.length > CHATGPT_URL_LIMIT) {
+          msgEl.textContent = 'プロンプトが長いため自動入力できません。「コピーする」→ChatGPTに手動で貼り付けてください。';
+          window.open('https://chatgpt.com/', '_blank', 'noopener');
+          return;
+        }
+        window.open('https://chatgpt.com/?q=' + encodeURIComponent(text), '_blank', 'noopener');
+        msgEl.textContent = '新しいタブでChatGPTを開きました（自動入力されない場合は「コピーする」→貼り付けてください）。';
+      });
       const KEY_STORE = 'ai-bijika:apiKey:';
       const providerSel = document.getElementById('provider');
       const keyInput = document.getElementById('apiKey');
