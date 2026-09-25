@@ -79,6 +79,7 @@ DBは標準の `node:sqlite`（`DatabaseSync`）。起動時に `--experimental-
 |---|---|---|
 | `sales-platform/**` | `deploy-sales.yml` | Fly.io `sq-sales-tanto20` |
 | `recruitment-platform/**` | `deploy.yml` | Fly.io `sq-saiyou`（デプロイ後に自社サイト求人の公開化スクリプトを実行） |
+| `ai-bijika-system/**` | `deploy-ai-bijika.yml` | Fly.io `sq-ai-bijika`（要初回セットアップ。詳細は `ai-bijika-system/README.md`） |
 | ルートの `*.html` 等 | GitHub Pages | `www.social-quality.com` |
 
 `kyujinbox-platform` と `life-tailor-platform` は**自動デプロイ対象外**（ローカル常駐。`install-autostart.ps1` でタスク登録）。

@@ -1,0 +1,35 @@
+# Fly.io deployment config
+# 初回のみ手動で必要（flyctl・FLY_API_TOKENが無い環境では実行できないため、
+# リポジトリ所有者側での一度きりの作業）:
+#   flyctl apps create sq-ai-bijika
+#   flyctl volumes create ai_bijika_data --app sq-ai-bijika --region nrt --size 1
+#   flyctl secrets set FLY_API_TOKEN=... (GitHub Actions側のリポジトリシークレットとして設定)
+# これ以降は .github/workflows/deploy-ai-bijika.yml が main への push で自動デプロイする。
+
+app = "sq-ai-bijika"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3300"
+  NODE_OPTIONS = "--experimental-sqlite"
+
+[http_service]
+  internal_port = 3300
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# データ永続化（SQLite）。上記の flyctl volumes create を先に実行しておくこと。
+[[mounts]]
+  source = "ai_bijika_data"
+  destination = "/app/data"
+  initial_size = "1gb"
