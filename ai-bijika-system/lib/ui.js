@@ -388,9 +388,6 @@ details.fold[open]>summary .chev{transform:rotate(90deg)}
 .pick input:checked+.pc .mark{background:var(--ink);box-shadow:none}
 .pick input:checked+.pc .mark::after{content:"";width:12px;height:12px;background:var(--gold-grad);-webkit-mask:var(--check) center/contain no-repeat;mask:var(--check) center/contain no-repeat}
 .pick input:focus-visible+.pc{box-shadow:inset 0 0 0 1.5px var(--gold),0 0 0 4px rgba(184,148,90,.2)}
-.stepper{display:flex;gap:6px;margin-bottom:16px}
-.stepper i{flex:1;height:3px;border-radius:99px;background:var(--line)}
-.stepper i.on{background:var(--gold-grad)}
 
 /* prompt detail */
 .detail-head{position:relative;margin-bottom:16px}
