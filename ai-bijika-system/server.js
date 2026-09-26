@@ -39,7 +39,7 @@ function loadEnvFile(file) {
 const { Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile } = require('./db');
 const auth = require('./lib/auth');
 const { runPrompt, PROVIDERS } = require('./lib/aiproxy');
-const { escapeHtml, jsonForScript, icon, layout } = require('./lib/ui');
+const { escapeHtml, jsonForScript, icon, layout, crest, guilloche, roman, pad2, initial } = require('./lib/ui');
 const { PERSONAS, tipsFor, prepStepsFor } = require('./lib/personas');
 const { planFields, fieldHtml, CLIENT_JS } = require('./lib/prompt-form');
 const O = require('./lib/options');
@@ -120,23 +120,49 @@ function reviewNosOf(def) {
 
 // ── ページ: トップ（未ログイン）──
 function homePage() {
-  const feat = (ic, t, d) => `<div class="feature"><div class="fi">${icon(ic, 22)}</div><div><b>${t}</b><small>${d}</small></div></div>`;
+  const feats = [
+    ['今やることが、ひと目でわかる', 'ロードマップ上に現在地と「次に開くプロンプト」を表示します。迷ったら上から順に開くだけです。'],
+    ['選ぶだけで、プロンプトが完成', '商品名や決済方法は一度登録すれば自動で入ります。ほとんどの項目はタップで選べます。'],
+    ['あなたのレベルに合わせて案内', 'ビジネス初心者・AI初心者など、選んだ属性に合わせてヒントとAIへの頼み方が変わります。'],
+    ['いつものChatGPTで、そのまま', 'APIキーは不要です。ワンタップでプロンプトをコピーして、ChatGPTを開けます。'],
+  ];
+  const journey = gateDefs.STAGES.map((st, i) => {
+    const g = st.gates;
+    const range = g.length > 1 ? `GATE ${g[0]}–${g[g.length - 1]}` : `GATE ${g[0]}`;
+    return `<li><span class="rn">${roman(i + 1)}</span><div><b>${escapeHtml(st.title)}</b><small>${escapeHtml(st.sub)}・${range}</small></div></li>`;
+  }).join('');
   return layout('ようこそ', `
-    <section class="landing-hero">
-      <div class="eyebrow">90 DAYS PROGRAM</div>
-      <h1>あなたの経験を、<br>ひとつの商品に。</h1>
-      <p>AIプロンプトと10のGATEで、商品選びから販売・改善までを順番に進めるための専用アプリです。</p>
-      <div class="btn-row" style="margin-top:18px">
-        <a class="btn btn-gold" href="/signup">アカウントを作成</a>
-        <a class="btn btn-ghost" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.35)" href="/login">ログイン</a>
+    <section class="landing-hero lux">
+      ${guilloche(420, 560, { lines: 22 })}
+      <div class="hero-in">
+        ${crest(60)}
+        <div class="eyebrow">The 90-Day Program</div>
+        <h1>あなたの経験を、<br><em>ひとつの商品</em>に。</h1>
+        <p>AIプロンプトと10のGATEで、商品選びから販売・改善までを順番に進めるための専用アプリです。</p>
+        <div class="btn-row" style="margin-top:24px">
+          <a class="btn btn-gold" href="/signup">はじめる</a>
+          <a class="btn btn-outline-light" href="/login">ログイン</a>
+        </div>
       </div>
     </section>
-    <div class="features">
-      ${feat('map', '今やることが、ひと目でわかる', 'ロードマップ上に現在地と「次に開くプロンプト」を表示します。')}
-      ${feat('sparkle', '選ぶだけでプロンプトが完成', '商品名や決済方法は一度登録すれば自動入力。ほとんどの項目はタップで選べます。')}
-      ${feat('user', 'あなたのレベルに合わせて案内', 'ビジネス初心者・AI初心者など、選んだ属性に合わせてヒントとAIへの頼み方が変わります。')}
-      ${feat('prompt', 'いつものChatGPTでそのまま使える', 'APIキーがなくても、コピーまたはワンタップでChatGPTを開いて使えます。')}
-    </div>
+    <section>
+      <h2><span class="sec-no">01</span>このアプリでできること</h2>
+      <div class="card"><ol class="feat-list">${feats.map(([t, d], i) => `<li><span class="fn">${pad2(i + 1)}</span><div><b>${t}</b><p>${d}</p></div></li>`).join('')}</ol></div>
+    </section>
+    <section>
+      <h2><span class="sec-no">02</span>90日の道のり</h2>
+      <div class="card"><ol class="journey">${journey}</ol></div>
+    </section>
+    <section class="cta-card lux">
+      ${guilloche(420, 300, { lines: 16, opacity: 0.18 })}
+      <div class="hero-in">
+        <div class="eyebrow c">Begin</div>
+        <h3>今日から、ひとつめの商品づくりを。</h3>
+        <a class="btn btn-gold btn-block" href="/signup">アカウントを作成</a>
+        <a class="btn btn-quiet btn-block" style="color:rgba(246,239,224,.72);margin-top:4px" href="/login">アカウントをお持ちの方はログイン</a>
+      </div>
+    </section>
+    <footer class="foot">${crest(30)}<div class="fname">AI商品化実践システム</div><div class="ftag">The 90-Day Program</div></footer>
   `);
 }
 
@@ -144,72 +170,94 @@ function homePage() {
 function authForm(kind, error) {
   const isSignup = kind === 'signup';
   return layout(isSignup ? 'アカウント作成' : 'ログイン', `
-    <div class="eyebrow">${isSignup ? 'CREATE ACCOUNT' : 'SIGN IN'}</div>
-    <h1>${isSignup ? 'アカウント作成' : 'ログイン'}</h1>
-    <p class="lead">${isSignup ? '購入時のメールアドレスで登録してください。' : 'おかえりなさい。続きから進めましょう。'}</p>
-    ${error ? `<div class="notice error" style="margin:12px 0">${escapeHtml(error)}</div>` : ''}
-    <div class="card" style="margin-top:14px">
-      <form method="POST" action="${isSignup ? '/signup' : '/login'}">
-        <div class="field"><label class="lbl" for="email">メールアドレス</label><input id="email" type="email" name="email" required autofocus autocomplete="email"></div>
-        <div class="field"><label class="lbl" for="password">パスワード${isSignup ? '（8文字以上）' : ''}</label>
-          <input id="password" type="password" name="password" required minlength="8" autocomplete="${isSignup ? 'new-password' : 'current-password'}"></div>
-        <button class="btn btn-primary btn-block" type="submit">${isSignup ? 'アカウントを作成して始める' : 'ログイン'}</button>
-      </form>
+    <div class="auth">
+      <div class="auth-head">
+        ${crest(58)}
+        <div class="eyebrow c">${isSignup ? 'Create Account' : 'Welcome Back'}</div>
+        <h1>${isSignup ? 'アカウント作成' : 'ログイン'}</h1>
+        <p class="lead">${isSignup ? '購入時のメールアドレスで登録してください。' : 'おかえりなさい。続きから進めましょう。'}</p>
+      </div>
+      ${error ? `<div class="notice error" style="margin:0 0 14px">${icon('flag', 16)}<div>${escapeHtml(error)}</div></div>` : ''}
+      <div class="card">
+        <form method="POST" action="${isSignup ? '/signup' : '/login'}">
+          <div class="field"><label class="lbl" for="email">メールアドレス</label><input id="email" type="email" name="email" required autofocus autocomplete="email"></div>
+          <div class="field"><label class="lbl" for="password">パスワード${isSignup ? '（8文字以上）' : ''}</label>
+            <input id="password" type="password" name="password" required minlength="8" autocomplete="${isSignup ? 'new-password' : 'current-password'}"></div>
+          <button class="btn btn-primary btn-block" type="submit" style="margin-top:4px">${isSignup ? 'アカウントを作成して始める' : 'ログイン'}</button>
+        </form>
+      </div>
+      <p class="muted center">${isSignup ? 'すでにアカウントをお持ちの方は <a href="/login">ログイン</a>'
+        : 'はじめての方は <a href="/signup">アカウント作成</a>'}</p>
     </div>
-    <p class="muted" style="text-align:center">${isSignup ? 'すでにアカウントをお持ちの方は <a href="/login">ログイン</a>'
-      : 'はじめての方は <a href="/signup">アカウント作成</a>'}</p>
   `);
 }
 
 // ── ページ: オンボーディング（購入者属性の選択）──
+const PERSONA_ICON = { both_beginner: 'sprout', ai_beginner: 'briefcase', biz_beginner: 'chip', experienced: 'compass' };
+
 function onboardingPage(user, isChange) {
   const cur = user.persona || '';
   const cards = Object.entries(PERSONAS).map(([key, p]) => `
     <label><input type="radio" name="persona" value="${key}" ${cur === key ? 'checked' : ''} required>
-      <div class="pc"><span class="mark"></span><div><b>${escapeHtml(p.label)}</b><small>${escapeHtml(p.desc)}</small></div></div></label>`).join('');
+      <div class="pc"><span class="pi">${icon(PERSONA_ICON[key] || 'user', 24)}</span><span class="tx"><b>${escapeHtml(p.label)}</b><small>${escapeHtml(p.desc)}</small></span><span class="mark"></span></div></label>`).join('');
   return layout('あなたについて', `
-    ${isChange ? '' : '<div class="stepper"><i class="on"></i><i></i></div><div class="eyebrow">STEP 1 / 2</div>'}
-    <h1>いちばん近いものを選んでください</h1>
-    <p class="lead">選んだ内容に合わせて、ヒントの出し方と、AIへの頼み方（説明の詳しさ）を調整します。あとからいつでも変更できます。</p>
-    <form method="POST" action="/api/persona" style="margin-top:16px">
+    ${isChange ? '' : '<div class="stepper"><i class="on"></i><i></i></div>'}
+    <header class="page-head">
+      <div class="eyebrow">${isChange ? 'Your Profile' : 'Step 1 of 2'}</div>
+      <h1>いちばん近いものを選んでください</h1>
+      <p class="lead">選んだ内容に合わせて、ヒントの出し方と、AIへの頼み方（説明の詳しさ）を調整します。あとからいつでも変更できます。</p>
+    </header>
+    <form method="POST" action="/api/persona">
       <input type="hidden" name="change" value="${isChange ? '1' : ''}">
       <div class="pick">${cards}</div>
-      <button class="btn btn-primary btn-block" type="submit" style="margin-top:18px">${isChange ? '変更を保存する' : '次へ'} ${icon('arrow', 18)}</button>
+      <button class="btn btn-primary btn-block" type="submit" style="margin-top:20px">${isChange ? '変更を保存する' : '次へ'} ${icon('arrow', 18)}</button>
     </form>
   `, { user, noNav: !isChange, active: 'account' });
 }
 
 // ── ページ: ダッシュボード ──
+function greeting() {
+  const h = new Date(Date.now() + 9 * 3600e3).getUTCHours(); // 日本時間
+  if (h >= 5 && h < 11) return 'おはようございます';
+  if (h >= 11 && h < 18) return 'こんにちは';
+  return 'こんばんは';
+}
+
 function heroHtml(pg, titles, profile) {
-  const pct = pg.greenCount / 10;
-  const C = 2 * Math.PI * 38;
-  const ring = `<div class="ring"><svg width="92" height="92" viewBox="0 0 92 92">
-      <circle cx="46" cy="46" r="38" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="8"/>
-      ${pct > 0 ? `<circle cx="46" cy="46" r="38" fill="none" stroke="url(#rg)" stroke-width="8" stroke-linecap="round"
-        stroke-dasharray="${(C * pct).toFixed(1)} ${C.toFixed(1)}"/>` : ''}
-      <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DDB0"/><stop offset="1" stop-color="#CFAE74"/></linearGradient></defs>
-    </svg><div class="num"><div><b>${pg.greenCount}</b><span>/ 10 GATE</span></div></div></div>`;
+  const R = 44;
+  const C = 2 * Math.PI * R;
+  const off = C * (1 - pg.greenCount / 10);
+  const ring = `<div class="ring"><svg width="104" height="104" viewBox="0 0 104 104" aria-hidden="true">
+      <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4E5BF"/><stop offset=".5" stop-color="#D6B878"/><stop offset="1" stop-color="#A9854A"/></linearGradient></defs>
+      <circle cx="52" cy="52" r="${R}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6"/>
+      <circle cx="52" cy="52" r="36" fill="none" stroke="rgba(217,191,140,.22)" stroke-width="1"/>
+      ${pg.greenCount > 0 ? `<circle class="prog" cx="52" cy="52" r="${R}" fill="none" stroke="url(#ringGrad)" stroke-width="6" stroke-linecap="round" style="--c:${C.toFixed(1)};--off:${off.toFixed(1)}"/>` : ''}
+    </svg><div class="num"><div><b>${pg.greenCount}</b><span>of 10 Gates</span></div></div></div>`;
   const dayPct = Math.round((pg.doneDays.size / 90) * 100);
   const daybar = `<div class="daybar"><div class="track"><div class="fill" style="width:${dayPct}%"></div></div>
-    <div class="meta"><span>90日チェックリスト</span><span>${pg.doneDays.size} / 90 日</span></div></div>`;
+    <div class="meta"><span>90日チェックリスト</span><span><b>${pg.doneDays.size}</b> / 90 日</span></div></div>`;
+  const stepRow = (href, label, first, i) => `<li><a class="${first ? 'first' : ''}" href="${href}"><span class="n">${i}</span><span class="t">${label}</span>${first ? '<span class="start">Start</span>' : ''}${icon('chevron', 16)}</a></li>`;
   if (!pg.nextDef) {
-    return `<section class="hero"><div class="hero-top">${ring}<div class="hero-next"><div class="eyebrow">COMPLETE</div>
-      <div class="gate">全GATE合格</div><p class="why">お疲れさまでした。No.16で商品のシリーズ展開を考えてみましょう。</p></div></div>
-      <div class="hero-steps"><a class="first" href="/prompts/16">No.16 ${escapeHtml(titles[16] || '')}</a></div>${daybar}</section>`;
+    return `<section class="hero lux">${guilloche(420, 360)}<div class="hero-in">
+      <div class="hero-top">${ring}<div class="hero-next"><div class="eyebrow">Complete</div>
+        <div class="gate"><span class="gno">ALL GATES</span><span class="gname">全GATE合格</span></div>
+        <p class="why">お疲れさまでした。No.16で商品のシリーズ展開を考えてみましょう。</p></div></div>
+      <ol class="hero-steps">${stepRow('/prompts/16', `No.16　${escapeHtml(titles[16] || '')}`, true, 1)}</ol>
+      ${daybar}</div></section>`;
   }
   const d = pg.nextDef;
-  const steps = d.steps.map((n, i) => `<a class="${i === 0 ? 'first' : ''}" href="/prompts/${n}"><span class="n">${i + 1}</span>No.${n} ${escapeHtml(titles[n] || '')}</a>`).join('');
+  const rows = d.steps.map((n, i) => stepRow(`/prompts/${n}`, `No.${n}　${escapeHtml(titles[n] || '')}`, i === 0, i + 1));
   const payReady = !!profile.payment_method;
-  const extra = d.setupLink && (!payReady || !d.steps.length)
-    ? `<a class="${d.steps.length ? '' : 'first'}" href="${d.setupLink.href}">${escapeHtml(payReady ? 'お客様からの代金の受け取り方を確認する' : d.setupLink.text)}</a>`
-    : '';
-  return `<section class="hero">
-    <div class="hero-top">${ring}<div class="hero-next"><div class="eyebrow">NEXT ・ ${escapeHtml(d.phase)}</div>
-      <div class="gate">GATE${d.no}　${escapeHtml(d.name)}</div>
+  if (d.setupLink && (!payReady || !d.steps.length)) {
+    rows.push(stepRow(d.setupLink.href, escapeHtml(payReady ? 'お客様からの代金の受け取り方を確認する' : d.setupLink.text), !d.steps.length, rows.length + 1));
+  }
+  return `<section class="hero lux">${guilloche(420, 380)}<div class="hero-in">
+    <div class="hero-top">${ring}<div class="hero-next"><div class="eyebrow">Next Gate · ${escapeHtml(d.phase)}</div>
+      <div class="gate"><span class="gno">GATE ${pad2(d.no)}</span><span class="gname">${escapeHtml(d.name)}</span></div>
       <p class="why">${d.steps.length ? '上から順にプロンプトを開いて進めましょう。' : 'このGATEは購入時の資料を見ながら進めます。'}</p></div></div>
-    <div class="hero-steps">${steps}${extra}</div>
+    <ol class="hero-steps">${rows.join('')}</ol>
     ${daybar}
-  </section>`;
+  </div></section>`;
 }
 
 function roadmapHtml(pg, persona, titles, openNo, profile) {
@@ -224,18 +272,16 @@ function roadmapHtml(pg, persona, titles, openNo, profile) {
         no === nextNo ? 'current' : '', isLast ? 'last' : ''].filter(Boolean).join(' ');
       const reviews = reviewNosOf(d);
       const stepLi = [...d.steps, ...(d.extra || [])].map((n) => `<li><a href="/prompts/${n}"><span class="no">No.${n}</span>
-        <span class="nm">${escapeHtml(titles[n] || '')}</span>${reviews.has(n) ? '<span class="tag">GATE判定</span>' : ''}
-        ${(d.extra || []).includes(n) ? '<span class="tag">必要な人だけ</span>' : ''}${icon('chevron', 16)}</a></li>`).join('');
+        <span class="nm">${escapeHtml(titles[n] || '')}${reviews.has(n) ? '<span class="tag">GATE判定</span>' : ''}${(d.extra || []).includes(n) ? '<span class="tag">必要な人だけ</span>' : ''}</span>${icon('chevron', 16)}</a></li>`).join('');
       const ext = d.external ? `<li><div class="ext">${icon('lock', 16)}「${escapeHtml(d.external)}」はアプリ未収録です。購入時にお渡しした資料をご覧ください。</div></li>` : '';
-      const setup = d.setupLink ? `<li><a href="${d.setupLink.href}"><span class="no">${icon('bank', 14)}</span><span class="nm">${escapeHtml(d.setupLink.text)}</span>
-        <span class="tag">${profile.payment_method ? '設定済み' : '未設定'}</span>${icon('chevron', 16)}</a></li>` : '';
+      const setup = d.setupLink ? `<li><a href="${d.setupLink.href}"><span class="no">${icon('bank', 15)}</span><span class="nm">${escapeHtml(d.setupLink.text)}<span class="tag">${profile.payment_method ? '設定済み' : '未設定'}</span></span>${icon('chevron', 16)}</a></li>` : '';
       const tips = tipsFor(persona, no).map((t) => `<div class="tip">${icon('bulb', 18)}<div><b>${escapeHtml(t.tag)}</b>${escapeHtml(t.text)}</div></div>`).join('');
       const seg = ['GREEN', 'YELLOW', 'RED', 'PENDING'].map((s) => `<button type="submit" name="status" value="${s}" class="s-${s} ${g.status === s ? 'on' : ''}">${STATUS_LABEL[s]}</button>`).join('');
       const open = no === nextNo || no === openNo;
       return `<li class="${cls}" id="gate-${no}">
         <span class="dot">${g.status === 'GREEN' ? icon('check', 18) : no}</span>
         <details class="node-card" ${open ? 'open' : ''}>
-          <summary><span class="t"><b>GATE${no}　${escapeHtml(d.name)}${no === nextNo ? '<span class="now-tag">NOW</span>' : ''}</b>
+          <summary><span class="t"><span class="gno">GATE ${pad2(no)}${no === nextNo ? '<span class="now-tag">Now</span>' : ''}</span><b>${escapeHtml(d.name)}</b>
             <small>${escapeHtml(d.phase)}</small></span><span class="badge st-${g.status}">${STATUS_LABEL[g.status]}</span>${icon('chevron', 18, 'chev')}</summary>
           <div class="node-body">
             <ul class="steps">${stepLi}${setup}${ext}</ul>
@@ -249,7 +295,7 @@ function roadmapHtml(pg, persona, titles, openNo, profile) {
         </details>
       </li>`;
     }).join('');
-    return `<li class="stage"><div class="stage-head"><b>${escapeHtml(st.title)}</b><span>${escapeHtml(st.sub)}</span></div><ol class="roadmap">${nodes}</ol></li>`;
+    return `<li class="stage"><div class="stage-head"><span class="roman">${roman(si + 1)}</span><b>${escapeHtml(st.title)}</b><span class="ph">${escapeHtml(st.sub.replace('PHASE', 'Phase '))}</span></div><ol class="roadmap">${nodes}</ol></li>`;
   }).join('');
   return `<ol class="roadmap">${stages}</ol>`;
 }
@@ -259,15 +305,15 @@ function lineupHtml(pg, profile) {
   const p1State = st(8) ? '販売中' : st(5) ? '販売準備中' : st(1) ? '制作中' : '選定中';
   const p2State = st(10) ? '企画確定' : st(9) ? '企画中' : 'これから';
   const card = (no, name, state, meta, active, locked) => `<div class="lu-card ${active ? 'active' : ''} ${locked ? 'locked' : ''}">
-      <div class="lu-head"><span class="lu-no">${no}</span><span class="lu-state">${escapeHtml(state)}</span></div>
+      <div class="lu-head"><span class="lu-no">${no}</span><span class="lu-state">${locked ? icon('lock', 12) : ''}${escapeHtml(state)}</span></div>
       <div class="lu-name">${escapeHtml(name)}</div><div class="lu-meta">${escapeHtml(meta)}</div></div>`;
   const arrow = `<div class="lu-arrow">${icon('arrow', 20)}</div>`;
   return `<div class="lineup">
-    ${card('PRODUCT 01', profile.product_name || '（未定）', p1State, [profile.product_format, profile.price_band].filter(Boolean).join('・') || 'GATE1〜9', true, false)}
+    ${card('Product 01', profile.product_name || '（未定）', p1State, [profile.product_format, profile.price_band].filter(Boolean).join('・') || 'GATE1〜9', true, false)}
     ${arrow}
-    ${card('PRODUCT 02', '商品1の学びを活かした商品', p2State, 'GATE10・No.25を再利用', st(9), !st(9))}
+    ${card('Product 02', '商品1の学びを活かした商品', p2State, 'GATE10・No.25を再利用', st(9), !st(9))}
     ${arrow}
-    ${card('SERIES', 'シリーズ・上位商品', st(10) ? '検討中' : 'これから', 'No.16でシリーズ化', st(10), !st(10))}
+    ${card('Series', 'シリーズ・上位商品', st(10) ? '検討中' : 'これから', 'No.16でシリーズ化', st(10), !st(10))}
   </div>`;
 }
 
@@ -292,16 +338,15 @@ function dashboardPage(user, openNo) {
       });
     </script>` : '';
   const profileNudge = profile.product_name ? '' : `
-    <a class="card" href="/product" style="display:flex;gap:14px;align-items:center;text-decoration:none;color:inherit">
-      <span class="feature" style="padding:0;border:0;box-shadow:none;background:none"><span class="fi">${icon('box', 22)}</span></span>
-      <span style="flex:1"><b style="display:block;font-size:14.5px">マイ商品を登録しましょう</b>
-      <span class="muted">商品名・ターゲット・決済方法などが、各プロンプトに自動で入るようになります。</span></span>${icon('chevron', 18)}</a>`;
+    <a class="card nudge" href="/product"><span class="ni">${icon('box', 22)}</span>
+      <span class="tx"><b>マイ商品を登録しましょう</b><span class="muted">商品名・ターゲット・お支払い方法などが、各プロンプトに自動で入るようになります。</span></span>${icon('chevron', 18, 'chev')}</a>`;
 
   return layout('ホーム', `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
-      <div><div class="eyebrow">DASHBOARD</div><h1 style="margin:0">今日も一歩ずつ</h1></div>
-      <a href="/onboarding?change=1" class="badge st-PENDING" style="text-decoration:none">${escapeHtml(persona.label)}</a>
-    </div>
+    <header class="page-head">
+      <div class="eyebrow">Dashboard</div>
+      <h1>${greeting()}</h1>
+      <div class="sub"><span>開始から<b>${pg.auto.daysSinceStart}</b>日目</span><a class="pill-link" href="/onboarding?change=1">${icon('user', 13)}${escapeHtml(persona.label)}</a></div>
+    </header>
     ${heroHtml(pg, titles, profile)}
     ${prepHtml}
     ${profileNudge}
@@ -342,13 +387,15 @@ function promptsPage(user) {
   const prompts = Prompts.all();
   const pg = progressOf(user);
   const rec = pg.nextDef ? [...pg.nextDef.steps, ...(pg.nextDef.extra || [])] : [];
-  const row = (p, isRec) => `<a class="row-link" href="/prompts/${p.no}"><span class="no">No.${p.no}</span>
+  const row = (p, isRec) => `<a class="row-link" href="/prompts/${p.no}"><span class="no"><small>No.</small><em>${p.no}</em></span>
     <span class="t"><b>${escapeHtml(p.title)}${isRec ? '<span class="rec">今使う</span>' : ''}</b><small>${escapeHtml(p.timing || p.phase)}</small></span>${icon('chevron', 18, 'chev')}</a>`;
   const byNo = new Map(prompts.map((p) => [p.no, p]));
   return layout('プロンプト', `
-    <div class="eyebrow">PROMPTS</div>
-    <h1>AIプロンプト</h1>
-    <p class="lead">項目を選ぶだけでプロンプトが完成します。そのままChatGPTで使えます。</p>
+    <header class="page-head">
+      <div class="eyebrow">Prompts</div>
+      <h1>AIプロンプト</h1>
+      <p class="lead">項目を選ぶだけでプロンプトが完成します。そのままChatGPTで使えます。</p>
+    </header>
     ${rec.length ? `<h2>${icon('flag', 20)}今のGATEで使う（GATE${pg.nextDef.no} ${escapeHtml(pg.nextDef.name)}）</h2>
       <div class="rows">${rec.map((n) => byNo.get(n)).filter(Boolean).map((p) => row(p, true)).join('')}</div>` : ''}
     <h2>${icon('bulb', 20)}困ったときに使う</h2>
@@ -372,19 +419,23 @@ function promptDetailPage(user, p) {
   const providers = Object.keys(PROVIDERS);
   return layout(`No.${p.no} ${p.title}`, `
     <a href="/prompts" class="btn btn-quiet back" style="padding-left:0">${icon('chevron', 16)}<span style="margin-left:-4px">プロンプト一覧</span></a>
-    <div class="eyebrow">PROMPT No.${p.no}</div>
-    <h1>${escapeHtml(p.title)}</h1>
-    <p class="muted">${escapeHtml(p.phase)}　｜　使うタイミング：${escapeHtml(p.timing || '―')}</p>
+    <header class="detail-head">
+      <div class="ghost-no" aria-hidden="true">${p.no}</div>
+      <div class="eyebrow">Prompt No. ${p.no}</div>
+      <h1>${escapeHtml(p.title)}</h1>
+      <div class="meta-chips"><span>${escapeHtml(p.phase)}</span><span>使うタイミング：${escapeHtml(p.timing || '―')}</span></div>
+    </header>
 
     <div class="card">
-      <div class="card-title">${icon('sparkle', 18)}選ぶだけで入力できます</div>
+      <div class="card-title"><span class="step-no">1</span>選ぶだけで入力できます</div>
       <form id="pbForm" onsubmit="return false">${formHtml}
         ${persona ? `<label class="chip" style="margin-top:14px"><input type="checkbox" id="usePreamble" checked><span>${icon('user', 16)}「${escapeHtml(persona.label)}」向けに説明してもらう</span></label>` : ''}
       </form>
     </div>
 
-    <div class="card">
-      <div class="card-title">${icon('prompt', 18)}完成したプロンプト</div>
+    <div class="card doc">
+      <span class="ribbon">Your Prompt</span>
+      <div class="card-title"><span class="step-no">2</span>完成したプロンプト</div>
       <textarea id="promptBody" class="pb-out" rows="10" aria-label="完成したプロンプト"></textarea>
       <div id="missMsg" class="miss"></div>
       <p class="hint">上の項目を変更すると、この欄は作り直されます。細かい修正は最後にこの欄で行ってください。</p>
@@ -438,9 +489,11 @@ function promptDetailPage(user, p) {
       document.getElementById('copyBtn').addEventListener('click', async () => {
         const text = document.getElementById('promptBody').value;
         const msgEl = document.getElementById('copyMsg');
-        msgEl.textContent = (await copyText(text))
+        const ok = await copyText(text);
+        msgEl.textContent = ok
           ? 'コピーしました。ChatGPTの入力欄を長押し→「ペースト」で貼り付けてください。'
           : 'コピーできませんでした。プロンプト欄を長押しして全選択→コピーしてください。';
+        if (ok) toast('コピーしました');
       });
       document.getElementById('openChatGptBtn').addEventListener('click', () => {
         const text = document.getElementById('promptBody').value;
@@ -449,6 +502,7 @@ function promptDetailPage(user, p) {
         const tooLong = text.length > CHATGPT_URL_LIMIT;
         window.open(tooLong ? 'https://chatgpt.com/' : 'https://chatgpt.com/?q=' + encodeURIComponent(text), '_blank', 'noopener');
         const done = function(ok){
+          if (ok) toast('プロンプトをコピーしました');
           msgEl.textContent = ok
             ? (tooLong ? 'プロンプトが長いため自動入力はされません。コピー済みなので、' : 'プロンプトをコピーしました。') + PASTE_HELP
             : 'ChatGPTを開きました。入力欄が空の場合は、この画面に戻って「コピー」を押し、貼り付けてください。';
@@ -542,13 +596,16 @@ function productPage(user, { welcome, saved } = {}) {
       <input id="${name}" type="url" name="${name}" value="${escapeHtml(pf[name])}" maxlength="300" placeholder="${placeholder}" autocomplete="off">
       <div class="hint">${hint}</div></div>`;
   return layout('マイ商品', `
-    ${welcome ? '<div class="stepper"><i class="on"></i><i class="on"></i></div><div class="eyebrow">STEP 2 / 2</div>' : '<div class="eyebrow">MY PRODUCT</div>'}
-    <h1>マイ商品</h1>
-    <p class="lead">あなたが作って売る商品の情報です。ここで登録した内容は各プロンプトに自動で入ります。決まっていない項目は空欄のままで大丈夫です。</p>
-    ${saved ? `<div class="notice info" style="margin:12px 0">${icon('check', 16)}<div>保存しました。</div></div>` : ''}
+    ${welcome ? '<div class="stepper"><i class="on"></i><i class="on"></i></div>' : ''}
+    <header class="page-head">
+      <div class="eyebrow">${welcome ? 'Step 2 of 2' : 'My Product'}</div>
+      <h1>マイ商品</h1>
+      <p class="lead">あなたが作って売る商品の情報です。ここで登録した内容は各プロンプトに自動で入ります。決まっていない項目は空欄のままで大丈夫です。</p>
+    </header>
+    ${saved ? `<script>document.addEventListener('DOMContentLoaded', function () { toast('保存しました'); });</script>` : ''}
     <form method="POST" action="/api/product" id="productForm">
       <input type="hidden" name="welcome" value="${welcome ? '1' : ''}">
-      <h2>${icon('box', 20)}商品の基本</h2>
+      <h2><span class="sec-no">01</span>商品の基本</h2>
       <div class="card">
         <div class="field"><label class="lbl" for="product_name">商品名（仮でもOK）</label>
           <input id="product_name" type="text" name="product_name" value="${escapeHtml(pf.product_name)}" maxlength="80" placeholder="例：はじめての家計簿テンプレート"></div>
@@ -563,7 +620,7 @@ function productPage(user, { welcome, saved } = {}) {
         <div class="field"><label class="lbl">価格帯（予定）</label>${chipsInput('price_band', O.PRICE_BANDS, pf.price_band)}</div>
       </div>
 
-      <h2 id="payment">${icon('bank', 20)}お客様からの代金の受け取り方</h2>
+      <h2 id="payment"><span class="sec-no">02</span>お客様からの代金の受け取り方</h2>
       <p class="muted">あなたの商品を買ってくれたお客様に、代金を支払ってもらうための設定です（このアプリの利用料の支払いとは関係ありません）。</p>
       <div class="card">
         <div class="field"><label class="lbl" for="sale_price">販売価格（税込）</label>
@@ -594,10 +651,10 @@ function productPage(user, { welcome, saved } = {}) {
         <div class="notice warn" style="margin-top:14px">${icon('flag', 16)}<div>インターネットで商品を販売するときは「特定商取引法に基づく表記」の掲載が必要です。販売ページとあわせて準備してください。</div></div>
       </div>
 
-      <h2 id="guide">${icon('copy', 20)}お客様へ送るお支払い案内</h2>
+      <h2 id="guide"><span class="sec-no">03</span>お客様へ送るお支払い案内</h2>
       <div class="card">
         ${guide ? `<p class="muted">お申し込みがあったお客様に、メールやDMでそのまま送れる文章です。保存した内容から自動で作られます。</p>
-          <pre class="template" id="tplText">${escapeHtml(guide)}</pre>
+          <div class="letter"><pre class="template" id="tplText">${escapeHtml(guide)}</pre></div>
           <button type="button" class="btn btn-ghost btn-sm" id="copyTpl" style="margin-top:10px">${icon('copy', 16)}案内文をコピー</button>
           <span id="tplMsg" class="muted"></span>`
         : '<p class="muted" style="margin:0">お支払い方法を選び、振込先やお支払いページのURLを入れて保存すると、お客様へ送る案内文がここに自動で作られます。</p>'}
@@ -629,7 +686,7 @@ function productPage(user, { welcome, saved } = {}) {
         });
         const copyTpl = document.getElementById('copyTpl');
         if (copyTpl) copyTpl.addEventListener('click', async function(){
-          try { await navigator.clipboard.writeText(document.getElementById('tplText').textContent); document.getElementById('tplMsg').textContent = ' コピーしました'; }
+          try { await navigator.clipboard.writeText(document.getElementById('tplText').textContent); document.getElementById('tplMsg').textContent = ' コピーしました'; toast('案内文をコピーしました'); }
           catch (e) { document.getElementById('tplMsg').textContent = ' コピーできませんでした。長押しで選択してください'; }
         });
       })();
@@ -680,12 +737,15 @@ function normalizeProfile(body) {
 function accountPage(user) {
   const persona = PERSONAS[user.persona];
   return layout('アカウント', `
-    <div class="eyebrow">ACCOUNT</div>
-    <h1>アカウント</h1>
-    <div class="card">
-      <dl class="kv"><dt>メール</dt><dd>${escapeHtml(user.email)}</dd>
-      <dt>あなたの属性</dt><dd>${escapeHtml(persona ? persona.label : '未設定')}</dd></dl>
-      <a class="btn btn-ghost btn-block" href="/onboarding?change=1" style="margin-top:14px">属性を変更する</a>
+    <header class="page-head"><div class="eyebrow">Account</div><h1>アカウント</h1></header>
+    <div class="card lux acct">
+      ${guilloche(420, 320, { lines: 16, opacity: 0.18 })}
+      <div class="hero-in">
+        <div class="avatar-lg">${escapeHtml(initial(user.email))}</div>
+        <dl class="kv"><dt>メール</dt><dd>${escapeHtml(user.email)}</dd>
+        <dt>あなたの属性</dt><dd>${escapeHtml(persona ? persona.label : '未設定')}</dd></dl>
+        <a class="btn btn-outline-light btn-block" href="/onboarding?change=1" style="margin-top:18px">属性を変更する</a>
+      </div>
     </div>
     <div class="card">
       <div class="card-title">${icon('lock', 18)}データの扱い</div>
