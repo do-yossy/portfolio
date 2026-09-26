@@ -118,6 +118,14 @@ function reviewNosOf(def) {
   return new Set([...def.usePrompt.matchAll(/No\.(\d+)/g)].map((m) => parseInt(m[1], 10)));
 }
 
+// 今のGATEの手順の中で、このプロンプトの次にやることを決める（最後ならGATE判定へ）
+function nextStepFor(pg, no) {
+  const def = pg.nextDef;
+  if (!def || !def.steps.includes(no)) return null;
+  const i = def.steps.indexOf(no);
+  return i < def.steps.length - 1 ? { type: 'prompt', no: def.steps[i + 1] } : { type: 'gate', gateNo: def.no, gateName: def.name };
+}
+
 // ── ページ: トップ（未ログイン）──
 function homePage() {
   const feats = [
@@ -416,6 +424,8 @@ function promptDetailPage(user, p) {
     ? fields.map((f) => fieldHtml(f, ctx)).join('')
     : '<p class="muted">このプロンプトは入力項目がありません。そのまま使えます。</p>';
   const providers = Object.keys(PROVIDERS);
+  const next = nextStepFor(pg, p.no);
+  const nextPrompt = next && next.type === 'prompt' ? Prompts.get(next.no) : null;
   return layout(`No.${p.no} ${p.title}`, `
     <a href="/prompts" class="btn btn-quiet back" style="padding-left:0">${icon('chevron', 16)}<span style="margin-left:-4px">プロンプト一覧</span></a>
     <header class="detail-head">
@@ -449,6 +459,15 @@ function promptDetailPage(user, p) {
       </div>
       <p id="copyMsg" class="muted" style="margin:6px 2px 0;text-align:center"></p>
     </div>
+
+    ${next ? `<div class="card" id="nextStepCard" style="margin-top:14px">
+      <div class="card-title">${icon('flag', 18)}次のステップ</div>
+      ${nextPrompt
+        ? `<p class="muted">ChatGPTの回答を確認できたら、続けて次に進みましょう。</p>
+           <a class="btn btn-primary btn-block" href="/prompts/${nextPrompt.no}">No.${nextPrompt.no} ${escapeHtml(nextPrompt.title)}へ ${icon('arrow', 16)}</a>`
+        : `<p class="muted">これでGATE${next.gateNo}「${escapeHtml(next.gateName)}」の手順は最後です。判定結果をダッシュボードで記録しましょう。</p>
+           <a class="btn btn-primary btn-block" href="/dashboard?open=${next.gateNo}#gate-${next.gateNo}">GATE${next.gateNo}の判定を記録する ${icon('arrow', 16)}</a>`}
+    </div>` : ''}
 
     <details class="card fold" style="margin-top:14px">
       <summary><span style="display:flex;gap:8px;align-items:center">${icon('lock', 18)}APIキーでアプリ内から実行する（上級者向け）</span>${icon('chevron', 18, 'chev')}</summary>
@@ -485,6 +504,7 @@ function promptDetailPage(user, p) {
         try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
       }
       const PASTE_HELP = 'ChatGPTアプリが開いて入力欄が空のときは、入力欄を長押し→「ペースト」で貼り付けて送信してください。';
+      let awaitingReturn = false;
       document.getElementById('copyBtn').addEventListener('click', async () => {
         const text = document.getElementById('promptBody').value;
         const msgEl = document.getElementById('copyMsg');
@@ -500,6 +520,7 @@ function promptDetailPage(user, p) {
         const copied = copySync(text);
         const tooLong = text.length > CHATGPT_URL_LIMIT;
         window.open(tooLong ? 'https://chatgpt.com/' : 'https://chatgpt.com/?q=' + encodeURIComponent(text), '_blank', 'noopener');
+        awaitingReturn = true;
         const done = function(ok){
           if (ok) toast('プロンプトをコピーしました');
           msgEl.textContent = ok
@@ -508,6 +529,14 @@ function promptDetailPage(user, p) {
         };
         if (copied || !navigator.clipboard) { done(copied); return; }
         navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || !awaitingReturn) return;
+        awaitingReturn = false;
+        const card = document.getElementById('nextStepCard');
+        if (!card) return;
+        toast('ChatGPTの回答が出たら、次のステップに進みましょう');
+        setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
       });
       const KEY_STORE = 'ai-bijika:apiKey:';
       const providerSel = document.getElementById('provider');
