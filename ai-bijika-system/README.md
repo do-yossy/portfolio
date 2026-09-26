@@ -64,21 +64,23 @@ flyctl volumes create ai_bijika_data --app sq-ai-bijika --region nrt --size 1
 #（sales-platform/recruitment-platform で既に設定済みなら流用可能）
 ```
 
-### 独自ドメインの設定（任意）
+### 独自ドメイン
 
-`https://sq-ai-bijika.fly.dev` の代わりに、`social-quality.com` のサブドメイン（例: `ai-bijika.social-quality.com`）でも
-アクセスできるようにする場合は、`flyctl` が使える環境で以下を実行する：
+`https://sq-ai-bijika.fly.dev` に加えて、`social-quality.com` のサブドメイン **`https://aipro.social-quality.com`** でも
+アクセスできる（設定済み）。`social-quality.com` のDNSはCloudflareで管理している。
+
+別のサブドメインを追加・変更する場合は、`flyctl` が使える環境で以下を実行する：
 
 ```bash
-# 1. 証明書の発行をリクエストする（追加すべきDNSレコードが表示される）
-flyctl certs create ai-bijika.social-quality.com --app sq-ai-bijika
+# 1. 証明書の発行をリクエストする（追加すべきDNSレコード=A/AAAAの値が表示される）
+flyctl certs create <サブドメイン>.social-quality.com --app sq-ai-bijika
 
-# 2. 表示された内容に従い、social-quality.com のDNS管理画面でレコードを追加する
-#    （サブドメインなので通常は CNAME → sq-ai-bijika.fly.dev）
+# 2. 表示されたA/AAAAレコードをCloudflareのDNS設定に追加する
+#    プロキシ状態は必ず「DNSのみ」（灰色の雲）にする。
+#    「プロキシ済み」（オレンジの雲）のままだとFly.io側の証明書検証が失敗する。
 
-# 3. 証明書の発行状況を確認する（Issuedになるまで数分〜数十分かかることがある）
-flyctl certs show ai-bijika.social-quality.com --app sq-ai-bijika
+# 3. 証明書の発行状況を確認する（Issuedになるまで数分程度）
+flyctl certs check <サブドメイン>.social-quality.com --app sq-ai-bijika
 ```
 
-DNS反映後、証明書が `Issued` になれば `https://ai-bijika.social-quality.com` でアクセスできる
-（`sq-ai-bijika.fly.dev` も引き続き有効）。サブドメイン名は任意に変更可能。
+使わなくなったサブドメインの証明書は `flyctl certs remove <サブドメイン>.social-quality.com --app sq-ai-bijika` で削除できる。
