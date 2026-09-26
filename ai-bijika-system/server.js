@@ -464,9 +464,9 @@ function promptDetailPage(user, p) {
       <div class="card-title">${icon('flag', 18)}次のステップ</div>
       ${nextPrompt
         ? `<p class="muted">ChatGPTの回答を確認できたら、続けて次に進みましょう。</p>
-           <a class="btn btn-primary btn-block" href="/prompts/${nextPrompt.no}">No.${nextPrompt.no} ${escapeHtml(nextPrompt.title)}へ ${icon('arrow', 16)}</a>`
+           <a class="btn btn-primary btn-block" style="white-space:normal;height:auto;line-height:1.4" href="/prompts/${nextPrompt.no}">No.${nextPrompt.no} ${escapeHtml(nextPrompt.title)}へ ${icon('arrow', 16)}</a>`
         : `<p class="muted">これでGATE${next.gateNo}「${escapeHtml(next.gateName)}」の手順は最後です。判定結果をダッシュボードで記録しましょう。</p>
-           <a class="btn btn-primary btn-block" href="/dashboard?open=${next.gateNo}#gate-${next.gateNo}">GATE${next.gateNo}の判定を記録する ${icon('arrow', 16)}</a>`}
+           <a class="btn btn-primary btn-block" style="white-space:normal;height:auto;line-height:1.4" href="/dashboard?open=${next.gateNo}#gate-${next.gateNo}">GATE${next.gateNo}の判定を記録する ${icon('arrow', 16)}</a>`}
     </div>` : ''}
 
     <details class="card fold" style="margin-top:14px">
