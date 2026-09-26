@@ -52,9 +52,10 @@ Google Fonts から読み込む（リポジトリ内の他ページと同じ方�
 
 ## 本番デプロイ（Fly.io）
 
-`fly.toml` と `.github/workflows/deploy-ai-bijika.yml` を用意済みで、`main` への push で自動デプロイされる
-（sales-platform / recruitment-platform と同じ仕組み）。ただし **このアプリ用のFly.ioアプリはまだ存在しない**ため、
-初回のみ以下をリポジトリ所有者側の環境（`flyctl` が使える環境）で一度だけ実行する必要がある：
+`fly.toml` と `.github/workflows/deploy-ai-bijika.yml` により、`ai-bijika-system/**` を `main` にpushするたびに
+Fly.ioアプリ `sq-ai-bijika`（<https://sq-ai-bijika.fly.dev>）へ自動デプロイされる（sales-platform / recruitment-platform と同じ仕組み）。
+
+初回セットアップ（アプリ作成・ボリューム作成）は完了済み。新しい環境に作り直す場合の手順は以下：
 
 ```bash
 flyctl apps create sq-ai-bijika
@@ -63,5 +64,21 @@ flyctl volumes create ai_bijika_data --app sq-ai-bijika --region nrt --size 1
 #（sales-platform/recruitment-platform で既に設定済みなら流用可能）
 ```
 
-これを実行した後は、`ai-bijika-system/**` への変更を `main` にpushするたびに自動デプロイされる。
-この一度きりのアプリ作成・ボリューム作成は、このセッションの環境には `flyctl` が無いため実行できなかった。
+### 独自ドメインの設定（任意）
+
+`https://sq-ai-bijika.fly.dev` の代わりに、`social-quality.com` のサブドメイン（例: `ai-bijika.social-quality.com`）でも
+アクセスできるようにする場合は、`flyctl` が使える環境で以下を実行する：
+
+```bash
+# 1. 証明書の発行をリクエストする（追加すべきDNSレコードが表示される）
+flyctl certs create ai-bijika.social-quality.com --app sq-ai-bijika
+
+# 2. 表示された内容に従い、social-quality.com のDNS管理画面でレコードを追加する
+#    （サブドメインなので通常は CNAME → sq-ai-bijika.fly.dev）
+
+# 3. 証明書の発行状況を確認する（Issuedになるまで数分〜数十分かかることがある）
+flyctl certs show ai-bijika.social-quality.com --app sq-ai-bijika
+```
+
+DNS反映後、証明書が `Issued` になれば `https://ai-bijika.social-quality.com` でアクセスできる
+（`sq-ai-bijika.fly.dev` も引き続き有効）。サブドメイン名は任意に変更可能。
