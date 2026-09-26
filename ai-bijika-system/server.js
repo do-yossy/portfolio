@@ -201,16 +201,15 @@ function onboardingPage(user, isChange) {
     <label><input type="radio" name="persona" value="${key}" ${cur === key ? 'checked' : ''} required>
       <div class="pc"><span class="pi">${icon(PERSONA_ICON[key] || 'user', 24)}</span><span class="tx"><b>${escapeHtml(p.label)}</b><small>${escapeHtml(p.desc)}</small></span><span class="mark"></span></div></label>`).join('');
   return layout('あなたについて', `
-    ${isChange ? '' : '<div class="stepper"><i class="on"></i><i></i></div>'}
     <header class="page-head">
-      <div class="eyebrow">${isChange ? 'Your Profile' : 'Step 1 of 2'}</div>
+      <div class="eyebrow">${isChange ? 'Your Profile' : 'Get Started'}</div>
       <h1>いちばん近いものを選んでください</h1>
       <p class="lead">選んだ内容に合わせて、ヒントの出し方と、AIへの頼み方（説明の詳しさ）を調整します。あとからいつでも変更できます。</p>
     </header>
     <form method="POST" action="/api/persona">
       <input type="hidden" name="change" value="${isChange ? '1' : ''}">
       <div class="pick">${cards}</div>
-      <button class="btn btn-primary btn-block" type="submit" style="margin-top:20px">${isChange ? '変更を保存する' : '次へ'} ${icon('arrow', 18)}</button>
+      <button class="btn btn-primary btn-block" type="submit" style="margin-top:20px">${isChange ? '変更を保存する' : 'はじめる'} ${icon('arrow', 18)}</button>
     </form>
   `, { user, noNav: !isChange, active: 'account' });
 }
@@ -585,7 +584,7 @@ function paymentGuide(pf) {
   ].join('\n');
 }
 
-function productPage(user, { welcome, saved } = {}) {
+function productPage(user, { saved } = {}) {
   const pf = ProductProfile.get(user.id);
   const methods = new Set(splitList(pf.payment_method));
   const guide = paymentGuide(pf);
@@ -596,15 +595,13 @@ function productPage(user, { welcome, saved } = {}) {
       <input id="${name}" type="url" name="${name}" value="${escapeHtml(pf[name])}" maxlength="300" placeholder="${placeholder}" autocomplete="off">
       <div class="hint">${hint}</div></div>`;
   return layout('マイ商品', `
-    ${welcome ? '<div class="stepper"><i class="on"></i><i class="on"></i></div>' : ''}
     <header class="page-head">
-      <div class="eyebrow">${welcome ? 'Step 2 of 2' : 'My Product'}</div>
+      <div class="eyebrow">My Product</div>
       <h1>マイ商品</h1>
       <p class="lead">あなたが作って売る商品の情報です。ここで登録した内容は各プロンプトに自動で入ります。決まっていない項目は空欄のままで大丈夫です。</p>
     </header>
     ${saved ? `<script>document.addEventListener('DOMContentLoaded', function () { toast('保存しました'); });</script>` : ''}
     <form method="POST" action="/api/product" id="productForm">
-      <input type="hidden" name="welcome" value="${welcome ? '1' : ''}">
       <h2><span class="sec-no">01</span>商品の基本</h2>
       <div class="card">
         <div class="field"><label class="lbl" for="product_name">商品名（仮でもOK）</label>
@@ -661,8 +658,7 @@ function productPage(user, { welcome, saved } = {}) {
       </div>
 
       <div class="sticky-actions">
-        <button class="btn btn-primary btn-block" type="submit">${welcome ? '保存して始める' : '保存する'}</button>
-        ${welcome ? '<a class="btn btn-quiet btn-block" href="/dashboard">あとで登録する</a>' : ''}
+        <button class="btn btn-primary btn-block" type="submit">保存する</button>
       </div>
     </form>
     <script>
@@ -691,7 +687,7 @@ function productPage(user, { welcome, saved } = {}) {
         });
       })();
     </script>
-  `, { user, active: 'product', noNav: welcome });
+  `, { user, active: 'product' });
 }
 
 // 入力値の検証・正規化（選択肢はリストにあるものだけを受け付ける）
@@ -820,9 +816,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/persona' && method === 'POST') {
       const { persona, change } = await parseBody(req);
       if (!PERSONAS[persona]) return sendHtml(res, 400, onboardingPage(user, !!change));
-      const first = !PERSONAS[user.persona];
       Users.setPersona(user.id, persona);
-      return redirect(res, first ? '/product?welcome=1' : (change ? '/account' : '/dashboard'));
+      return redirect(res, change ? '/account' : '/dashboard');
     }
 
     // 属性が未設定なら、まずオンボーディングへ（既存アカウントも含む）
@@ -835,12 +830,12 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/prompts' && method === 'GET') return sendHtml(res, 200, promptsPage(user));
     if (pathname === '/account' && method === 'GET') return sendHtml(res, 200, accountPage(user));
     if (pathname === '/product' && method === 'GET') {
-      return sendHtml(res, 200, productPage(user, { welcome: url.searchParams.get('welcome') === '1', saved: url.searchParams.get('saved') === '1' }));
+      return sendHtml(res, 200, productPage(user, { saved: url.searchParams.get('saved') === '1' }));
     }
     if (pathname === '/api/product' && method === 'POST') {
       const body = await parseBody(req);
       ProductProfile.update(user.id, normalizeProfile(body));
-      return redirect(res, body.welcome ? '/dashboard' : '/product?saved=1');
+      return redirect(res, '/product?saved=1');
     }
 
     const promptMatch = pathname.match(/^\/prompts\/(\d+)$/);
