@@ -51,7 +51,7 @@ Prompts.sync(promptSeeds);
 
 const PORT = parseInt(process.env.PORT || '3300', 10);
 const STATUS_LABEL = { PENDING: '未着手', GREEN: '合格', YELLOW: '要修正', RED: 'やり直し' };
-const TROUBLE_PROMPTS = [18, 28, 23, 24];
+const TROUBLE_PROMPTS = [27, 30, 28, 29];
 
 const splitList = (v) => String(v || '').split('、').filter(Boolean);
 const yen = (v) => `${Number(v).toLocaleString('ja-JP')}円`;
@@ -248,8 +248,8 @@ function heroHtml(pg, titles, profile) {
     return `<section class="hero lux">${guilloche(420, 360)}<div class="hero-in">
       <div class="hero-top">${ring}<div class="hero-next"><div class="eyebrow">Complete</div>
         <div class="gate"><span class="gno">ALL GATES</span><span class="gname">全GATE合格</span></div>
-        <p class="why">お疲れさまでした。No.16で商品のシリーズ展開を考えてみましょう。</p></div></div>
-      <ol class="hero-steps">${stepRow('/prompts/16', `No.16　${escapeHtml(titles[16] || '')}`, true, 1)}</ol>
+        <p class="why">お疲れさまでした。No.25で商品のシリーズ展開を考えてみましょう。</p></div></div>
+      <ol class="hero-steps">${stepRow('/prompts/25', `No.25　${escapeHtml(titles[25] || '')}`, true, 1)}</ol>
       ${daybar}</div></section>`;
   }
   const d = pg.nextDef;
@@ -318,9 +318,9 @@ function lineupHtml(pg, profile) {
   return `<div class="lineup">
     ${card('Product 01', profile.product_name || '（未定）', p1State, [profile.product_format, profile.price_band].filter(Boolean).join('・') || 'GATE1〜9', true, false)}
     ${arrow}
-    ${card('Product 02', '商品1の学びを活かした商品', p2State, 'GATE10・No.25を再利用', st(9), !st(9))}
+    ${card('Product 02', '商品1の学びを活かした商品', p2State, 'GATE10・No.5を再利用', st(9), !st(9))}
     ${arrow}
-    ${card('Series', 'シリーズ・上位商品', st(10) ? '検討中' : 'これから', 'No.16でシリーズ化', st(10), !st(10))}
+    ${card('Series', 'シリーズ・上位商品', st(10) ? '検討中' : 'これから', 'No.25でシリーズ化', st(10), !st(10))}
   </div>`;
 }
 
@@ -638,7 +638,7 @@ function productPage(user, { saved } = {}) {
         <div class="field"><label class="lbl">商品の形式</label>${chipsInput('product_format', O.PRODUCT_FORMATS, pf.product_format)}</div>
         <div class="field"><label class="lbl" for="product_type">商品タイプ</label>
           <select id="product_type" name="product_type">${O.PRODUCT_TYPES.map((t) => `<option ${pf.product_type === t || (!pf.product_type && t === '未判定') ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}</select>
-          <div class="hint">分からなければ「未判定」のままで、<a href="/prompts/29">No.29 商品タイプ判定</a>を使ってください。</div></div>
+          <div class="hint">分からなければ「未判定」のままで、<a href="/prompts/6">No.6 商品タイプ判定</a>を使ってください。</div></div>
         <div class="field"><label class="lbl">ターゲット（誰に届けるか）</label>${chipsInput('target', O.TARGETS, pf.target, { other: true })}</div>
         <div class="field"><label class="lbl" for="pain">ターゲットの悩み（一言で）</label>
           <input id="pain" type="text" name="pain" value="${escapeHtml(pf.pain)}" maxlength="120" placeholder="例：家計簿が続かない"></div>
@@ -651,9 +651,9 @@ function productPage(user, { saved } = {}) {
       <div class="card">
         <div class="field"><label class="lbl" for="sale_price">販売価格（税込）</label>
           <div class="yen-wrap"><input id="sale_price" type="text" name="sale_price" inputmode="numeric" value="${escapeHtml(pf.sale_price)}" maxlength="11" placeholder="例：2980"><span>円</span></div>
-          <div class="hint">決まっていなければ空欄でOK。販売ページのプロンプト（No.12）とお支払い案内文に入ります。</div></div>
+          <div class="hint">決まっていなければ空欄でOK。販売ページのプロンプト（No.17）とお支払い案内文に入ります。</div></div>
         <div class="field"><label class="lbl">お客様のお支払い方法<span class="req-badge">複数選択可</span></label>${chipsInput('payment_method', O.PAYMENT_METHODS, pf.payment_method, { multi: true })}
-          <div class="hint">選んだ方法は販売ページのプロンプト（No.12）に自動で反映されます。口座番号やURLはAIには送りません。</div></div>
+          <div class="hint">選んだ方法は販売ページのプロンプト（No.17）に自動で反映されます。口座番号やURLはAIには送りません。</div></div>
         ${block(O.PAY.BANK, '銀行振込の振込先（あなたの口座）', `
           <div class="notice gold" style="margin-bottom:14px">${icon('lock', 16)}<div>振込先はあなたのアカウントでのみ表示され、AIへ送るプロンプトには含まれません。</div></div>
           <div class="field"><label class="lbl" for="bank_name">銀行名</label>
