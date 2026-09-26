@@ -34,6 +34,7 @@ module.exports = {
       ],
     },
   },
+  30: { 理想の1日のストーリー: paste('理想の1日のストーリー', 'No.0でChatGPTが作ってくれたストーリーを貼り付け') },
   1: {
     自己紹介: {
       kind: 'compose', label: '自己紹介', parts: [

@@ -4,7 +4,7 @@
 // steps: そのGATEで使う順番のプロンプト番号（各プロンプトの「使うタイミング」に基づく）
 // extra: 必要な人だけ使うプロンプト / external: アプリ未収録の参考資料
 module.exports = [
-  { no: 1, name: '商品選定', phase: 'PHASE1', usePrompt: 'No.25', steps: [0, 1, 2, 3, 25] },
+  { no: 1, name: '商品選定', phase: 'PHASE1', usePrompt: 'No.25', steps: [0, 30, 1, 2, 3, 25] },
   { no: 2, name: '市場検証', phase: 'PHASE1→2間', usePrompt: '市場検証・収益モデルガイド', steps: [29], external: '市場検証・収益モデルガイド' },
   { no: 3, name: '商品コンセプト', phase: 'PHASE2', usePrompt: 'No.19', steps: [4, 5, 19] },
   { no: 4, name: '商品構成', phase: 'PHASE2〜3', usePrompt: 'No.20', steps: [6, 20] },
