@@ -78,6 +78,20 @@ db.exec(`
   );
 `);
 
+// ── inquiries（お問い合わせ。購入前の質問／購入者からの質問どちらも受け付ける）──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS inquiries (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    name TEXT DEFAULT '',
+    email TEXT NOT NULL,
+    category TEXT DEFAULT '',
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'NEW',  -- NEW / DONE
+    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+`);
+
 // 購入者属性（オンボーディングで選択）。既存DB向けに冪等ALTERで追加
 try { db.exec("ALTER TABLE users ADD COLUMN persona TEXT DEFAULT ''"); } catch {}
 
@@ -219,4 +233,19 @@ const AiRuns = {
   },
 };
 
-module.exports = { db, Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, generateId, now };
+const Inquiries = {
+  create({ userId, name, email, category, message }) {
+    const id = generateId();
+    db.prepare(`INSERT INTO inquiries (id, user_id, name, email, category, message) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(id, userId || null, name || '', email, category || '', message);
+    return id;
+  },
+  all() {
+    return db.prepare('SELECT * FROM inquiries ORDER BY created_at DESC').all();
+  },
+  setStatus(id, status) {
+    db.prepare('UPDATE inquiries SET status = ? WHERE id = ?').run(status, id);
+  },
+};
+
+module.exports = { db, Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, generateId, now };

@@ -7,6 +7,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { URL } = require('url');
 
 const APP_DIR = __dirname;
@@ -36,7 +37,7 @@ function loadEnvFile(file) {
   loadEnvFile(own);
 })();
 
-const { Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile } = require('./db');
+const { Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries } = require('./db');
 const auth = require('./lib/auth');
 const { runPrompt, PROVIDERS } = require('./lib/aiproxy');
 const { escapeHtml, jsonForScript, icon, layout, crest, guilloche, roman, pad2, initial } = require('./lib/ui');
@@ -52,6 +53,19 @@ Prompts.sync(promptSeeds);
 const PORT = parseInt(process.env.PORT || '3300', 10);
 const STATUS_LABEL = { PENDING: '未着手', GREEN: '合格', YELLOW: '要修正', RED: 'やり直し' };
 const TROUBLE_PROMPTS = [27, 30, 28, 29];
+
+// お問い合わせの管理画面（/admin/inquiries）用の簡易パスワード認証。購入者アカウントとは別系統。
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
+if (ADMIN_PASSWORD === 'changeme') console.warn('[warn] ADMIN_PASSWORD 未設定。本番では必ず設定してください（/admin/inquiries が誰でも見られる状態です）。');
+const adminSessions = new Set();
+function isAdminAuthed(req) {
+  const sid = auth.parseCookies(req).get('admin_sid');
+  return !!(sid && adminSessions.has(sid));
+}
+function adminSessionCookie(sid) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `admin_sid=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400${secure}`;
+}
 
 const splitList = (v) => String(v || '').split('、').filter(Boolean);
 const yen = (v) => `${Number(v).toLocaleString('ja-JP')}円`;
@@ -170,7 +184,8 @@ function homePage() {
         <a class="btn btn-quiet btn-block" style="color:rgba(246,239,224,.72);margin-top:4px" href="/login">アカウントをお持ちの方はログイン</a>
       </div>
     </section>
-    <footer class="foot">${crest(30)}<div class="fname">AI商品化実践システム</div><div class="ftag">The 90-Day Program</div></footer>
+    <footer class="foot">${crest(30)}<div class="fname">AI商品化実践システム</div><div class="ftag">The 90-Day Program</div>
+      <div style="margin-top:10px"><a href="/contact">お問い合わせ</a></div></footer>
   `);
 }
 
@@ -198,6 +213,42 @@ function authForm(kind, error) {
         : 'はじめての方は <a href="/signup">アカウント作成</a>'}</p>
     </div>
   `);
+}
+
+// ── ページ: お問い合わせ（ログイン前後どちらからでも使える）──
+function contactPage(user, { sent, error, values } = {}) {
+  const v = values || {};
+  return layout('お問い合わせ', `
+    <header class="page-head"><div class="eyebrow">Contact</div><h1>お問い合わせ</h1>
+      <p class="lead">使い方やお支払いについてのご質問、不具合のご報告など、お気軽にお送りください。</p></header>
+    ${sent ? `
+      <div class="card lux acct">
+        ${guilloche(420, 220, { lines: 12, opacity: 0.18 })}
+        <div class="hero-in" style="text-align:center;padding:8px 0">
+          <div style="margin-bottom:10px">${icon('check', 30)}</div>
+          <h2 style="margin:0 0 8px">お問い合わせを受け付けました</h2>
+          <p class="muted" style="color:rgba(243,238,228,.72)">内容を確認のうえ、ご入力いただいたメールアドレスへご連絡いたします。</p>
+        </div>
+      </div>
+      <a class="btn btn-ghost btn-block" href="${user ? '/dashboard' : '/'}" style="margin-top:16px">${user ? 'ホームに戻る' : 'トップに戻る'}</a>
+    ` : `
+      ${error ? `<div class="notice error" style="margin:0 0 14px">${icon('flag', 16)}<div>${escapeHtml(error)}</div></div>` : ''}
+      <form method="POST" action="/api/contact">
+        <div class="card">
+          <div class="field"><label class="lbl" for="name">お名前（任意）</label>
+            <input id="name" type="text" name="name" value="${escapeHtml(v.name || '')}" maxlength="60" autocomplete="name"></div>
+          <div class="field"><label class="lbl" for="email">メールアドレス</label>
+            <input id="email" type="email" name="email" required maxlength="200" value="${escapeHtml(v.email || (user ? user.email : ''))}" autocomplete="email"></div>
+          <div class="field"><label class="lbl">お問い合わせの種類</label>${chipsInput('category', O.CONTACT_CATEGORIES, v.category || '')}</div>
+          <div class="field"><label class="lbl" for="message">お問い合わせ内容</label>
+            <textarea id="message" name="message" required maxlength="2000" rows="7" placeholder="できるだけ詳しくお書きください">${escapeHtml(v.message || '')}</textarea></div>
+        </div>
+        <div class="sticky-actions">
+          <button class="btn btn-primary btn-block" type="submit">送信する</button>
+        </div>
+      </form>
+    `}
+  `, { user, active: 'contact', noNav: !user });
 }
 
 // ── ページ: オンボーディング（購入者属性の選択）──
@@ -776,8 +827,70 @@ function accountPage(user) {
       <div class="card-title">${icon('lock', 18)}データの扱い</div>
       <p class="muted" style="margin:0">AIのAPIキーはサーバーに保存しません（このブラウザ内のみ）。マイ商品・振込先・進捗は、あなたのアカウントでのみ表示されます。</p>
     </div>
+    <a class="btn btn-ghost btn-block" href="/contact">${icon('mail', 18)}お問い合わせ</a>
     <a class="btn btn-quiet btn-block" href="/logout">${icon('logout', 18)}ログアウト</a>
   `, { user, active: 'account' });
+}
+
+// ── お問い合わせ管理（運営者用。購入者アカウントとは別のシンプルなパスワード認証）──
+function adminLoginPage(error) {
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管理者ログイン｜AI商品化実践システム</title>
+<style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0E1A22;color:#F3EEE4;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
+form{width:min(340px,86vw);background:#152530;padding:30px 26px;border-radius:18px;box-shadow:0 20px 44px -18px rgba(0,0,0,.6)}
+h1{font-size:16px;margin:0 0 18px;letter-spacing:.04em}
+input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;border:0;background:#0E1A22;color:#fff;margin-bottom:14px;font-size:15px;box-shadow:inset 0 0 0 1px #33454F}
+button{width:100%;padding:13px;border:0;border-radius:10px;background:#D9BF8C;color:#1B1408;font-weight:700;font-size:15px;cursor:pointer}
+.err{color:#E8998C;font-size:13px;margin-bottom:14px}
+</style></head><body>
+<form method="POST" action="/admin/login">
+  <h1>お問い合わせ管理</h1>
+  ${error ? `<div class="err">${escapeHtml(error)}</div>` : ''}
+  <input type="password" name="password" placeholder="管理者パスワード" required autofocus autocomplete="current-password">
+  <button type="submit">ログイン</button>
+</form>
+</body></html>`;
+}
+
+function adminInquiriesPage(list) {
+  const newCount = list.filter((i) => i.status !== 'DONE').length;
+  const rows = list.map((inq) => `
+    <div class="inq">
+      <div class="inq-head">
+        <span class="badge ${inq.status === 'DONE' ? 'done' : 'new'}">${inq.status === 'DONE' ? '対応済み' : '未対応'}</span>
+        <time>${escapeHtml(new Date(inq.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }))}</time>
+      </div>
+      <div class="inq-meta"><b>${escapeHtml(inq.name || '（お名前なし）')}</b> ／ ${escapeHtml(inq.email)}${inq.category ? ` ／ ${escapeHtml(inq.category)}` : ''}${inq.user_id ? ' ／ <span class="tag">購入者</span>' : ''}</div>
+      <p class="inq-msg">${escapeHtml(inq.message)}</p>
+      <form method="POST" action="/admin/inquiries/${inq.id}/status">
+        <input type="hidden" name="status" value="${inq.status === 'DONE' ? 'NEW' : 'DONE'}">
+        <button type="submit">${inq.status === 'DONE' ? '未対応に戻す' : '対応済みにする'}</button>
+      </form>
+    </div>`).join('') || '<p class="empty">お問い合わせはまだありません。</p>';
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>お問い合わせ管理｜AI商品化実践システム</title>
+<style>
+body{margin:0;background:#F5F1EA;color:#0E1A22;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:#0E1A22;color:#F3EEE4}
+header h1{font-size:15px;margin:0;letter-spacing:.02em}
+header a{color:#D9BF8C;font-size:13px;text-decoration:none}
+main{max-width:640px;margin:0 auto;padding:18px}
+.inq{background:#fff;border-radius:14px;box-shadow:0 1px 2px rgba(14,26,34,.06);padding:16px 18px;margin-bottom:14px}
+.inq-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.04em}
+.badge.new{background:#FBF0D8;color:#9C660F}
+.badge.done{background:#E2F1E8;color:#1C7A55}
+time{font-size:11.5px;color:#6B7780}
+.inq-meta{font-size:13px;color:#42525D;margin-bottom:8px;word-break:break-all}
+.tag{color:#0D4D47;font-weight:700}
+.inq-msg{white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.8;margin:0 0 12px}
+.inq form button{border:0;background:#F5F1EA;color:#42525D;font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer}
+.empty{color:#6B7780;text-align:center;padding:40px 0}
+</style></head><body>
+<header><h1>お問い合わせ管理（未対応 ${newCount}件）</h1><a href="/admin/logout">ログアウト</a></header>
+<main>${rows}</main>
+</body></html>`;
 }
 
 // ── リクエストハンドラ ──
@@ -834,6 +947,55 @@ const server = http.createServer(async (req, res) => {
       const token = auth.parseCookies(req).get('session');
       auth.destroySession(token);
       return redirect(res, '/', { 'Set-Cookie': auth.clearCookie() });
+    }
+
+    // ── お問い合わせ（ログイン前後どちらからでも送信できる）──
+    if (pathname === '/contact' && method === 'GET') {
+      return sendHtml(res, 200, contactPage(user, { sent: url.searchParams.get('sent') === '1' }));
+    }
+    if (pathname === '/api/contact' && method === 'POST') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim().slice(0, 60);
+      const email = String(body.email || '').trim().slice(0, 200);
+      const category = O.CONTACT_CATEGORIES.includes(String(body.category || '')) ? body.category : '';
+      const message = String(body.message || '').trim().slice(0, 2000);
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!emailOk || !message) {
+        return sendHtml(res, 400, contactPage(user, {
+          error: 'メールアドレスとお問い合わせ内容を正しく入力してください。',
+          values: { name, email, category, message },
+        }));
+      }
+      Inquiries.create({ userId: user ? user.id : null, name, email, category, message });
+      return redirect(res, '/contact?sent=1');
+    }
+
+    // ── お問い合わせ管理（運営者用。購入者ログインとは別のパスワード認証）──
+    if (pathname === '/admin/login' && method === 'GET') {
+      return sendHtml(res, 200, adminLoginPage());
+    }
+    if (pathname === '/admin/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      if (password !== ADMIN_PASSWORD) return sendHtml(res, 401, adminLoginPage('パスワードが違います。'));
+      const sid = crypto.randomBytes(24).toString('hex');
+      adminSessions.add(sid);
+      return redirect(res, '/admin/inquiries', { 'Set-Cookie': adminSessionCookie(sid) });
+    }
+    if (pathname === '/admin/logout') {
+      const sid = auth.parseCookies(req).get('admin_sid');
+      if (sid) adminSessions.delete(sid);
+      return redirect(res, '/admin/login', { 'Set-Cookie': 'admin_sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
+    }
+    if (pathname === '/admin/inquiries' && method === 'GET') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      return sendHtml(res, 200, adminInquiriesPage(Inquiries.all()));
+    }
+    const inqStatusMatch = pathname.match(/^\/admin\/inquiries\/([a-f0-9]+)\/status$/);
+    if (inqStatusMatch && method === 'POST') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      const { status } = await parseBody(req);
+      if (['NEW', 'DONE'].includes(status)) Inquiries.setStatus(inqStatusMatch[1], status);
+      return redirect(res, '/admin/inquiries');
     }
 
     // ── 以降は認証必須 ──
