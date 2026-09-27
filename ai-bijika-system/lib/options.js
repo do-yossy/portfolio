@@ -19,6 +19,7 @@ module.exports = {
   ACCOUNT_TYPES: ['普通', '当座', '貯蓄'],
   BANKS: ['ゆうちょ銀行', '三菱UFJ銀行', '三井住友銀行', 'みずほ銀行', 'りそな銀行', '楽天銀行', 'PayPay銀行', '住信SBIネット銀行', 'ソニー銀行', 'auじぶん銀行', 'GMOあおぞらネット銀行'],
   GATE_NAMES: ['GATE1 商品選定', 'GATE2 市場検証', 'GATE3 商品コンセプト', 'GATE4 商品構成', 'GATE5 商品完成', 'GATE6 販売ページ', 'GATE7 販売導線', 'GATE8 SNS・販売', 'GATE9 KPI・改善', 'GATE10 商品2'],
+  CONTACT_CATEGORIES: ['使い方について', 'お支払い・購入について', '不具合の報告', 'その他'],
   PHASES: ['PHASE0（準備）', 'PHASE1', 'PHASE2', 'PHASE3', 'PHASE4', 'PHASE5', 'PHASE6', 'PHASE7', 'PHASE8'],
 };
 module.exports.PAYMENT_METHODS = Object.values(module.exports.PAY);

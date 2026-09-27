@@ -39,6 +39,7 @@ npm start          # --experimental-sqlite --env-file=.env
 - お客様へ送る「お支払い方法のご案内」文の自動作成（口座番号やURLはAIに送るプロンプトには含めない）
 - プロンプト詳細画面に「次のステップ」を表示（今のGATEの手順の中で次に開くべきプロンプト、または最後ならGATE判定への導線）。ChatGPTで開いたあと画面に戻ると、次のステップまでスクロールして知らせる
 - DAY1〜90チェックリスト、ChatGPTで開く（押した時点でプロンプトを自動コピー。スマホのChatGPTアプリはURLからの自動入力に対応していないため、貼り付けで渡せるようにしている）／コピー、購入者のAPIキーでの実行（キーは保存しない）、PWA
+- お問い合わせページ・フォーム（`/contact`。ログイン前後どちらからでも送信可能。フッターとアカウント画面からリンク）。送信内容はDBに保存され、`/admin/inquiries`（`ADMIN_PASSWORD`によるパスワード認証。購入者ログインとは別系統）で確認・対応済み管理ができる
 
 デザイン：「Midnight & Champagne」（深い紺・シャンパンゴールド・アイボリー）。見出しは Shippori Mincho B1、英字・数字は Cormorant Garamond を
 Google Fonts から読み込む（リポジトリ内の他ページと同じ方式。npm依存は増やしていない）。デザイントークン・共通レイアウト・アイコン・紋章・地紋は `lib/ui.js` に集約。
@@ -66,6 +67,9 @@ flyctl apps create sq-ai-bijika
 flyctl volumes create ai_bijika_data --app sq-ai-bijika --region nrt --size 1
 # GitHub リポジトリの Secrets に FLY_API_TOKEN が未設定であれば追加
 #（sales-platform/recruitment-platform で既に設定済みなら流用可能）
+
+# お問い合わせ管理画面（/admin/inquiries）用のパスワードを設定（未設定だと既定値のままで誰でも見られる）
+flyctl secrets set ADMIN_PASSWORD="運営者だけが知る文字列" --app sq-ai-bijika
 ```
 
 ### 独自ドメイン
