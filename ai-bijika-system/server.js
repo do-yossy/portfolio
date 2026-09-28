@@ -550,7 +550,7 @@ function promptDetailPage(user, p) {
       <textarea id="promptBody" class="pb-out" rows="10" aria-label="完成したプロンプト"></textarea>
       <div id="missMsg" class="miss"></div>
       <p class="hint">上の項目を変更すると、この欄は作り直されます。細かい修正は最後にこの欄で行ってください。</p>
-      <div class="notice info" style="margin-top:10px">${icon('external', 16)}<div>「ChatGPTで開く」を押すと、このプロンプトは自動でコピーされます。スマホにChatGPTアプリが入っているとアプリが開き、入力欄が空のことがあります。そのときは入力欄を長押しして「ペースト」を押すだけでOKです（打ち込む必要はありません）。</div></div>
+      <div class="notice info" style="margin-top:10px">${icon('external', 16)}<div>「ChatGPTで開く」を押すと、このプロンプトは自動でコピーされます。スマホにChatGPTアプリが入っているとアプリが開き、入力欄が空のことがあります。そのときは入力欄を長押しして「ペースト」を押すだけでOKです（打ち込む必要はありません）。<br><br>まれに、アプリではなくブラウザでChatGPTのページが開くことがあります（前回のChatGPTアプリを完全に閉じずに残していると起きやすいようです）。その場合は一度ChatGPTアプリをスマホの「アプリの切り替え」から上にスワイプして完全に閉じてから、もう一度「ChatGPTで開く」を押すとアプリが開きやすくなります。</div></div>
       <div class="notice info" style="margin-top:10px">${icon('flag', 16)}<div><b>この画面への戻り方</b>：ChatGPTでのやり取りが終わったら、開いた画面の右上（または左上）にある「×」や「完了」をタップして閉じてください。それだけでこの画面に戻ってきます（戻ってくると、次にやることを自動でお知らせします）。閉じるボタンが見当たらないときは、スマホの画面を下から上へスワイプして開く「アプリの切り替え」から、このアプリに戻ってください。</div></div>
       <div class="notice gold" style="margin-top:10px">${icon('bulb', 16)}<div>回答が一般的・浅いと感じたら、そのまま使わずに「もっと具体的に」「私の経験をもっと反映して」のように聞き返してください。それだけで内容の質が大きく変わります。</div></div>
       ${p.note && p.note !== '―' ? `<div class="notice warn" style="margin-top:10px">${icon('flag', 16)}<div>注意：${escapeHtml(p.note)}</div></div>` : ''}
@@ -623,7 +623,10 @@ function promptDetailPage(user, p) {
         const msgEl = document.getElementById('copyMsg');
         const copied = copySync(text);
         const tooLong = text.length > CHATGPT_URL_LIMIT;
-        window.open(tooLong ? 'https://chatgpt.com/' : 'https://chatgpt.com/?q=' + encodeURIComponent(text), '_blank', 'noopener');
+        // 末尾に毎回変わる値を付け、iOS/Androidが「前回と同じURL」とみなしてWeb版に留まる（アプリへの引き継ぎが起きない）のを避ける
+        const cacheBust = 't=' + Date.now();
+        const url = tooLong ? 'https://chatgpt.com/?' + cacheBust : 'https://chatgpt.com/?q=' + encodeURIComponent(text) + '&' + cacheBust;
+        window.open(url, '_blank', 'noopener');
         awaitingReturn = true;
         const done = function(ok){
           if (ok) toast('プロンプトをコピーしました');
