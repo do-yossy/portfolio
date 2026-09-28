@@ -348,7 +348,9 @@ function roadmapHtml(pg, persona, titles, openNo, profile) {
             <form class="status-form" method="POST" action="/api/gate/${no}">
               <div class="lbl">GATE判定の結果を記録</div>
               <div class="seg">${seg}</div>
-              <div class="seg-help">「GATE判定」のプロンプトでAIが出した判定（GREEN＝合格／YELLOW＝要修正／RED＝やり直し）をそのまま記録してください。</div>
+              <div class="seg-help">${d.selfJudge
+                ? 'このGATEのプロンプト（または資料）の内容を読んで、ご自身で判断して記録してください。目安：大きな指摘がなければ合格／直すべき点があれば要修正／大きく見直しが必要ならやり直し。AIは「GREEN」等の判定そのものは出しません。'
+                : '「GATE判定」のプロンプトでAIが出した判定（GREEN＝合格／YELLOW＝要修正／RED＝やり直し）をそのまま記録してください。'}</div>
             </form>
           </div>
         </details>
