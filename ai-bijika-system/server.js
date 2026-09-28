@@ -404,7 +404,7 @@ function dashboardPage(user, openNo) {
     <header class="page-head">
       <div class="eyebrow">Dashboard</div>
       <h1>${greeting()}</h1>
-      <div class="sub"><span>開始から<b>${pg.auto.daysSinceStart}</b>日目</span><a class="pill-link" href="/onboarding?change=1">${icon('user', 13)}${escapeHtml(persona.label)}</a></div>
+      <div class="sub"><span>開始から<b>${pg.auto.daysSinceStart}</b>日目</span><a class="pill-link" href="/onboarding?change=1">${icon('user', 13)}${escapeHtml(persona.label)}</a><a class="pill-link" href="/guide">${icon('bulb', 13)}使い方ガイド</a></div>
     </header>
     ${heroHtml(pg, titles, profile)}
     ${prepHtml}
@@ -439,6 +439,54 @@ function dayGrid(doneDays) {
     });
   </script>`;
   return html;
+}
+
+// ── ページ: 使い方ガイド（初心者向け・「押すと何が起きるか」を明示）──
+function guidePage(user, { welcome } = {}) {
+  const step = (label, desc) => `<p style="margin:0 0 16px"><b>${label}</b><br><span class="muted">${desc}</span></p>`;
+  return layout('使い方ガイド', `
+    <header class="page-head">
+      <div class="eyebrow">Guide</div>
+      <h1>${welcome ? 'はじめに、使い方を確認しましょう' : '使い方ガイド'}</h1>
+      <p class="lead">ボタンを押すと何が起きるかをまとめました。迷ったら、いつでもこのページに戻ってきてください。</p>
+    </header>
+
+    <div class="card">
+      <div class="card-title">${icon('home', 18)}画面下の4つのタブ</div>
+      ${step('ホーム', '今の進み具合と、次にやることが分かる場所です。迷ったら、まずここを開いてください。')}
+      ${step('プロンプト', 'AIに頼むときの文章（プロンプト）の一覧です。')}
+      ${step('マイ商品', '商品の情報と、お客様からの代金の受け取り方を登録する場所です。')}
+      ${step('アカウント', '属性の変更・お問い合わせ・ログアウトができます。')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">${icon('external', 18)}プロンプト画面のボタン</div>
+      ${step('「コピー」を押すと', '完成したプロンプトの文章がコピーされます。ChatGPTの入力欄に貼り付けて使います。')}
+      ${step('「ChatGPTで開く」を押すと', 'コピーと同時に、ChatGPTの画面が新しく開きます。入力欄が空のときは、長押しして「ペースト」を選ぶだけでOKです。')}
+      ${step('ChatGPTから戻るには', '開いた画面の右上（または左上）にある「×」や「完了」をタップして閉じます。戻ってくると、次にやることを自動でお知らせします。')}
+      ${step('「次のステップ」を押すと', '今のGATEで次に使うプロンプトへ移動します。最後まで進んでいれば、GATEの判定を記録する画面に移動します。')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">${icon('flag', 18)}GATEの判定ボタン</div>
+      <p class="muted" style="margin:0 0 14px">各GATEの手順を終えたら、ホーム画面でそのGATEを開き、3つのうちどれかを選びます。</p>
+      ${step('「合格」を押すと', 'そのGATEが完了になり、次のGATEに進めるようになります。')}
+      ${step('「要修正」を押すと', 'そのGATEはまだ完了になりません。指摘された点をAIにもう一度直してもらってから、あらためて判定してください。')}
+      ${step('「やり直し」を押すと', '前の工程まで戻って考え直すサインです。無理に先へ進めなくて大丈夫です。')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">${icon('box', 18)}マイ商品・お支払いの設定</div>
+      <p class="muted" style="margin:0">商品名やターゲットなどを一度登録すると、以後すべてのプロンプトに自動で入るようになります。お客様からの代金の受け取り方（銀行振込・PayPal）を設定すると、お客様に送る案内文も自動で作られます。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">${icon('bulb', 18)}それでも分からないときは</div>
+      <p class="muted" style="margin:0">「プロンプト」タブの「困ったときに使う」に、進め方に迷ったとき・時間が足りないときのためのプロンプトがあります。それでも分からなければ、<a href="/contact">お問い合わせ</a>からご連絡ください。</p>
+    </div>
+
+    ${welcome ? `<a class="btn btn-primary btn-block" href="/dashboard" style="margin-top:6px">ホームへ進む ${icon('arrow', 16)}</a>` : ''}
+  `, { user, active: 'guide', noNav: !!welcome });
 }
 
 // ── ページ: プロンプト一覧 ──
@@ -828,6 +876,7 @@ function accountPage(user) {
       <div class="card-title">${icon('lock', 18)}データの扱い</div>
       <p class="muted" style="margin:0">AIのAPIキーはサーバーに保存しません（このブラウザ内のみ）。マイ商品・振込先・進捗は、あなたのアカウントでのみ表示されます。</p>
     </div>
+    <a class="btn btn-ghost btn-block" href="/guide">${icon('bulb', 18)}使い方ガイド</a>
     <a class="btn btn-ghost btn-block" href="/contact">${icon('mail', 18)}お問い合わせ</a>
     <a class="btn btn-quiet btn-block" href="/logout">${icon('logout', 18)}ログアウト</a>
   `, { user, active: 'account' });
@@ -1009,7 +1058,7 @@ const server = http.createServer(async (req, res) => {
       const { persona, change } = await parseBody(req);
       if (!PERSONAS[persona]) return sendHtml(res, 400, onboardingPage(user, !!change));
       Users.setPersona(user.id, persona);
-      return redirect(res, change ? '/account' : '/dashboard');
+      return redirect(res, change ? '/account' : '/guide?welcome=1');
     }
 
     // 属性が未設定なら、まずオンボーディングへ（既存アカウントも含む）
@@ -1021,6 +1070,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/prompts' && method === 'GET') return sendHtml(res, 200, promptsPage(user));
     if (pathname === '/account' && method === 'GET') return sendHtml(res, 200, accountPage(user));
+    if (pathname === '/guide' && method === 'GET') {
+      return sendHtml(res, 200, guidePage(user, { welcome: url.searchParams.get('welcome') === '1' }));
+    }
     if (pathname === '/product' && method === 'GET') {
       return sendHtml(res, 200, productPage(user, { saved: url.searchParams.get('saved') === '1' }));
     }
