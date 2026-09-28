@@ -1,5 +1,5 @@
 'use strict';
-// 商品化デビュー｜購入者向けWebアプリ（旧称：AI商品化実践システム）
+// ミチシルベ｜購入者向けWebアプリ（旧称：AI商品化実践システム）
 // - 購入者アカウント（メール+パスワード）、購入者属性に合わせた進め方、90日/GATE進捗の保存
 // - マイ商品（商品の基本情報・お客様からの代金の受け取り方）を一度登録すると、各プロンプトに自動入力される
 // - AIプロンプト実行は購入者自身のAPIキーを都度受け取って中継するのみ。
@@ -185,7 +185,7 @@ function homePage() {
         <a class="btn btn-quiet btn-block" style="color:rgba(246,239,224,.72);margin-top:4px" href="/login">アカウントをお持ちの方はログイン</a>
       </div>
     </section>
-    <footer class="foot">${crest(30)}<div class="fname">商品化デビュー</div><div class="ftag">Your First Product, 90 Days</div>
+    <footer class="foot">${crest(30)}<div class="fname">ミチシルベ</div><div class="ftag">Your First Product, 90 Days</div>
       <div style="margin-top:10px"><a href="/contact">お問い合わせ</a></div></footer>
   `);
 }
@@ -890,7 +890,7 @@ function accountPage(user) {
 // ── お問い合わせ管理（運営者用。購入者アカウントとは別のシンプルなパスワード認証）──
 function adminLoginPage(error) {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>管理者ログイン｜商品化デビュー</title>
+<title>管理者ログイン｜ミチシルベ</title>
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0E1A22;color:#F3EEE4;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
 form{width:min(340px,86vw);background:#152530;padding:30px 26px;border-radius:18px;box-shadow:0 20px 44px -18px rgba(0,0,0,.6)}
@@ -924,7 +924,7 @@ function adminInquiriesPage(list) {
       </form>
     </div>`).join('') || '<p class="empty">お問い合わせはまだありません。</p>';
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>お問い合わせ管理｜商品化デビュー</title>
+<title>お問い合わせ管理｜ミチシルベ</title>
 <style>
 body{margin:0;background:#F5F1EA;color:#0E1A22;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
 header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:#0E1A22;color:#F3EEE4}
@@ -1135,7 +1135,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`商品化デビュー: http://localhost:${PORT}`));
+  server.listen(PORT, () => console.log(`ミチシルベ: http://localhost:${PORT}`));
 }
 
 module.exports = server;

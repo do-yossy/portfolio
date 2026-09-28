@@ -56,6 +56,7 @@ function crest(size = 34) {
     <path d="M18,16 L24,23 L30,16"/>
     <path d="M24,23 L24,35"/>
   </g>
+  <path d="M20,18.3 L22.3,21" stroke="#FBF3DE" stroke-width="1" stroke-linecap="round" opacity=".85"/>
 </svg>`;
 }
 
@@ -502,14 +503,14 @@ function layout(title, bodyHtml, { user, active, noNav } = {}) {
   const tab = (href, key, ic, label) => `<a href="${href}" class="${active === key ? 'active' : ''}">${icon(ic, 22)}<span>${label}</span></a>`;
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>${escapeHtml(title)}｜商品化デビュー</title>
+<title>${escapeHtml(title)}｜ミチシルベ</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="theme-color" content="#0E1A22">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="商品化デビュー">
+<meta name="apple-mobile-web-app-title" content="ミチシルベ">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONT_CSS}">
 <style>${CSS}</style>
@@ -524,7 +525,7 @@ window.toast = function (msg) {
 };
 </script>
 </head><body class="${showNav ? '' : 'no-nav'}">
-<header class="topbar"><a class="brand" href="${user ? '/dashboard' : '/'}">${crest(34)}<span class="brand-name">商品化デビュー<small>Your First Product, 90 Days</small></span></a>
+<header class="topbar"><a class="brand" href="${user ? '/dashboard' : '/'}">${crest(34)}<span class="brand-name">ミチシルベ<small>Your First Product, 90 Days</small></span></a>
 ${user ? `<a class="avatar" href="/account" aria-label="アカウント">${escapeHtml(initial(user.email))}</a>` : ''}</header>
 <main>${bodyHtml}</main>
 ${showNav ? `<nav class="tabbar">
