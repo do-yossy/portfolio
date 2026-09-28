@@ -95,6 +95,24 @@ db.exec(`
 // 購入者属性（オンボーディングで選択）。既存DB向けに冪等ALTERで追加
 try { db.exec("ALTER TABLE users ADD COLUMN persona TEXT DEFAULT ''"); } catch {}
 
+// ライセンス認証済みかどうか。DEFAULT 1 なので、この列を追加した時点で既にDBにいる
+// 購入者（=既存のお客様）は自動的に認証済み扱いになる（締め出さない）。
+// 新規登録は Users.create 側で明示的に 0 を渡し、/license でのコード入力を必須にする。
+try { db.exec('ALTER TABLE users ADD COLUMN license_active INTEGER DEFAULT 1'); } catch {}
+
+// ── licenses（購入者だけが使えるようにするためのライセンスキー。運営者が発行し、購入者に案内する）──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS licenses (
+    id TEXT PRIMARY KEY,
+    code TEXT UNIQUE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'UNUSED', -- UNUSED / ACTIVE / REVOKED
+    user_id TEXT,
+    note TEXT DEFAULT '',
+    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    activated_at TEXT
+  );
+`);
+
 // ── product_profile（購入者が作っている商品の基本情報＋お客様からの代金の受け取り方。1購入者1件）──
 db.exec(`
   CREATE TABLE IF NOT EXISTS product_profile (
@@ -129,10 +147,12 @@ const PROFILE_FIELDS = [
 ];
 
 const Users = {
-  create({ email, passwordHash, passwordSalt, displayName }) {
+  // licenseActive: 既定は0（未認証）。新規登録は必ずライセンスキーの入力が必要になる。
+  // ALTER時にDEFAULT 1で追加された既存行（=既に使っている購入者）だけが最初から1のまま残る。
+  create({ email, passwordHash, passwordSalt, displayName, licenseActive = 0 }) {
     const id = generateId();
-    db.prepare(`INSERT INTO users (id, email, password_hash, password_salt, display_name) VALUES (?, ?, ?, ?, ?)`)
-      .run(id, email.toLowerCase().trim(), passwordHash, passwordSalt, displayName || '');
+    db.prepare(`INSERT INTO users (id, email, password_hash, password_salt, display_name, license_active) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(id, email.toLowerCase().trim(), passwordHash, passwordSalt, displayName || '', licenseActive ? 1 : 0);
     return id;
   },
   findByEmail(email) {
@@ -143,6 +163,50 @@ const Users = {
   },
   setPersona(id, persona) {
     db.prepare('UPDATE users SET persona = ? WHERE id = ?').run(persona, id);
+  },
+  setLicenseActive(id, active) {
+    db.prepare('UPDATE users SET license_active = ? WHERE id = ?').run(active ? 1 : 0, id);
+  },
+};
+
+const LICENSE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 紛らわしい 0/O・1/I は除外
+function randomLicenseCode() {
+  const part = () => Array.from({ length: 4 }, () => LICENSE_CODE_CHARS[crypto.randomInt(LICENSE_CODE_CHARS.length)]).join('');
+  return `MICHI-${part()}-${part()}`;
+}
+
+const Licenses = {
+  // n件のコードを新規発行して、生成したコードの配列を返す（運営者がそのまま購入者に案内する）
+  generate(n, note) {
+    const stmt = db.prepare('INSERT INTO licenses (id, code, note) VALUES (?, ?, ?)');
+    const codes = [];
+    for (let i = 0; i < n; i++) {
+      const code = randomLicenseCode();
+      stmt.run(generateId(), code, note || '');
+      codes.push(code);
+    }
+    return codes;
+  },
+  findByCode(code) {
+    return db.prepare('SELECT * FROM licenses WHERE code = ?').get(String(code || '').toUpperCase().trim());
+  },
+  all() {
+    return db.prepare(`
+      SELECT licenses.*, users.email AS user_email
+      FROM licenses LEFT JOIN users ON users.id = licenses.user_id
+      ORDER BY licenses.created_at DESC
+    `).all();
+  },
+  // UNUSEDのコードを、そのユーザーに割り当てて有効化する
+  activate(code, userId) {
+    db.prepare(`UPDATE licenses SET status='ACTIVE', user_id=?, activated_at=? WHERE code=?`)
+      .run(userId, now(), String(code || '').toUpperCase().trim());
+  },
+  revoke(id) {
+    const row = db.prepare('SELECT * FROM licenses WHERE id = ?').get(id);
+    if (!row) return null;
+    db.prepare(`UPDATE licenses SET status='REVOKED' WHERE id=?`).run(id);
+    return row;
   },
 };
 
@@ -248,4 +312,4 @@ const Inquiries = {
   },
 };
 
-module.exports = { db, Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, generateId, now };
+module.exports = { db, Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, Licenses, generateId, now };
