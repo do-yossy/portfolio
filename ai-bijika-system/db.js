@@ -1,5 +1,5 @@
 'use strict';
-// AI商品化実践システム DB（node:sqlite）
+// 商品化デビュー DB（node:sqlite）
 // 買い切りの購入者向けアプリ。AI利用料は購入者自身のAPIキーで負担する方針のため、
 // APIキーは一切このDBに保存しない（lib/aiproxy.js を参照）。
 const { DatabaseSync } = require('node:sqlite');

@@ -1,5 +1,5 @@
 'use strict';
-// AI商品化実践システム｜購入者向けWebアプリ
+// 商品化デビュー｜購入者向けWebアプリ（旧称：AI商品化実践システム）
 // - 購入者アカウント（メール+パスワード）、購入者属性に合わせた進め方、90日/GATE進捗の保存
 // - マイ商品（商品の基本情報・お客様からの代金の受け取り方）を一度登録すると、各プロンプトに自動入力される
 // - AIプロンプト実行は購入者自身のAPIキーを都度受け取って中継するのみ。
@@ -158,9 +158,9 @@ function homePage() {
       ${guilloche(420, 560, { lines: 22 })}
       <div class="hero-in">
         ${crest(60)}
-        <div class="eyebrow">The 90-Day Program</div>
-        <h1>あなたの経験を、<br><em>ひとつの商品</em>に。</h1>
-        <p>AIプロンプトと10のGATEで、商品選びから販売・改善までを順番に進めるための専用アプリです。</p>
+        <div class="eyebrow">Your First Product, 90 Days</div>
+        <h1>あなたの経験を、<br><em>売れる商品</em>に。</h1>
+        <p>経験を商品にして、実際に売る。10のGATEに沿って一つずつ進むだけで、90日後にはそれができるようになっています。AIは、その道のりを助ける相棒です。</p>
         <div class="btn-row" style="margin-top:24px">
           <a class="btn btn-gold" href="/signup">はじめる</a>
           <a class="btn btn-outline-light" href="/login">ログイン</a>
@@ -173,6 +173,7 @@ function homePage() {
     </section>
     <section>
       <h2><span class="sec-no">02</span>90日の道のり</h2>
+      <p class="muted" style="margin:0 0 14px">1日30分を目安にしたペースです。まとまった時間を取れる方は、前のめりにどんどん進めてもらって構いません。</p>
       <div class="card"><ol class="journey">${journey}</ol></div>
     </section>
     <section class="cta-card lux">
@@ -184,7 +185,7 @@ function homePage() {
         <a class="btn btn-quiet btn-block" style="color:rgba(246,239,224,.72);margin-top:4px" href="/login">アカウントをお持ちの方はログイン</a>
       </div>
     </section>
-    <footer class="foot">${crest(30)}<div class="fname">AI商品化実践システム</div><div class="ftag">The 90-Day Program</div>
+    <footer class="foot">${crest(30)}<div class="fname">商品化デビュー</div><div class="ftag">Your First Product, 90 Days</div>
       <div style="margin-top:10px"><a href="/contact">お問い合わせ</a></div></footer>
   `);
 }
@@ -500,6 +501,7 @@ function promptDetailPage(user, p) {
       <div id="missMsg" class="miss"></div>
       <p class="hint">上の項目を変更すると、この欄は作り直されます。細かい修正は最後にこの欄で行ってください。</p>
       <div class="notice info" style="margin-top:10px">${icon('external', 16)}<div>「ChatGPTで開く」を押すと、このプロンプトは自動でコピーされます。スマホにChatGPTアプリが入っているとアプリが開き、入力欄が空のことがあります。そのときは入力欄を長押しして「ペースト」を押すだけでOKです（打ち込む必要はありません）。</div></div>
+      <div class="notice info" style="margin-top:10px">${icon('flag', 16)}<div><b>この画面への戻り方</b>：ChatGPTでのやり取りが終わったら、開いた画面の右上（または左上）にある「×」や「完了」をタップして閉じてください。それだけでこの画面に戻ってきます（戻ってくると、次にやることを自動でお知らせします）。閉じるボタンが見当たらないときは、スマホの画面を下から上へスワイプして開く「アプリの切り替え」から、このアプリに戻ってください。</div></div>
       <div class="notice gold" style="margin-top:10px">${icon('bulb', 16)}<div>回答が一般的・浅いと感じたら、そのまま使わずに「もっと具体的に」「私の経験をもっと反映して」のように聞き返してください。それだけで内容の質が大きく変わります。</div></div>
       ${p.note && p.note !== '―' ? `<div class="notice warn" style="margin-top:10px">${icon('flag', 16)}<div>注意：${escapeHtml(p.note)}</div></div>` : ''}
     </div>
@@ -834,7 +836,7 @@ function accountPage(user) {
 // ── お問い合わせ管理（運営者用。購入者アカウントとは別のシンプルなパスワード認証）──
 function adminLoginPage(error) {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>管理者ログイン｜AI商品化実践システム</title>
+<title>管理者ログイン｜商品化デビュー</title>
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0E1A22;color:#F3EEE4;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
 form{width:min(340px,86vw);background:#152530;padding:30px 26px;border-radius:18px;box-shadow:0 20px 44px -18px rgba(0,0,0,.6)}
@@ -868,7 +870,7 @@ function adminInquiriesPage(list) {
       </form>
     </div>`).join('') || '<p class="empty">お問い合わせはまだありません。</p>';
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>お問い合わせ管理｜AI商品化実践システム</title>
+<title>お問い合わせ管理｜商品化デビュー</title>
 <style>
 body{margin:0;background:#F5F1EA;color:#0E1A22;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
 header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:#0E1A22;color:#F3EEE4}
@@ -1076,7 +1078,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`AI商品化実践システム: http://localhost:${PORT}`));
+  server.listen(PORT, () => console.log(`商品化デビュー: http://localhost:${PORT}`));
 }
 
 module.exports = server;
