@@ -1,6 +1,6 @@
 {
-  "name": "商品化デビュー",
-  "short_name": "商品化デビュー",
+  "name": "ミチシルベ",
+  "short_name": "ミチシルベ",
   "description": "経験を、90日であなたの商品に。進捗管理とAIプロンプト実行をスマホから",
   "start_url": "/dashboard",
   "scope": "/",

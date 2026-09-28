@@ -1,5 +1,5 @@
 'use strict';
-// 商品化デビュー｜購入者向けWebアプリ（旧称：AI商品化実践システム）
+// ミチシルベ｜購入者向けWebアプリ（旧称：AI商品化実践システム）
 // - 購入者アカウント（メール+パスワード）、購入者属性に合わせた進め方、90日/GATE進捗の保存
 // - マイ商品（商品の基本情報・お客様からの代金の受け取り方）を一度登録すると、各プロンプトに自動入力される
 // - AIプロンプト実行は購入者自身のAPIキーを都度受け取って中継するのみ。
@@ -18,6 +18,10 @@ const STATIC_FILES = {
   '/icon-192.png': { file: 'icon-192.png', type: 'image/png' },
   '/icon-512.png': { file: 'icon-512.png', type: 'image/png' },
 };
+// 使い方ガイド（/guide）に載せる実際の画面キャプチャ。public/guide/ にあるものを自動で配信対象にする
+for (const f of fs.readdirSync(path.join(PUBLIC_DIR, 'guide'))) {
+  STATIC_FILES[`/guide/${f}`] = { file: `guide/${f}`, type: 'image/png' };
+}
 
 // ── .env 読み込み（自作。dotenv 等の依存は使わない）──
 function loadEnvFile(file) {
@@ -185,7 +189,7 @@ function homePage() {
         <a class="btn btn-quiet btn-block" style="color:rgba(246,239,224,.72);margin-top:4px" href="/login">アカウントをお持ちの方はログイン</a>
       </div>
     </section>
-    <footer class="foot">${crest(30)}<div class="fname">商品化デビュー</div><div class="ftag">Your First Product, 90 Days</div>
+    <footer class="foot">${crest(30)}<div class="fname">ミチシルベ</div><div class="ftag">Your First Product, 90 Days</div>
       <div style="margin-top:10px"><a href="/contact">お問い合わせ</a></div></footer>
   `);
 }
@@ -446,15 +450,17 @@ function dayGrid(doneDays) {
 // ── ページ: 使い方ガイド（初心者向け・「押すと何が起きるか」を明示）──
 function guidePage(user, { welcome } = {}) {
   const step = (label, desc) => `<p style="margin:0 0 16px"><b>${label}</b><br><span class="muted">${desc}</span></p>`;
+  const shot = (file, alt) => `<img src="/guide/${file}" alt="${escapeHtml(alt)}" style="width:100%;border-radius:12px;box-shadow:0 1px 2px rgba(14,26,34,.08),0 0 0 1px var(--line);margin:2px 0 16px;display:block">`;
   return layout('使い方ガイド', `
     <header class="page-head">
       <div class="eyebrow">Guide</div>
       <h1>${welcome ? 'はじめに、使い方を確認しましょう' : '使い方ガイド'}</h1>
-      <p class="lead">ボタンを押すと何が起きるかをまとめました。迷ったら、いつでもこのページに戻ってきてください。</p>
+      <p class="lead">実際の画面と一緒に、ボタンを押すと何が起きるかをまとめました。迷ったら、いつでもこのページに戻ってきてください。</p>
     </header>
 
     <div class="card">
       <div class="card-title">${icon('home', 18)}画面下の4つのタブ</div>
+      ${shot('tabbar.png', '画面下のタブ：ホーム・プロンプト・マイ商品・アカウント')}
       ${step('ホーム', '今の進み具合と、次にやることが分かる場所です。迷ったら、まずここを開いてください。')}
       ${step('プロンプト', 'AIに頼むときの文章（プロンプト）の一覧です。')}
       ${step('マイ商品', '商品の情報と、お客様からの代金の受け取り方を登録する場所です。')}
@@ -463,15 +469,19 @@ function guidePage(user, { welcome } = {}) {
 
     <div class="card">
       <div class="card-title">${icon('external', 18)}プロンプト画面のボタン</div>
+      ${shot('copy-open.png', '「コピー」ボタンと「ChatGPTで開く」ボタン')}
       ${step('「コピー」を押すと', '完成したプロンプトの文章がコピーされます。ChatGPTの入力欄に貼り付けて使います。')}
       ${step('「ChatGPTで開く」を押すと', 'コピーと同時に、ChatGPTの画面が新しく開きます。入力欄が空のときは、長押しして「ペースト」を選ぶだけでOKです。')}
-      ${step('ChatGPTから戻るには', 'スマホの「アプリの切り替え」（画面の下から上にスワイプ）からこの画面に戻ります。途中で左上に「×」だけがある真っ白の画面が出たら、それはChatGPTアプリを開くための一時的な画面なので、その「×」をタップして閉じてください。戻ってくると、次にやることを自動でお知らせします。')}
+      ${shot('return-toast.png', 'ChatGPTから戻ってくると出る通知と、この先の案内')}
+      ${step('ChatGPTから戻るには', 'スマホの「アプリの切り替え」（画面の下から上にスワイプ）からこの画面に戻ります。途中で左上に「×」だけがある真っ白の画面が出たら、それはChatGPTアプリを開くための一時的な画面なので、その「×」をタップして閉じてください。戻ってくると、上のような通知で次にやることを自動でお知らせします。')}
+      ${shot('nextstep.png', '「次のステップ」カードと進むボタン（オレンジの枠＝押す場所）')}
       ${step('「次のステップ」を押すと', '今のGATEで次に使うプロンプトへ移動します。最後まで進んでいれば、GATEの判定を記録する画面に移動します。')}
     </div>
 
     <div class="card">
       <div class="card-title">${icon('flag', 18)}GATEの判定ボタン</div>
       <p class="muted" style="margin:0 0 14px">各GATEの手順を終えたら、ホーム画面でそのGATEを開き、3つのうちどれかを選びます。</p>
+      ${shot('gate-judge.png', 'GATE判定の3つのボタン（オレンジの枠＝合格ボタンの例）')}
       ${step('「合格」を押すと', 'そのGATEが完了になり、次のGATEに進めるようになります。')}
       ${step('「要修正」を押すと', 'そのGATEはまだ完了になりません。指摘された点をAIにもう一度直してもらってから、あらためて判定してください。')}
       ${step('「やり直し」を押すと', '前の工程まで戻って考え直すサインです。無理に先へ進めなくて大丈夫です。')}
@@ -479,6 +489,7 @@ function guidePage(user, { welcome } = {}) {
 
     <div class="card">
       <div class="card-title">${icon('box', 18)}マイ商品・お支払いの設定</div>
+      ${shot('payment-chips.png', 'お客様のお支払い方法を選ぶチップ')}
       <p class="muted" style="margin:0">商品名やターゲットなどを一度登録すると、以後すべてのプロンプトに自動で入るようになります。お客様からの代金の受け取り方（銀行振込・PayPal）を設定すると、お客様に送る案内文も自動で作られます。</p>
     </div>
 
@@ -890,7 +901,7 @@ function accountPage(user) {
 // ── お問い合わせ管理（運営者用。購入者アカウントとは別のシンプルなパスワード認証）──
 function adminLoginPage(error) {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>管理者ログイン｜商品化デビュー</title>
+<title>管理者ログイン｜ミチシルベ</title>
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0E1A22;color:#F3EEE4;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
 form{width:min(340px,86vw);background:#152530;padding:30px 26px;border-radius:18px;box-shadow:0 20px 44px -18px rgba(0,0,0,.6)}
@@ -924,7 +935,7 @@ function adminInquiriesPage(list) {
       </form>
     </div>`).join('') || '<p class="empty">お問い合わせはまだありません。</p>';
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>お問い合わせ管理｜商品化デビュー</title>
+<title>お問い合わせ管理｜ミチシルベ</title>
 <style>
 body{margin:0;background:#F5F1EA;color:#0E1A22;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
 header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:#0E1A22;color:#F3EEE4}
@@ -1135,7 +1146,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`商品化デビュー: http://localhost:${PORT}`));
+  server.listen(PORT, () => console.log(`ミチシルベ: http://localhost:${PORT}`));
 }
 
 module.exports = server;
