@@ -1,6 +1,6 @@
 @echo off
 REM Runs the kyujinbox auto-improve loop (kyujinbox_autoloop.js) for every company
-REM that uses kyujinbox (sq/bg/st/bi/nl/sl/am — nx is engage-only, excluded), 25 postings
+REM that uses kyujinbox (sq/bg/st/bi/nl/sl/am - nx is engage-only, excluded), 25 postings
 REM each, and saves the output under logs\kyujinbox-revise\.
 REM
 REM IMPORTANT: This runs with --apply --push --push-save, so AI-rewritten title/

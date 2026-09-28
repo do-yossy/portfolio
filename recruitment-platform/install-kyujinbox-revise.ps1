@@ -1,4 +1,4 @@
-# 求人ボックスの求人修正（kyujinbox_autoloop.js、各社25件・--apply --push --push-save）を
+﻿# 求人ボックスの求人修正（kyujinbox_autoloop.js、各社25件・--apply --push --push-save）を
 # 「月・水・金 7:00（このPCのローカル時刻）」に自動実行するタスクを登録します。
 # 対象会社: sq, bg, st, bi, nl, sl, am（nxはengage専業のため対象外）。
 #
