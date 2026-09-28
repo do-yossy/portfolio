@@ -647,13 +647,8 @@ function paymentGuide(pf) {
       `※${pf.transfer_note || O.TRANSFER_NOTES[0]}`,
     ].join('\n'));
   }
-  if (methods.has(P.CARD) && pf.pay_url_card) sections.push(['■クレジットカード', '下記のお支払いページからお手続きください。', pf.pay_url_card].join('\n'));
-  if (methods.has(P.PAYPAL) && pf.pay_url_paypal) sections.push(['■PayPal', '下記のリンクからお支払いください。', pf.pay_url_paypal].join('\n'));
-  if (methods.has(P.PLATFORM) && pf.pay_url_platform) sections.push(['■販売サイトでのご購入', '下記のページからご購入手続きをお願いいたします。', pf.pay_url_platform].join('\n'));
-  if (methods.has(P.OTHER) && pf.pay_other_note) sections.push(['■その他のお支払い方法', pf.pay_other_note].join('\n'));
+  if (methods.has(P.PAYPAL) && pf.pay_url_paypal) sections.push(['■PayPal', 'お客様側もPayPalアカウントへのご登録が必要です。下記のリンクからお支払いください。', pf.pay_url_paypal].join('\n'));
   if (!sections.length) return '';
-  // 販売サイト経由だけなら入金確認・お届けは販売サイト側で行われるため、その一文は付けない
-  const direct = sections.some((sec) => !sec.startsWith('■販売サイト'));
   return [
     '【お支払い方法のご案内】',
     `このたびは${pf.product_name ? `「${pf.product_name}」に` : ''}お申し込みいただき、ありがとうございます。`,
@@ -661,7 +656,8 @@ function paymentGuide(pf) {
     sections.length > 1 ? '以下のいずれかの方法でお支払いをお願いいたします。' : '以下の方法でお支払いをお願いいたします。',
     '',
     sections.join('\n\n'),
-    ...(direct ? ['', '※ご入金を確認でき次第、商品のお届けについてご連絡いたします。'] : []),
+    '',
+    '※ご入金を確認でき次第、商品のお届けについてご連絡いたします。',
   ].join('\n');
 }
 
@@ -721,11 +717,13 @@ function productPage(user, { saved } = {}) {
             <input id="account_holder" type="text" name="account_holder" value="${escapeHtml(pf.account_holder)}" maxlength="60" placeholder="例：ヤマダ タロウ"></div>
           <div class="field"><label class="lbl">振込手数料</label>${chipsInput('transfer_note', O.TRANSFER_NOTES, pf.transfer_note)}</div>
           <div class="field"><label class="lbl">お振込期限</label>${chipsInput('pay_deadline', O.PAY_DEADLINES, pf.pay_deadline || '指定しない')}</div>`)}
-        ${block(O.PAY.CARD, 'クレジットカード決済', urlField('pay_url_card', 'お支払いページのURL', 'https://buy.stripe.com/...', 'Stripeの「Payment Links」など、決済サービスで作ったお支払いページのURLを貼り付けます。'))}
-        ${block(O.PAY.PAYPAL, 'PayPal', urlField('pay_url_paypal', 'PayPalのお支払いリンク', 'https://www.paypal.me/...', 'PayPal.Meのリンクなど、お客様が支払いに使うリンクを貼り付けます。'))}
-        ${block(O.PAY.PLATFORM, '販売プラットフォーム', urlField('pay_url_platform', '商品ページのURL', 'https://...', 'note・Brain・BASE・STORESなどに出品した、あなたの商品ページのURLを貼り付けます。'))}
-        ${block(O.PAY.OTHER, 'その他の方法', `<div class="field"><label class="lbl" for="pay_other_note">お支払い方法の説明</label>
-          <input id="pay_other_note" type="text" name="pay_other_note" value="${escapeHtml(pf.pay_other_note)}" maxlength="120" placeholder="例：対面でのお支払い（現金）"></div>`)}
+        ${block(O.PAY.PAYPAL, 'PayPal', `
+          <div class="notice info" style="margin-bottom:14px">${icon('flag', 16)}<div>
+            <b>使い方</b>：PayPalアカウントを作成し、「PayPal.Me」リンクまたは「請求書」機能でお客様に金額を伝えます。お客様側もPayPalアカウントへの登録が必要です（日本ではアカウントを持たない相手からの支払いは受けられません）。<br>
+            <b>決済手段</b>：お客様はPayPal残高・登録済みのクレジットカード・銀行口座のいずれかから支払えます。<br>
+            <b>手数料</b>：受け取り時に手数料がかかります（国内取引の目安：受取額の3.6％＋40円）。料率は変更されることがあるため、最新の金額はPayPalの公式ページで確認してください。
+          </div></div>
+          ${urlField('pay_url_paypal', 'PayPal.Meのリンクまたは請求書URL', 'https://www.paypal.me/...', 'PayPal.Meのリンクなど、お客様が支払いに使うリンクを貼り付けます。')}`)}
         <div class="notice warn" style="margin-top:14px">${icon('flag', 16)}<div>インターネットで商品を販売するときは「特定商取引法に基づく表記」の掲載が必要です。販売ページとあわせて準備してください。</div></div>
       </div>
 
