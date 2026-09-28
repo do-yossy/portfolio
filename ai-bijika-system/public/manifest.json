@@ -1,7 +1,7 @@
 {
-  "name": "AI商品化実践システム",
-  "short_name": "AI商品化",
-  "description": "90日間の進捗管理とAIプロンプト実行をスマホから",
+  "name": "商品化デビュー",
+  "short_name": "商品化デビュー",
+  "description": "経験を、90日であなたの商品に。進捗管理とAIプロンプト実行をスマホから",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

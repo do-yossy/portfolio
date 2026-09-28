@@ -42,7 +42,7 @@ function icon(name, size = 20, extraClass = '') {
   return `<svg class="ico ${extraClass}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
 }
 
-// ブランドの紋章（金の二重リングにAIのモノグラム）
+// ブランドの紋章（金の二重リングに、経験が磨かれ商品になることを表すジェムのモノグラム）
 let crestSeq = 0;
 function crest(size = 34) {
   const id = `cr${++crestSeq % 100000}`;
@@ -50,7 +50,12 @@ function crest(size = 34) {
   <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4E5BF"/><stop offset=".45" stop-color="#D6B878"/><stop offset=".75" stop-color="#A9854A"/><stop offset="1" stop-color="#E9D4A4"/></linearGradient></defs>
   <circle cx="24" cy="24" r="22.8" fill="#0E1A22" stroke="url(#${id})" stroke-width="1.4"/>
   <circle cx="24" cy="24" r="19.4" fill="none" stroke="url(#${id})" stroke-width=".55" opacity=".75"/>
-  <text x="24" y="30.6" text-anchor="middle" font-family="Cormorant Garamond, Shippori Mincho B1, serif" font-weight="600" font-size="19.5" letter-spacing=".6" fill="url(#${id})">AI</text>
+  <g stroke="url(#${id})" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" fill="none">
+    <path d="M18,16 L30,16 L36,23 L24,35 L12,23 Z"/>
+    <path d="M12,23 L36,23"/>
+    <path d="M18,16 L24,23 L30,16"/>
+    <path d="M24,23 L24,35"/>
+  </g>
 </svg>`;
 }
 
@@ -497,14 +502,14 @@ function layout(title, bodyHtml, { user, active, noNav } = {}) {
   const tab = (href, key, ic, label) => `<a href="${href}" class="${active === key ? 'active' : ''}">${icon(ic, 22)}<span>${label}</span></a>`;
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>${escapeHtml(title)}｜AI商品化実践システム</title>
+<title>${escapeHtml(title)}｜商品化デビュー</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="theme-color" content="#0E1A22">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="AI商品化">
+<meta name="apple-mobile-web-app-title" content="商品化デビュー">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONT_CSS}">
 <style>${CSS}</style>
@@ -519,7 +524,7 @@ window.toast = function (msg) {
 };
 </script>
 </head><body class="${showNav ? '' : 'no-nav'}">
-<header class="topbar"><a class="brand" href="${user ? '/dashboard' : '/'}">${crest(34)}<span class="brand-name">AI商品化実践システム<small>The 90-Day Program</small></span></a>
+<header class="topbar"><a class="brand" href="${user ? '/dashboard' : '/'}">${crest(34)}<span class="brand-name">商品化デビュー<small>Your First Product, 90 Days</small></span></a>
 ${user ? `<a class="avatar" href="/account" aria-label="アカウント">${escapeHtml(initial(user.email))}</a>` : ''}</header>
 <main>${bodyHtml}</main>
 ${showNav ? `<nav class="tabbar">
