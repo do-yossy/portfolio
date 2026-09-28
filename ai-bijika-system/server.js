@@ -498,6 +498,10 @@ function guidePage(user, { welcome } = {}) {
       ${shot('copy-open.png', '「コピー」ボタンと「ChatGPTで開く」ボタン')}
       ${step('「コピー」を押すと', '完成したプロンプトの文章がコピーされます。ChatGPTの入力欄に貼り付けて使います。')}
       ${step('「ChatGPTで開く」を押すと', 'コピーと同時に、ChatGPTの画面が新しく開きます。入力欄が空のときは、長押しして「ペースト」を選ぶだけでOKです。')}
+      ${shot('chatgpt-buttons.png', 'ChatGPTの画面イメージ：貼り付け・送信・回答のコピーの場所（実際の画面と多少異なる場合があります）')}
+      ${step('①貼り付け', '入力欄が空のときは、その欄を指で押したままにする（長押し）と「ペースト」という小さなメニューが出てくるので、それをタップします。文字を自分で打ち込む必要はありません。')}
+      ${step('②送信', '貼り付けたら、入力欄の右にある黒い丸のボタン（上向きの矢印マーク）を押します。これでChatGPTに送られます。')}
+      ${step('③回答をコピー', 'ChatGPTが答え終わったら、回答の下に小さいアイコンが並びます。四角が2つ重なったアイコンを押すと、回答全体がコピーされます。')}
       ${shot('return-toast.png', 'ChatGPTから戻ってくると出る通知と、この先の案内')}
       ${step('ChatGPTから戻るには', 'スマホの「アプリの切り替え」（画面の下から上にスワイプ）からこの画面に戻ります。途中で左上に「×」だけがある真っ白の画面が出たら、それはChatGPTアプリを開くための一時的な画面なので、その「×」をタップして閉じてください。戻ってくると、上のような通知で次にやることを自動でお知らせします。')}
       ${shot('nextstep.png', '「次のステップ」カードと進むボタン（オレンジの枠＝押す場所）')}
@@ -587,7 +591,10 @@ function promptDetailPage(user, p) {
       <textarea id="promptBody" class="pb-out" rows="10" aria-label="完成したプロンプト"></textarea>
       <div id="missMsg" class="miss"></div>
       <p class="hint">上の項目を変更すると、この欄は作り直されます。細かい修正は最後にこの欄で行ってください。</p>
-      <div class="notice info" style="margin-top:10px">${icon('external', 16)}<div>「ChatGPTで開く」を押すと、このプロンプトは自動でコピーされます。スマホにChatGPTアプリが入っているとアプリが開き、入力欄が空のことがあります。そのときは入力欄を長押しして「ペースト」を押すだけでOKです（打ち込む必要はありません）。<br><br>まれに、アプリではなくブラウザでChatGPTのページが開くことがあります（前回のChatGPTアプリを完全に閉じずに残していると起きやすいようです）。その場合は一度ChatGPTアプリをスマホの「アプリの切り替え」から上にスワイプして完全に閉じてから、もう一度「ChatGPTで開く」を押すとアプリが開きやすくなります。</div></div>
+      <div class="notice info" style="margin-top:10px">${icon('external', 16)}<div>「ChatGPTで開く」を押すと、このプロンプトは自動でコピーされます。スマホにChatGPTアプリが入っているとアプリが開き、入力欄が空のことがあります。そのときは入力欄を長押しして「ペースト」を押すだけでOKです（打ち込む必要はありません）。<br><br>まれに、アプリではなくブラウザでChatGPTのページが開くことがあります（前回のChatGPTアプリを完全に閉じずに残していると起きやすいようです）。その場合は一度ChatGPTアプリをスマホの「アプリの切り替え」から上にスワイプして完全に閉じてから、もう一度「ChatGPTで開く」を押すとアプリが開きやすくなります。
+        <img src="/guide/chatgpt-buttons.png" alt="ChatGPTの画面イメージ：貼り付け・送信・回答のコピーの場所" style="width:100%;border-radius:10px;margin-top:12px;display:block">
+        <span class="muted" style="display:block;margin-top:6px">①長押しして「ペースト」→②丸いボタンで送信→回答が出たら③のアイコンでコピー（実際の画面と多少異なる場合があります）。</span>
+      </div></div>
       <div class="notice info" style="margin-top:10px">${icon('flag', 16)}<div><b>この画面への戻り方</b>：ChatGPTでの作業が終わったら、スマホの「アプリの切り替え」（画面の下から上にスワイプすると出てきます）から、この画面に戻ってください。その途中で、<b>左上に「×」だけがある真っ白の画面</b>が出ることがあります。これはChatGPTアプリを開くための一時的な画面なので、そのまま左上の「×」をタップして閉じてください。閉じると、この画面に戻ってきます（戻ってくると、次にやることを自動でお知らせします）。</div></div>
       <div class="notice gold" style="margin-top:10px">${icon('bulb', 16)}<div>回答が一般的・浅いと感じたら、そのまま使わずに「もっと具体的に」「私の経験をもっと反映して」のように聞き返してください。それだけで内容の質が大きく変わります。</div></div>
       ${p.note && p.note !== '―' ? `<div class="notice warn" style="margin-top:10px">${icon('flag', 16)}<div>注意：${escapeHtml(p.note)}</div></div>` : ''}
