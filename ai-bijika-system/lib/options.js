@@ -9,10 +9,7 @@ module.exports = {
   // あなたの商品を買うお客様からの代金の受け取り方（複数選択可。未選択＝未定）
   PAY: {
     BANK: '銀行振込',
-    CARD: 'クレジットカード（Stripe等の決済サービス）',
     PAYPAL: 'PayPal',
-    PLATFORM: '販売プラットフォームの決済（note・Brain・BASE・STORES等）',
-    OTHER: 'その他',
   },
   PAY_DEADLINES: ['指定しない', 'お申し込みから3日以内', 'お申し込みから7日以内'],
   TRANSFER_NOTES: ['振込手数料はお客様のご負担でお願いいたします。', '振込手数料は当方で負担いたします。'],
