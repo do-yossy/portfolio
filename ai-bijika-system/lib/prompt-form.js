@@ -132,6 +132,49 @@ const CLIENT_JS = `
       o.classList.toggle('hide', !on);
     });
   }
+  // 一度入力した内容を憶えておき、同じプロンプトに戻ってきたときに復元する（このブラウザ内のみ・サーバーには送らない）
+  const DRAFT_KEY = 'ai-bijika:draft:' + D.no;
+  function scopes(){
+    const list = [];
+    document.querySelectorAll('[data-fid]').forEach(function(root){
+      if (root.dataset.kind === 'compose') {
+        Array.from(root.querySelectorAll('[data-part]')).forEach(function(p, i){ list.push({ key: root.dataset.fid + '.' + i, el: p }); });
+      } else {
+        list.push({ key: root.dataset.fid, el: root });
+      }
+    });
+    return list;
+  }
+  function saveDraft(){
+    const draft = {};
+    scopes().forEach(function(s){
+      const val = s.el.querySelector('[data-role=val]');
+      if (val && val.value) draft[s.key + '.val'] = val.value;
+      const other = s.el.querySelector('[data-role=other]');
+      if (other && other.value) draft[s.key + '.other'] = other.value;
+      const checked = Array.from(s.el.querySelectorAll('[data-role=radio]:checked, [data-role=check]:checked')).map(function(c){ return c.value; });
+      if (checked.length) draft[s.key + '.choice'] = checked;
+    });
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
+  }
+  function loadDraft(){
+    let draft;
+    try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); } catch (e) { draft = {}; }
+    scopes().forEach(function(s){
+      const val = s.el.querySelector('[data-role=val]');
+      if (val && !val.value && draft[s.key + '.val']) val.value = draft[s.key + '.val'];
+      const already = s.el.querySelector('[data-role=radio]:checked, [data-role=check]:checked');
+      const choice = draft[s.key + '.choice'];
+      if (!already && Array.isArray(choice)) {
+        choice.forEach(function(v){
+          const box = s.el.querySelector('[data-role=radio][value="' + CSS.escape(v) + '"], [data-role=check][value="' + CSS.escape(v) + '"]');
+          if (box) box.checked = true;
+        });
+      }
+      const other = s.el.querySelector('[data-role=other]');
+      if (other && !other.value && draft[s.key + '.other']) other.value = draft[s.key + '.other'];
+    });
+  }
   function build(){
     syncOther();
     const vals = {};
@@ -150,10 +193,12 @@ const CLIENT_JS = `
       missEl.textContent = miss ? '未入力の項目があります（【 】の部分）。空欄のままでも送れますが、埋めると回答の質が上がります。' : 'すべての項目が入力されました。';
       missEl.classList.toggle('ok', !miss);
     }
+    saveDraft();
   }
   document.getElementById('pbForm').addEventListener('input', build);
   document.getElementById('pbForm').addEventListener('change', build);
   if (pre) pre.addEventListener('change', build);
+  loadDraft();
   build();
 })();
 `;
