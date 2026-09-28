@@ -348,7 +348,9 @@ function roadmapHtml(pg, persona, titles, openNo, profile) {
             <form class="status-form" method="POST" action="/api/gate/${no}">
               <div class="lbl">GATE判定の結果を記録</div>
               <div class="seg">${seg}</div>
-              <div class="seg-help">「GATE判定」のプロンプトでAIが出した判定（GREEN＝合格／YELLOW＝要修正／RED＝やり直し）をそのまま記録してください。</div>
+              <div class="seg-help">${d.selfJudge
+                ? 'このGATEのプロンプト（または資料）の内容を読んで、ご自身で判断して記録してください。目安：大きな指摘がなければ合格／直すべき点があれば要修正／大きく見直しが必要ならやり直し。AIは「GREEN」等の判定そのものは出しません。'
+                : '「GATE判定」のプロンプトでAIが出した判定（GREEN＝合格／YELLOW＝要修正／RED＝やり直し）をそのまま記録してください。'}</div>
             </form>
           </div>
         </details>
@@ -404,7 +406,7 @@ function dashboardPage(user, openNo) {
     <header class="page-head">
       <div class="eyebrow">Dashboard</div>
       <h1>${greeting()}</h1>
-      <div class="sub"><span>開始から<b>${pg.auto.daysSinceStart}</b>日目</span><a class="pill-link" href="/onboarding?change=1">${icon('user', 13)}${escapeHtml(persona.label)}</a></div>
+      <div class="sub"><span>開始から<b>${pg.auto.daysSinceStart}</b>日目</span><a class="pill-link" href="/onboarding?change=1">${icon('user', 13)}${escapeHtml(persona.label)}</a><a class="pill-link" href="/guide">${icon('bulb', 13)}使い方ガイド</a></div>
     </header>
     ${heroHtml(pg, titles, profile)}
     ${prepHtml}
@@ -439,6 +441,54 @@ function dayGrid(doneDays) {
     });
   </script>`;
   return html;
+}
+
+// ── ページ: 使い方ガイド（初心者向け・「押すと何が起きるか」を明示）──
+function guidePage(user, { welcome } = {}) {
+  const step = (label, desc) => `<p style="margin:0 0 16px"><b>${label}</b><br><span class="muted">${desc}</span></p>`;
+  return layout('使い方ガイド', `
+    <header class="page-head">
+      <div class="eyebrow">Guide</div>
+      <h1>${welcome ? 'はじめに、使い方を確認しましょう' : '使い方ガイド'}</h1>
+      <p class="lead">ボタンを押すと何が起きるかをまとめました。迷ったら、いつでもこのページに戻ってきてください。</p>
+    </header>
+
+    <div class="card">
+      <div class="card-title">${icon('home', 18)}画面下の4つのタブ</div>
+      ${step('ホーム', '今の進み具合と、次にやることが分かる場所です。迷ったら、まずここを開いてください。')}
+      ${step('プロンプト', 'AIに頼むときの文章（プロンプト）の一覧です。')}
+      ${step('マイ商品', '商品の情報と、お客様からの代金の受け取り方を登録する場所です。')}
+      ${step('アカウント', '属性の変更・お問い合わせ・ログアウトができます。')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">${icon('external', 18)}プロンプト画面のボタン</div>
+      ${step('「コピー」を押すと', '完成したプロンプトの文章がコピーされます。ChatGPTの入力欄に貼り付けて使います。')}
+      ${step('「ChatGPTで開く」を押すと', 'コピーと同時に、ChatGPTの画面が新しく開きます。入力欄が空のときは、長押しして「ペースト」を選ぶだけでOKです。')}
+      ${step('ChatGPTから戻るには', 'スマホの「アプリの切り替え」（画面の下から上にスワイプ）からこの画面に戻ります。途中で左上に「×」だけがある真っ白の画面が出たら、それはChatGPTアプリを開くための一時的な画面なので、その「×」をタップして閉じてください。戻ってくると、次にやることを自動でお知らせします。')}
+      ${step('「次のステップ」を押すと', '今のGATEで次に使うプロンプトへ移動します。最後まで進んでいれば、GATEの判定を記録する画面に移動します。')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">${icon('flag', 18)}GATEの判定ボタン</div>
+      <p class="muted" style="margin:0 0 14px">各GATEの手順を終えたら、ホーム画面でそのGATEを開き、3つのうちどれかを選びます。</p>
+      ${step('「合格」を押すと', 'そのGATEが完了になり、次のGATEに進めるようになります。')}
+      ${step('「要修正」を押すと', 'そのGATEはまだ完了になりません。指摘された点をAIにもう一度直してもらってから、あらためて判定してください。')}
+      ${step('「やり直し」を押すと', '前の工程まで戻って考え直すサインです。無理に先へ進めなくて大丈夫です。')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">${icon('box', 18)}マイ商品・お支払いの設定</div>
+      <p class="muted" style="margin:0">商品名やターゲットなどを一度登録すると、以後すべてのプロンプトに自動で入るようになります。お客様からの代金の受け取り方（銀行振込・PayPal）を設定すると、お客様に送る案内文も自動で作られます。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">${icon('bulb', 18)}それでも分からないときは</div>
+      <p class="muted" style="margin:0">「プロンプト」タブの「困ったときに使う」に、進め方に迷ったとき・時間が足りないときのためのプロンプトがあります。それでも分からなければ、<a href="/contact">お問い合わせ</a>からご連絡ください。</p>
+    </div>
+
+    ${welcome ? `<a class="btn btn-primary btn-block" href="/dashboard" style="margin-top:6px">ホームへ進む ${icon('arrow', 16)}</a>` : ''}
+  `, { user, active: 'guide', noNav: !!welcome });
 }
 
 // ── ページ: プロンプト一覧 ──
@@ -500,8 +550,8 @@ function promptDetailPage(user, p) {
       <textarea id="promptBody" class="pb-out" rows="10" aria-label="完成したプロンプト"></textarea>
       <div id="missMsg" class="miss"></div>
       <p class="hint">上の項目を変更すると、この欄は作り直されます。細かい修正は最後にこの欄で行ってください。</p>
-      <div class="notice info" style="margin-top:10px">${icon('external', 16)}<div>「ChatGPTで開く」を押すと、このプロンプトは自動でコピーされます。スマホにChatGPTアプリが入っているとアプリが開き、入力欄が空のことがあります。そのときは入力欄を長押しして「ペースト」を押すだけでOKです（打ち込む必要はありません）。</div></div>
-      <div class="notice info" style="margin-top:10px">${icon('flag', 16)}<div><b>この画面への戻り方</b>：ChatGPTでのやり取りが終わったら、開いた画面の右上（または左上）にある「×」や「完了」をタップして閉じてください。それだけでこの画面に戻ってきます（戻ってくると、次にやることを自動でお知らせします）。閉じるボタンが見当たらないときは、スマホの画面を下から上へスワイプして開く「アプリの切り替え」から、このアプリに戻ってください。</div></div>
+      <div class="notice info" style="margin-top:10px">${icon('external', 16)}<div>「ChatGPTで開く」を押すと、このプロンプトは自動でコピーされます。スマホにChatGPTアプリが入っているとアプリが開き、入力欄が空のことがあります。そのときは入力欄を長押しして「ペースト」を押すだけでOKです（打ち込む必要はありません）。<br><br>まれに、アプリではなくブラウザでChatGPTのページが開くことがあります（前回のChatGPTアプリを完全に閉じずに残していると起きやすいようです）。その場合は一度ChatGPTアプリをスマホの「アプリの切り替え」から上にスワイプして完全に閉じてから、もう一度「ChatGPTで開く」を押すとアプリが開きやすくなります。</div></div>
+      <div class="notice info" style="margin-top:10px">${icon('flag', 16)}<div><b>この画面への戻り方</b>：ChatGPTでの作業が終わったら、スマホの「アプリの切り替え」（画面の下から上にスワイプすると出てきます）から、この画面に戻ってください。その途中で、<b>左上に「×」だけがある真っ白の画面</b>が出ることがあります。これはChatGPTアプリを開くための一時的な画面なので、そのまま左上の「×」をタップして閉じてください。閉じると、この画面に戻ってきます（戻ってくると、次にやることを自動でお知らせします）。</div></div>
       <div class="notice gold" style="margin-top:10px">${icon('bulb', 16)}<div>回答が一般的・浅いと感じたら、そのまま使わずに「もっと具体的に」「私の経験をもっと反映して」のように聞き返してください。それだけで内容の質が大きく変わります。</div></div>
       ${p.note && p.note !== '―' ? `<div class="notice warn" style="margin-top:10px">${icon('flag', 16)}<div>注意：${escapeHtml(p.note)}</div></div>` : ''}
     </div>
@@ -573,7 +623,10 @@ function promptDetailPage(user, p) {
         const msgEl = document.getElementById('copyMsg');
         const copied = copySync(text);
         const tooLong = text.length > CHATGPT_URL_LIMIT;
-        window.open(tooLong ? 'https://chatgpt.com/' : 'https://chatgpt.com/?q=' + encodeURIComponent(text), '_blank', 'noopener');
+        // 末尾に毎回変わる値を付け、iOS/Androidが「前回と同じURL」とみなしてWeb版に留まる（アプリへの引き継ぎが起きない）のを避ける
+        const cacheBust = 't=' + Date.now();
+        const url = tooLong ? 'https://chatgpt.com/?' + cacheBust : 'https://chatgpt.com/?q=' + encodeURIComponent(text) + '&' + cacheBust;
+        window.open(url, '_blank', 'noopener');
         awaitingReturn = true;
         const done = function(ok){
           if (ok) toast('プロンプトをコピーしました');
@@ -828,6 +881,7 @@ function accountPage(user) {
       <div class="card-title">${icon('lock', 18)}データの扱い</div>
       <p class="muted" style="margin:0">AIのAPIキーはサーバーに保存しません（このブラウザ内のみ）。マイ商品・振込先・進捗は、あなたのアカウントでのみ表示されます。</p>
     </div>
+    <a class="btn btn-ghost btn-block" href="/guide">${icon('bulb', 18)}使い方ガイド</a>
     <a class="btn btn-ghost btn-block" href="/contact">${icon('mail', 18)}お問い合わせ</a>
     <a class="btn btn-quiet btn-block" href="/logout">${icon('logout', 18)}ログアウト</a>
   `, { user, active: 'account' });
@@ -1009,7 +1063,7 @@ const server = http.createServer(async (req, res) => {
       const { persona, change } = await parseBody(req);
       if (!PERSONAS[persona]) return sendHtml(res, 400, onboardingPage(user, !!change));
       Users.setPersona(user.id, persona);
-      return redirect(res, change ? '/account' : '/dashboard');
+      return redirect(res, change ? '/account' : '/guide?welcome=1');
     }
 
     // 属性が未設定なら、まずオンボーディングへ（既存アカウントも含む）
@@ -1021,6 +1075,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/prompts' && method === 'GET') return sendHtml(res, 200, promptsPage(user));
     if (pathname === '/account' && method === 'GET') return sendHtml(res, 200, accountPage(user));
+    if (pathname === '/guide' && method === 'GET') {
+      return sendHtml(res, 200, guidePage(user, { welcome: url.searchParams.get('welcome') === '1' }));
+    }
     if (pathname === '/product' && method === 'GET') {
       return sendHtml(res, 200, productPage(user, { saved: url.searchParams.get('saved') === '1' }));
     }
