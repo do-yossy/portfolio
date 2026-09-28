@@ -533,7 +533,7 @@ function promptDetailPage(user, p) {
       </div>
     </details>
 
-    <script type="application/json" id="pb-data">${jsonForScript({ body: p.body, occ, preamble: persona ? persona.preamble : '' })}</script>
+    <script type="application/json" id="pb-data">${jsonForScript({ no: p.no, body: p.body, occ, preamble: persona ? persona.preamble : '' })}</script>
     <script>${CLIENT_JS}</script>
     <script>
       const CHATGPT_URL_LIMIT = 1500; // これを超える長さはURL方式が不安定になりうるため、URLには載せずコピーで渡す
