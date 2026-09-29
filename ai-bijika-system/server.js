@@ -41,7 +41,7 @@ function loadEnvFile(file) {
   loadEnvFile(own);
 })();
 
-const { Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, Licenses } = require('./db');
+const { Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, Licenses, AllowedEmails } = require('./db');
 const auth = require('./lib/auth');
 const { runPrompt, PROVIDERS } = require('./lib/aiproxy');
 const { escapeHtml, jsonForScript, icon, layout, crest, guilloche, roman, pad2, initial } = require('./lib/ui');
@@ -254,6 +254,17 @@ function contactPage(user, { sent, error, values } = {}) {
       </form>
     `}
   `, { user, active: 'contact', noNav: !user });
+}
+
+// 購入時のメールアドレスが許可リスト（allowed_emails）に登録済みなら、キー入力なしで自動的に認証済みにする。
+// signup直後・login直後にだけ呼ぶ（＝そのメールアドレスで本人が登録・ログインした時点でのみ消費される）。
+function tryAutoActivateByEmail(user) {
+  if (!user || user.license_active) return;
+  const allowed = AllowedEmails.findByEmail(user.email);
+  if (!allowed || allowed.status !== 'UNUSED') return;
+  AllowedEmails.activate(user.email, user.id);
+  Users.setLicenseActive(user.id, true);
+  user.license_active = 1;
 }
 
 // ── ページ: ライセンスキー入力（購入者だけが使えるようにする認証）──
@@ -995,7 +1006,7 @@ time{font-size:11.5px;color:#6B7780}
 }
 
 // ── ライセンスキー管理（運営者用。購入者だけが使えるようにするためのキーを発行・無効化する）──
-function adminLicensesPage(list, { generated } = {}) {
+function adminLicensesPage(list, emailList, { generated } = {}) {
   const counts = { UNUSED: 0, ACTIVE: 0, REVOKED: 0 };
   for (const l of list) counts[l.status] = (counts[l.status] || 0) + 1;
   const STATUS_LABEL_LIC = { UNUSED: '未使用', ACTIVE: '使用中', REVOKED: '無効化済み' };
@@ -1009,7 +1020,23 @@ function adminLicensesPage(list, { generated } = {}) {
       ${l.status !== 'REVOKED' ? `<form method="POST" action="/admin/licenses/${l.id}/revoke" onsubmit="return confirm('このライセンスキーを無効化しますか？${l.user_email ? '割り当て済みのため、このアカウントは使えなくなります。' : ''}')">
         <button type="submit">無効化する</button>
       </form>` : ''}
-    </div>`).join('') || '<p class="empty">ライセンスキーはまだありません。まず下のフォームから発行してください。</p>';
+    </div>`).join('') || '<p class="empty">ライセンスキーはまだありません。まず上のフォームから発行してください。</p>';
+
+  const emailCounts = { UNUSED: 0, ACTIVE: 0, REVOKED: 0 };
+  for (const a of emailList) emailCounts[a.status] = (emailCounts[a.status] || 0) + 1;
+  const STATUS_LABEL_AE = { UNUSED: '未ログイン', ACTIVE: 'ログイン済み', REVOKED: '無効化済み' };
+  const emailRows = emailList.map((a) => `
+    <div class="lic">
+      <div class="lic-head">
+        <code class="lic-code">${escapeHtml(a.email)}</code>
+        <span class="badge ${a.status.toLowerCase()}">${STATUS_LABEL_AE[a.status]}</span>
+      </div>
+      <div class="lic-meta">${a.note ? `${escapeHtml(a.note)} ／ ` : ''}<time>${escapeHtml(new Date(a.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }))}登録</time></div>
+      ${a.status !== 'REVOKED' ? `<form method="POST" action="/admin/licenses/emails/${a.id}/revoke" onsubmit="return confirm('このメールアドレスの許可を取り消しますか？${a.status === 'ACTIVE' ? 'ログイン済みのため、このアカウントは使えなくなります。' : ''}')">
+        <button type="submit">無効化する</button>
+      </form>` : ''}
+    </div>`).join('') || '<p class="empty">許可済みのメールアドレスはまだありません。</p>';
+
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ライセンス管理｜ミチシルベ</title>
 <style>
@@ -1018,6 +1045,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:18p
 header h1{font-size:15px;margin:0;letter-spacing:.02em}
 header a{color:#D9BF8C;font-size:13px;text-decoration:none;margin-left:14px}
 main{max-width:640px;margin:0 auto;padding:18px}
+.section-title{font-size:13.5px;font-weight:700;margin:26px 0 10px;padding-top:6px;border-top:1px solid #DCD4C4}
+.section-title:first-child{margin-top:0;padding-top:0;border-top:none}
+.section-desc{font-size:12.5px;color:#42525D;margin:-4px 0 12px}
 .counts{display:flex;gap:10px;margin-bottom:16px;font-size:12.5px;color:#42525D}
 .counts b{color:#0E1A22}
 .genbox{background:#fff;border-radius:14px;box-shadow:0 1px 2px rgba(14,26,34,.06);padding:16px 18px;margin-bottom:18px}
@@ -1041,6 +1071,23 @@ main{max-width:640px;margin:0 auto;padding:18px}
 </style></head><body>
 <header><h1>ライセンス管理</h1><div><a href="/admin/inquiries">お問い合わせ</a><a href="/admin/logout">ログアウト</a></div></header>
 <main>
+  <div class="section-title">メールアドレスで許可する（キー不要）</div>
+  <p class="section-desc">購入時のメールアドレスを登録すると、そのメールアドレスで登録・ログインした時点で自動的に使えるようになります。キーの発行・案内は不要です。</p>
+  <div class="counts">未ログイン <b>${emailCounts.UNUSED || 0}</b>／ログイン済み <b>${emailCounts.ACTIVE || 0}</b>／無効化済み <b>${emailCounts.REVOKED || 0}</b></div>
+  <div class="genbox">
+    <h2>メールアドレスを許可する</h2>
+    <form method="POST" action="/admin/licenses/allow-email">
+      <label for="allow-email">購入者のメールアドレス</label>
+      <input id="allow-email" type="email" name="email" required placeholder="buyer@example.com">
+      <label for="allow-note">メモ（任意。購入経路など）</label>
+      <input id="allow-note" type="text" name="note" maxlength="100" placeholder="例：2026-09 note販売分">
+      <button type="submit">許可する</button>
+    </form>
+  </div>
+  ${emailRows}
+
+  <div class="section-title">ライセンスキーで許可する</div>
+  <p class="section-desc">購入者のメールアドレスが事前にわからない場合や、案内するアカウントを購入者自身に選んでもらいたい場合に使います。発行したキーは購入者へお送りください。</p>
   <div class="counts">未使用 <b>${counts.UNUSED || 0}</b>／使用中 <b>${counts.ACTIVE || 0}</b>／無効化済み <b>${counts.REVOKED || 0}</b></div>
   ${generated && generated.length ? `<div class="newcodes"><h3>発行しました（${generated.length}件）。このまま購入者へお送りください</h3>${generated.map((c) => `<code>${escapeHtml(c)}</code>`).join('')}</div>` : ''}
   <div class="genbox">
@@ -1094,6 +1141,7 @@ const server = http.createServer(async (req, res) => {
       }
       const { hash, salt } = auth.hashPassword(password);
       const id = Users.create({ email, passwordHash: hash, passwordSalt: salt });
+      tryAutoActivateByEmail(Users.findById(id));
       const token = auth.createSession(id);
       return redirect(res, '/onboarding', { 'Set-Cookie': auth.sessionCookie(token) });
     }
@@ -1104,6 +1152,7 @@ const server = http.createServer(async (req, res) => {
       if (!u || !auth.verifyPassword(password || '', u.password_hash, u.password_salt)) {
         return sendHtml(res, 401, authForm('login', 'メールアドレスまたはパスワードが違います。'));
       }
+      if (!u.license_active) tryAutoActivateByEmail(u);
       const token = auth.createSession(u.id);
       return redirect(res, '/dashboard', { 'Set-Cookie': auth.sessionCookie(token) });
     }
@@ -1166,19 +1215,36 @@ const server = http.createServer(async (req, res) => {
     // ── ライセンスキー管理（運営者用。購入者だけが使えるようにするためのキーを発行・無効化する）──
     if (pathname === '/admin/licenses' && method === 'GET') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
-      return sendHtml(res, 200, adminLicensesPage(Licenses.all()));
+      return sendHtml(res, 200, adminLicensesPage(Licenses.all(), AllowedEmails.all()));
     }
     if (pathname === '/admin/licenses/generate' && method === 'POST') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
       const { count, note } = await parseBody(req);
       const n = Math.min(50, Math.max(1, parseInt(count, 10) || 1));
       const generated = Licenses.generate(n, String(note || '').trim().slice(0, 100));
-      return sendHtml(res, 200, adminLicensesPage(Licenses.all(), { generated }));
+      return sendHtml(res, 200, adminLicensesPage(Licenses.all(), AllowedEmails.all(), { generated }));
     }
     const licRevokeMatch = pathname.match(/^\/admin\/licenses\/([a-f0-9]+)\/revoke$/);
     if (licRevokeMatch && method === 'POST') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
       const revoked = Licenses.revoke(licRevokeMatch[1]);
+      if (revoked && revoked.user_id) Users.setLicenseActive(revoked.user_id, false);
+      return redirect(res, '/admin/licenses');
+    }
+    // ── メールアドレスでの許可（運営者用。購入時のメールアドレスだけを許可し、キーの発行・案内を不要にする）──
+    if (pathname === '/admin/licenses/allow-email' && method === 'POST') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      const { email, note } = await parseBody(req);
+      const trimmed = String(email || '').trim().toLowerCase();
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        AllowedEmails.add(trimmed, String(note || '').trim().slice(0, 100));
+      }
+      return redirect(res, '/admin/licenses');
+    }
+    const aeRevokeMatch = pathname.match(/^\/admin\/licenses\/emails\/([a-f0-9]+)\/revoke$/);
+    if (aeRevokeMatch && method === 'POST') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      const revoked = AllowedEmails.revoke(aeRevokeMatch[1]);
       if (revoked && revoked.user_id) Users.setLicenseActive(revoked.user_id, false);
       return redirect(res, '/admin/licenses');
     }
