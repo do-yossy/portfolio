@@ -43,7 +43,8 @@ function icon(name, size = 20, extraClass = '') {
   return `<svg class="ico ${extraClass}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
 }
 
-// ブランドの紋章（金の二重リングに、経験が磨かれ商品になることを表すジェムのモノグラム）
+// ブランドの紋章（金の二重リングに、道を示すガイディングスターのモノグラム。
+// 「ミチシルベ」＝道標という名前の意味そのものを、輝く星のかたちで表している）
 let crestSeq = 0;
 function crest(size = 34) {
   const id = `cr${++crestSeq % 100000}`;
@@ -51,13 +52,8 @@ function crest(size = 34) {
   <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4E5BF"/><stop offset=".45" stop-color="#D6B878"/><stop offset=".75" stop-color="#A9854A"/><stop offset="1" stop-color="#E9D4A4"/></linearGradient></defs>
   <circle cx="24" cy="24" r="22.8" fill="#0E1A22" stroke="url(#${id})" stroke-width="1.4"/>
   <circle cx="24" cy="24" r="19.4" fill="none" stroke="url(#${id})" stroke-width=".55" opacity=".75"/>
-  <g stroke="url(#${id})" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" fill="none">
-    <path d="M18,16 L30,16 L36,23 L24,35 L12,23 Z"/>
-    <path d="M12,23 L36,23"/>
-    <path d="M18,16 L24,23 L30,16"/>
-    <path d="M24,23 L24,35"/>
-  </g>
-  <path d="M20,18.3 L22.3,21" stroke="#FBF3DE" stroke-width="1" stroke-linecap="round" opacity=".85"/>
+  <path d="M24,5 L28.2,19.8 L43,24 L28.2,28.2 L24,43 L19.8,28.2 L5,24 L19.8,19.8 Z" fill="url(#${id})" stroke="url(#${id})" stroke-width=".6" stroke-linejoin="round"/>
+  <path d="M24,9.5 L26.1,16.3" stroke="#FBF3DE" stroke-width="1.1" stroke-linecap="round" opacity=".9"/>
 </svg>`;
 }
 
