@@ -36,7 +36,6 @@ const ICON_PATHS = {
   chip: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
   compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 6.5 8 6 8-6"/>',
-  key: '<circle cx="8" cy="15" r="4.2"/><path d="M11 12 20.5 2.5M15.5 6.5 18 9M12.5 9.5 15 12"/>',
 };
 
 function icon(name, size = 20, extraClass = '') {
