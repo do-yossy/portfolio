@@ -113,6 +113,22 @@ db.exec(`
   );
 `);
 
+// ── allowed_emails（購入時のメールアドレスだけを許可するための許可リスト。運営者が登録する）──
+// ライセンスキーは誰が使っても通ってしまう（キーさえ知っていれば認証できる）のに対し、
+// こちらは「そのメールアドレスで登録・ログインした場合のみ」自動的に認証済みにする。
+// キーの発行・案内（送付）が不要になる分、購入者のメールアドレスを事前に把握できる場合に使う。
+db.exec(`
+  CREATE TABLE IF NOT EXISTS allowed_emails (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'UNUSED', -- UNUSED / ACTIVE / REVOKED
+    user_id TEXT,
+    note TEXT DEFAULT '',
+    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    activated_at TEXT
+  );
+`);
+
 // ── product_profile（購入者が作っている商品の基本情報＋お客様からの代金の受け取り方。1購入者1件）──
 db.exec(`
   CREATE TABLE IF NOT EXISTS product_profile (
@@ -206,6 +222,48 @@ const Licenses = {
     const row = db.prepare('SELECT * FROM licenses WHERE id = ?').get(id);
     if (!row) return null;
     db.prepare(`UPDATE licenses SET status='REVOKED' WHERE id=?`).run(id);
+    return row;
+  },
+};
+
+const AllowedEmails = {
+  // 購入者のメールアドレスを許可リストに登録する（冪等：既に登録済みなら基本は何もしない。
+  // 無効化済みのものを再登録した場合のみ UNUSED に戻す＝再度使えるようにする）
+  add(email, note) {
+    const normalized = String(email || '').toLowerCase().trim();
+    const existing = db.prepare('SELECT * FROM allowed_emails WHERE email = ?').get(normalized);
+    if (existing) {
+      if (existing.status === 'REVOKED') {
+        db.prepare(`UPDATE allowed_emails SET status='UNUSED', note=?, user_id=NULL, activated_at=NULL WHERE id=?`)
+          .run(note || existing.note, existing.id);
+      } else if (note) {
+        db.prepare('UPDATE allowed_emails SET note=? WHERE id=?').run(note, existing.id);
+      }
+      return existing.id;
+    }
+    const id = generateId();
+    db.prepare('INSERT INTO allowed_emails (id, email, note) VALUES (?, ?, ?)').run(id, normalized, note || '');
+    return id;
+  },
+  findByEmail(email) {
+    return db.prepare('SELECT * FROM allowed_emails WHERE email = ?').get(String(email || '').toLowerCase().trim());
+  },
+  all() {
+    return db.prepare(`
+      SELECT allowed_emails.*, users.email AS user_email
+      FROM allowed_emails LEFT JOIN users ON users.id = allowed_emails.user_id
+      ORDER BY allowed_emails.created_at DESC
+    `).all();
+  },
+  // UNUSEDの許可を、そのユーザーに割り当てて消費する（同じメールアドレスの再利用はできない）
+  activate(email, userId) {
+    db.prepare(`UPDATE allowed_emails SET status='ACTIVE', user_id=?, activated_at=? WHERE email=? AND status='UNUSED'`)
+      .run(userId, now(), String(email || '').toLowerCase().trim());
+  },
+  revoke(id) {
+    const row = db.prepare('SELECT * FROM allowed_emails WHERE id = ?').get(id);
+    if (!row) return null;
+    db.prepare(`UPDATE allowed_emails SET status='REVOKED' WHERE id=?`).run(id);
     return row;
   },
 };
@@ -312,4 +370,4 @@ const Inquiries = {
   },
 };
 
-module.exports = { db, Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, Licenses, generateId, now };
+module.exports = { db, Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, Licenses, AllowedEmails, generateId, now };
