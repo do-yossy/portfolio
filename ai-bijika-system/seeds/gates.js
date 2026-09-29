@@ -13,7 +13,7 @@ module.exports = [
   { no: 5, name: '商品完成', phase: 'PHASE3', usePrompt: 'No.12 / No.13', steps: [12, 13], extra: [14, 15, 16] },
   { no: 6, name: '販売ページ', phase: 'PHASE4', usePrompt: 'No.18', steps: [17, 18], setupLink: { href: '/product#payment', text: 'お客様からの代金の受け取り方を設定する' } },
   { no: 7, name: '販売導線', phase: 'PHASE4', usePrompt: '販売開始チェックリスト', steps: [], external: '販売開始チェックリスト', setupLink: { href: '/product#payment', text: 'お客様からの代金の受け取り方を設定する' }, selfJudge: true },
-  { no: 8, name: 'SNS・販売', phase: 'PHASE5', usePrompt: 'No.21', steps: [19, 20, 21], extra: [22] },
+  { no: 8, name: 'SNS・販売', phase: 'PHASE5', usePrompt: 'No.21', steps: [31, 32, 19, 33, 20, 21], extra: [22] },
   { no: 9, name: 'KPI・改善', phase: 'PHASE6', usePrompt: 'No.23 / No.24', steps: [23, 24], selfJudge: true },
   { no: 10, name: '商品2', phase: 'PHASE7', usePrompt: 'No.5（再利用）', steps: [25, 5] },
 ];

@@ -150,4 +150,16 @@ module.exports = {
     ],
     '分/時間': { kind: 'select', label: '今日使える時間', options: ['15分', '30分', '1時間', '2時間', '3時間以上'] },
   },
+  31: {
+    商品名: productName,
+    ターゲット: target,
+    集客経路: P('channel', '今予定している集客経路'),
+  },
+  32: {
+    SNS名: { kind: 'select', label: 'アカウントを作りたいSNS', other: true, options: O.SNS_PLATFORMS },
+  },
+  33: {
+    商品名: productName,
+    雰囲気: { kind: 'select', label: '写真の雰囲気', other: true, options: O.SNS_MOODS },
+  },
 };
