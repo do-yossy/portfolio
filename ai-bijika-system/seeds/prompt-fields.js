@@ -73,7 +73,7 @@ module.exports = {
   7: { 商品名: productName },
   8: { 商品名: productName },
   9: { コンセプトを貼り付け: paste('商品コンセプト', 'No.8で作った設計、または自分で書いたコンセプトを貼り付け') },
-  10: { 商品名: productName, ターゲット: target, 悩み: pain },
+  10: { 商品名: productName, ターゲット: target, 悩み: pain, '棚卸し内容(No.3のアウトプット)': paste('棚卸し内容', 'No.3で棚卸しした内容を貼り付け(複数でOK)') },
   11: { 商品名: productName, 章構成を貼り付け: paste('章構成', 'No.10で作った目次を貼り付け') },
   12: {
     商品名: productName,
