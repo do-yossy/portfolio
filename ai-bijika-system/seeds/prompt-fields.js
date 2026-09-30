@@ -168,4 +168,14 @@ module.exports = {
     商品名: productName,
     雰囲気: { kind: 'select', label: '写真の雰囲気', other: true, options: O.SNS_MOODS },
   },
+  34: {
+    商品名: productName,
+    ターゲット: target,
+    問い合わせ方法: { kind: 'text', label: '分からないことがあった時の連絡先・確認方法', placeholder: '例：LINE公式アカウントへメッセージ、購入時のメールに返信' },
+  },
+  35: {
+    商品: productName,
+    ターゲット: target,
+    届いた内容: paste('届いたコメント・DM', 'コメントやDMの内容をそのまま貼り付け'),
+  },
 };
