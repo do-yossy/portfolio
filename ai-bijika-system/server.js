@@ -17,6 +17,8 @@ const STATIC_FILES = {
   '/sw.js': { file: 'sw.js', type: 'application/javascript; charset=utf-8' },
   '/icon-192.png': { file: 'icon-192.png', type: 'image/png' },
   '/icon-512.png': { file: 'icon-512.png', type: 'image/png' },
+  '/icon-192-maskable.png': { file: 'icon-192-maskable.png', type: 'image/png' },
+  '/icon-512-maskable.png': { file: 'icon-512-maskable.png', type: 'image/png' },
 };
 // 使い方ガイド（/guide）に載せる実際の画面キャプチャ。public/guide/ にあるものを自動で配信対象にする
 for (const f of fs.readdirSync(path.join(PUBLIC_DIR, 'guide'))) {
