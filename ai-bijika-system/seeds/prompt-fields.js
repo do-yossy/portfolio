@@ -69,6 +69,11 @@ module.exports = {
     '商品の目的（学ぶ／使う／作業を代行される、等）': { kind: 'select', label: '商品の目的', options: ['学ぶ', '使う', '作業を代行される'] },
     '将来的な商品展開の予定（あれば）': { kind: 'select', label: '将来の展開', options: ['予定なし', 'シリーズ化したい', '上位商品を作りたい', '未定'] },
     タイプ定義: SKIP, 出力: SKIP,
+    '市場調査で分かったこと（類似・競合商品の有無、価格帯、需要を感じた根拠など）': {
+      kind: 'textarea', label: '市場調査で分かったこと',
+      placeholder: '調べて分かったことを書く（例：ココナラで似た商品が3件、1000〜3000円で出品されていた）',
+      fallback: 'まだ調べていない',
+    },
   },
   7: { 商品名: productName },
   8: { 商品名: productName },
@@ -157,6 +162,7 @@ module.exports = {
   },
   32: {
     SNS名: { kind: 'select', label: 'アカウントを作りたいSNS', other: true, options: O.SNS_PLATFORMS },
+    商品名: productName,
   },
   33: {
     商品名: productName,
