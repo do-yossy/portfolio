@@ -1,5 +1,5 @@
 'use strict';
-// AIプロンプト集（No.0〜35、実際にやる順に採番）のマスタデータ。db.js の Prompts.sync() で起動のたびにDBへ同期する。
+// AIプロンプト集（No.0〜36、実際にやる順に採番）のマスタデータ。db.js の Prompts.sync() で起動のたびにDBへ同期する。
 module.exports = [
   {
     "no": 0,
