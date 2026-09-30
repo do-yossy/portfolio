@@ -70,9 +70,12 @@ module.exports = {
     '将来的な商品展開の予定（あれば）': { kind: 'select', label: '将来の展開', options: ['予定なし', 'シリーズ化したい', '上位商品を作りたい', '未定'] },
     タイプ定義: SKIP, 出力: SKIP,
     '市場調査で分かったこと（類似・競合商品の有無、価格帯、需要を感じた根拠など）': {
-      kind: 'textarea', label: '市場調査で分かったこと',
-      placeholder: '調べて分かったことを書く（例：ココナラで似た商品が3件、1000〜3000円で出品されていた）',
-      fallback: 'まだ調べていない',
+      kind: 'compose', label: '市場調査で分かったこと（分かる範囲でOK）', fallback: 'まだ調べていない',
+      parts: [
+        { label: '類似・競合の商品', kind: 'select', options: ['見つかった', '見つからなかった', 'まだ調べていない'] },
+        { label: '価格帯', kind: 'text', placeholder: '例：1000〜3000円（任意）' },
+        { label: '需要を感じた声・根拠', kind: 'text', placeholder: '例：SNSで「欲しい」という声を見た（任意）' },
+      ],
     },
   },
   7: { 商品名: productName },
@@ -177,5 +180,9 @@ module.exports = {
     商品: productName,
     ターゲット: target,
     届いた内容: paste('届いたコメント・DM', 'コメントやDMの内容をそのまま貼り付け'),
+  },
+  36: {
+    商品名: productName,
+    全章の本文を貼り付け: paste('全章の本文', 'No.12でGREENになった各章の本文を、順番につなげて貼り付け'),
   },
 };
