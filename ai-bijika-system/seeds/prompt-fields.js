@@ -69,11 +69,16 @@ module.exports = {
     '商品の目的（学ぶ／使う／作業を代行される、等）': { kind: 'select', label: '商品の目的', options: ['学ぶ', '使う', '作業を代行される'] },
     '将来的な商品展開の予定（あれば）': { kind: 'select', label: '将来の展開', options: ['予定なし', 'シリーズ化したい', '上位商品を作りたい', '未定'] },
     タイプ定義: SKIP, 出力: SKIP,
+    '市場調査で分かったこと（類似・競合商品の有無、価格帯、需要を感じた根拠など）': {
+      kind: 'textarea', label: '市場調査で分かったこと',
+      placeholder: '調べて分かったことを書く（例：ココナラで似た商品が3件、1000〜3000円で出品されていた）',
+      fallback: 'まだ調べていない',
+    },
   },
   7: { 商品名: productName },
   8: { 商品名: productName },
   9: { コンセプトを貼り付け: paste('商品コンセプト', 'No.8で作った設計、または自分で書いたコンセプトを貼り付け') },
-  10: { 商品名: productName, ターゲット: target, 悩み: pain },
+  10: { 商品名: productName, ターゲット: target, 悩み: pain, '棚卸し内容(No.3のアウトプット)': paste('棚卸し内容', 'No.3で棚卸しした内容を貼り付け(複数でOK)') },
   11: { 商品名: productName, 章構成を貼り付け: paste('章構成', 'No.10で作った目次を貼り付け') },
   12: {
     商品名: productName,
@@ -157,9 +162,20 @@ module.exports = {
   },
   32: {
     SNS名: { kind: 'select', label: 'アカウントを作りたいSNS', other: true, options: O.SNS_PLATFORMS },
+    商品名: productName,
   },
   33: {
     商品名: productName,
     雰囲気: { kind: 'select', label: '写真の雰囲気', other: true, options: O.SNS_MOODS },
+  },
+  34: {
+    商品名: productName,
+    ターゲット: target,
+    問い合わせ方法: { kind: 'text', label: '分からないことがあった時の連絡先・確認方法', placeholder: '例：LINE公式アカウントへメッセージ、購入時のメールに返信' },
+  },
+  35: {
+    商品: productName,
+    ターゲット: target,
+    届いた内容: paste('届いたコメント・DM', 'コメントやDMの内容をそのまま貼り付け'),
   },
 };
