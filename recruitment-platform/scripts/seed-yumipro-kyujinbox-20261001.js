@@ -7,8 +7,11 @@
  *   ・Indeed分（seed-yumipro-indeed-20261001.js）と同じ考え方・同じ内容プールを使う。
  *   ・求人ボックスは既存会社（sq/bg/st/bi/nl/sl/am）では「入替のみ・純増なし」方針だが、
  *     YUMIPROは新規開設アカウントのため既存掲載が無く、入替ではなく新規掲載（純増）として扱う。
- *   ・件数はIndeed分と同じ14件（経営者カウンセリング4/経営コンサル3/採用コンサル3/組織コンサル3/専属1）。
- *   ・Indeed分とエリアの文言が重複しないよう、求人ボックス専用のエリア一覧を使う
+ *   ・件数はIndeed分の14件とは別に25件とする（2026-10-01ユーザー指定）。POOL.ypの重み
+ *     （経営者カウンセリング4/経営コンサル3/採用コンサル3/組織コンサル3/専属1＝周期14）を
+ *     pickByWeightでそのまま25件分回す（14件1周目＋11件分2周目）ことで、専属ドライバーは
+ *     2周目の範囲に入らず結果的に1件のまま、主要4職種は8/6/6/5件程度に自然増加する。
+ *   ・Indeed分とエリアの文言が重複しないよう、求人ボックス専用のエリア一覧（25件）を使う
  *     （同一媒体内での重複コンテンツを避けるのが目的で、媒体をまたいだ重複は各媒体のBAN判定上
  *     問題にならないため、Indeed分と全く同じ内容でも支障はないが、念のため分けている）。
  *
@@ -32,12 +35,13 @@ const fs = require('fs');
   });
 })();
 
-const { PLANNED_COUNTS, buildJob, pickByWeight } = require('./lib/taxi-funnel-content');
+const { buildJob, pickByWeight } = require('./lib/taxi-funnel-content');
 const { Jobs } = require('../db-factory');
 
 const APPLY = process.argv.includes('--apply');
+const TOTAL = 25; // Indeed分(14件)とは別にユーザー指定の25件（2026-10-01）
 
-// 関西圏・実在地名14件（Indeed分（seed-yumipro-indeed-20261001.js）とは別の地点を使用）。
+// 関西圏・実在地名25件（Indeed分（seed-yumipro-indeed-20261001.js）とは別の地点を使用）。
 const AREAS = [
   { area: '淡路',     ward: '大阪市東淀川区', pref: '大阪府' },
   { area: '鴫野',     ward: '大阪市城東区',   pref: '大阪府' },
@@ -53,12 +57,23 @@ const AREAS = [
   { area: '西大路',   ward: '京都市下京区',   pref: '京都府' },
   { area: '丹波橋',   ward: '京都市伏見区',   pref: '京都府' },
   { area: '桂',       ward: '京都市西京区',   pref: '京都府' },
+  { area: '喜連瓦屋',   ward: '大阪市東住吉区', pref: '大阪府' },
+  { area: '松原',       ward: '松原市',         pref: '大阪府' },
+  { area: '富田林',     ward: '富田林市',       pref: '大阪府' },
+  { area: '河内長野',   ward: '河内長野市',     pref: '大阪府' },
+  { area: '茶山台',     ward: '堺市南区',       pref: '大阪府' },
+  { area: '摂津富田',   ward: '高槻市',         pref: '大阪府' },
+  { area: '須磨',       ward: '神戸市須磨区',   pref: '兵庫県' },
+  { area: '甲東園',     ward: '西宮市',         pref: '兵庫県' },
+  { area: '伊丹',       ward: '伊丹市',         pref: '兵庫県' },
+  { area: '山科',       ward: '京都市山科区',   pref: '京都府' },
+  { area: '洛西口',     ward: '京都市西京区',   pref: '京都府' },
 ];
 
 async function main() {
   console.log(`\n=== YUMIPRO AGENCY（yp）向け求人ボックス新規求人 初回投入${APPLY ? '（--apply・実際に作成)' : '（DRY-RUN)'} ===\n`);
 
-  const total = PLANNED_COUNTS.yp;
+  const total = TOTAL;
   let created = 0;
   for (let i = 0; i < total; i++) {
     const poolEntry = pickByWeight('yp', i);
