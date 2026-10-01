@@ -480,4 +480,59 @@ function pickByWeight(company, index) {
   return pool[pool.length - 1];
 }
 
-module.exports = { POOL, PLANNED_COUNTS, BIZ_LABEL, buildJob, pickByWeight };
+// 関西圏・実在地名プール（YUMIPRO向けIndeed分・求人ボックス分で使った地点を統合）。
+// 大量投入（例: 求人ボックス月水金×25件=75件）でプールを使い切った場合は、
+// nextArea() が2周目以降「地名+周回数」の表記でバリエーションを維持する
+// （swap-kyujinbox-taxi-funnel.jsのnextArea()と同じ考え方）。
+const KANSAI_AREAS = [
+  { area: '本町',     ward: '大阪市中央区',   pref: '大阪府' },
+  { area: '中津',     ward: '大阪市北区',     pref: '大阪府' },
+  { area: '新大阪',   ward: '大阪市淀川区',   pref: '大阪府' },
+  { area: '弁天町',   ward: '大阪市港区',     pref: '大阪府' },
+  { area: '緑地公園', ward: '豊中市',         pref: '大阪府' },
+  { area: '千里中央', ward: '吹田市',         pref: '大阪府' },
+  { area: '北千里',   ward: '吹田市',         pref: '大阪府' },
+  { area: 'なかもず', ward: '堺市北区',       pref: '大阪府' },
+  { area: '三宮',     ward: '神戸市中央区',   pref: '兵庫県' },
+  { area: '岡本',     ward: '神戸市東灘区',   pref: '兵庫県' },
+  { area: '芦屋川',   ward: '芦屋市',         pref: '兵庫県' },
+  { area: '河原町',   ward: '京都市中京区',   pref: '京都府' },
+  { area: '西院',     ward: '京都市右京区',   pref: '京都府' },
+  { area: '北大路',   ward: '京都市北区',     pref: '京都府' },
+  { area: '淡路',     ward: '大阪市東淀川区', pref: '大阪府' },
+  { area: '鴫野',     ward: '大阪市城東区',   pref: '大阪府' },
+  { area: '安立',     ward: '堺市堺区',       pref: '大阪府' },
+  { area: '千林',     ward: '大阪市旭区',     pref: '大阪府' },
+  { area: '石橋',     ward: '池田市',         pref: '大阪府' },
+  { area: '北野田',   ward: '堺市東区',       pref: '大阪府' },
+  { area: '光明池',   ward: '堺市南区',       pref: '大阪府' },
+  { area: '沢之町',   ward: '守口市',         pref: '大阪府' },
+  { area: '六甲',     ward: '神戸市灘区',     pref: '兵庫県' },
+  { area: '塚口',     ward: '尼崎市',         pref: '兵庫県' },
+  { area: '門戸厄神', ward: '西宮市',         pref: '兵庫県' },
+  { area: '西大路',   ward: '京都市下京区',   pref: '京都府' },
+  { area: '丹波橋',   ward: '京都市伏見区',   pref: '京都府' },
+  { area: '桂',       ward: '京都市西京区',   pref: '京都府' },
+  { area: '喜連瓦屋', ward: '大阪市東住吉区', pref: '大阪府' },
+  { area: '松原',     ward: '松原市',         pref: '大阪府' },
+  { area: '富田林',   ward: '富田林市',       pref: '大阪府' },
+  { area: '河内長野', ward: '河内長野市',     pref: '大阪府' },
+  { area: '茶山台',   ward: '堺市南区',       pref: '大阪府' },
+  { area: '摂津富田', ward: '高槻市',         pref: '大阪府' },
+  { area: '須磨',     ward: '神戸市須磨区',   pref: '兵庫県' },
+  { area: '甲東園',   ward: '西宮市',         pref: '兵庫県' },
+  { area: '伊丹',     ward: '伊丹市',         pref: '兵庫県' },
+  { area: '山科',     ward: '京都市山科区',   pref: '京都府' },
+  { area: '洛西口',   ward: '京都市西京区',   pref: '京都府' },
+];
+
+// offset（0始まりの通し番号）を渡すと、KANSAI_AREAS を順に消費し、
+// 周回したら「地名+周回数」で表記を変えて重複コンテンツに見えないようにする。
+function nextArea(offset) {
+  const a = KANSAI_AREAS[offset % KANSAI_AREAS.length];
+  const cycle = Math.floor(offset / KANSAI_AREAS.length);
+  const area = cycle > 0 ? `${a.area}${cycle + 1}` : a.area;
+  return { area, location: `${a.pref}${a.ward}${a.area}` };
+}
+
+module.exports = { POOL, PLANNED_COUNTS, BIZ_LABEL, buildJob, pickByWeight, KANSAI_AREAS, nextArea };
