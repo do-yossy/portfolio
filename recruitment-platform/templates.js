@@ -12,6 +12,7 @@ const COMPANIES = {
   nl: { label: 'NOWLIVE',        full: '株式会社NOWLIVE',         color: '#b91c1c' },
   sl: { label: 'スマイルライフ',   full: '合同会社スマイルライフ',   color: '#059669' },
   am: { label: 'AMBITION',       full: 'AMBITION合同会社',        color: '#9333ea' },
+  yp: { label: 'YUMIPRO AGENCY', full: '合同会社YUMIPRO AGENCY', color: '#65a30d' },
 };
 
 // 運用管理の媒体マスタ

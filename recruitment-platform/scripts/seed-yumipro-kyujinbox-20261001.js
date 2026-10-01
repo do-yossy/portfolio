@@ -1,0 +1,82 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * 合同会社YUMIPRO AGENCY（新規会社・新規開設の求人ボックスアカウント）向けの
+ * タクシー推薦の入口（送迎・専属ドライバー系）求人、初回投入分。
+ * 2026-10-01、ユーザーとの確認に基づく：
+ *   ・Indeed分（seed-yumipro-indeed-20261001.js）と同じ考え方・同じ内容プールを使う。
+ *   ・求人ボックスは既存会社（sq/bg/st/bi/nl/sl/am）では「入替のみ・純増なし」方針だが、
+ *     YUMIPROは新規開設アカウントのため既存掲載が無く、入替ではなく新規掲載（純増）として扱う。
+ *   ・件数はIndeed分と同じ14件（経営者カウンセリング4/経営コンサル3/採用コンサル3/組織コンサル3/専属1）。
+ *   ・Indeed分とエリアの文言が重複しないよう、求人ボックス専用のエリア一覧を使う
+ *     （同一媒体内での重複コンテンツを避けるのが目的で、媒体をまたいだ重複は各媒体のBAN判定上
+ *     問題にならないため、Indeed分と全く同じ内容でも支障はないが、念のため分けている）。
+ *
+ * 使い方（recruitment-platform フォルダで）:
+ *   node --experimental-sqlite scripts/seed-yumipro-kyujinbox-20261001.js             // ドライラン
+ *   node --experimental-sqlite scripts/seed-yumipro-kyujinbox-20261001.js --apply     // 実際に作成
+ */
+const path = require('path');
+const fs = require('fs');
+(function loadEnv() {
+  const envFile = path.join(__dirname, '..', '.env');
+  if (!fs.existsSync(envFile)) return;
+  fs.readFileSync(envFile, 'utf8').split('\n').forEach(rawLine => {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) return;
+    const eq = line.indexOf('=');
+    if (eq < 0) return;
+    const key = line.slice(0, eq).trim();
+    const val = line.slice(eq + 1).trim();
+    if (key && !(key in process.env)) process.env[key] = val;
+  });
+})();
+
+const { PLANNED_COUNTS, buildJob, pickByWeight } = require('./lib/taxi-funnel-content');
+const { Jobs } = require('../db-factory');
+
+const APPLY = process.argv.includes('--apply');
+
+// 関西圏・実在地名14件（Indeed分（seed-yumipro-indeed-20261001.js）とは別の地点を使用）。
+const AREAS = [
+  { area: '淡路',     ward: '大阪市東淀川区', pref: '大阪府' },
+  { area: '鴫野',     ward: '大阪市城東区',   pref: '大阪府' },
+  { area: '安立',     ward: '堺市堺区',       pref: '大阪府' },
+  { area: '千林',     ward: '大阪市旭区',     pref: '大阪府' },
+  { area: '石橋',     ward: '池田市',         pref: '大阪府' },
+  { area: '北野田',   ward: '堺市東区',       pref: '大阪府' },
+  { area: '光明池',   ward: '堺市南区',       pref: '大阪府' },
+  { area: '沢之町',   ward: '守口市',         pref: '大阪府' },
+  { area: '六甲',     ward: '神戸市灘区',     pref: '兵庫県' },
+  { area: '塚口',     ward: '尼崎市',         pref: '兵庫県' },
+  { area: '門戸厄神', ward: '西宮市',         pref: '兵庫県' },
+  { area: '西大路',   ward: '京都市下京区',   pref: '京都府' },
+  { area: '丹波橋',   ward: '京都市伏見区',   pref: '京都府' },
+  { area: '桂',       ward: '京都市西京区',   pref: '京都府' },
+];
+
+async function main() {
+  console.log(`\n=== YUMIPRO AGENCY（yp）向け求人ボックス新規求人 初回投入${APPLY ? '（--apply・実際に作成)' : '（DRY-RUN)'} ===\n`);
+
+  const total = PLANNED_COUNTS.yp;
+  let created = 0;
+  for (let i = 0; i < total; i++) {
+    const poolEntry = pickByWeight('yp', i);
+    const a = AREAS[i % AREAS.length];
+    const area = a.area;
+    const location = `${a.pref}${a.ward}${a.area}`;
+    const newJob = buildJob('yp', poolEntry, area, location, '求人ボックス');
+
+    console.log(`  作成: [${newJob.jobType}] ${newJob.title}`);
+    if (APPLY) {
+      await Jobs.create(newJob);
+    }
+    created++;
+  }
+
+  console.log(`\n完了: 作成${created}件（合同会社YUMIPRO AGENCY／求人ボックス新規／想定${total}件）`);
+  if (!APPLY) console.log('→ 反映するには --apply を付けて再実行してください。');
+  console.log('※ 新規開設アカウントのため純増扱い（既存会社の「入替のみ」方針とは異なる）。');
+}
+
+main().catch(err => { console.error(err); process.exit(1); });
