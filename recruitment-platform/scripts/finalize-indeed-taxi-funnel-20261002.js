@@ -168,8 +168,9 @@ const RENAME_PATCHES = [
   },
   {
     co: 'am', finalType: 'スタッフ送迎ドライバー', salary: '月収280,000円〜',
+    worktimeHoliday: `時間選択制（${AM_GAKUDO_HOURS.join('／')}から選択）\n実働8時間・シフト制`,
     oldTypes: ['降園送迎ドライバー'],
-    buildDescription: a => layout({ a, salary: '月収280,000円〜',
+    buildDescription: a => layout({ a, salary: '月収280,000円〜', hours: AM_GAKUDO_HOURS,
       points: ['保育スタッフを運ぶ、人を運ぶお仕事', '送迎が中心で、人と接するのが苦にならない方なら安心'],
       intro: `託児所・保育所を運営する当社で、スタッフ送迎ドライバーを募集します。${a}周辺で、保育スタッフの出退勤・園間の移動を送迎車（乗用車）でサポートします。`,
       duties: ['保育スタッフの自宅・園間などの送迎', 'シフトに合わせた運行スケジュールの管理'],
