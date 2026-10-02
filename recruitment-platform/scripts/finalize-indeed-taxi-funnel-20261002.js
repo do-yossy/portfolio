@@ -136,8 +136,9 @@ const RENAME_PATCHES = [
   },
   {
     co: 'st', finalType: '展示会スタッフ送迎ドライバー', salary: ST_SAL,
+    worktimeHoliday: `時間選択制（${SL_ESTE_HOURS.join('／')}から選択）\n実働8時間・シフト制`,
     oldTypes: ['展示会場スタッフ送迎ドライバー', 'スタッフ送迎ドライバー', 'ハイヤードライバー'],
-    buildDescription: a => layout({ a, salary: ST_SAL,
+    buildDescription: a => layout({ a, salary: ST_SAL, hours: SL_ESTE_HOURS,
       points: ['展示会・催事を裏側から支える、スタッフの送迎ポジション', '送迎と簡単なサポートが中心。人と接するのが苦にならない方なら安心'],
       intro: `伝統ブランド・伝統工芸品のリメイクプロデュースを手掛ける当社で、展示会スタッフ送迎ドライバーを募集します。展示会・催事に向かうスタッフを、${a}周辺の会場まで送り届けます。`,
       duties: ['展示会・催事スタッフの送迎', '会場での搬入サポート（運転以外の業務も一部あり）'],
