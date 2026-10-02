@@ -87,7 +87,10 @@ function extractArea(title) {
 // 過去に応募・成約が出ていた求人（夜間送迎ドライバー等）の構成に合わせた本文レイアウト。
 // ★ハイライト → 仕事内容 → ▼主な業務 → ▼勤務条件 → ▼応募資格。
 // 給与・勤務日数・研修期間など、実際の条件が確認できていない数値は書かない（給与は各社の登録値のみ）。
-function layout({ a, role, intro, duties, points, closing, salary }) {
+function layout({ a, role, intro, duties, points, closing, salary, hours }) {
+  const hoursLines = hours
+    ? `    •    勤務時間：時間選択制（${hours.join('／')}から選択）\n    •    実働8時間・シフト制`
+    : '    •    勤務時間・日数：シフト制（ご希望は面談時にご相談ください）';
   return `★経験者優遇／普通免許（AT限定可）で応募OK
 ★${points[0]}
 ★${points[1]}
@@ -106,7 +109,7 @@ ${closing}
 
 ▼勤務条件
     •    勤務地：${a}周辺
-    •    勤務時間・日数：シフト制（ご希望は面談時にご相談ください）
+${hoursLines}
 【給与】${salary}
 【待遇】${COMMON_BENEFIT}
 
@@ -119,6 +122,7 @@ ${closing}
 }
 
 // ===== グループA: 名称を変更するケース（タイトル・job_type・本文を全面差し替え）=====
+const SL_ESTE_HOURS = ['7:00〜16:00', '10:00〜19:00', '14:00〜23:00'];
 const ST_SAL = '月給350,000円〜（経験・能力を考慮）';
 const RENAME_PATCHES = [
   {
@@ -178,8 +182,9 @@ const RENAME_PATCHES = [
   },
   {
     co: 'sl', finalType: 'エステ送迎ドライバー', salary: '月収290,000円〜',
+    worktimeHoliday: `時間選択制（${SL_ESTE_HOURS.join('／')}から選択）\n実働8時間・シフト制`,
     oldTypes: ['治療院・エステ通院送迎ドライバー'],
-    buildDescription: a => layout({ a, salary: '月収290,000円〜',
+    buildDescription: a => layout({ a, salary: '月収290,000円〜', hours: SL_ESTE_HOURS,
       points: ['エステ・治療院にご来店のお客様を運ぶ、人を運ぶお仕事', '送迎と乗降のサポートが中心。本格的な接客スキルは不要'],
       intro: `整骨院・治療院・エステサロンを運営する当社で、エステ送迎ドライバーを募集します。${a}周辺のご自宅とエステサロン・治療院の間を送迎し、ご来店をサポートします。`,
       duties: ['お客様のご自宅〜エステサロン・治療院間の送迎', '乗降時のサポート'],
@@ -229,7 +234,7 @@ const WORDING_PATCHES = [
   { co: 'nl', jobType: '送迎ドライバー' },
 ];
 
-async function patchRename(job, finalType, titlePrefix, buildDescription, salary) {
+async function patchRename(job, finalType, titlePrefix, buildDescription, salary, worktimeHoliday) {
   const area = extractArea(job.title) || job.location;
   const prefix = titlePrefix || '';
   const newTitle = `【${area}】${prefix}${finalType}｜正社員・経験者優遇・${salaryLabel(salary)}`;
@@ -240,7 +245,7 @@ async function patchRename(job, finalType, titlePrefix, buildDescription, salary
   if (APPLY) {
     await Jobs.update(job.id, {
       title: newTitle, jobType: finalType, description: newDescription,
-      catchcopy: newCatchcopy, salary, tags: ['経験者優遇', '正社員', '普通免許OK', finalType],
+      catchcopy: newCatchcopy, salary, ...(worktimeHoliday ? { worktimeHoliday } : {}), tags: ['経験者優遇', '正社員', '普通免許OK', finalType],
     });
   }
 }
@@ -256,7 +261,7 @@ async function main() {
     ).all(patch.co, ...patch.oldTypes);
     console.log(`[${patch.co}] ${patch.oldTypes.filter(t=>!t.endsWith('XX')).join('／')} → ${patch.finalType}: ${jobs.length}件`);
     for (const job of jobs) {
-      await patchRename(job, patch.finalType, patch.titlePrefix, patch.buildDescription, patch.salary);
+      await patchRename(job, patch.finalType, patch.titlePrefix, patch.buildDescription, patch.salary, patch.worktimeHoliday);
       total++;
     }
   }
