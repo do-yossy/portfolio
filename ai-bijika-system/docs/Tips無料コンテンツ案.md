@@ -77,7 +77,7 @@
 【次の一歩】
 
 経験を活かして自分の商品を作る方法に興味がある方、もう少し詳しく話を聞いてみたい方は、お気軽にご連絡ください。
-https://sq-ai-bijika.fly.dev/contact
+https://aipro.social-quality.com/contact
 ```
 
 ---
@@ -142,7 +142,7 @@ https://sq-ai-bijika.fly.dev/contact
 【次の一歩】
 
 特にタイプ1（経験・知識を活かすタイプ）に興味を持った方、自分の経験を商品にする具体的な手順を知りたい方は、お気軽にご連絡ください。
-https://sq-ai-bijika.fly.dev/contact
+https://aipro.social-quality.com/contact
 ```
 
 ---
@@ -207,7 +207,7 @@ AIの答えの中で「これは確かにそうかも」と思うものがあれ
 【次の一歩】
 
 この続き（経験の整理の仕方、商品アイデアの出し方、実際に形にする手順）まで体系的に知りたい方は、お気軽にご連絡ください。
-https://sq-ai-bijika.fly.dev/contact
+https://aipro.social-quality.com/contact
 ```
 
 ---

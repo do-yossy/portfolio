@@ -111,7 +111,7 @@ Q1〜Q3のうち、2つ以上に具体的に書けた方は、商品のタネが
 
 もう少し詳しく話を聞いてみたい方は、無料のオンライン相談も行っています。
 ご希望の方は、下記からお問い合わせください。
-https://sq-ai-bijika.fly.dev/contact
+https://aipro.social-quality.com/contact
 ```
 
 ---
