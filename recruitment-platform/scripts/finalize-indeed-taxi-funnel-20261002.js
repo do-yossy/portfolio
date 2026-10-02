@@ -31,7 +31,7 @@
  *   yp: 組織コンサル訪問送迎ドライバー(3)         → スタッフ送迎ドライバー
  *   yp: 専属ドライバー(1)                        → 変更なし
  *
- * 全社共通で「未経験歓迎」は使わず「経験者優遇・月給35万円〜」に統一
+ * 全社共通で「未経験歓迎」は使わず「経験者優遇」に統一（タイトルの給与表記は各社の実際の給与に合わせる）
  * （過去の成約パターン：経験者優遇の求人に応募→未経験で難しいと伝える→
  *  抵抗の少ない送迎としてタクシーを案内→内定、という流れに合わせるため）。
  * 「役員ドライバー」「ハイヤードライバー」は不採用（ハイヤードライバーは普通二種免許が
@@ -69,6 +69,15 @@ const db = new DatabaseSync(DB_PATH);
 const APPLY = process.argv.includes('--apply');
 const COMMON_BENEFIT = '各種社会保険完備／交通費支給／車両・燃料は会社負担／研修あり／昇給あり';
 const QUAL_EXP = '普通自動車運転免許（AT限定可）／送迎・運転業務のご経験がある方歓迎';
+
+// 給与文字列（例: '月収280,000円〜'）からタイトル用の表記（'月収28万円〜'）を作る。
+// 実際の給与とタイトルの金額がずれないようにするため、全社固定の「35万円」は使わない。
+function salaryLabel(salary) {
+  const m = salary.match(/^(月給|月収)(\d{1,3}),(\d{3})円/);
+  if (!m) return salary;
+  const man = Math.round((parseInt(m[2], 10) * 1000 + parseInt(m[3], 10)) / 10000);
+  return `${m[1]}${man}万円〜`;
+}
 
 function extractArea(title) {
   const m = title.match(/^【(.+?)】/);
@@ -321,9 +330,9 @@ const WORDING_PATCHES = [
 async function patchRename(job, finalType, titlePrefix, buildDescription, salary) {
   const area = extractArea(job.title) || job.location;
   const prefix = titlePrefix || '';
-  const newTitle = `【${area}】${prefix}${finalType}｜正社員・経験者優遇・月給35万円〜`;
+  const newTitle = `【${area}】${prefix}${finalType}｜正社員・経験者優遇・${salaryLabel(salary)}`;
   const newDescription = buildDescription(area);
-  const newCatchcopy = `${finalType}（${area}）｜経験者優遇・月給35万円〜`;
+  const newCatchcopy = `${finalType}（${area}）｜経験者優遇・${salaryLabel(salary)}`;
   console.log(`  ${job.title.slice(0, 48)}`);
   console.log(`   →  ${newTitle}`);
   if (APPLY) {
