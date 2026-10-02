@@ -50,7 +50,12 @@ const db = new DatabaseSync(DB_PATH);
 
 const APPLY = process.argv.includes('--apply');
 const COMMON_BENEFIT = '各種社会保険完備／交通費支給／車両・燃料は会社負担／研修あり／昇給あり';
-const COMMON_QUAL = '普通自動車運転免許（AT限定可）／未経験・ブランク歓迎・学歴不問';
+// 2026-10-02修正：「未経験歓迎」を明記すると、後で電話にて「この役員送迎は経験者優遇で
+// 厳しい」と伝える際に矛盾が生じる（過去の成約パターンは「経験者優遇の役員ドライバーに
+// 応募→未経験で難しいと伝える→抵抗の少ない送迎としてタクシーを案内→内定」という流れの
+// ため、最初から未経験歓迎と謳わないことが前提）。役員送迎ドライバーのみ、通常の
+// COMMON_QUALではなく経験者優遇の応募資格を使う。
+const QUAL_YAKUIN = '普通自動車運転免許（AT限定可）／送迎・運転業務のご経験がある方歓迎';
 const NEW_JOB_TYPE = '役員送迎ドライバー';
 
 function extractArea(title) {
@@ -68,12 +73,12 @@ const BUILD_DESC = {
 
 【この仕事の魅力】
 ◆ 役員クラスの方々と接する、落ち着いた環境のお仕事
-◆ 送迎と簡単なご案内が中心で、本格的な秘書業務・同乗対応は不要。人と接するのが苦にならない方なら安心です
-◆ 普通免許（AT限定可）があればOK、未経験歓迎
+◆ 送迎と簡単なご案内が中心で、本格的な秘書業務は不要。人と接するのが苦にならない方なら安心です
+◆ 普通免許（AT限定可）必須。送迎・運転業務のご経験がある方歓迎
 
 【給与】月給350,000円〜（経験・能力を考慮）
 【待遇】${COMMON_BENEFIT}
-【応募資格】${COMMON_QUAL}
+【応募資格】${QUAL_YAKUIN}
 
 ※${a}周辺での募集です。`,
   yp: a => `経営者・役員層向けのエグゼクティブカウンセリング・経営コンサルティング・採用戦略コンサルティング・組織活性コンサルティングを手掛ける当社で、訪問先企業の役員の送迎を担当する役員送迎ドライバーを募集します。顧問先企業役員の移動を、${a}周辺を中心にサポートするお仕事です。
@@ -85,12 +90,12 @@ const BUILD_DESC = {
 
 【この仕事の魅力】
 ◆ 役員クラスの方々と接する、落ち着いた環境のお仕事
-◆ 送迎と簡単なご案内が中心で、本格的な秘書業務・同乗対応は不要。人と接するのが苦にならない方なら安心です
-◆ 普通免許（AT限定可）があればOK、未経験歓迎
+◆ 送迎と簡単なご案内が中心で、本格的な秘書業務は不要。人と接するのが苦にならない方なら安心です
+◆ 普通免許（AT限定可）必須。送迎・運転業務のご経験がある方歓迎
 
 【給与】月給350,000円〜
 【待遇】${COMMON_BENEFIT}
-【応募資格】${COMMON_QUAL}
+【応募資格】${QUAL_YAKUIN}
 
 ※${a}周辺での募集です。`,
 };
@@ -108,22 +113,39 @@ async function main() {
 
   let totalConverted = 0;
   for (const co of Object.keys(DONORS)) {
+    const targetCount = DONORS[co].length;
+
+    // 1) 既にこのスクリプトの旧版（未経験歓迎の文面）で変換済みのレコードがあれば、
+    //    それらを先に正しい文面へ直す（内容は会社ごとに同一なのでdonor元は問わない）。
+    const already = db.prepare(
+      `SELECT id, title, location FROM jobs WHERE company = ? AND job_type = ? AND target_media LIKE '%indeed%'`
+    ).all(co, NEW_JOB_TYPE);
+
+    const jobsToPatch = [...already];
+
+    // 2) まだ変換していない分は、残っているdonorTypeから必要数だけ変換する。
     for (const donorType of DONORS[co]) {
+      if (jobsToPatch.length >= targetCount) break;
       const job = db.prepare(
         `SELECT id, title, location FROM jobs WHERE company = ? AND job_type = ? AND target_media LIKE '%indeed%' LIMIT 1`
       ).get(co, donorType);
+      if (job) jobsToPatch.push(job);
+    }
 
-      if (!job) {
-        console.log(`[${co}] 「${donorType}」の対象求人が見つかりません。スキップ`);
-        continue;
-      }
+    if (jobsToPatch.length === 0) {
+      console.log(`[${co}] 対象求人が見つかりません。スキップ`);
+      continue;
+    }
 
+    for (const job of jobsToPatch) {
       const area = extractArea(job.title) || job.location;
-      const newTitle = `【${area}】${NEW_JOB_TYPE}｜正社員・未経験歓迎・普通免許OK`;
+      // タイトル・キャッチコピーは「未経験歓迎」を使わず、給与・経験者優遇を前面に出す
+      // （ハードルは少し高めに見せつつ、好待遇で応募は呼び込む狙い）
+      const newTitle = `【${area}】${NEW_JOB_TYPE}｜正社員・経験者優遇・月給35万円〜`;
       const newDescription = BUILD_DESC[co](area);
-      const newCatchcopy = `${NEW_JOB_TYPE}（${area}）｜未経験歓迎・普通免許OK`;
+      const newCatchcopy = `${NEW_JOB_TYPE}（${area}）｜経験者優遇・月給35万円〜`;
 
-      console.log(`[${co}] 「${donorType}」1件 → 「${NEW_JOB_TYPE}」に変換`);
+      console.log(`[${co}] 「${NEW_JOB_TYPE}」に変換／更新`);
       console.log(`  ${job.title.slice(0, 45)}`);
       console.log(`   →  ${newTitle}`);
 
@@ -134,7 +156,7 @@ async function main() {
           description: newDescription,
           catchcopy: newCatchcopy,
           salary: SALARY[co],
-          tags: ['未経験歓迎', '正社員', '普通免許OK', NEW_JOB_TYPE],
+          tags: ['経験者優遇', '正社員', '普通免許OK', NEW_JOB_TYPE],
         });
       }
       totalConverted++;
