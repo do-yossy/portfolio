@@ -669,6 +669,7 @@ const COMPANIES = [
   { id: 'nl', name: '株式会社NOWLIVE',         short: 'NL', label: 'NOWLIVE' },
   { id: 'sl', name: '合同会社スマイルライフ',   short: 'SL', label: 'スマイルライフ' },
   { id: 'am', name: 'AMBITION合同会社',        short: 'AM', label: 'AMBITION' },
+  { id: 'yp', name: '合同会社YUMIPRO AGENCY',  short: 'YP', label: 'YUMIPRO AGENCY' },
 ];
 const MEDIA = [
   { id: 'indeed',   name: 'Indeed' },
