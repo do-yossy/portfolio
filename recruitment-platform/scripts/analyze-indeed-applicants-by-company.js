@@ -50,14 +50,16 @@ for (const co of companies) {
   const q = db.prepare(`SELECT COUNT(*) n FROM applicants WHERE company != ? AND (normalized_phone = ? OR normalized_email = ?)`);
   for (const k of keys) { if (q.get(co, k, k).n > 0) other++; }
   console.log(`  他社にも応募歴がある人: ${other}人 / ${keys.length}人`);
+  console.log(`  対応中: ${rows.filter(r => r.status === '対応中').length}件（応募の ${(100 * rows.filter(r => r.status === '対応中').length / rows.length).toFixed(1)}%）`);
 
   const byTitle = new Map();
   for (const r of rows) {
-    const b = byTitle.get(r.job_title) || { n: 0, set: new Set() };
-    b.n++; b.set.add(keyOf(r)); byTitle.set(r.job_title, b);
+    const b = byTitle.get(r.job_title) || { n: 0, set: new Set(), dup: 0, active: 0 };
+    b.n++; b.set.add(keyOf(r)); if (r.is_duplicate) b.dup++; if (r.status === '対応中') b.active++;
+    byTitle.set(r.job_title, b);
   }
-  console.log('  求人タイトル別（応募件数 / ユニーク人数）:');
-  [...byTitle.entries()].sort((a, b) => b[1].n - a[1].n).forEach(([t, b]) => console.log(`    ${String(t).slice(0, 34).padEnd(36)} ${String(b.n).padStart(3)} / ${b.set.size}`));
+  console.log('  求人タイトル別（応募件数 / ユニーク人数 / 重複 / 対応中）:');
+  [...byTitle.entries()].sort((a, b) => b[1].n - a[1].n).forEach(([t, b]) => console.log(`    ${String(t).slice(0, 34).padEnd(36)} ${String(b.n).padStart(3)} / ${String(b.set.size).padStart(3)} / 重複${String(b.dup).padStart(2)} / 対応中${String(b.active).padStart(2)}`));
 
   const st = new Map();
   for (const r of rows) st.set(r.status, (st.get(r.status) || 0) + 1);
