@@ -78,13 +78,9 @@ function adminSessionCookie(sid) {
 // ── 有料ツール（/tools/shukyaku・/tools/kanyu）用の簡易パスワード認証 ──
 // ミチシルベの購入者アカウントとは別系統。Tips等で購入後、/contact経由で本人確認した
 // 上でパスワードを案内する運用を想定（admin認証と同じ、依存ゼロの方式）。
-// giftEnvName（任意）を指定すると、購入者用パスワードとは別の「ギフト用パスワード」も
-// 有効になる。無償プレゼント（例：アポミー再アプローチ）専用に発行し、購入者用パスワード
-// とは独立して変更・無効化できるようにするための仕組み（どちらで入っても同じツールを使える）。
-function makeToolGate(envName, cookieName, giftEnvName) {
+function makeToolGate(envName, cookieName, optional) {
   const password = process.env[envName] || '';
-  if (!password) console.warn(`[warn] ${envName} 未設定。本番では必ず設定してください（${cookieName}のツールが誰でも使える状態です）。`);
-  const giftPassword = giftEnvName ? (process.env[giftEnvName] || '') : '';
+  if (!password && !optional) console.warn(`[warn] ${envName} 未設定。本番では必ず設定してください（${cookieName}のツールが誰でも使える状態です）。`);
   const sessions = new Set();
   return {
     isAuthed(req) {
@@ -92,8 +88,7 @@ function makeToolGate(envName, cookieName, giftEnvName) {
       return !!(sid && sessions.has(sid));
     },
     tryLogin(input) {
-      const ok = (!!password && input === password) || (!!giftPassword && input === giftPassword);
-      if (!ok) return null;
+      if (!password || input !== password) return null;
       const sid = crypto.randomBytes(24).toString('hex');
       sessions.add(sid);
       return sid;
@@ -104,9 +99,17 @@ function makeToolGate(envName, cookieName, giftEnvName) {
     },
   };
 }
-const shukyakuGate = makeToolGate('SHUKYAKU_TOOL_PASSWORD', 'shukyaku_sid', 'SHUKYAKU_GIFT_PASSWORD');
-const kanyuGate = makeToolGate('KANYU_TOOL_PASSWORD', 'kanyu_sid', 'KANYU_GIFT_PASSWORD');
-const jidoutoukouGate = makeToolGate('JIDOUTOUKOU_TOOL_PASSWORD', 'jidoutoukou_sid', 'JIDOUTOUKOU_GIFT_PASSWORD');
+const shukyakuGate = makeToolGate('SHUKYAKU_TOOL_PASSWORD', 'shukyaku_sid');
+const kanyuGate = makeToolGate('KANYU_TOOL_PASSWORD', 'kanyu_sid');
+const jidoutoukouGate = makeToolGate('JIDOUTOUKOU_TOOL_PASSWORD', 'jidoutoukou_sid');
+
+// ── 有料ツール3本の「ギフト版」（/tools/shukyaku-gift等）用。購入者用とは別URL・別パスワード・
+// 別セッションで、無償プレゼント専用に案内する（例：アポミー再アプローチ）。ツール本体
+// （モード定義・生成API）は購入者版と完全に同じものを使い、ログイン画面・ツール画面の
+// 案内文だけがギフト向けになる。ギフト用パスワードを変更・無効化しても購入者版には影響しない。
+const shukyakuGiftGate = makeToolGate('SHUKYAKU_GIFT_PASSWORD', 'shukyaku_gift_sid', true);
+const kanyuGiftGate = makeToolGate('KANYU_GIFT_PASSWORD', 'kanyu_gift_sid', true);
+const jidoutoukouGiftGate = makeToolGate('JIDOUTOUKOU_GIFT_PASSWORD', 'jidoutoukou_gift_sid', true);
 
 // ── 有料ツール「かんたん版」（/tools/shukyaku-kantan・/tools/kanyu-kantan）用。
 // 購入者自身のAPIキー入力を不要にする代わりに、運営者自身のAIプロバイダAPIキーを
@@ -434,11 +437,11 @@ const FUKUGYOU_MODES = [
     ], build: (v) => `あなたはプロのセールスライターです。以下の情報をもとに、商品・サービスの紹介文の書き出し部分（最初の2〜3文）を3パターン作ってください。読んだ人が『自分に関係がある』と感じる書き出しにしてください。\n\n【商品・サービス】：${v.a}\n【対象者】：${v.b}\n【解決できる悩み】：${v.c}` },
 ];
 
-function toolLoginPage(title, loginPath, error) {
+function toolLoginPage(title, loginPath, error, leadText) {
   return layout(title, `
     <div class="auth">
       <div class="auth-head">${crest(50)}<div class="eyebrow c">Members</div><h1>${escapeHtml(title)}</h1>
-        <p class="lead">購入時にご案内したパスワードを入力してください。</p></div>
+        <p class="lead">${escapeHtml(leadText || '購入時にご案内したパスワードを入力してください。')}</p></div>
       ${error ? `<div class="notice error" style="margin:0 0 14px">${icon('flag', 16)}<div>${escapeHtml(error)}</div></div>` : ''}
       <div class="card">
         <form method="POST" action="${loginPath}">
@@ -1466,11 +1469,11 @@ const SNS_STATUS_LABEL = { posted: '投稿済み', scheduled: '予約済み', pr
 // 投稿先の選択肢に含めない。選べてしまうとポストメッシュ側のバリデーションで投稿が失敗するため）。
 const SNS_TEXT_PLATFORMS = new Set(['x', 'threads', 'facebook']);
 
-function jidoutoukouToolPage() {
+function jidoutoukouToolPage(eyebrow) {
   return layout('SNS自動投稿ツール', `
     <section class="landing-hero lux" style="padding-bottom:22px">
       ${crest(50)}
-      <div class="eyebrow">ご購入者様専用</div>
+      <div class="eyebrow">${escapeHtml(eyebrow || 'ご購入者様専用')}</div>
       <h1>SNS自動投稿<br><em>ツール</em></h1>
       <p>ご自身のポストメッシュアカウントと連携し、複数のSNSへまとめて投稿・予約配信できます。</p>
     </section>
@@ -1826,7 +1829,7 @@ const server = http.createServer(async (req, res) => {
       return redirect(res, '/tools/shukyaku', { 'Set-Cookie': shukyakuGate.cookie(sid) });
     }
     if (pathname === '/api/tools/shukyaku' && method === 'POST') {
-      if (!shukyakuGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!shukyakuGate.isAuthed(req) && !shukyakuGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
       const { mode, provider, apiKey, values } = await parseBody(req);
       const m = SHUKYAKU_MODES.find((x) => x.key === mode);
       if (!m) return sendJson(res, 400, { error: 'invalid mode' });
@@ -1841,6 +1844,18 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ── ギフト版：集客・接客ツール（無償プレゼント専用。購入者版とは別URL・別パスワード）──
+    if (pathname === '/tools/shukyaku-gift' && method === 'GET') {
+      if (!shukyakuGiftGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('集客・接客ツール（プレゼント）', '/tools/shukyaku-gift/login', null, 'ご案内したパスワードを入力してください。'));
+      return sendHtml(res, 200, multiModeToolPage('集客・接客ツール', '無料プレゼント', SHUKYAKU_MODES, '/api/tools/shukyaku'));
+    }
+    if (pathname === '/tools/shukyaku-gift/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = shukyakuGiftGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('集客・接客ツール（プレゼント）', '/tools/shukyaku-gift/login', 'パスワードが違います。', 'ご案内したパスワードを入力してください。'));
+      return redirect(res, '/tools/shukyaku-gift', { 'Set-Cookie': shukyakuGiftGate.cookie(sid) });
+    }
+
     // ── 有料ツール：ダウンライン拡大ツール（1,480円）──
     if (pathname === '/tools/kanyu' && method === 'GET') {
       if (!kanyuGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('ダウンライン拡大ツール', '/tools/kanyu/login'));
@@ -1853,7 +1868,7 @@ const server = http.createServer(async (req, res) => {
       return redirect(res, '/tools/kanyu', { 'Set-Cookie': kanyuGate.cookie(sid) });
     }
     if (pathname === '/api/tools/kanyu' && method === 'POST') {
-      if (!kanyuGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!kanyuGate.isAuthed(req) && !kanyuGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
       const { mode, provider, apiKey, values } = await parseBody(req);
       const m = KANYU_MODES.find((x) => x.key === mode);
       if (!m) return sendJson(res, 400, { error: 'invalid mode' });
@@ -1866,6 +1881,18 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         return sendJson(res, 400, { error: e.message });
       }
+    }
+
+    // ── ギフト版：ダウンライン拡大ツール（無償プレゼント専用。購入者版とは別URL・別パスワード）──
+    if (pathname === '/tools/kanyu-gift' && method === 'GET') {
+      if (!kanyuGiftGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('ダウンライン拡大ツール（プレゼント）', '/tools/kanyu-gift/login', null, 'ご案内したパスワードを入力してください。'));
+      return sendHtml(res, 200, multiModeToolPage('ダウンライン拡大ツール', '無料プレゼント', KANYU_MODES, '/api/tools/kanyu'));
+    }
+    if (pathname === '/tools/kanyu-gift/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = kanyuGiftGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('ダウンライン拡大ツール（プレゼント）', '/tools/kanyu-gift/login', 'パスワードが違います。', 'ご案内したパスワードを入力してください。'));
+      return redirect(res, '/tools/kanyu-gift', { 'Set-Cookie': kanyuGiftGate.cookie(sid) });
     }
 
     // ── 有料ツール：集客・接客ツール かんたん版（APIキー不要。運営者の共有APIキーで生成、1日上限あり）──
@@ -1989,8 +2016,21 @@ const server = http.createServer(async (req, res) => {
       if (!sid) return sendHtml(res, 401, toolLoginPage('SNS自動投稿ツール', '/tools/jidoutoukou/login', 'パスワードが違います。'));
       return redirect(res, '/tools/jidoutoukou', { 'Set-Cookie': jidoutoukouGate.cookie(sid) });
     }
+
+    // ── ギフト版：SNS自動投稿ツール（無償プレゼント専用。購入者版とは別URL・別パスワード）──
+    if (pathname === '/tools/jidoutoukou-gift' && method === 'GET') {
+      if (!jidoutoukouGiftGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('SNS自動投稿ツール（プレゼント）', '/tools/jidoutoukou-gift/login', null, 'ご案内したパスワードを入力してください。'));
+      return sendHtml(res, 200, jidoutoukouToolPage('無料プレゼント'));
+    }
+    if (pathname === '/tools/jidoutoukou-gift/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = jidoutoukouGiftGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('SNS自動投稿ツール（プレゼント）', '/tools/jidoutoukou-gift/login', 'パスワードが違います。', 'ご案内したパスワードを入力してください。'));
+      return redirect(res, '/tools/jidoutoukou-gift', { 'Set-Cookie': jidoutoukouGiftGate.cookie(sid) });
+    }
+
     if (pathname === '/api/tools/jidoutoukou/connections' && method === 'POST') {
-      if (!jidoutoukouGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!jidoutoukouGate.isAuthed(req) && !jidoutoukouGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
       const { pmApiKey } = await parseBody(req);
       try {
         const connections = await postmesh.listConnections({ apiKey: pmApiKey });
@@ -2000,7 +2040,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (pathname === '/api/tools/jidoutoukou/posts' && method === 'POST') {
-      if (!jidoutoukouGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!jidoutoukouGate.isAuthed(req) && !jidoutoukouGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
       const { pmApiKey } = await parseBody(req);
       try {
         const posts = await postmesh.listPosts({ apiKey: pmApiKey, limit: 20 });
@@ -2010,7 +2050,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (pathname === '/api/tools/jidoutoukou/compose' && method === 'POST') {
-      if (!jidoutoukouGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!jidoutoukouGate.isAuthed(req) && !jidoutoukouGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
       const { pmApiKey, caption, connectionIds, scheduledAt, draft } = await parseBody(req);
       const captionText = String(caption || '').trim().slice(0, 5000);
       const ids = Array.isArray(connectionIds) ? connectionIds : (connectionIds ? [connectionIds] : []);
@@ -2034,7 +2074,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (pathname === '/api/tools/jidoutoukou/draft' && method === 'POST') {
-      if (!jidoutoukouGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!jidoutoukouGate.isAuthed(req) && !jidoutoukouGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
       const { theme, provider, apiKey } = await parseBody(req);
       const themeText = String(theme || '').trim().slice(0, 2000);
       if (!themeText) return sendJson(res, 400, { error: 'テーマを入力してください。' });
