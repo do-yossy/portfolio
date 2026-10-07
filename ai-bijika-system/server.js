@@ -46,6 +46,7 @@ function loadEnvFile(file) {
 const { Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, AllowedEmails } = require('./db');
 const auth = require('./lib/auth');
 const { runPrompt, PROVIDERS } = require('./lib/aiproxy');
+const postmesh = require('./lib/postmesh');
 const { escapeHtml, jsonForScript, icon, layout, crest, guilloche, roman, pad2, initial } = require('./lib/ui');
 const { PERSONAS, tipsFor, prepStepsFor } = require('./lib/personas');
 const { planFields, fieldHtml, CLIENT_JS } = require('./lib/prompt-form');
@@ -63,6 +64,7 @@ const TROUBLE_PROMPTS = [27, 30, 28, 29];
 // お問い合わせの管理画面（/admin/inquiries）用の簡易パスワード認証。購入者アカウントとは別系統。
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
 if (ADMIN_PASSWORD === 'changeme') console.warn('[warn] ADMIN_PASSWORD 未設定。本番では必ず設定してください（/admin/inquiries が誰でも見られる状態です）。');
+
 const adminSessions = new Set();
 function isAdminAuthed(req) {
   const sid = auth.parseCookies(req).get('admin_sid');
@@ -72,6 +74,83 @@ function adminSessionCookie(sid) {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
   return `admin_sid=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400${secure}`;
 }
+
+// ── 有料ツール（/tools/shukyaku・/tools/kanyu）用の簡易パスワード認証 ──
+// ミチシルベの購入者アカウントとは別系統。Tips等で購入後、/contact経由で本人確認した
+// 上でパスワードを案内する運用を想定（admin認証と同じ、依存ゼロの方式）。
+function makeToolGate(envName, cookieName, optional) {
+  const password = process.env[envName] || '';
+  if (!password && !optional) console.warn(`[warn] ${envName} 未設定。本番では必ず設定してください（${cookieName}のツールが誰でも使える状態です）。`);
+  const sessions = new Set();
+  return {
+    isAuthed(req) {
+      const sid = auth.parseCookies(req).get(cookieName);
+      return !!(sid && sessions.has(sid));
+    },
+    tryLogin(input) {
+      if (!password || input !== password) return null;
+      const sid = crypto.randomBytes(24).toString('hex');
+      sessions.add(sid);
+      return sid;
+    },
+    cookie(sid) {
+      const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+      return `${cookieName}=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${secure}`; // 30日
+    },
+  };
+}
+const shukyakuGate = makeToolGate('SHUKYAKU_TOOL_PASSWORD', 'shukyaku_sid');
+const kanyuGate = makeToolGate('KANYU_TOOL_PASSWORD', 'kanyu_sid');
+const jidoutoukouGate = makeToolGate('JIDOUTOUKOU_TOOL_PASSWORD', 'jidoutoukou_sid');
+
+// ── 有料ツール3本の「ギフト版」（/tools/shukyaku-gift等）用。購入者用とは別URL・別パスワード・
+// 別セッションで、無償プレゼント専用に案内する（例：アポミー再アプローチ）。ツール本体
+// （モード定義・生成API）は購入者版と完全に同じものを使い、ログイン画面・ツール画面の
+// 案内文だけがギフト向けになる。ギフト用パスワードを変更・無効化しても購入者版には影響しない。
+const shukyakuGiftGate = makeToolGate('SHUKYAKU_GIFT_PASSWORD', 'shukyaku_gift_sid', true);
+const kanyuGiftGate = makeToolGate('KANYU_GIFT_PASSWORD', 'kanyu_gift_sid', true);
+const jidoutoukouGiftGate = makeToolGate('JIDOUTOUKOU_GIFT_PASSWORD', 'jidoutoukou_gift_sid', true);
+
+// ── 有料ツール「かんたん版」（/tools/shukyaku-kantan・/tools/kanyu-kantan）用。
+// 購入者自身のAPIキー入力を不要にする代わりに、運営者自身のAIプロバイダAPIキーを
+// サーバー側で使う。購入者ごとに使用量を分けられないため、1日あたりの生成回数を
+// ツールごとに上限で区切り、運営者の費用負担に歯止めをかける（下記 makeDailyLimiter）。
+const shukyakuKantanGate = makeToolGate('SHUKYAKU_KANTAN_TOOL_PASSWORD', 'shukyaku_kantan_sid');
+const kanyuKantanGate = makeToolGate('KANYU_KANTAN_TOOL_PASSWORD', 'kanyu_kantan_sid');
+
+const SHARED_AI_PROVIDER = process.env.SHARED_AI_PROVIDER || 'openai';
+const SHARED_AI_API_KEY = process.env.SHARED_AI_API_KEY || '';
+if (!SHARED_AI_API_KEY) console.warn('[warn] SHARED_AI_API_KEY 未設定。かんたん版ツール（APIキー不要版）は利用できません。');
+
+// 日付（UTC）が変わるとカウントをリセットする、依存ゼロの簡易レート制限。
+// プロセス再起動でもリセットされる（永続化しない）。購入者ごとではなく、
+// ツール全体で1日の合計生成回数を制限する設計。
+function makeDailyLimiter(envName, defaultLimit) {
+  const limit = parseInt(process.env[envName] || '', 10) || defaultLimit;
+  let day = '';
+  let count = 0;
+  const rollIfNeeded = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (today !== day) { day = today; count = 0; }
+  };
+  return {
+    limit,
+    // 予約：呼び出し前に枠を1つ確保する。falseなら上限到達（APIは呼ばない）
+    tryConsume() {
+      rollIfNeeded();
+      if (count >= limit) return false;
+      count += 1;
+      return true;
+    },
+    // 返却：実際には費用が発生しなかった（失敗・エラー）場合に枠を戻す
+    refund() {
+      rollIfNeeded();
+      if (count > 0) count -= 1;
+    },
+  };
+}
+const shukyakuKantanLimiter = makeDailyLimiter('SHUKYAKU_KANTAN_DAILY_LIMIT', 30);
+const kanyuKantanLimiter = makeDailyLimiter('KANYU_KANTAN_DAILY_LIMIT', 30);
 
 const splitList = (v) => String(v || '').split('、').filter(Boolean);
 const yen = (v) => `${Number(v).toLocaleString('ja-JP')}円`;
@@ -286,6 +365,233 @@ function jikoshoukaiToolPage() {
       });
     </script>
   `);
+}
+
+// ── 有料ツール：集客・接客ツール（980円、/tools/shukyaku）・ダウンライン拡大ツール（1,480円、/tools/kanyu）──
+// いずれも docs/TipsMLM集客接客プロンプト案.md・docs/TipsMLMダウンライン拡大プロンプト案.md の
+// 承認済みプロンプト文面をそのままモード定義として使う（文面の新規創作はしていない）。
+const SHUKYAKU_MODES = [
+  { key: 'sns', label: 'SNS投稿文', fields: [
+      { id: 'a', label: '商品・サービス' },
+      { id: 'b', label: '伝えたい魅力・体験' },
+      { id: 'c', label: '投稿する媒体（Instagram・LINE公式等）' },
+    ], build: (v) => `あなたはSNSマーケティングの専門家です。以下の情報をもとに、売り込み色を抑えた商品紹介の投稿文を3パターン作ってください。断定的な効果・効能の表現は使わないでください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【商品・サービス】：${v.a}\n【伝えたい魅力・体験】：${v.b}\n【投稿する媒体（Instagram・LINE公式等）】：${v.c}` },
+  { key: 'follow', label: 'お客様へのフォローアップ文', fields: [
+      { id: 'a', label: '商品' },
+      { id: 'b', label: '購入・前回の連絡からの期間' },
+      { id: 'c', label: '伝えたい一言' },
+    ], build: (v) => `あなたは誠実な接客を大切にするスタッフです。以下の情報をもとに、お客様に送るフォローアップメッセージを作ってください。売り込み感を出さず、相手の状況を尋ねる姿勢を大切にしてください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【商品】：${v.a}\n【購入・前回の連絡からの期間】：${v.b}\n【伝えたい一言】：${v.c}` },
+  { key: 'decline', label: 'お断りへの返信文', fields: [
+      { id: 'a', label: '断られた内容・状況' },
+    ], build: (v) => `あなたは誠実な接客対応ができるスタッフです。以下の状況で、お客様（または知人）からお断りの返事があった場合の、丁寧で押し付けがましくない返信文を作ってください。再度の勧誘や説得は含めないでください。\n\n【断られた内容・状況】：${v.a}` },
+  { key: 'profile', label: '自己紹介文・プロフィール文', fields: [
+      { id: 'a', label: '自分の経験・大切にしていること' },
+      { id: 'b', label: '扱っている商品・サービスの分野' },
+    ], build: (v) => `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える自己紹介文を作ってください。資格・肩書きを誇張せず、誠実な印象になるようにしてください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【自分の経験・大切にしていること】：${v.a}\n【扱っている商品・サービスの分野】：${v.b}` },
+  { key: 'event', label: 'イベント・体験会の案内文', fields: [
+      { id: 'a', label: 'イベント内容' },
+      { id: 'b', label: '日時・場所' },
+      { id: 'c', label: '参加してほしい人' },
+    ], build: (v) => `あなたはイベント運営のアシスタントです。以下の情報をもとに、商品の体験会・交流会の案内文を作ってください。参加を強制するような表現や、過度な期待を抱かせる表現は避けてください。新しい会員・ビジネスパートナーの募集を目的とした案内文は作成しないでください。\n\n【イベント内容】：${v.a}\n【日時・場所】：${v.b}\n【参加してほしい人】：${v.c}` },
+];
+const KANYU_MODES = [
+  { key: 'approach', label: '最初の声かけ文（法令上の開示義務に対応）', fields: [
+      { id: 'a', label: '自分の名前' },
+      { id: 'b', label: '取り扱う商品・サービス' },
+      { id: 'c', label: '相手との関係性' },
+    ], build: (v) => `あなたは法令を守って誠実にビジネスを紹介するアシスタントです。以下の情報をもとに、ネットワークビジネス（連鎖販売取引）への参加を誘う最初の声かけ文を作ってください。必ず文章の冒頭で、①自分の名前、②これがネットワークビジネス（連鎖販売取引）の勧誘であること、③取り扱う商品・サービスの名称、の3点を明確に伝えてください。これらを隠したり、後回しにしたりしないでください。断定的な収入の表現（必ず稼げる、誰でも成功する等）は使わないでください。\n\n【自分の名前】：${v.a}\n【取り扱う商品・サービス】：${v.b}\n【相手との関係性】：${v.c}` },
+  { key: 'briefing', label: '説明会・説明の機会への案内文', fields: [
+      { id: 'a', label: '説明会の形式（オンライン・対面等）' },
+      { id: 'b', label: '日時・場所' },
+      { id: 'c', label: '当日説明する内容' },
+    ], build: (v) => `あなたは誠実にビジネス説明の機会を案内するアシスタントです。以下の情報をもとに、ネットワークビジネスの説明会・説明の機会に誘う案内文を作ってください。参加を強制するような表現は避け、興味がある場合のみの任意参加であることを明記してください。\n\n【説明会の形式（オンライン・対面等）】：${v.a}\n【日時・場所】：${v.b}\n【当日説明する内容】：${v.c}` },
+  { key: 'faq', label: 'よくある質問への回答文', fields: [
+      { id: 'a', label: 'よくある質問' },
+      { id: 'b', label: '実際に伝えたい答えの要点' },
+    ], build: (v) => `あなたは誠実にビジネスについて説明するアシスタントです。以下の質問に対して、断定的な収入の保証や誇張を避け、正直に答える回答文を作ってください。\n\n【よくある質問】：${v.a}\n【実際に伝えたい答えの要点】：${v.b}` },
+  { key: 'coolingoff', label: 'クーリング・オフ・契約内容の説明文（法令遵守のための必須案内）', fields: [
+      { id: 'a', label: '扱う商品・サービス' },
+      { id: 'b', label: '入会にかかる費用' },
+    ], build: (v) => `あなたは法令を守って契約内容を説明するアシスタントです。ネットワークビジネスへの入会を決めた方に対して、特定商取引法で定められたクーリング・オフ制度（契約から一定期間内は無条件で契約を解除できる権利）があることを、分かりやすく、隠さずに説明する文章を作ってください。\n\n【扱う商品・サービス】：${v.a}\n【入会にかかる費用】：${v.b}` },
+  { key: 'checkin', label: '検討中の方へのフォローアップ文', fields: [
+      { id: 'a', label: '相手の検討状況' },
+    ], build: (v) => `あなたは誠実にフォローアップするアシスタントです。以下の情報をもとに、説明を聞いた後、まだ検討中の方への確認・フォローアップメッセージを作ってください。急かすような表現、繰り返しの強い勧誘は避けてください。\n\n【相手の検討状況】：${v.a}` },
+];
+
+// 副業初心者向け無料ツール。docs/Tips低価格商品案.md（300円）の3プロンプトと同一（意図的に無料公開に転用）
+const FUKUGYOU_MODES = [
+  { key: 'sns', label: 'SNS用の短い自己紹介文', fields: [
+      { id: 'a', label: '経験・得意なこと' },
+      { id: 'b', label: '伝えたい相手' },
+      { id: 'c', label: '大切にしていること' },
+    ], build: (v) => `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える100字程度の自己紹介文を3パターン作ってください。\n\n【経験・得意なこと】：${v.a}\n【伝えたい相手】：${v.b}\n【大切にしていること】：${v.c}` },
+  { key: 'meet', label: '初対面の人にも伝わる自己紹介文', fields: [
+      { id: 'a', label: '経験・得意なこと' },
+      { id: 'b', label: '具体的なエピソード' },
+      { id: 'c', label: '今取り組んでいること' },
+    ], build: (v) => `あなたはプロのライターです。以下の情報をもとに、初めて会う人にも伝わるような300字程度の自己紹介文を作ってください。経験の具体的なエピソードを1つ盛り込んでください。\n\n【経験・得意なこと】：${v.a}\n【具体的なエピソード】：${v.b}\n【今取り組んでいること】：${v.c}` },
+  { key: 'pitch', label: '商品・サービス紹介の書き出し文', fields: [
+      { id: 'a', label: '商品・サービス' },
+      { id: 'b', label: '対象者' },
+      { id: 'c', label: '解決できる悩み' },
+    ], build: (v) => `あなたはプロのセールスライターです。以下の情報をもとに、商品・サービスの紹介文の書き出し部分（最初の2〜3文）を3パターン作ってください。読んだ人が『自分に関係がある』と感じる書き出しにしてください。\n\n【商品・サービス】：${v.a}\n【対象者】：${v.b}\n【解決できる悩み】：${v.c}` },
+];
+
+function toolLoginPage(title, loginPath, error, leadText) {
+  return layout(title, `
+    <div class="auth">
+      <div class="auth-head">${crest(50)}<div class="eyebrow c">Members</div><h1>${escapeHtml(title)}</h1>
+        <p class="lead">${escapeHtml(leadText || '購入時にご案内したパスワードを入力してください。')}</p></div>
+      ${error ? `<div class="notice error" style="margin:0 0 14px">${icon('flag', 16)}<div>${escapeHtml(error)}</div></div>` : ''}
+      <div class="card">
+        <form method="POST" action="${loginPath}">
+          <div class="field"><label class="lbl" for="password">パスワード</label>
+            <input id="password" type="password" name="password" required autofocus></div>
+          <button class="btn btn-primary btn-block" type="submit" style="margin-top:4px">入る</button>
+        </form>
+      </div>
+      <p class="muted center">パスワードが分からない方は<a href="/contact">お問い合わせ</a>ください。</p>
+    </div>
+  `);
+}
+
+function multiModeToolPage(title, eyebrow, modes, apiPath) {
+  const modeOptions = modes.map((m) => `<option value="${m.key}">${escapeHtml(m.label)}</option>`).join('');
+  const fieldsJson = JSON.stringify(modes.map((m) => ({ key: m.key, label: m.label, fields: m.fields })));
+  return layout(title, `
+    <section class="landing-hero lux" style="padding-bottom:22px">
+      ${crest(50)}
+      <div class="eyebrow">${escapeHtml(eyebrow)}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <p>場面を選んで入力すると、AIがそのまま使える文章を作ります。</p>
+    </section>
+    <section>
+      <div class="card">
+        <div class="field"><label class="lbl" for="modeSel">場面を選ぶ</label>
+          <select id="modeSel">${modeOptions}</select></div>
+        <div id="fieldsArea"></div>
+
+        <details class="fold" style="margin-top:12px">
+          <summary>${icon('lock', 18)}AIで生成する（APIキーが必要）</summary>
+          <div style="margin-top:12px">
+            <div class="notice info">APIキーはこのブラウザにのみ保存され、実行のたびにサーバーへ中継されるだけで保存されません。利用料はご自身のOpenAI／Anthropicのご契約に基づき発生します。</div>
+            <div class="field" style="margin-top:12px"><label class="lbl" for="provider">プロバイダ</label>
+              <select id="provider">${Object.keys(PROVIDERS).map((pv) => `<option value="${pv}">${pv}</option>`).join('')}</select></div>
+            <div class="field"><label class="lbl" for="apiKey">APIキー</label><input id="apiKey" type="password" placeholder="sk-... / このブラウザにのみ保存" autocomplete="off"></div>
+            <button id="runBtn" type="button" class="btn btn-primary btn-block">文章を作る</button>
+            <div id="result" style="margin-top:14px;white-space:pre-wrap;font-size:13.5px"></div>
+          </div>
+        </details>
+      </div>
+      <p class="muted center" style="margin-top:14px">生成された文章はそのまま使わず、事実と異なる部分が無いかご自身でご確認ください。</p>
+    </section>
+    <script>
+      const MODES = ${fieldsJson};
+      const modeSel = document.getElementById('modeSel');
+      const fieldsArea = document.getElementById('fieldsArea');
+      function renderFields() {
+        const m = MODES.find((x) => x.key === modeSel.value);
+        fieldsArea.innerHTML = m.fields.map((f, i) =>
+          '<div class="field"><label class="lbl" for="f_' + f.id + '">' + f.label.replace(/</g, '&lt;') + '</label>' +
+          '<textarea id="f_' + f.id + '" rows="2"></textarea></div>'
+        ).join('');
+      }
+      modeSel.addEventListener('change', renderFields);
+      renderFields();
+
+      const KEY_STORE = 'ai-bijika:apiKey:';
+      const providerSel = document.getElementById('provider');
+      const keyInput = document.getElementById('apiKey');
+      function loadKey() { try { keyInput.value = localStorage.getItem(KEY_STORE + providerSel.value) || ''; } catch (e) {} }
+      providerSel.addEventListener('change', loadKey);
+      loadKey();
+
+      document.getElementById('runBtn').addEventListener('click', async () => {
+        const mode = modeSel.value;
+        const m = MODES.find((x) => x.key === mode);
+        const provider = providerSel.value;
+        const apiKey = keyInput.value.trim();
+        const resultEl = document.getElementById('result');
+        const values = {};
+        for (const f of m.fields) values[f.id] = document.getElementById('f_' + f.id).value.trim();
+        if (!apiKey) { resultEl.textContent = 'APIキーを入力してください。'; return; }
+        if (m.fields.some((f) => !values[f.id])) { resultEl.textContent = '必要な項目を入力してください。'; return; }
+        try { localStorage.setItem(KEY_STORE + provider, apiKey); } catch (e) {}
+        resultEl.textContent = '作成中…';
+        try {
+          const resp = await fetch('${apiPath}', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ mode, provider, apiKey, values })
+          });
+          const data = await resp.json();
+          resultEl.textContent = resp.ok ? data.output : ('エラー: ' + data.error);
+        } catch (e) {
+          resultEl.textContent = '通信エラーが発生しました。';
+        }
+      });
+    </script>
+  `, { noNav: true });
+}
+
+// multiModeToolPage()の「かんたん版」。購入者のAPIキー入力欄を持たず、サーバー側の
+// 共有APIキー（SHARED_AI_API_KEY）で生成する。APIキーの用意・入力が不要な代わりに、
+// 1日の生成回数に上限がある（limitLabelで画面に明記する）。
+function multiModeToolPageNoKey(title, eyebrow, modes, apiPath, limitLabel) {
+  const modeOptions = modes.map((m) => `<option value="${m.key}">${escapeHtml(m.label)}</option>`).join('');
+  const fieldsJson = JSON.stringify(modes.map((m) => ({ key: m.key, label: m.label, fields: m.fields })));
+  return layout(title, `
+    <section class="landing-hero lux" style="padding-bottom:22px">
+      ${crest(50)}
+      <div class="eyebrow">${escapeHtml(eyebrow)}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <p>場面を選んで入力すると、AIがそのまま使える文章を作ります。APIキーの入力は不要です。</p>
+    </section>
+    <section>
+      <div class="card">
+        <div class="field"><label class="lbl" for="modeSel">場面を選ぶ</label>
+          <select id="modeSel">${modeOptions}</select></div>
+        <div id="fieldsArea"></div>
+        <div class="notice info" style="margin-top:12px">${escapeHtml(limitLabel)}</div>
+        <button id="runBtn" type="button" class="btn btn-primary btn-block" style="margin-top:12px">文章を作る</button>
+        <div id="result" style="margin-top:14px;white-space:pre-wrap;font-size:13.5px"></div>
+      </div>
+      <p class="muted center" style="margin-top:14px">生成された文章はそのまま使わず、事実と異なる部分が無いかご自身でご確認ください。</p>
+    </section>
+    <script>
+      const MODES = ${fieldsJson};
+      const modeSel = document.getElementById('modeSel');
+      const fieldsArea = document.getElementById('fieldsArea');
+      function renderFields() {
+        const m = MODES.find((x) => x.key === modeSel.value);
+        fieldsArea.innerHTML = m.fields.map((f, i) =>
+          '<div class="field"><label class="lbl" for="f_' + f.id + '">' + f.label.replace(/</g, '&lt;') + '</label>' +
+          '<textarea id="f_' + f.id + '" rows="2"></textarea></div>'
+        ).join('');
+      }
+      modeSel.addEventListener('change', renderFields);
+      renderFields();
+
+      document.getElementById('runBtn').addEventListener('click', async () => {
+        const mode = modeSel.value;
+        const m = MODES.find((x) => x.key === mode);
+        const resultEl = document.getElementById('result');
+        const values = {};
+        for (const f of m.fields) values[f.id] = document.getElementById('f_' + f.id).value.trim();
+        if (m.fields.some((f) => !values[f.id])) { resultEl.textContent = '必要な項目を入力してください。'; return; }
+        resultEl.textContent = '作成中…';
+        try {
+          const resp = await fetch('${apiPath}', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ mode, values })
+          });
+          const data = await resp.json();
+          resultEl.textContent = resp.ok ? data.output : ('エラー: ' + data.error);
+        } catch (e) {
+          resultEl.textContent = '通信エラーが発生しました。';
+        }
+      });
+    </script>
+  `, { noNav: true });
 }
 
 // ── ページ: サインアップ／ログイン ──
@@ -1148,8 +1454,186 @@ time{font-size:11.5px;color:#6B7780}
 </body></html>`;
 }
 
+// ── 有料ツール：SNS自動投稿ツール（ポストメッシュ https://post-mesh.com/ のAPIを中継する）──
+// ポストメッシュへの登録・SNSアカウントの連携・APIキーの発行は、購入者自身がそれぞれ行う
+// 前提（運営者側では一切管理しない）。APIキーは画面から毎回受け取って中継するだけで、
+// このアプリのDB・ログには一切保存しない（/tools/shukyaku・/tools/kanyu と同じ設計）。
+// いいね・フォロー・コメント自動返信などのエンゲージメント自動化は、SNS各社の規約に
+// 抵触しやすいため実装していない（`営業システム`側の求人媒体に関する
+// 「自動巡回・自動応募は実装しない」という方針と同じ理由。詳細は`docs/SNS自動投稿連携案.md`）。
+const SNS_PLATFORM_LABEL = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', threads: 'Threads', x: 'X', facebook: 'Facebook' };
+const SNS_CAPTION_LIMIT = { x: '280字', threads: '500字', tiktok: '2,200字', instagram: '2,200字', youtube: '5,000バイト', facebook: '上限なし' };
+const SNS_STATUS_LABEL = { posted: '投稿済み', scheduled: '予約済み', processing: '処理中', failed: '失敗', draft: '下書き' };
+// 本ツールはテキスト投稿（category: text）のみを扱う。ポストメッシュの仕様上、テキスト投稿に対応する
+// プラットフォームはX・Threads・Facebookの3つのみ（画像・動画が必須のYouTube・Instagram・TikTokは
+// 投稿先の選択肢に含めない。選べてしまうとポストメッシュ側のバリデーションで投稿が失敗するため）。
+const SNS_TEXT_PLATFORMS = new Set(['x', 'threads', 'facebook']);
+
+function jidoutoukouToolPage(eyebrow) {
+  return layout('SNS自動投稿ツール', `
+    <section class="landing-hero lux" style="padding-bottom:22px">
+      ${crest(50)}
+      <div class="eyebrow">${escapeHtml(eyebrow || 'ご購入者様専用')}</div>
+      <h1>SNS自動投稿<br><em>ツール</em></h1>
+      <p>ご自身のポストメッシュアカウントと連携し、複数のSNSへまとめて投稿・予約配信できます。</p>
+    </section>
+    <section>
+      <div class="card">
+        <div class="notice warn">${icon('flag', 16)}<div>本ツールのご利用には、<a href="https://post-mesh.com/" target="_blank" rel="noopener">ポストメッシュ</a>へのご自身での登録と、投稿したいSNSアカウントの連携が必要です（連携作業はポストメッシュのダッシュボードで行います）。登録・連携がまだの方は、先にポストメッシュ側で済ませてください。</div></div>
+        <div class="field"><label class="lbl" for="pmApiKey">ポストメッシュのAPIキー</label>
+          <input id="pmApiKey" type="password" placeholder="ポストメッシュのダッシュボードで発行したAPIキー" autocomplete="off"></div>
+        <button id="connectBtn" type="button" class="btn btn-primary btn-block">連携アカウントを読み込む</button>
+        <p id="connectError" class="err"></p>
+
+        <div id="afterConnect" style="display:none;margin-top:18px">
+          <div class="field"><label class="lbl">投稿先のSNSアカウント</label>
+            <div id="connList"></div>
+          </div>
+          <div class="field"><label class="lbl" for="caption">投稿本文</label>
+            <textarea id="caption" rows="6" placeholder="投稿する文章"></textarea></div>
+
+          <details class="fold" style="margin-top:12px">
+            <summary>${icon('lock', 18)}AIで下書きを作る（任意）</summary>
+            <div style="margin-top:12px">
+              <div class="notice info">APIキーはこのブラウザにのみ保存され、実行のたびにサーバーへ中継されるだけで保存されません。利用料はご自身のOpenAI／Anthropicのご契約に基づき発生します。</div>
+              <div class="field" style="margin-top:12px"><label class="lbl" for="draftTheme">伝えたいテーマ・役立つ情報</label>
+                <textarea id="draftTheme" rows="2" placeholder="例：副業で最初の一歩を踏み出せない人へ、今日からできる小さな一歩"></textarea></div>
+              <div class="field"><label class="lbl" for="provider">プロバイダ</label>
+                <select id="provider">${Object.keys(PROVIDERS).map((p) => `<option value="${p}">${p}</option>`).join('')}</select></div>
+              <div class="field"><label class="lbl" for="apiKey">APIキー</label><input id="apiKey" type="password" placeholder="sk-... / このブラウザにのみ保存" autocomplete="off"></div>
+              <button id="draftBtn" type="button" class="btn btn-ghost btn-block">AIで下書きを作る</button>
+              <p id="draftError" class="err"></p>
+            </div>
+          </details>
+
+          <div class="field" style="margin-top:12px"><label class="lbl" for="scheduledAt">予約日時（空なら即時投稿）</label>
+            <input id="scheduledAt" type="datetime-local"></div>
+          <label class="chip" style="margin-top:8px"><input type="checkbox" id="draftOnly"><span>下書きとして保存する（SNSへは配信しない）</span></label>
+          <button id="composeBtn" type="button" class="btn btn-primary btn-block" style="margin-top:14px">投稿する</button>
+          <p id="composeResult" style="margin-top:10px;font-size:13.5px"></p>
+
+          <div style="margin-top:22px">
+            <label class="lbl">直近の投稿</label>
+            <div id="postList"></div>
+          </div>
+        </div>
+      </div>
+      <p class="muted center" style="margin-top:14px">投稿内容は必ずご自身で確認してから送信してください。断定的な収入表現・実在しない実績は含めないでください。</p>
+    </section>
+    <script>
+      const PLATFORM_LABEL = ${JSON.stringify(SNS_PLATFORM_LABEL)};
+      const CAPTION_LIMIT = ${JSON.stringify(SNS_CAPTION_LIMIT)};
+      const STATUS_LABEL = ${JSON.stringify(SNS_STATUS_LABEL)};
+      const esc = (s) => (s || '').replace(/</g, '&lt;');
+
+      const KEY_STORE_PM = 'ai-bijika:postmeshApiKey';
+      const KEY_STORE = 'ai-bijika:apiKey:';
+      const pmKeyInput = document.getElementById('pmApiKey');
+      try { pmKeyInput.value = localStorage.getItem(KEY_STORE_PM) || ''; } catch (e) {}
+      const providerSel = document.getElementById('provider');
+      const keyInput = document.getElementById('apiKey');
+      function loadKey() { try { keyInput.value = localStorage.getItem(KEY_STORE + providerSel.value) || ''; } catch (e) {} }
+      providerSel.addEventListener('change', loadKey);
+      loadKey();
+
+      let CONNECTIONS = [];
+      function renderConnections() {
+        document.getElementById('connList').innerHTML = CONNECTIONS.map((c) =>
+          '<label class="chip" style="margin:4px 6px 4px 0"><input type="checkbox" class="connCb" value="' + esc(c.id) + '">' +
+          '<span>' + esc(PLATFORM_LABEL[c.platform] || c.platform) + ' ' + esc(c.account_name) +
+          ' ・ ' + esc(CAPTION_LIMIT[c.platform] || '') + '</span></label>'
+        ).join('') || '<p class="muted">連携済みのアカウントがありません。ポストメッシュのダッシュボードでSNSアカウントを連携してください。</p>';
+      }
+      function renderPosts(posts) {
+        document.getElementById('postList').innerHTML = posts.map((p) =>
+          '<div style="font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border,#E7E0D2)">' +
+          '<b>' + esc(p.title) + '</b>　' + esc(STATUS_LABEL[p.status] || p.status) + '　' +
+          new Date(p.display_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) + '</div>'
+        ).join('') || '<p class="muted">投稿はまだありません。</p>';
+      }
+
+      document.getElementById('connectBtn').addEventListener('click', async () => {
+        const errEl = document.getElementById('connectError');
+        errEl.textContent = '';
+        const pmApiKey = pmKeyInput.value.trim();
+        if (!pmApiKey) { errEl.textContent = 'ポストメッシュのAPIキーを入力してください。'; return; }
+        try { localStorage.setItem(KEY_STORE_PM, pmApiKey); } catch (e) {}
+        try {
+          const [connResp, postResp] = await Promise.all([
+            fetch('/api/tools/jidoutoukou/connections', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pmApiKey }) }),
+            fetch('/api/tools/jidoutoukou/posts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pmApiKey }) }),
+          ]);
+          const connData = await connResp.json();
+          if (!connResp.ok) throw new Error(connData.error || '連携アカウントの取得に失敗しました');
+          const postData = await postResp.json();
+          CONNECTIONS = connData.connections;
+          renderConnections();
+          renderPosts(postResp.ok ? postData.posts : []);
+          document.getElementById('afterConnect').style.display = '';
+        } catch (e) {
+          errEl.textContent = e.message;
+        }
+      });
+
+      document.getElementById('draftBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('draftBtn');
+        const errEl = document.getElementById('draftError');
+        errEl.textContent = '';
+        const theme = document.getElementById('draftTheme').value.trim();
+        const provider = providerSel.value;
+        const apiKey = keyInput.value.trim();
+        if (!theme) { errEl.textContent = 'テーマを入力してください。'; return; }
+        if (!apiKey) { errEl.textContent = 'APIキーを入力してください。'; return; }
+        try { localStorage.setItem(KEY_STORE + provider, apiKey); } catch (e) {}
+        btn.disabled = true; btn.textContent = '作成中…';
+        try {
+          const resp = await fetch('/api/tools/jidoutoukou/draft', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme, provider, apiKey }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || '生成に失敗しました');
+          document.getElementById('caption').value = data.output;
+        } catch (e) {
+          errEl.textContent = e.message;
+        } finally {
+          btn.disabled = false; btn.textContent = 'AIで下書きを作る';
+        }
+      });
+
+      document.getElementById('composeBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('composeBtn');
+        const resultEl = document.getElementById('composeResult');
+        resultEl.textContent = '';
+        const pmApiKey = pmKeyInput.value.trim();
+        const caption = document.getElementById('caption').value.trim();
+        const connectionIds = [...document.querySelectorAll('.connCb:checked')].map((el) => el.value);
+        const scheduledAt = document.getElementById('scheduledAt').value;
+        const draftOnly = document.getElementById('draftOnly').checked;
+        if (!caption || connectionIds.length === 0) { resultEl.textContent = '投稿本文と、投稿先のSNSアカウントを1つ以上指定してください。'; return; }
+        btn.disabled = true; btn.textContent = '送信中…';
+        try {
+          const resp = await fetch('/api/tools/jidoutoukou/compose', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pmApiKey, caption, connectionIds, scheduledAt, draft: draftOnly }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || '投稿に失敗しました');
+          resultEl.textContent = draftOnly ? '下書きとして保存しました。' : '投稿しました。';
+          const postResp = await fetch('/api/tools/jidoutoukou/posts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pmApiKey }) });
+          if (postResp.ok) renderPosts((await postResp.json()).posts);
+        } catch (e) {
+          resultEl.textContent = 'エラー: ' + e.message;
+        } finally {
+          btn.disabled = false; btn.textContent = '投稿する';
+        }
+      });
+    </script>
+  `, { noNav: true });
+}
+
 // ── ライセンス管理（運営者用。購入時のメールアドレスを許可リストに登録し、購入者だけが使えるようにする）──
-function adminLicensesPage(emailList) {
+function adminLicensesPage(emailList, error) {
   const emailCounts = { UNUSED: 0, ACTIVE: 0, REVOKED: 0 };
   for (const a of emailList) emailCounts[a.status] = (emailCounts[a.status] || 0) + 1;
   const STATUS_LABEL_AE = { UNUSED: '未ログイン', ACTIVE: 'ログイン済み', REVOKED: '無効化済み' };
@@ -1192,6 +1676,7 @@ main{max-width:640px;margin:0 auto;padding:18px}
 .lic-meta{font-size:12.5px;color:#42525D;margin:6px 0 8px;word-break:break-all}
 .lic form button{border:0;background:#F5F1EA;color:#42525D;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:10px;cursor:pointer}
 .empty{color:#6B7780;text-align:center;padding:40px 0}
+.err{color:#9C3B2C;background:#F6E3DF;font-size:12.5px;padding:10px 12px;border-radius:8px;margin:0 0 12px}
 </style></head><body>
 <header><h1>ライセンス管理</h1><div><a href="/admin/inquiries">お問い合わせ</a><a href="/admin/logout">ログアウト</a></div></header>
 <main>
@@ -1199,6 +1684,7 @@ main{max-width:640px;margin:0 auto;padding:18px}
   <div class="counts">未ログイン <b>${emailCounts.UNUSED || 0}</b>／ログイン済み <b>${emailCounts.ACTIVE || 0}</b>／無効化済み <b>${emailCounts.REVOKED || 0}</b></div>
   <div class="genbox">
     <h2>メールアドレスを許可する</h2>
+    ${error ? `<div class="err">${escapeHtml(error)}</div>` : ''}
     <form method="POST" action="/admin/licenses/allow-email">
       <label for="allow-email">購入者のメールアドレス</label>
       <input id="allow-email" type="email" name="email" required placeholder="buyer@example.com">
@@ -1302,7 +1788,7 @@ const server = http.createServer(async (req, res) => {
       const a = String(fieldA || '').trim().slice(0, 2000);
       const b = String(fieldB || '').trim().slice(0, 2000);
       const c = String(fieldC || '').trim().slice(0, 2000);
-      if (!a || !b) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      if (!a || !b || (mode !== 'mlm' && !c)) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
       const promptText = mode === 'mlm'
         ? `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える自己紹介文を作ってください。資格・肩書きを誇張せず、誠実な印象になるようにしてください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【自分の経験・大切にしていること】：${a}\n【扱っている商品・サービスの分野】：${b}`
         : `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える100字程度の自己紹介文を3パターン作ってください。\n\n【経験・得意なこと】：${a}\n【伝えたい相手】：${b}\n【大切にしていること】：${c}`;
@@ -1310,6 +1796,163 @@ const server = http.createServer(async (req, res) => {
         const output = await runPrompt({ provider, apiKey, promptText });
         return sendJson(res, 200, { output });
       } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── 公開ツール：副業初心者向け集客ツール（ログイン不要。APIキーは毎回受け取るだけで保存しない）──
+    if (pathname === '/tools/fukugyou' && method === 'GET') {
+      return sendHtml(res, 200, multiModeToolPage('副業初心者向け集客ツール', 'どなたでも無料でお使いいただけます', FUKUGYOU_MODES, '/api/tools/fukugyou'));
+    }
+    if (pathname === '/api/tools/fukugyou' && method === 'POST') {
+      const { mode, provider, apiKey, values } = await parseBody(req);
+      const m = FUKUGYOU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText: m.build(v) });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── 有料ツール：集客・接客ツール（980円）──
+    if (pathname === '/tools/shukyaku' && method === 'GET') {
+      if (!shukyakuGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('集客・接客ツール', '/tools/shukyaku/login'));
+      return sendHtml(res, 200, multiModeToolPage('集客・接客ツール', 'ご購入者様専用', SHUKYAKU_MODES, '/api/tools/shukyaku'));
+    }
+    if (pathname === '/tools/shukyaku/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = shukyakuGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('集客・接客ツール', '/tools/shukyaku/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/shukyaku', { 'Set-Cookie': shukyakuGate.cookie(sid) });
+    }
+    if (pathname === '/api/tools/shukyaku' && method === 'POST') {
+      if (!shukyakuGate.isAuthed(req) && !shukyakuGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { mode, provider, apiKey, values } = await parseBody(req);
+      const m = SHUKYAKU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText: m.build(v) });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── ギフト版：集客・接客ツール（無償プレゼント専用。購入者版とは別URL・別パスワード）──
+    if (pathname === '/tools/shukyaku-gift' && method === 'GET') {
+      if (!shukyakuGiftGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('集客・接客ツール（プレゼント）', '/tools/shukyaku-gift/login', null, 'ご案内したパスワードを入力してください。'));
+      return sendHtml(res, 200, multiModeToolPage('集客・接客ツール', '無料プレゼント', SHUKYAKU_MODES, '/api/tools/shukyaku'));
+    }
+    if (pathname === '/tools/shukyaku-gift/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = shukyakuGiftGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('集客・接客ツール（プレゼント）', '/tools/shukyaku-gift/login', 'パスワードが違います。', 'ご案内したパスワードを入力してください。'));
+      return redirect(res, '/tools/shukyaku-gift', { 'Set-Cookie': shukyakuGiftGate.cookie(sid) });
+    }
+
+    // ── 有料ツール：ダウンライン拡大ツール（1,480円）──
+    if (pathname === '/tools/kanyu' && method === 'GET') {
+      if (!kanyuGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('ダウンライン拡大ツール', '/tools/kanyu/login'));
+      return sendHtml(res, 200, multiModeToolPage('ダウンライン拡大ツール', 'ご購入者様専用', KANYU_MODES, '/api/tools/kanyu'));
+    }
+    if (pathname === '/tools/kanyu/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = kanyuGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('ダウンライン拡大ツール', '/tools/kanyu/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/kanyu', { 'Set-Cookie': kanyuGate.cookie(sid) });
+    }
+    if (pathname === '/api/tools/kanyu' && method === 'POST') {
+      if (!kanyuGate.isAuthed(req) && !kanyuGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { mode, provider, apiKey, values } = await parseBody(req);
+      const m = KANYU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText: m.build(v) });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── ギフト版：ダウンライン拡大ツール（無償プレゼント専用。購入者版とは別URL・別パスワード）──
+    if (pathname === '/tools/kanyu-gift' && method === 'GET') {
+      if (!kanyuGiftGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('ダウンライン拡大ツール（プレゼント）', '/tools/kanyu-gift/login', null, 'ご案内したパスワードを入力してください。'));
+      return sendHtml(res, 200, multiModeToolPage('ダウンライン拡大ツール', '無料プレゼント', KANYU_MODES, '/api/tools/kanyu'));
+    }
+    if (pathname === '/tools/kanyu-gift/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = kanyuGiftGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('ダウンライン拡大ツール（プレゼント）', '/tools/kanyu-gift/login', 'パスワードが違います。', 'ご案内したパスワードを入力してください。'));
+      return redirect(res, '/tools/kanyu-gift', { 'Set-Cookie': kanyuGiftGate.cookie(sid) });
+    }
+
+    // ── 有料ツール：集客・接客ツール かんたん版（APIキー不要。運営者の共有APIキーで生成、1日上限あり）──
+    if (pathname === '/tools/shukyaku-kantan' && method === 'GET') {
+      if (!shukyakuKantanGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('集客・接客ツール かんたん版', '/tools/shukyaku-kantan/login'));
+      return sendHtml(res, 200, multiModeToolPageNoKey('集客・接客ツール かんたん版', 'ご購入者様専用・APIキー不要', SHUKYAKU_MODES, '/api/tools/shukyaku-kantan', `1日${shukyakuKantanLimiter.limit}回まで生成できます（全購入者共通の上限です）。`));
+    }
+    if (pathname === '/tools/shukyaku-kantan/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = shukyakuKantanGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('集客・接客ツール かんたん版', '/tools/shukyaku-kantan/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/shukyaku-kantan', { 'Set-Cookie': shukyakuKantanGate.cookie(sid) });
+    }
+    if (pathname === '/api/tools/shukyaku-kantan' && method === 'POST') {
+      if (!shukyakuKantanGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!SHARED_AI_API_KEY) return sendJson(res, 400, { error: '現在ご利用いただけません（運営者側の設定が未完了です）。お手数ですがお問い合わせください。' });
+      const { mode, values } = await parseBody(req);
+      const m = SHUKYAKU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      if (!shukyakuKantanLimiter.tryConsume()) return sendJson(res, 429, { error: '本日の生成回数の上限に達しました。日付が変わってからお試しください。' });
+      try {
+        const output = await runPrompt({ provider: SHARED_AI_PROVIDER, apiKey: SHARED_AI_API_KEY, promptText: m.build(v) });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        shukyakuKantanLimiter.refund();
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── 有料ツール：ダウンライン拡大ツール かんたん版（APIキー不要。運営者の共有APIキーで生成、1日上限あり）──
+    if (pathname === '/tools/kanyu-kantan' && method === 'GET') {
+      if (!kanyuKantanGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('ダウンライン拡大ツール かんたん版', '/tools/kanyu-kantan/login'));
+      return sendHtml(res, 200, multiModeToolPageNoKey('ダウンライン拡大ツール かんたん版', 'ご購入者様専用・APIキー不要', KANYU_MODES, '/api/tools/kanyu-kantan', `1日${kanyuKantanLimiter.limit}回まで生成できます（全購入者共通の上限です）。`));
+    }
+    if (pathname === '/tools/kanyu-kantan/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = kanyuKantanGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('ダウンライン拡大ツール かんたん版', '/tools/kanyu-kantan/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/kanyu-kantan', { 'Set-Cookie': kanyuKantanGate.cookie(sid) });
+    }
+    if (pathname === '/api/tools/kanyu-kantan' && method === 'POST') {
+      if (!kanyuKantanGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!SHARED_AI_API_KEY) return sendJson(res, 400, { error: '現在ご利用いただけません（運営者側の設定が未完了です）。お手数ですがお問い合わせください。' });
+      const { mode, values } = await parseBody(req);
+      const m = KANYU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      if (!kanyuKantanLimiter.tryConsume()) return sendJson(res, 429, { error: '本日の生成回数の上限に達しました。日付が変わってからお試しください。' });
+      try {
+        const output = await runPrompt({ provider: SHARED_AI_PROVIDER, apiKey: SHARED_AI_API_KEY, promptText: m.build(v) });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        kanyuKantanLimiter.refund();
         return sendJson(res, 400, { error: e.message });
       }
     }
@@ -1350,10 +1993,12 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/admin/licenses/allow-email' && method === 'POST') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
       const { email, note, trialDays, trialGates } = await parseBody(req);
-      const trimmed = String(email || '').trim().toLowerCase();
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-        AllowedEmails.add(trimmed, String(note || '').trim().slice(0, 100), String(trialDays || '').trim(), String(trialGates || '').trim());
+      // 全角の＠・．で入力された場合（IME変換ミス）も受け付ける
+      const trimmed = String(email || '').trim().toLowerCase().replace(/＠/g, '@').replace(/．/g, '.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        return sendHtml(res, 400, adminLicensesPage(AllowedEmails.all(), 'メールアドレスの形式が正しくありません。半角で入力してください（例：taro@example.com）。'));
       }
+      AllowedEmails.add(trimmed, String(note || '').trim().slice(0, 100), String(trialDays || '').trim(), String(trialGates || '').trim());
       return redirect(res, '/admin/licenses');
     }
     const aeRevokeMatch = pathname.match(/^\/admin\/licenses\/emails\/([a-f0-9]+)\/revoke$/);
@@ -1362,6 +2007,88 @@ const server = http.createServer(async (req, res) => {
       const revoked = AllowedEmails.revoke(aeRevokeMatch[1]);
       if (revoked && revoked.user_id) Users.setLicenseActive(revoked.user_id, false);
       return redirect(res, '/admin/licenses');
+    }
+
+    // ── 有料ツール：SNS自動投稿ツール（ポストメッシュAPIを中継。購入者自身のアカウント・APIキーを使う）──
+    if (pathname === '/tools/jidoutoukou' && method === 'GET') {
+      if (!jidoutoukouGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('SNS自動投稿ツール', '/tools/jidoutoukou/login'));
+      return sendHtml(res, 200, jidoutoukouToolPage());
+    }
+    if (pathname === '/tools/jidoutoukou/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = jidoutoukouGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('SNS自動投稿ツール', '/tools/jidoutoukou/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/jidoutoukou', { 'Set-Cookie': jidoutoukouGate.cookie(sid) });
+    }
+
+    // ── ギフト版：SNS自動投稿ツール（無償プレゼント専用。購入者版とは別URL・別パスワード）──
+    if (pathname === '/tools/jidoutoukou-gift' && method === 'GET') {
+      if (!jidoutoukouGiftGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('SNS自動投稿ツール（プレゼント）', '/tools/jidoutoukou-gift/login', null, 'ご案内したパスワードを入力してください。'));
+      return sendHtml(res, 200, jidoutoukouToolPage('無料プレゼント'));
+    }
+    if (pathname === '/tools/jidoutoukou-gift/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = jidoutoukouGiftGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('SNS自動投稿ツール（プレゼント）', '/tools/jidoutoukou-gift/login', 'パスワードが違います。', 'ご案内したパスワードを入力してください。'));
+      return redirect(res, '/tools/jidoutoukou-gift', { 'Set-Cookie': jidoutoukouGiftGate.cookie(sid) });
+    }
+
+    if (pathname === '/api/tools/jidoutoukou/connections' && method === 'POST') {
+      if (!jidoutoukouGate.isAuthed(req) && !jidoutoukouGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { pmApiKey } = await parseBody(req);
+      try {
+        const connections = await postmesh.listConnections({ apiKey: pmApiKey });
+        return sendJson(res, 200, { connections: connections.filter((c) => SNS_TEXT_PLATFORMS.has(c.platform)) });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+    if (pathname === '/api/tools/jidoutoukou/posts' && method === 'POST') {
+      if (!jidoutoukouGate.isAuthed(req) && !jidoutoukouGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { pmApiKey } = await parseBody(req);
+      try {
+        const posts = await postmesh.listPosts({ apiKey: pmApiKey, limit: 20 });
+        return sendJson(res, 200, { posts });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+    if (pathname === '/api/tools/jidoutoukou/compose' && method === 'POST') {
+      if (!jidoutoukouGate.isAuthed(req) && !jidoutoukouGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { pmApiKey, caption, connectionIds, scheduledAt, draft } = await parseBody(req);
+      const captionText = String(caption || '').trim().slice(0, 5000);
+      const ids = Array.isArray(connectionIds) ? connectionIds : (connectionIds ? [connectionIds] : []);
+      if (!captionText || ids.length === 0) {
+        return sendJson(res, 400, { error: '投稿本文と、投稿先のSNSアカウントを1つ以上指定してください。' });
+      }
+      let scheduledAtIso = null;
+      if (scheduledAt) {
+        // <input type="datetime-local"> にはタイムゾーン情報が無いため、日本時間として明示的に解釈する
+        // （サーバーの実行タイムゾーンに依存させない。本番はTZ未指定のためUTCで動く）
+        const d = new Date(`${scheduledAt}+09:00`);
+        if (isNaN(d.getTime())) return sendJson(res, 400, { error: '予約日時の形式が正しくありません。' });
+        scheduledAtIso = d.toISOString();
+      }
+      const targets = ids.map((id) => ({ connection_id: id, caption: captionText }));
+      try {
+        const result = await postmesh.createTextPost({ apiKey: pmApiKey, targets, scheduledAt: scheduledAtIso, draft: !!draft });
+        return sendJson(res, 200, { ok: true, post: result.data });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+    if (pathname === '/api/tools/jidoutoukou/draft' && method === 'POST') {
+      if (!jidoutoukouGate.isAuthed(req) && !jidoutoukouGiftGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { theme, provider, apiKey } = await parseBody(req);
+      const themeText = String(theme || '').trim().slice(0, 2000);
+      if (!themeText) return sendJson(res, 400, { error: 'テーマを入力してください。' });
+      const promptText = `あなたはSNSマーケティングに詳しいコピーライターです。副業やネットワークビジネスにこれから取り組む人・取り組み始めたばかりの人に向けて、押し売り感のない、読んだ人が「役に立った」と感じるSNS投稿文を1つ作ってください。断定的な収入の保証表現（必ず稼げる、誰でも成功する等）は使わないでください。実在しない実績・お客様の声は含めないでください。\n\n【伝えたいテーマ・役立つ情報】：${themeText}`;
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
     }
 
     // ── 以降は認証必須 ──
