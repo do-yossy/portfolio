@@ -196,6 +196,98 @@ function homePage() {
   `);
 }
 
+// ── ページ: 自己紹介文ジェネレーター（公開・ログイン不要の無料ツール）──
+// SNS等での最初のきっかけとして無料で渡す「ツールそのもの」。テキストのプロンプトを
+// コピーしてもらうのではなく、ここで直接AIに実行させて結果を返す（APIキーは購入者
+// 〔この場合は閲覧者〕自身のものを毎回受け取り、保存しない。/api/run-promptと同じ方式）。
+function jikoshoukaiToolPage() {
+  const providers = Object.keys(PROVIDERS);
+  return layout('自己紹介文ジェネレーター', `
+    <section class="landing-hero lux" style="padding-bottom:22px">
+      ${crest(50)}
+      <div class="eyebrow">無料ツール・登録不要</div>
+      <h1>自己紹介文<br><em>ジェネレーター</em></h1>
+      <p>いくつか入力するだけで、AIがSNS用の自己紹介文を作ります。ログインは不要です。</p>
+    </section>
+    <section>
+      <div class="card">
+        <div class="field">
+          <label class="lbl">どちらに近いですか？</label>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="mode" value="normal" checked><span>副業・経験を発信したい方</span></label>
+            <label class="chip"><input type="radio" name="mode" value="mlm"><span>ネットワークビジネスをしている方</span></label>
+          </div>
+        </div>
+        <div class="field"><label class="lbl" id="labelA" for="fieldA">経験・得意なこと</label>
+          <textarea id="fieldA" rows="2" placeholder="例：10年間、子育てをしながらパート事務をしてきました"></textarea></div>
+        <div class="field"><label class="lbl" id="labelB" for="fieldB">伝えたい相手</label>
+          <input id="fieldB" type="text" placeholder="例：これから副業を始めたい方"></div>
+        <div class="field" id="fieldCRow"><label class="lbl" for="fieldC">大切にしていること</label>
+          <input id="fieldC" type="text" placeholder="例：誠実に、相手の立場で考えること"></div>
+
+        <details class="fold" style="margin-top:12px">
+          <summary>${icon('lock', 18)}AIで生成する（APIキーが必要）</summary>
+          <div style="margin-top:12px">
+            <div class="notice info">APIキーはこのブラウザにのみ保存され、実行のたびにサーバーへ中継されるだけで保存されません。利用料はご自身のOpenAI／Anthropicのご契約に基づき発生します。</div>
+            <div class="field" style="margin-top:12px"><label class="lbl" for="provider">プロバイダ</label>
+              <select id="provider">${providers.map((pv) => `<option value="${pv}">${pv}</option>`).join('')}</select></div>
+            <div class="field"><label class="lbl" for="apiKey">APIキー</label><input id="apiKey" type="password" placeholder="sk-... / このブラウザにのみ保存" autocomplete="off"></div>
+            <button id="runBtn" type="button" class="btn btn-primary btn-block">自己紹介文を作る</button>
+            <div id="result" style="margin-top:14px;white-space:pre-wrap;font-size:13.5px"></div>
+          </div>
+        </details>
+      </div>
+      <p class="muted center" style="margin-top:14px">生成された文章はそのまま使わず、事実と異なる部分が無いかご自身でご確認ください。もっと詳しく相談したい方は<a href="/contact">お問い合わせ</a>へ。</p>
+    </section>
+    <script>
+      const KEY_STORE = 'ai-bijika:apiKey:';
+      const providerSel = document.getElementById('provider');
+      const keyInput = document.getElementById('apiKey');
+      function loadKey() { try { keyInput.value = localStorage.getItem(KEY_STORE + providerSel.value) || ''; } catch (e) {} }
+      providerSel.addEventListener('change', loadKey);
+      loadKey();
+
+      const LABELS = {
+        normal: { a: '経験・得意なこと', b: '伝えたい相手', showC: true },
+        mlm: { a: '自分の経験・大切にしていること', b: '扱っている商品・サービスの分野', showC: false },
+      };
+      function applyMode() {
+        const mode = document.querySelector('input[name=mode]:checked').value;
+        const L = LABELS[mode];
+        document.getElementById('labelA').textContent = L.a;
+        document.getElementById('labelB').textContent = L.b;
+        document.getElementById('fieldCRow').style.display = L.showC ? '' : 'none';
+      }
+      document.querySelectorAll('input[name=mode]').forEach((el) => el.addEventListener('change', applyMode));
+      applyMode();
+
+      document.getElementById('runBtn').addEventListener('click', async () => {
+        const mode = document.querySelector('input[name=mode]:checked').value;
+        const provider = providerSel.value;
+        const apiKey = keyInput.value.trim();
+        const fieldA = document.getElementById('fieldA').value.trim();
+        const fieldB = document.getElementById('fieldB').value.trim();
+        const fieldC = document.getElementById('fieldC').value.trim();
+        const resultEl = document.getElementById('result');
+        if (!apiKey) { resultEl.textContent = 'APIキーを入力してください。'; return; }
+        if (!fieldA || !fieldB) { resultEl.textContent = '必要な項目を入力してください。'; return; }
+        try { localStorage.setItem(KEY_STORE + provider, apiKey); } catch (e) {}
+        resultEl.textContent = '作成中…';
+        try {
+          const resp = await fetch('/api/tools/jikoshoukai', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ mode, provider, apiKey, fieldA, fieldB, fieldC })
+          });
+          const data = await resp.json();
+          resultEl.textContent = resp.ok ? data.output : ('エラー: ' + data.error);
+        } catch (e) {
+          resultEl.textContent = '通信エラーが発生しました。';
+        }
+      });
+    </script>
+  `);
+}
+
 // ── ページ: サインアップ／ログイン ──
 function authForm(kind, error) {
   const isSignup = kind === 'signup';
@@ -1199,6 +1291,27 @@ const server = http.createServer(async (req, res) => {
       }
       Inquiries.create({ userId: user ? user.id : null, name, email, category, message });
       return redirect(res, '/contact?sent=1');
+    }
+
+    // ── 公開ツール：自己紹介文ジェネレーター（ログイン不要。APIキーは毎回受け取るだけで保存しない）──
+    if (pathname === '/tools/jikoshoukai' && method === 'GET') {
+      return sendHtml(res, 200, jikoshoukaiToolPage());
+    }
+    if (pathname === '/api/tools/jikoshoukai' && method === 'POST') {
+      const { mode, provider, apiKey, fieldA, fieldB, fieldC } = await parseBody(req);
+      const a = String(fieldA || '').trim().slice(0, 2000);
+      const b = String(fieldB || '').trim().slice(0, 2000);
+      const c = String(fieldC || '').trim().slice(0, 2000);
+      if (!a || !b) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      const promptText = mode === 'mlm'
+        ? `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える自己紹介文を作ってください。資格・肩書きを誇張せず、誠実な印象になるようにしてください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【自分の経験・大切にしていること】：${a}\n【扱っている商品・サービスの分野】：${b}`
+        : `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える100字程度の自己紹介文を3パターン作ってください。\n\n【経験・得意なこと】：${a}\n【伝えたい相手】：${b}\n【大切にしていること】：${c}`;
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
     }
 
     // ── お問い合わせ管理（運営者用。購入者ログインとは別のパスワード認証）──
