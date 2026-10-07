@@ -101,6 +101,11 @@ try { db.exec("ALTER TABLE users ADD COLUMN persona TEXT DEFAULT ''"); } catch {
 // 登録・ログイン（allowed_emails との自動照合）を必須にする。
 try { db.exec('ALTER TABLE users ADD COLUMN license_active INTEGER DEFAULT 1'); } catch {}
 
+// 期間・範囲限定の体験版向け。空文字 = 無期限・全GATE（既存の購入者は全員これに当たり、挙動は変わらない）
+for (const col of ['license_expires_at', 'license_gates']) {
+  try { db.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT DEFAULT ''`); } catch {}
+}
+
 // ── allowed_emails（購入時のメールアドレスだけを許可するための許可リスト。運営者が登録する）──
 // 「そのメールアドレスで登録・ログインした場合のみ」自動的に認証済みにする。購入者は
 // 事前に把握できる（決済時に本人から受け取る）ため、鍵の発行・送付は行わない。
@@ -115,6 +120,11 @@ db.exec(`
     activated_at TEXT
   );
 `);
+
+// allowed_emails: 体験版の設定（登録時に運営者が指定。空なら通常の購入者と同じ無期限・全GATEになる）
+for (const col of ['trial_expires_days', 'trial_gates']) {
+  try { db.exec(`ALTER TABLE allowed_emails ADD COLUMN ${col} TEXT DEFAULT ''`); } catch {}
+}
 
 // ── product_profile（購入者が作っている商品の基本情報＋お客様からの代金の受け取り方。1購入者1件）──
 db.exec(`
@@ -170,25 +180,34 @@ const Users = {
   setLicenseActive(id, active) {
     db.prepare('UPDATE users SET license_active = ? WHERE id = ?').run(active ? 1 : 0, id);
   },
+  // 体験版の期限・アクセス可能GATEを設定する。expiresAt/gatesが空文字なら無期限・全GATE扱い
+  setTrial(id, { expiresAt, gates }) {
+    db.prepare('UPDATE users SET license_expires_at = ?, license_gates = ? WHERE id = ?').run(expiresAt || '', gates || '', id);
+  },
 };
 
 const AllowedEmails = {
   // 購入者のメールアドレスを許可リストに登録する（冪等：既に登録済みなら基本は何もしない。
   // 無効化済みのものを再登録した場合のみ UNUSED に戻す＝再度使えるようにする）
-  add(email, note) {
+  // trialExpiresDays/trialGates は体験版用（省略すれば従来通り無期限・全GATE）
+  add(email, note, trialExpiresDays, trialGates) {
     const normalized = String(email || '').toLowerCase().trim();
+    const days = String(trialExpiresDays || '').trim();
+    const gates = String(trialGates || '').trim();
     const existing = db.prepare('SELECT * FROM allowed_emails WHERE email = ?').get(normalized);
     if (existing) {
       if (existing.status === 'REVOKED') {
-        db.prepare(`UPDATE allowed_emails SET status='UNUSED', note=?, user_id=NULL, activated_at=NULL WHERE id=?`)
-          .run(note || existing.note, existing.id);
-      } else if (note) {
-        db.prepare('UPDATE allowed_emails SET note=? WHERE id=?').run(note, existing.id);
+        db.prepare(`UPDATE allowed_emails SET status='UNUSED', note=?, user_id=NULL, activated_at=NULL, trial_expires_days=?, trial_gates=? WHERE id=?`)
+          .run(note || existing.note, days, gates, existing.id);
+      } else if (note || days || gates) {
+        db.prepare('UPDATE allowed_emails SET note=?, trial_expires_days=?, trial_gates=? WHERE id=?')
+          .run(note || existing.note, days || existing.trial_expires_days, gates || existing.trial_gates, existing.id);
       }
       return existing.id;
     }
     const id = generateId();
-    db.prepare('INSERT INTO allowed_emails (id, email, note) VALUES (?, ?, ?)').run(id, normalized, note || '');
+    db.prepare('INSERT INTO allowed_emails (id, email, note, trial_expires_days, trial_gates) VALUES (?, ?, ?, ?, ?)')
+      .run(id, normalized, note || '', days, gates);
     return id;
   },
   findByEmail(email) {

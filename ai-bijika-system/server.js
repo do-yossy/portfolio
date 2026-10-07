@@ -267,10 +267,57 @@ function tryAutoActivateByEmail(user) {
   AllowedEmails.activate(user.email, user.id);
   Users.setLicenseActive(user.id, true);
   user.license_active = 1;
+  // 体験版（期間・範囲限定）として登録されていた場合、そのままユーザーに引き継ぐ
+  if (allowed.trial_expires_days || allowed.trial_gates) {
+    const days = parseInt(allowed.trial_expires_days, 10);
+    const expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : '';
+    Users.setTrial(user.id, { expiresAt, gates: allowed.trial_gates || '' });
+    user.license_expires_at = expiresAt;
+    user.license_gates = allowed.trial_gates || '';
+  }
+}
+
+// 体験版の期限切れ判定。license_expires_at が空（無期限）なら常にfalse
+function isLicenseExpired(user) {
+  return !!(user.license_expires_at && new Date(user.license_expires_at).getTime() < Date.now());
+}
+// このユーザーがアクセスできるGATE番号の集合。null = 無制限（通常の購入者は全員これ）
+function userAllowedGates(user) {
+  if (!user.license_gates) return null;
+  const set = new Set(String(user.license_gates).split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isInteger(n) && n > 0));
+  return set.size ? set : null;
+}
+function isGateAllowed(user, gateNo) {
+  const allowed = userAllowedGates(user);
+  return !allowed || allowed.has(gateNo);
+}
+// プロンプト番号が属するGATE番号（steps・extra配列から逆引き）。該当GATEが無ければnull
+function gateNoOfPrompt(promptNo) {
+  const n = parseInt(promptNo, 10);
+  const d = gateDefs.find((g) => g.steps.includes(n) || (g.extra || []).includes(n));
+  return d ? d.no : null;
+}
+// 体験版でアクセス対象外のGATEを開こうとしたときの案内ページ
+function trialLockedPage(user, gateNo) {
+  const d = gateDefs.find((x) => x.no === gateNo);
+  return layout('体験版の対象外です', `
+    <header class="page-head"><div class="eyebrow">License</div><h1>このGATEは体験版の対象外です</h1></header>
+    <div class="notice gold">${icon('bulb', 16)}<div>GATE${gateNo}「${escapeHtml(d ? d.name : '')}」は、本編（ミチシルベ）でご利用いただけます。気になる方はお気軽にお問い合わせください。</div></div>
+    <a class="btn btn-primary btn-block" href="/dashboard" style="margin-top:14px">ダッシュボードに戻る</a>
+    <a class="btn btn-block" href="/contact" style="margin-top:8px">お問い合わせ</a>
+  `, { user, active: 'dashboard' });
 }
 
 // ── ページ: ライセンス状態（購入者だけが使えるようにする認証。購入時のメールアドレスで自動判定）──
 function licensePage(user) {
+  if (user.license_active && isLicenseExpired(user)) {
+    const until = user.license_expires_at ? new Date(user.license_expires_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '';
+    return layout('体験版の期間が終了しました', `
+      <header class="page-head"><div class="eyebrow">License</div><h1>体験版の期間が終了しました</h1></header>
+      <div class="notice gold">${icon('bulb', 16)}<div>体験版のご利用期間（${escapeHtml(until)}まで）が終了しました。続けてご利用になりたい方、本編にご興味がある方は、お気軽にお問い合わせください。</div></div>
+      <a class="btn btn-primary btn-block" href="/contact" style="margin-top:14px">お問い合わせ</a>
+    `, { user, noNav: true, active: 'account' });
+  }
   if (user.license_active) {
     return layout('ライセンス', `
       <header class="page-head"><div class="eyebrow">License</div><h1>ライセンス認証済みです</h1></header>
@@ -352,13 +399,25 @@ function heroHtml(pg, titles, profile) {
   </div></section>`;
 }
 
-function roadmapHtml(pg, persona, titles, openNo, profile) {
+function roadmapHtml(pg, persona, titles, openNo, profile, allowedGates) {
   const byNo = new Map(pg.gates.map((g) => [g.gate_no, g]));
   const nextNo = pg.nextGate ? pg.nextGate.gate_no : null;
   const stages = gateDefs.STAGES.map((st, si) => {
     const nodes = st.gates.map((no) => {
-      const g = byNo.get(no);
       const d = gateDefs.find((x) => x.no === no);
+      if (allowedGates && !allowedGates.has(no)) {
+        return `<li class="node locked" id="gate-${no}">
+          <span class="dot">${icon('lock', 16)}</span>
+          <details class="node-card">
+            <summary><span class="t"><span class="gno">GATE ${pad2(no)}</span><b>${escapeHtml(d.name)}</b>
+              <small>${escapeHtml(d.phase)}</small></span><span class="badge">体験版では未収録</span>${icon('chevron', 18, 'chev')}</summary>
+            <div class="node-body">
+              <div class="notice gold">${icon('bulb', 16)}<div>このGATEは体験版には含まれていません。本編（ミチシルベ）でご利用いただけます。</div></div>
+            </div>
+          </details>
+        </li>`;
+      }
+      const g = byNo.get(no);
       const isLast = si === gateDefs.STAGES.length - 1 && no === st.gates[st.gates.length - 1];
       const cls = ['node', g.status === 'GREEN' ? 'done' : '', g.status === 'YELLOW' ? 'st-y' : '', g.status === 'RED' ? 'st-r' : '',
         no === nextNo ? 'current' : '', isLast ? 'last' : ''].filter(Boolean).join(' ');
@@ -446,7 +505,7 @@ function dashboardPage(user, openNo) {
     ${profileNudge}
     <h2>${icon('map', 20)}ロードマップ</h2>
     <p class="muted">各GATEをタップすると、使うプロンプトと進め方のヒントが開きます。順番は強制ではありませんが、上から進めるのがおすすめです。</p>
-    ${roadmapHtml(pg, user.persona, titles, openNo, profile)}
+    ${roadmapHtml(pg, user.persona, titles, openNo, profile, userAllowedGates(user))}
     <h2>${icon('box', 20)}商品ラインナップ</h2>
     <p class="muted">1つめの商品を売り始めたら、その学びを次の商品へつなげます。</p>
     ${lineupHtml(pg, profile)}
@@ -1009,6 +1068,7 @@ function adminLicensesPage(emailList) {
         <span class="badge ${a.status.toLowerCase()}">${STATUS_LABEL_AE[a.status]}</span>
       </div>
       <div class="lic-meta">${a.note ? `${escapeHtml(a.note)} ／ ` : ''}<time>${escapeHtml(new Date(a.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }))}登録</time></div>
+      ${a.trial_expires_days || a.trial_gates ? `<div class="lic-meta">体験版：${a.trial_gates ? `GATE${escapeHtml(a.trial_gates)}のみ` : '全GATE'}・${a.trial_expires_days ? `${escapeHtml(a.trial_expires_days)}日間` : '無期限'}</div>` : ''}
       ${a.status !== 'REVOKED' ? `<form method="POST" action="/admin/licenses/emails/${a.id}/revoke" onsubmit="return confirm('このメールアドレスの許可を取り消しますか？${a.status === 'ACTIVE' ? 'ログイン済みのため、このアカウントは使えなくなります。' : ''}')">
         <button type="submit">無効化する</button>
       </form>` : ''}
@@ -1052,6 +1112,10 @@ main{max-width:640px;margin:0 auto;padding:18px}
       <input id="allow-email" type="email" name="email" required placeholder="buyer@example.com">
       <label for="allow-note">メモ（任意。購入経路など）</label>
       <input id="allow-note" type="text" name="note" maxlength="100" placeholder="例：2026-09 note販売分">
+      <label for="allow-trial-days">体験版の期間・日数（任意。空欄なら通常の購入者と同じ無期限）</label>
+      <input id="allow-trial-days" type="number" name="trialDays" min="1" placeholder="例：7">
+      <label for="allow-trial-gates">体験版でアクセスできるGATE番号（任意。カンマ区切り。空欄なら全GATE）</label>
+      <input id="allow-trial-gates" type="text" name="trialGates" placeholder="例：1,3">
       <button type="submit">許可する</button>
     </form>
   </div>
@@ -1172,10 +1236,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/admin/licenses/allow-email' && method === 'POST') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
-      const { email, note } = await parseBody(req);
+      const { email, note, trialDays, trialGates } = await parseBody(req);
       const trimmed = String(email || '').trim().toLowerCase();
       if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-        AllowedEmails.add(trimmed, String(note || '').trim().slice(0, 100));
+        AllowedEmails.add(trimmed, String(note || '').trim().slice(0, 100), String(trialDays || '').trim(), String(trialGates || '').trim());
       }
       return redirect(res, '/admin/licenses');
     }
@@ -1193,9 +1257,10 @@ const server = http.createServer(async (req, res) => {
     // ── ライセンス認証（購入者だけが使えるようにする）。/license と /account 以外はすべてブロックする ──
     // リクエストのたびに許可リストを再照合する（管理者がログイン中に許可した場合も、再ログイン不要で即座に反映される）。
     if (!user.license_active) tryAutoActivateByEmail(user);
+    const licenseExpired = isLicenseExpired(user);
     const LICENSE_EXEMPT_PATHS = new Set(['/license', '/account']);
-    if (!user.license_active && !LICENSE_EXEMPT_PATHS.has(pathname)) {
-      if (pathname.startsWith('/api/')) return sendJson(res, 403, { error: 'ライセンス認証が必要です' });
+    if ((!user.license_active || licenseExpired) && !LICENSE_EXEMPT_PATHS.has(pathname)) {
+      if (pathname.startsWith('/api/')) return sendJson(res, 403, { error: licenseExpired ? '体験版の期間が終了しました' : 'ライセンス認証が必要です' });
       return redirect(res, '/license');
     }
     if (pathname === '/license' && method === 'GET') {
@@ -1237,6 +1302,8 @@ const server = http.createServer(async (req, res) => {
     if (promptMatch && method === 'GET') {
       const p = Prompts.get(parseInt(promptMatch[1], 10));
       if (!p) { res.writeHead(404); return res.end('not found'); }
+      const promptGateNo = gateNoOfPrompt(p.no);
+      if (promptGateNo && !isGateAllowed(user, promptGateNo)) return sendHtml(res, 200, trialLockedPage(user, promptGateNo));
       return sendHtml(res, 200, promptDetailPage(user, p));
     }
 
@@ -1247,6 +1314,7 @@ const server = http.createServer(async (req, res) => {
       if (gateNo < 1 || gateNo > 10 || !['PENDING', 'GREEN', 'YELLOW', 'RED'].includes(status)) {
         return sendJson(res, 400, { error: 'invalid status' });
       }
+      if (!isGateAllowed(user, gateNo)) return sendJson(res, 403, { error: '体験版では利用できないGATEです' });
       GateProgress.upsert(user.id, gateNo, status, '');
       return redirect(res, `/dashboard?open=${gateNo}#gate-${gateNo}`);
     }
@@ -1262,6 +1330,8 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/run-prompt' && method === 'POST') {
       const { provider, apiKey, promptText, promptNo } = await parseBody(req);
+      const runGateNo = gateNoOfPrompt(promptNo);
+      if (runGateNo && !isGateAllowed(user, runGateNo)) return sendJson(res, 403, { error: '体験版では利用できないGATEです' });
       try {
         const output = await runPrompt({ provider, apiKey, promptText });
         AiRuns.create({ userId: user.id, promptNo: promptNo || null, provider, inputText: promptText, outputText: output });
