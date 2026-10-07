@@ -103,6 +103,47 @@ const shukyakuGate = makeToolGate('SHUKYAKU_TOOL_PASSWORD', 'shukyaku_sid');
 const kanyuGate = makeToolGate('KANYU_TOOL_PASSWORD', 'kanyu_sid');
 const jidoutoukouGate = makeToolGate('JIDOUTOUKOU_TOOL_PASSWORD', 'jidoutoukou_sid');
 
+// ── 有料ツール「かんたん版」（/tools/shukyaku-kantan・/tools/kanyu-kantan）用。
+// 購入者自身のAPIキー入力を不要にする代わりに、運営者自身のAIプロバイダAPIキーを
+// サーバー側で使う。購入者ごとに使用量を分けられないため、1日あたりの生成回数を
+// ツールごとに上限で区切り、運営者の費用負担に歯止めをかける（下記 makeDailyLimiter）。
+const shukyakuKantanGate = makeToolGate('SHUKYAKU_KANTAN_TOOL_PASSWORD', 'shukyaku_kantan_sid');
+const kanyuKantanGate = makeToolGate('KANYU_KANTAN_TOOL_PASSWORD', 'kanyu_kantan_sid');
+
+const SHARED_AI_PROVIDER = process.env.SHARED_AI_PROVIDER || 'openai';
+const SHARED_AI_API_KEY = process.env.SHARED_AI_API_KEY || '';
+if (!SHARED_AI_API_KEY) console.warn('[warn] SHARED_AI_API_KEY 未設定。かんたん版ツール（APIキー不要版）は利用できません。');
+
+// 日付（UTC）が変わるとカウントをリセットする、依存ゼロの簡易レート制限。
+// プロセス再起動でもリセットされる（永続化しない）。購入者ごとではなく、
+// ツール全体で1日の合計生成回数を制限する設計。
+function makeDailyLimiter(envName, defaultLimit) {
+  const limit = parseInt(process.env[envName] || '', 10) || defaultLimit;
+  let day = '';
+  let count = 0;
+  const rollIfNeeded = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (today !== day) { day = today; count = 0; }
+  };
+  return {
+    limit,
+    // 予約：呼び出し前に枠を1つ確保する。falseなら上限到達（APIは呼ばない）
+    tryConsume() {
+      rollIfNeeded();
+      if (count >= limit) return false;
+      count += 1;
+      return true;
+    },
+    // 返却：実際には費用が発生しなかった（失敗・エラー）場合に枠を戻す
+    refund() {
+      rollIfNeeded();
+      if (count > 0) count -= 1;
+    },
+  };
+}
+const shukyakuKantanLimiter = makeDailyLimiter('SHUKYAKU_KANTAN_DAILY_LIMIT', 30);
+const kanyuKantanLimiter = makeDailyLimiter('KANYU_KANTAN_DAILY_LIMIT', 30);
+
 const splitList = (v) => String(v || '').split('、').filter(Boolean);
 const yen = (v) => `${Number(v).toLocaleString('ja-JP')}円`;
 
@@ -473,6 +514,67 @@ function multiModeToolPage(title, eyebrow, modes, apiPath) {
           const resp = await fetch('${apiPath}', {
             method: 'POST', headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ mode, provider, apiKey, values })
+          });
+          const data = await resp.json();
+          resultEl.textContent = resp.ok ? data.output : ('エラー: ' + data.error);
+        } catch (e) {
+          resultEl.textContent = '通信エラーが発生しました。';
+        }
+      });
+    </script>
+  `, { noNav: true });
+}
+
+// multiModeToolPage()の「かんたん版」。購入者のAPIキー入力欄を持たず、サーバー側の
+// 共有APIキー（SHARED_AI_API_KEY）で生成する。APIキーの用意・入力が不要な代わりに、
+// 1日の生成回数に上限がある（limitLabelで画面に明記する）。
+function multiModeToolPageNoKey(title, eyebrow, modes, apiPath, limitLabel) {
+  const modeOptions = modes.map((m) => `<option value="${m.key}">${escapeHtml(m.label)}</option>`).join('');
+  const fieldsJson = JSON.stringify(modes.map((m) => ({ key: m.key, label: m.label, fields: m.fields })));
+  return layout(title, `
+    <section class="landing-hero lux" style="padding-bottom:22px">
+      ${crest(50)}
+      <div class="eyebrow">${escapeHtml(eyebrow)}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <p>場面を選んで入力すると、AIがそのまま使える文章を作ります。APIキーの入力は不要です。</p>
+    </section>
+    <section>
+      <div class="card">
+        <div class="field"><label class="lbl" for="modeSel">場面を選ぶ</label>
+          <select id="modeSel">${modeOptions}</select></div>
+        <div id="fieldsArea"></div>
+        <div class="notice info" style="margin-top:12px">${escapeHtml(limitLabel)}</div>
+        <button id="runBtn" type="button" class="btn btn-primary btn-block" style="margin-top:12px">文章を作る</button>
+        <div id="result" style="margin-top:14px;white-space:pre-wrap;font-size:13.5px"></div>
+      </div>
+      <p class="muted center" style="margin-top:14px">生成された文章はそのまま使わず、事実と異なる部分が無いかご自身でご確認ください。</p>
+    </section>
+    <script>
+      const MODES = ${fieldsJson};
+      const modeSel = document.getElementById('modeSel');
+      const fieldsArea = document.getElementById('fieldsArea');
+      function renderFields() {
+        const m = MODES.find((x) => x.key === modeSel.value);
+        fieldsArea.innerHTML = m.fields.map((f, i) =>
+          '<div class="field"><label class="lbl" for="f_' + f.id + '">' + f.label.replace(/</g, '&lt;') + '</label>' +
+          '<textarea id="f_' + f.id + '" rows="2"></textarea></div>'
+        ).join('');
+      }
+      modeSel.addEventListener('change', renderFields);
+      renderFields();
+
+      document.getElementById('runBtn').addEventListener('click', async () => {
+        const mode = modeSel.value;
+        const m = MODES.find((x) => x.key === mode);
+        const resultEl = document.getElementById('result');
+        const values = {};
+        for (const f of m.fields) values[f.id] = document.getElementById('f_' + f.id).value.trim();
+        if (m.fields.some((f) => !values[f.id])) { resultEl.textContent = '必要な項目を入力してください。'; return; }
+        resultEl.textContent = '作成中…';
+        try {
+          const resp = await fetch('${apiPath}', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ mode, values })
           });
           const data = await resp.json();
           resultEl.textContent = resp.ok ? data.output : ('エラー: ' + data.error);
@@ -1757,6 +1859,66 @@ const server = http.createServer(async (req, res) => {
         const output = await runPrompt({ provider, apiKey, promptText: m.build(v) });
         return sendJson(res, 200, { output });
       } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── 有料ツール：集客・接客ツール かんたん版（APIキー不要。運営者の共有APIキーで生成、1日上限あり）──
+    if (pathname === '/tools/shukyaku-kantan' && method === 'GET') {
+      if (!shukyakuKantanGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('集客・接客ツール かんたん版', '/tools/shukyaku-kantan/login'));
+      return sendHtml(res, 200, multiModeToolPageNoKey('集客・接客ツール かんたん版', 'ご購入者様専用・APIキー不要', SHUKYAKU_MODES, '/api/tools/shukyaku-kantan', `1日${shukyakuKantanLimiter.limit}回まで生成できます（全購入者共通の上限です）。`));
+    }
+    if (pathname === '/tools/shukyaku-kantan/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = shukyakuKantanGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('集客・接客ツール かんたん版', '/tools/shukyaku-kantan/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/shukyaku-kantan', { 'Set-Cookie': shukyakuKantanGate.cookie(sid) });
+    }
+    if (pathname === '/api/tools/shukyaku-kantan' && method === 'POST') {
+      if (!shukyakuKantanGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!SHARED_AI_API_KEY) return sendJson(res, 400, { error: '現在ご利用いただけません（運営者側の設定が未完了です）。お手数ですがお問い合わせください。' });
+      const { mode, values } = await parseBody(req);
+      const m = SHUKYAKU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      if (!shukyakuKantanLimiter.tryConsume()) return sendJson(res, 429, { error: '本日の生成回数の上限に達しました。日付が変わってからお試しください。' });
+      try {
+        const output = await runPrompt({ provider: SHARED_AI_PROVIDER, apiKey: SHARED_AI_API_KEY, promptText: m.build(v) });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        shukyakuKantanLimiter.refund();
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── 有料ツール：ダウンライン拡大ツール かんたん版（APIキー不要。運営者の共有APIキーで生成、1日上限あり）──
+    if (pathname === '/tools/kanyu-kantan' && method === 'GET') {
+      if (!kanyuKantanGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('ダウンライン拡大ツール かんたん版', '/tools/kanyu-kantan/login'));
+      return sendHtml(res, 200, multiModeToolPageNoKey('ダウンライン拡大ツール かんたん版', 'ご購入者様専用・APIキー不要', KANYU_MODES, '/api/tools/kanyu-kantan', `1日${kanyuKantanLimiter.limit}回まで生成できます（全購入者共通の上限です）。`));
+    }
+    if (pathname === '/tools/kanyu-kantan/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = kanyuKantanGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('ダウンライン拡大ツール かんたん版', '/tools/kanyu-kantan/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/kanyu-kantan', { 'Set-Cookie': kanyuKantanGate.cookie(sid) });
+    }
+    if (pathname === '/api/tools/kanyu-kantan' && method === 'POST') {
+      if (!kanyuKantanGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      if (!SHARED_AI_API_KEY) return sendJson(res, 400, { error: '現在ご利用いただけません（運営者側の設定が未完了です）。お手数ですがお問い合わせください。' });
+      const { mode, values } = await parseBody(req);
+      const m = KANYU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      if (!kanyuKantanLimiter.tryConsume()) return sendJson(res, 429, { error: '本日の生成回数の上限に達しました。日付が変わってからお試しください。' });
+      try {
+        const output = await runPrompt({ provider: SHARED_AI_PROVIDER, apiKey: SHARED_AI_API_KEY, promptText: m.build(v) });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        kanyuKantanLimiter.refund();
         return sendJson(res, 400, { error: e.message });
       }
     }
