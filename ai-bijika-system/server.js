@@ -1354,6 +1354,10 @@ time{font-size:11.5px;color:#6B7780}
 const SNS_PLATFORM_LABEL = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', threads: 'Threads', x: 'X', facebook: 'Facebook' };
 const SNS_CAPTION_LIMIT = { x: '280字', threads: '500字', tiktok: '2,200字', instagram: '2,200字', youtube: '5,000バイト', facebook: '上限なし' };
 const SNS_STATUS_LABEL = { posted: '投稿済み', scheduled: '予約済み', processing: '処理中', failed: '失敗', draft: '下書き' };
+// 本ツールはテキスト投稿（category: text）のみを扱う。ポストメッシュの仕様上、テキスト投稿に対応する
+// プラットフォームはX・Threads・Facebookの3つのみ（画像・動画が必須のYouTube・Instagram・TikTokは
+// 投稿先の選択肢に含めない。選べてしまうとポストメッシュ側のバリデーションで投稿が失敗するため）。
+const SNS_TEXT_PLATFORMS = new Set(['x', 'threads', 'facebook']);
 
 function jidoutoukouToolPage() {
   return layout('SNS自動投稿ツール', `
@@ -1823,7 +1827,7 @@ const server = http.createServer(async (req, res) => {
       const { pmApiKey } = await parseBody(req);
       try {
         const connections = await postmesh.listConnections({ apiKey: pmApiKey });
-        return sendJson(res, 200, { connections });
+        return sendJson(res, 200, { connections: connections.filter((c) => SNS_TEXT_PLATFORMS.has(c.platform)) });
       } catch (e) {
         return sendJson(res, 400, { error: e.message });
       }
@@ -1848,7 +1852,9 @@ const server = http.createServer(async (req, res) => {
       }
       let scheduledAtIso = null;
       if (scheduledAt) {
-        const d = new Date(scheduledAt);
+        // <input type="datetime-local"> にはタイムゾーン情報が無いため、日本時間として明示的に解釈する
+        // （サーバーの実行タイムゾーンに依存させない。本番はTZ未指定のためUTCで動く）
+        const d = new Date(`${scheduledAt}+09:00`);
         if (isNaN(d.getTime())) return sendJson(res, 400, { error: '予約日時の形式が正しくありません。' });
         scheduledAtIso = d.toISOString();
       }
