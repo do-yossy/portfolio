@@ -46,6 +46,7 @@ function loadEnvFile(file) {
 const { Users, GateProgress, DayProgress, Prompts, AiRuns, ProductProfile, Inquiries, AllowedEmails } = require('./db');
 const auth = require('./lib/auth');
 const { runPrompt, PROVIDERS } = require('./lib/aiproxy');
+const postmesh = require('./lib/postmesh');
 const { escapeHtml, jsonForScript, icon, layout, crest, guilloche, roman, pad2, initial } = require('./lib/ui');
 const { PERSONAS, tipsFor, prepStepsFor } = require('./lib/personas');
 const { planFields, fieldHtml, CLIENT_JS } = require('./lib/prompt-form');
@@ -63,6 +64,11 @@ const TROUBLE_PROMPTS = [27, 30, 28, 29];
 // お問い合わせの管理画面（/admin/inquiries）用の簡易パスワード認証。購入者アカウントとは別系統。
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
 if (ADMIN_PASSWORD === 'changeme') console.warn('[warn] ADMIN_PASSWORD 未設定。本番では必ず設定してください（/admin/inquiries が誰でも見られる状態です）。');
+
+// SNS自動投稿連携（/admin/sns）用のポストメッシュAPIキー。運営者がポストメッシュのダッシュボードで
+// 自身のSNSアカウントを連携し、発行したAPIキーをここに設定する。未設定でも起動はできるが機能は使えない。
+const POSTMESH_API_KEY = process.env.POSTMESH_API_KEY || '';
+if (!POSTMESH_API_KEY) console.warn('[warn] POSTMESH_API_KEY 未設定。/admin/sns（SNS自動投稿連携）は利用できません。');
 const adminSessions = new Set();
 function isAdminAuthed(req) {
   const sid = auth.parseCookies(req).get('admin_sid');
@@ -1336,8 +1342,144 @@ time{font-size:11.5px;color:#6B7780}
 .empty{color:#6B7780;text-align:center;padding:40px 0}
 .navlink{margin-left:14px}
 </style></head><body>
-<header><h1>お問い合わせ管理（未対応 ${newCount}件）</h1><div><a class="navlink" href="/admin/licenses">ライセンス</a><a class="navlink" href="/admin/logout">ログアウト</a></div></header>
+<header><h1>お問い合わせ管理（未対応 ${newCount}件）</h1><div><a class="navlink" href="/admin/licenses">ライセンス</a><a class="navlink" href="/admin/sns">SNS投稿</a><a class="navlink" href="/admin/logout">ログアウト</a></div></header>
 <main>${rows}</main>
+</body></html>`;
+}
+
+// ── SNS自動投稿連携（運営者用。ポストメッシュ https://post-mesh.com/ のAPIを中継する）──
+// SNSアカウントの連携（OAuth）自体はポストメッシュのダッシュボードで行う前提。本アプリは
+// 連携済みアカウントの一覧表示・投稿の作成・予約配信のみを扱う。いいね・フォロー・コメント
+// 自動返信などのエンゲージメント自動化は、SNS各社の規約に抵触しやすいため実装していない
+// （`営業システム`側の求人媒体に関する「自動巡回・自動応募は実装しない」という方針と同じ理由）。
+const SNS_PLATFORM_LABEL = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', threads: 'Threads', x: 'X', facebook: 'Facebook' };
+const SNS_CAPTION_LIMIT = { x: '280字', threads: '500字', tiktok: '2,200字', instagram: '2,200字', youtube: '5,000バイト', facebook: '上限なし' };
+const SNS_STATUS_LABEL = { posted: '投稿済み', scheduled: '予約済み', processing: '処理中', failed: '失敗', draft: '下書き' };
+
+function adminSnsPage({ apiKeySet, connectionError, formError, connections, posts, flash }) {
+  const body = !apiKeySet ? `
+    <div class="notice warn">
+      <b>ポストメッシュのAPIキーが未設定です。</b><br>
+      ① <a href="https://post-mesh.com/" target="_blank" rel="noopener">ポストメッシュ</a>に登録し、ダッシュボードでSNSアカウントを連携する（連携作業はポストメッシュ側で行います）<br>
+      ② ダッシュボードの「APIキー」画面でAPIキーを発行する<br>
+      ③ 環境変数 <code>POSTMESH_API_KEY</code> に設定し、再起動する
+    </div>` : connectionError ? `
+    <div class="notice error"><b>ポストメッシュへの接続に失敗しました：</b>${escapeHtml(connectionError)}</div>` : `
+    ${flash ? `<div class="notice ok">${escapeHtml(flash)}</div>` : ''}
+    ${formError ? `<div class="notice error">${escapeHtml(formError)}</div>` : ''}
+    <section>
+      <h2>連携中のSNSアカウント</h2>
+      ${connections.length === 0 ? `<p class="empty">連携済みのアカウントがありません。<a href="https://post-mesh.com/" target="_blank" rel="noopener">ポストメッシュのダッシュボード</a>でSNSアカウントを連携してください。</p>` : `
+      <div class="conn-list">${connections.map((c) => `
+        <label class="conn"><input type="checkbox" name="connection_id" value="${escapeHtml(c.id)}" form="compose">
+          <span class="conn-name"><b>${escapeHtml(SNS_PLATFORM_LABEL[c.platform] || c.platform)}</b> ${escapeHtml(c.account_name || '')}</span>
+          <span class="conn-limit">${escapeHtml(SNS_CAPTION_LIMIT[c.platform] || '')}</span>
+        </label>`).join('')}</div>`}
+    </section>
+
+    <section>
+      <h2>投稿を作成</h2>
+      <p class="hint">選んだすべてのアカウントに同じ本文で投稿します（プラットフォームごとの文字数上限は上の一覧を参照）。断定的な収入表現・誇張表現は避けてください。</p>
+      <details class="fold">
+        <summary>AIで下書きを作る（任意）</summary>
+        <div class="notice info">APIキーはこのブラウザにのみ保存され、実行のたびにサーバーへ中継されるだけで保存されません。利用料はご自身のOpenAI／Anthropicのご契約に基づき発生します。</div>
+        <label>伝えたいテーマ・役立つ情報<textarea id="draftTheme" rows="2" placeholder="例：副業で最初の一歩を踏み出せない人へ、今日からできる小さな一歩"></textarea></label>
+        <label>プロバイダ<select id="draftProvider">${Object.keys(PROVIDERS).map((p) => `<option value="${p}">${p}</option>`).join('')}</select></label>
+        <label>APIキー<input id="draftApiKey" type="password" placeholder="sk-... / このブラウザにのみ保存"></label>
+        <button type="button" id="draftBtn">AIで下書きを作る</button>
+        <p id="draftError" class="err"></p>
+      </details>
+      <form id="compose" method="POST" action="/admin/sns/compose">
+        <label>投稿本文<textarea name="caption" id="caption" rows="6" required placeholder="投稿する文章"></textarea></label>
+        <label>予約日時（空なら即時投稿）<input type="datetime-local" name="scheduled_at"></label>
+        <label class="checkline"><input type="checkbox" name="draft" value="1"> 下書きとして保存する（SNSへは配信しない）</label>
+        <button type="submit">投稿する</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>直近の投稿</h2>
+      ${posts.length === 0 ? '<p class="empty">投稿はまだありません。</p>' : `
+      <div class="post-list">${posts.map((p) => `
+        <div class="post-row">
+          <span class="badge ${p.status}">${escapeHtml(SNS_STATUS_LABEL[p.status] || p.status)}</span>
+          <span class="post-title">${escapeHtml(p.title || '')}</span>
+          <span class="post-plat">${(p.platforms || []).map((pl) => escapeHtml(SNS_PLATFORM_LABEL[pl.platform] || pl.platform)).join('・')}</span>
+          <time>${escapeHtml(new Date(p.display_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }))}</time>
+        </div>`).join('')}</div>`}
+    </section>
+
+    <script>
+      document.getElementById('draftBtn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('draftBtn');
+        const errEl = document.getElementById('draftError');
+        errEl.textContent = '';
+        const theme = document.getElementById('draftTheme').value.trim();
+        const provider = document.getElementById('draftProvider').value;
+        const apiKey = document.getElementById('draftApiKey').value.trim();
+        if (!theme) { errEl.textContent = 'テーマを入力してください。'; return; }
+        if (!apiKey) { errEl.textContent = 'APIキーを入力してください。'; return; }
+        btn.disabled = true; btn.textContent = '作成中…';
+        try {
+          const resp = await fetch('/api/admin/sns/draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme, provider, apiKey }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || '生成に失敗しました');
+          document.getElementById('caption').value = data.output;
+        } catch (e) {
+          errEl.textContent = e.message;
+        } finally {
+          btn.disabled = false; btn.textContent = 'AIで下書きを作る';
+        }
+      });
+    </script>`;
+
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SNS自動投稿連携｜ミチシルベ</title>
+<style>
+body{margin:0;background:#F5F1EA;color:#0E1A22;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:#0E1A22;color:#F3EEE4}
+header h1{font-size:15px;margin:0;letter-spacing:.02em}
+header a{color:#D9BF8C;font-size:13px;text-decoration:none;margin-left:14px}
+main{max-width:640px;margin:0 auto;padding:18px}
+section{background:#fff;border-radius:14px;box-shadow:0 1px 2px rgba(14,26,34,.06);padding:18px;margin-bottom:16px}
+h2{font-size:14px;margin:0 0 12px}
+.hint{font-size:12.5px;color:#6B7780;margin:0 0 12px}
+.notice{border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.7;margin-bottom:14px}
+.notice.warn{background:#FBF0D8;color:#7A4E00}
+.notice.error{background:#FBE2DD;color:#9C2E1F}
+.notice.ok{background:#E2F1E8;color:#1C7A55}
+.notice.info{background:#EEF3F1;color:#42525D}
+.conn-list{display:flex;flex-direction:column;gap:8px}
+.conn{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:8px 10px;border:1px solid #EAE3D6;border-radius:10px;cursor:pointer}
+.conn-name{flex:1}
+.conn-limit{color:#6B7780;font-size:11.5px}
+label{display:block;font-size:12.5px;color:#42525D;font-weight:700;margin:10px 0 4px}
+textarea,input,select{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #D8D0BF;border-radius:10px;font-size:14px;font-family:inherit}
+.checkline{display:flex;align-items:center;gap:8px;font-weight:400}
+.checkline input{width:auto}
+button[type=submit],#draftBtn{margin-top:14px;border:0;background:#0E1A22;color:#F3EEE4;font-size:13.5px;font-weight:700;padding:10px 18px;border-radius:10px;cursor:pointer}
+.fold{margin-bottom:10px;border:1px solid #EAE3D6;border-radius:10px;padding:10px 12px}
+.fold summary{cursor:pointer;font-size:13px;font-weight:700;color:#42525D}
+.err{color:#9C2E1F;font-size:12.5px;min-height:1.4em}
+.post-list{display:flex;flex-direction:column;gap:8px}
+.post-row{display:flex;align-items:center;gap:8px;font-size:12.5px;flex-wrap:wrap}
+.post-title{flex:1;min-width:120px}
+.post-plat{color:#6B7780}
+.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.02em;white-space:nowrap}
+.badge.posted{background:#E2F1E8;color:#1C7A55}
+.badge.scheduled{background:#E2E9FB;color:#2A4FAD}
+.badge.processing{background:#FBF0D8;color:#9C660F}
+.badge.failed{background:#FBE2DD;color:#9C2E1F}
+.badge.draft{background:#EDEAE2;color:#6B7780}
+.empty{color:#6B7780;text-align:center;padding:24px 0}
+code{background:#F5F1EA;padding:1px 6px;border-radius:6px}
+</style></head><body>
+<header><h1>SNS自動投稿連携</h1><div><a href="/admin/inquiries">お問い合わせ</a><a href="/admin/licenses">ライセンス</a><a href="/admin/logout">ログアウト</a></div></header>
+<main>${body}</main>
 </body></html>`;
 }
 
@@ -1386,7 +1528,7 @@ main{max-width:640px;margin:0 auto;padding:18px}
 .lic form button{border:0;background:#F5F1EA;color:#42525D;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:10px;cursor:pointer}
 .empty{color:#6B7780;text-align:center;padding:40px 0}
 </style></head><body>
-<header><h1>ライセンス管理</h1><div><a href="/admin/inquiries">お問い合わせ</a><a href="/admin/logout">ログアウト</a></div></header>
+<header><h1>ライセンス管理</h1><div><a href="/admin/inquiries">お問い合わせ</a><a href="/admin/sns">SNS投稿</a><a href="/admin/logout">ログアウト</a></div></header>
 <main>
   <p class="section-desc">購入時のメールアドレスを登録すると、そのメールアドレスで登録・ログインした時点で自動的に使えるようになります。</p>
   <div class="counts">未ログイン <b>${emailCounts.UNUSED || 0}</b>／ログイン済み <b>${emailCounts.ACTIVE || 0}</b>／無効化済み <b>${emailCounts.REVOKED || 0}</b></div>
@@ -1628,6 +1770,71 @@ const server = http.createServer(async (req, res) => {
       const revoked = AllowedEmails.revoke(aeRevokeMatch[1]);
       if (revoked && revoked.user_id) Users.setLicenseActive(revoked.user_id, false);
       return redirect(res, '/admin/licenses');
+    }
+
+    // ── SNS自動投稿連携（運営者用。ポストメッシュAPIを中継。/admin/inquiries と同じパスワード認証）──
+    if (pathname === '/admin/sns' && method === 'GET') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      if (!POSTMESH_API_KEY) return sendHtml(res, 200, adminSnsPage({ apiKeySet: false }));
+      const flashCode = url.searchParams.get('flash');
+      const flash = flashCode === 'posted' ? '投稿を作成しました。' : flashCode === 'draft' ? '下書きとして保存しました。' : null;
+      try {
+        const [connections, posts] = await Promise.all([
+          postmesh.listConnections({ apiKey: POSTMESH_API_KEY }),
+          postmesh.listPosts({ apiKey: POSTMESH_API_KEY, limit: 20 }),
+        ]);
+        return sendHtml(res, 200, adminSnsPage({ apiKeySet: true, connections, posts, flash }));
+      } catch (e) {
+        return sendHtml(res, 200, adminSnsPage({ apiKeySet: true, connectionError: e.message }));
+      }
+    }
+    if (pathname === '/admin/sns/compose' && method === 'POST') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      if (!POSTMESH_API_KEY) return sendHtml(res, 200, adminSnsPage({ apiKeySet: false }));
+      const { caption, connection_id, scheduled_at, draft } = await parseBody(req);
+      const captionText = String(caption || '').trim().slice(0, 5000);
+      const connectionIds = Array.isArray(connection_id) ? connection_id : (connection_id ? [connection_id] : []);
+      const isDraft = draft === '1' || draft === 'on';
+      const reload = async (formError) => {
+        try {
+          const [connections, posts] = await Promise.all([
+            postmesh.listConnections({ apiKey: POSTMESH_API_KEY }),
+            postmesh.listPosts({ apiKey: POSTMESH_API_KEY, limit: 20 }),
+          ]);
+          return sendHtml(res, 200, adminSnsPage({ apiKeySet: true, formError, connections, posts }));
+        } catch (e) {
+          return sendHtml(res, 200, adminSnsPage({ apiKeySet: true, connectionError: e.message }));
+        }
+      };
+      if (!captionText || connectionIds.length === 0) {
+        return reload('投稿本文と、投稿先のSNSアカウントを1つ以上指定してください。');
+      }
+      let scheduledAt = null;
+      if (scheduled_at) {
+        const d = new Date(scheduled_at);
+        if (isNaN(d.getTime())) return reload('予約日時の形式が正しくありません。');
+        scheduledAt = d.toISOString();
+      }
+      const targets = connectionIds.map((id) => ({ connection_id: id, caption: captionText }));
+      try {
+        await postmesh.createTextPost({ apiKey: POSTMESH_API_KEY, targets, scheduledAt, draft: isDraft });
+        return redirect(res, `/admin/sns?flash=${isDraft ? 'draft' : 'posted'}`);
+      } catch (e) {
+        return reload(e.message);
+      }
+    }
+    if (pathname === '/api/admin/sns/draft' && method === 'POST') {
+      if (!isAdminAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { theme, provider, apiKey } = await parseBody(req);
+      const themeText = String(theme || '').trim().slice(0, 2000);
+      if (!themeText) return sendJson(res, 400, { error: 'テーマを入力してください。' });
+      const promptText = `あなたはSNSマーケティングに詳しいコピーライターです。副業やネットワークビジネスにこれから取り組む人・取り組み始めたばかりの人に向けて、押し売り感のない、読んだ人が「役に立った」と感じるSNS投稿文を1つ作ってください。断定的な収入の保証表現（必ず稼げる、誰でも成功する等）は使わないでください。実在しない実績・お客様の声は含めないでください。\n\n【伝えたいテーマ・役立つ情報】：${themeText}`;
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
     }
 
     // ── 以降は認証必須 ──
