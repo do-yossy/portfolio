@@ -178,6 +178,8 @@ const RENAME_PATCHES = [
   },
   {
     co: 'sl', finalType: '通院送迎ドライバー', salary: '月収290,000円〜',
+    // ユーザー確認（2026-10-05）：通院送迎7件／エステ送迎6件。足りない分は、エステ系（旧・新どちらの名前でも）から1件移す。
+    targetCount: 7, extraFrom: ['治療院・エステ通院送迎ドライバー', 'エステ送迎ドライバー'],
     oldTypes: ['整骨院通院送迎ドライバー', 'お客様送迎ドライバー'],
     buildDescription: a => layout({ a, salary: '月収290,000円〜',
       points: ['通院が難しい方を運ぶ、感謝されるお仕事', '送迎と乗降のサポートが中心。本格的な介助スキルは不要'],
@@ -265,6 +267,18 @@ async function main() {
       `SELECT id, title, location FROM jobs WHERE company = ? AND job_type IN (${placeholders}) AND target_media LIKE '%indeed%'`
     ).all(patch.co, ...patch.oldTypes);
     console.log(`[${patch.co}] ${patch.oldTypes.filter(t=>!t.endsWith('XX')).join('／')} → ${patch.finalType}: ${jobs.length}件`);
+    if (patch.targetCount) {
+      const have = db.prepare(`SELECT COUNT(*) n FROM jobs WHERE company = ? AND job_type = ? AND target_media LIKE '%indeed%'`).get(patch.co, patch.finalType).n;
+      const need = patch.targetCount - (have + jobs.length);
+      if (need > 0) {
+        const ph2 = patch.extraFrom.map(() => '?').join(',');
+        const extra = db.prepare(
+          `SELECT id, title, location FROM jobs WHERE company = ? AND job_type IN (${ph2}) AND target_media LIKE '%indeed%' ORDER BY id DESC LIMIT ?`
+        ).all(patch.co, ...patch.extraFrom, need);
+        console.log(`   ${patch.finalType}の目標${patch.targetCount}件に対し不足${need}件 → ${patch.extraFrom[0]}から${extra.length}件を移す`);
+        jobs.push(...extra);
+      }
+    }
     for (const job of jobs) {
       await patchRename(job, patch.finalType, patch.titlePrefix, patch.buildDescription, patch.salary, patch.worktimeHoliday);
       total++;
