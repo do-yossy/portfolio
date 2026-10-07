@@ -366,6 +366,25 @@ const KANYU_MODES = [
     ], build: (v) => `あなたは誠実にフォローアップするアシスタントです。以下の情報をもとに、説明を聞いた後、まだ検討中の方への確認・フォローアップメッセージを作ってください。急かすような表現、繰り返しの強い勧誘は避けてください。\n\n【相手の検討状況】：${v.a}` },
 ];
 
+// 副業初心者向け無料ツール。docs/Tips低価格商品案.md（300円）の3プロンプトと同一（意図的に無料公開に転用）
+const FUKUGYOU_MODES = [
+  { key: 'sns', label: 'SNS用の短い自己紹介文', fields: [
+      { id: 'a', label: '経験・得意なこと' },
+      { id: 'b', label: '伝えたい相手' },
+      { id: 'c', label: '大切にしていること' },
+    ], build: (v) => `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える100字程度の自己紹介文を3パターン作ってください。\n\n【経験・得意なこと】：${v.a}\n【伝えたい相手】：${v.b}\n【大切にしていること】：${v.c}` },
+  { key: 'meet', label: '初対面の人にも伝わる自己紹介文', fields: [
+      { id: 'a', label: '経験・得意なこと' },
+      { id: 'b', label: '具体的なエピソード' },
+      { id: 'c', label: '今取り組んでいること' },
+    ], build: (v) => `あなたはプロのライターです。以下の情報をもとに、初めて会う人にも伝わるような300字程度の自己紹介文を作ってください。経験の具体的なエピソードを1つ盛り込んでください。\n\n【経験・得意なこと】：${v.a}\n【具体的なエピソード】：${v.b}\n【今取り組んでいること】：${v.c}` },
+  { key: 'pitch', label: '商品・サービス紹介の書き出し文', fields: [
+      { id: 'a', label: '商品・サービス' },
+      { id: 'b', label: '対象者' },
+      { id: 'c', label: '解決できる悩み' },
+    ], build: (v) => `あなたはプロのセールスライターです。以下の情報をもとに、商品・サービスの紹介文の書き出し部分（最初の2〜3文）を3パターン作ってください。読んだ人が『自分に関係がある』と感じる書き出しにしてください。\n\n【商品・サービス】：${v.a}\n【対象者】：${v.b}\n【解決できる悩み】：${v.c}` },
+];
+
 function toolLoginPage(title, loginPath, error) {
   return layout(title, `
     <div class="auth">
@@ -1482,6 +1501,25 @@ const server = http.createServer(async (req, res) => {
         : `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える100字程度の自己紹介文を3パターン作ってください。\n\n【経験・得意なこと】：${a}\n【伝えたい相手】：${b}\n【大切にしていること】：${c}`;
       try {
         const output = await runPrompt({ provider, apiKey, promptText });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── 公開ツール：副業初心者向け集客ツール（ログイン不要。APIキーは毎回受け取るだけで保存しない）──
+    if (pathname === '/tools/fukugyou' && method === 'GET') {
+      return sendHtml(res, 200, multiModeToolPage('副業初心者向け集客ツール', 'どなたでも無料でお使いいただけます', FUKUGYOU_MODES, '/api/tools/fukugyou'));
+    }
+    if (pathname === '/api/tools/fukugyou' && method === 'POST') {
+      const { mode, provider, apiKey, values } = await parseBody(req);
+      const m = FUKUGYOU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText: m.build(v) });
         return sendJson(res, 200, { output });
       } catch (e) {
         return sendJson(res, 400, { error: e.message });
