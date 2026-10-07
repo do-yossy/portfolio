@@ -1633,7 +1633,7 @@ function jidoutoukouToolPage(eyebrow) {
 }
 
 // ── ライセンス管理（運営者用。購入時のメールアドレスを許可リストに登録し、購入者だけが使えるようにする）──
-function adminLicensesPage(emailList) {
+function adminLicensesPage(emailList, error) {
   const emailCounts = { UNUSED: 0, ACTIVE: 0, REVOKED: 0 };
   for (const a of emailList) emailCounts[a.status] = (emailCounts[a.status] || 0) + 1;
   const STATUS_LABEL_AE = { UNUSED: '未ログイン', ACTIVE: 'ログイン済み', REVOKED: '無効化済み' };
@@ -1676,6 +1676,7 @@ main{max-width:640px;margin:0 auto;padding:18px}
 .lic-meta{font-size:12.5px;color:#42525D;margin:6px 0 8px;word-break:break-all}
 .lic form button{border:0;background:#F5F1EA;color:#42525D;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:10px;cursor:pointer}
 .empty{color:#6B7780;text-align:center;padding:40px 0}
+.err{color:#9C3B2C;background:#F6E3DF;font-size:12.5px;padding:10px 12px;border-radius:8px;margin:0 0 12px}
 </style></head><body>
 <header><h1>ライセンス管理</h1><div><a href="/admin/inquiries">お問い合わせ</a><a href="/admin/logout">ログアウト</a></div></header>
 <main>
@@ -1683,6 +1684,7 @@ main{max-width:640px;margin:0 auto;padding:18px}
   <div class="counts">未ログイン <b>${emailCounts.UNUSED || 0}</b>／ログイン済み <b>${emailCounts.ACTIVE || 0}</b>／無効化済み <b>${emailCounts.REVOKED || 0}</b></div>
   <div class="genbox">
     <h2>メールアドレスを許可する</h2>
+    ${error ? `<div class="err">${escapeHtml(error)}</div>` : ''}
     <form method="POST" action="/admin/licenses/allow-email">
       <label for="allow-email">購入者のメールアドレス</label>
       <input id="allow-email" type="email" name="email" required placeholder="buyer@example.com">
@@ -1991,10 +1993,12 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/admin/licenses/allow-email' && method === 'POST') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
       const { email, note, trialDays, trialGates } = await parseBody(req);
-      const trimmed = String(email || '').trim().toLowerCase();
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-        AllowedEmails.add(trimmed, String(note || '').trim().slice(0, 100), String(trialDays || '').trim(), String(trialGates || '').trim());
+      // 全角の＠・．で入力された場合（IME変換ミス）も受け付ける
+      const trimmed = String(email || '').trim().toLowerCase().replace(/＠/g, '@').replace(/．/g, '.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        return sendHtml(res, 400, adminLicensesPage(AllowedEmails.all(), 'メールアドレスの形式が正しくありません。半角で入力してください（例：taro@example.com）。'));
       }
+      AllowedEmails.add(trimmed, String(note || '').trim().slice(0, 100), String(trialDays || '').trim(), String(trialGates || '').trim());
       return redirect(res, '/admin/licenses');
     }
     const aeRevokeMatch = pathname.match(/^\/admin\/licenses\/emails\/([a-f0-9]+)\/revoke$/);
