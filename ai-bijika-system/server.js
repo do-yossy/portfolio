@@ -73,6 +73,33 @@ function adminSessionCookie(sid) {
   return `admin_sid=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400${secure}`;
 }
 
+// ── 有料ツール（/tools/shukyaku・/tools/kanyu）用の簡易パスワード認証 ──
+// ミチシルベの購入者アカウントとは別系統。Tips等で購入後、/contact経由で本人確認した
+// 上でパスワードを案内する運用を想定（admin認証と同じ、依存ゼロの方式）。
+function makeToolGate(envName, cookieName) {
+  const password = process.env[envName] || '';
+  if (!password) console.warn(`[warn] ${envName} 未設定。本番では必ず設定してください（${cookieName}のツールが誰でも使える状態です）。`);
+  const sessions = new Set();
+  return {
+    isAuthed(req) {
+      const sid = auth.parseCookies(req).get(cookieName);
+      return !!(sid && sessions.has(sid));
+    },
+    tryLogin(input) {
+      if (!password || input !== password) return null;
+      const sid = crypto.randomBytes(24).toString('hex');
+      sessions.add(sid);
+      return sid;
+    },
+    cookie(sid) {
+      const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+      return `${cookieName}=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${secure}`; // 30日
+    },
+  };
+}
+const shukyakuGate = makeToolGate('SHUKYAKU_TOOL_PASSWORD', 'shukyaku_sid');
+const kanyuGate = makeToolGate('KANYU_TOOL_PASSWORD', 'kanyu_sid');
+
 const splitList = (v) => String(v || '').split('、').filter(Boolean);
 const yen = (v) => `${Number(v).toLocaleString('ja-JP')}円`;
 
@@ -286,6 +313,153 @@ function jikoshoukaiToolPage() {
       });
     </script>
   `);
+}
+
+// ── 有料ツール：集客・接客ツール（980円、/tools/shukyaku）・ダウンライン拡大ツール（1,480円、/tools/kanyu）──
+// いずれも docs/TipsMLM集客接客プロンプト案.md・docs/TipsMLMダウンライン拡大プロンプト案.md の
+// 承認済みプロンプト文面をそのままモード定義として使う（文面の新規創作はしていない）。
+const SHUKYAKU_MODES = [
+  { key: 'sns', label: 'SNS投稿文', fields: [
+      { id: 'a', label: '商品・サービス' },
+      { id: 'b', label: '伝えたい魅力・体験' },
+      { id: 'c', label: '投稿する媒体（Instagram・LINE公式等）' },
+    ], build: (v) => `あなたはSNSマーケティングの専門家です。以下の情報をもとに、売り込み色を抑えた商品紹介の投稿文を3パターン作ってください。断定的な効果・効能の表現は使わないでください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【商品・サービス】：${v.a}\n【伝えたい魅力・体験】：${v.b}\n【投稿する媒体（Instagram・LINE公式等）】：${v.c}` },
+  { key: 'follow', label: 'お客様へのフォローアップ文', fields: [
+      { id: 'a', label: '商品' },
+      { id: 'b', label: '購入・前回の連絡からの期間' },
+      { id: 'c', label: '伝えたい一言' },
+    ], build: (v) => `あなたは誠実な接客を大切にするスタッフです。以下の情報をもとに、お客様に送るフォローアップメッセージを作ってください。売り込み感を出さず、相手の状況を尋ねる姿勢を大切にしてください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【商品】：${v.a}\n【購入・前回の連絡からの期間】：${v.b}\n【伝えたい一言】：${v.c}` },
+  { key: 'decline', label: 'お断りへの返信文', fields: [
+      { id: 'a', label: '断られた内容・状況' },
+    ], build: (v) => `あなたは誠実な接客対応ができるスタッフです。以下の状況で、お客様（または知人）からお断りの返事があった場合の、丁寧で押し付けがましくない返信文を作ってください。再度の勧誘や説得は含めないでください。\n\n【断られた内容・状況】：${v.a}` },
+  { key: 'profile', label: '自己紹介文・プロフィール文', fields: [
+      { id: 'a', label: '自分の経験・大切にしていること' },
+      { id: 'b', label: '扱っている商品・サービスの分野' },
+    ], build: (v) => `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える自己紹介文を作ってください。資格・肩書きを誇張せず、誠実な印象になるようにしてください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【自分の経験・大切にしていること】：${v.a}\n【扱っている商品・サービスの分野】：${v.b}` },
+  { key: 'event', label: 'イベント・体験会の案内文', fields: [
+      { id: 'a', label: 'イベント内容' },
+      { id: 'b', label: '日時・場所' },
+      { id: 'c', label: '参加してほしい人' },
+    ], build: (v) => `あなたはイベント運営のアシスタントです。以下の情報をもとに、商品の体験会・交流会の案内文を作ってください。参加を強制するような表現や、過度な期待を抱かせる表現は避けてください。新しい会員・ビジネスパートナーの募集を目的とした案内文は作成しないでください。\n\n【イベント内容】：${v.a}\n【日時・場所】：${v.b}\n【参加してほしい人】：${v.c}` },
+];
+const KANYU_MODES = [
+  { key: 'approach', label: '最初の声かけ文（法令上の開示義務に対応）', fields: [
+      { id: 'a', label: '自分の名前' },
+      { id: 'b', label: '取り扱う商品・サービス' },
+      { id: 'c', label: '相手との関係性' },
+    ], build: (v) => `あなたは法令を守って誠実にビジネスを紹介するアシスタントです。以下の情報をもとに、ネットワークビジネス（連鎖販売取引）への参加を誘う最初の声かけ文を作ってください。必ず文章の冒頭で、①自分の名前、②これがネットワークビジネス（連鎖販売取引）の勧誘であること、③取り扱う商品・サービスの名称、の3点を明確に伝えてください。これらを隠したり、後回しにしたりしないでください。断定的な収入の表現（必ず稼げる、誰でも成功する等）は使わないでください。\n\n【自分の名前】：${v.a}\n【取り扱う商品・サービス】：${v.b}\n【相手との関係性】：${v.c}` },
+  { key: 'briefing', label: '説明会・説明の機会への案内文', fields: [
+      { id: 'a', label: '説明会の形式（オンライン・対面等）' },
+      { id: 'b', label: '日時・場所' },
+      { id: 'c', label: '当日説明する内容' },
+    ], build: (v) => `あなたは誠実にビジネス説明の機会を案内するアシスタントです。以下の情報をもとに、ネットワークビジネスの説明会・説明の機会に誘う案内文を作ってください。参加を強制するような表現は避け、興味がある場合のみの任意参加であることを明記してください。\n\n【説明会の形式（オンライン・対面等）】：${v.a}\n【日時・場所】：${v.b}\n【当日説明する内容】：${v.c}` },
+  { key: 'faq', label: 'よくある質問への回答文', fields: [
+      { id: 'a', label: 'よくある質問' },
+      { id: 'b', label: '実際に伝えたい答えの要点' },
+    ], build: (v) => `あなたは誠実にビジネスについて説明するアシスタントです。以下の質問に対して、断定的な収入の保証や誇張を避け、正直に答える回答文を作ってください。\n\n【よくある質問】：${v.a}\n【実際に伝えたい答えの要点】：${v.b}` },
+  { key: 'coolingoff', label: 'クーリング・オフ・契約内容の説明文（法令遵守のための必須案内）', fields: [
+      { id: 'a', label: '扱う商品・サービス' },
+      { id: 'b', label: '入会にかかる費用' },
+    ], build: (v) => `あなたは法令を守って契約内容を説明するアシスタントです。ネットワークビジネスへの入会を決めた方に対して、特定商取引法で定められたクーリング・オフ制度（契約から一定期間内は無条件で契約を解除できる権利）があることを、分かりやすく、隠さずに説明する文章を作ってください。\n\n【扱う商品・サービス】：${v.a}\n【入会にかかる費用】：${v.b}` },
+  { key: 'checkin', label: '検討中の方へのフォローアップ文', fields: [
+      { id: 'a', label: '相手の検討状況' },
+    ], build: (v) => `あなたは誠実にフォローアップするアシスタントです。以下の情報をもとに、説明を聞いた後、まだ検討中の方への確認・フォローアップメッセージを作ってください。急かすような表現、繰り返しの強い勧誘は避けてください。\n\n【相手の検討状況】：${v.a}` },
+];
+
+function toolLoginPage(title, loginPath, error) {
+  return layout(title, `
+    <div class="auth">
+      <div class="auth-head">${crest(50)}<div class="eyebrow c">Members</div><h1>${escapeHtml(title)}</h1>
+        <p class="lead">購入時にご案内したパスワードを入力してください。</p></div>
+      ${error ? `<div class="notice error" style="margin:0 0 14px">${icon('flag', 16)}<div>${escapeHtml(error)}</div></div>` : ''}
+      <div class="card">
+        <form method="POST" action="${loginPath}">
+          <div class="field"><label class="lbl" for="password">パスワード</label>
+            <input id="password" type="password" name="password" required autofocus></div>
+          <button class="btn btn-primary btn-block" type="submit" style="margin-top:4px">入る</button>
+        </form>
+      </div>
+      <p class="muted center">パスワードが分からない方は<a href="/contact">お問い合わせ</a>ください。</p>
+    </div>
+  `);
+}
+
+function multiModeToolPage(title, eyebrow, modes, apiPath) {
+  const modeOptions = modes.map((m) => `<option value="${m.key}">${escapeHtml(m.label)}</option>`).join('');
+  const fieldsJson = JSON.stringify(modes.map((m) => ({ key: m.key, label: m.label, fields: m.fields })));
+  return layout(title, `
+    <section class="landing-hero lux" style="padding-bottom:22px">
+      ${crest(50)}
+      <div class="eyebrow">${escapeHtml(eyebrow)}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <p>場面を選んで入力すると、AIがそのまま使える文章を作ります。</p>
+    </section>
+    <section>
+      <div class="card">
+        <div class="field"><label class="lbl" for="modeSel">場面を選ぶ</label>
+          <select id="modeSel">${modeOptions}</select></div>
+        <div id="fieldsArea"></div>
+
+        <details class="fold" style="margin-top:12px">
+          <summary>${icon('lock', 18)}AIで生成する（APIキーが必要）</summary>
+          <div style="margin-top:12px">
+            <div class="notice info">APIキーはこのブラウザにのみ保存され、実行のたびにサーバーへ中継されるだけで保存されません。利用料はご自身のOpenAI／Anthropicのご契約に基づき発生します。</div>
+            <div class="field" style="margin-top:12px"><label class="lbl" for="provider">プロバイダ</label>
+              <select id="provider">${Object.keys(PROVIDERS).map((pv) => `<option value="${pv}">${pv}</option>`).join('')}</select></div>
+            <div class="field"><label class="lbl" for="apiKey">APIキー</label><input id="apiKey" type="password" placeholder="sk-... / このブラウザにのみ保存" autocomplete="off"></div>
+            <button id="runBtn" type="button" class="btn btn-primary btn-block">文章を作る</button>
+            <div id="result" style="margin-top:14px;white-space:pre-wrap;font-size:13.5px"></div>
+          </div>
+        </details>
+      </div>
+      <p class="muted center" style="margin-top:14px">生成された文章はそのまま使わず、事実と異なる部分が無いかご自身でご確認ください。</p>
+    </section>
+    <script>
+      const MODES = ${fieldsJson};
+      const modeSel = document.getElementById('modeSel');
+      const fieldsArea = document.getElementById('fieldsArea');
+      function renderFields() {
+        const m = MODES.find((x) => x.key === modeSel.value);
+        fieldsArea.innerHTML = m.fields.map((f, i) =>
+          '<div class="field"><label class="lbl" for="f_' + f.id + '">' + f.label.replace(/</g, '&lt;') + '</label>' +
+          '<textarea id="f_' + f.id + '" rows="2"></textarea></div>'
+        ).join('');
+      }
+      modeSel.addEventListener('change', renderFields);
+      renderFields();
+
+      const KEY_STORE = 'ai-bijika:apiKey:';
+      const providerSel = document.getElementById('provider');
+      const keyInput = document.getElementById('apiKey');
+      function loadKey() { try { keyInput.value = localStorage.getItem(KEY_STORE + providerSel.value) || ''; } catch (e) {} }
+      providerSel.addEventListener('change', loadKey);
+      loadKey();
+
+      document.getElementById('runBtn').addEventListener('click', async () => {
+        const mode = modeSel.value;
+        const m = MODES.find((x) => x.key === mode);
+        const provider = providerSel.value;
+        const apiKey = keyInput.value.trim();
+        const resultEl = document.getElementById('result');
+        const values = {};
+        for (const f of m.fields) values[f.id] = document.getElementById('f_' + f.id).value.trim();
+        if (!apiKey) { resultEl.textContent = 'APIキーを入力してください。'; return; }
+        if (m.fields.some((f) => !values[f.id])) { resultEl.textContent = '必要な項目を入力してください。'; return; }
+        try { localStorage.setItem(KEY_STORE + provider, apiKey); } catch (e) {}
+        resultEl.textContent = '作成中…';
+        try {
+          const resp = await fetch('${apiPath}', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ mode, provider, apiKey, values })
+          });
+          const data = await resp.json();
+          resultEl.textContent = resp.ok ? data.output : ('エラー: ' + data.error);
+        } catch (e) {
+          resultEl.textContent = '通信エラーが発生しました。';
+        }
+      });
+    </script>
+  `, { noNav: true });
 }
 
 // ── ページ: サインアップ／ログイン ──
@@ -1302,12 +1476,66 @@ const server = http.createServer(async (req, res) => {
       const a = String(fieldA || '').trim().slice(0, 2000);
       const b = String(fieldB || '').trim().slice(0, 2000);
       const c = String(fieldC || '').trim().slice(0, 2000);
-      if (!a || !b) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      if (!a || !b || (mode !== 'mlm' && !c)) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
       const promptText = mode === 'mlm'
         ? `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える自己紹介文を作ってください。資格・肩書きを誇張せず、誠実な印象になるようにしてください。新しい会員・ビジネスパートナーの募集を目的とした内容は含めないでください。\n\n【自分の経験・大切にしていること】：${a}\n【扱っている商品・サービスの分野】：${b}`
         : `あなたはプロのコピーライターです。以下の情報をもとに、SNSのプロフィール欄に使える100字程度の自己紹介文を3パターン作ってください。\n\n【経験・得意なこと】：${a}\n【伝えたい相手】：${b}\n【大切にしていること】：${c}`;
       try {
         const output = await runPrompt({ provider, apiKey, promptText });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── 有料ツール：集客・接客ツール（980円）──
+    if (pathname === '/tools/shukyaku' && method === 'GET') {
+      if (!shukyakuGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('集客・接客ツール', '/tools/shukyaku/login'));
+      return sendHtml(res, 200, multiModeToolPage('集客・接客ツール', 'ご購入者様専用', SHUKYAKU_MODES, '/api/tools/shukyaku'));
+    }
+    if (pathname === '/tools/shukyaku/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = shukyakuGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('集客・接客ツール', '/tools/shukyaku/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/shukyaku', { 'Set-Cookie': shukyakuGate.cookie(sid) });
+    }
+    if (pathname === '/api/tools/shukyaku' && method === 'POST') {
+      if (!shukyakuGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { mode, provider, apiKey, values } = await parseBody(req);
+      const m = SHUKYAKU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText: m.build(v) });
+        return sendJson(res, 200, { output });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+    }
+
+    // ── 有料ツール：ダウンライン拡大ツール（1,480円）──
+    if (pathname === '/tools/kanyu' && method === 'GET') {
+      if (!kanyuGate.isAuthed(req)) return sendHtml(res, 200, toolLoginPage('ダウンライン拡大ツール', '/tools/kanyu/login'));
+      return sendHtml(res, 200, multiModeToolPage('ダウンライン拡大ツール', 'ご購入者様専用', KANYU_MODES, '/api/tools/kanyu'));
+    }
+    if (pathname === '/tools/kanyu/login' && method === 'POST') {
+      const { password } = await parseBody(req);
+      const sid = kanyuGate.tryLogin(String(password || ''));
+      if (!sid) return sendHtml(res, 401, toolLoginPage('ダウンライン拡大ツール', '/tools/kanyu/login', 'パスワードが違います。'));
+      return redirect(res, '/tools/kanyu', { 'Set-Cookie': kanyuGate.cookie(sid) });
+    }
+    if (pathname === '/api/tools/kanyu' && method === 'POST') {
+      if (!kanyuGate.isAuthed(req)) return sendJson(res, 403, { error: 'ログインが必要です。' });
+      const { mode, provider, apiKey, values } = await parseBody(req);
+      const m = KANYU_MODES.find((x) => x.key === mode);
+      if (!m) return sendJson(res, 400, { error: 'invalid mode' });
+      const v = {};
+      for (const f of m.fields) v[f.id] = String((values && values[f.id]) || '').trim().slice(0, 2000);
+      if (m.fields.some((f) => !v[f.id])) return sendJson(res, 400, { error: '必要な項目を入力してください。' });
+      try {
+        const output = await runPrompt({ provider, apiKey, promptText: m.build(v) });
         return sendJson(res, 200, { output });
       } catch (e) {
         return sendJson(res, 400, { error: e.message });
