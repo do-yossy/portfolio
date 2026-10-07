@@ -78,9 +78,13 @@ function adminSessionCookie(sid) {
 // ── 有料ツール（/tools/shukyaku・/tools/kanyu）用の簡易パスワード認証 ──
 // ミチシルベの購入者アカウントとは別系統。Tips等で購入後、/contact経由で本人確認した
 // 上でパスワードを案内する運用を想定（admin認証と同じ、依存ゼロの方式）。
-function makeToolGate(envName, cookieName) {
+// giftEnvName（任意）を指定すると、購入者用パスワードとは別の「ギフト用パスワード」も
+// 有効になる。無償プレゼント（例：アポミー再アプローチ）専用に発行し、購入者用パスワード
+// とは独立して変更・無効化できるようにするための仕組み（どちらで入っても同じツールを使える）。
+function makeToolGate(envName, cookieName, giftEnvName) {
   const password = process.env[envName] || '';
   if (!password) console.warn(`[warn] ${envName} 未設定。本番では必ず設定してください（${cookieName}のツールが誰でも使える状態です）。`);
+  const giftPassword = giftEnvName ? (process.env[giftEnvName] || '') : '';
   const sessions = new Set();
   return {
     isAuthed(req) {
@@ -88,7 +92,8 @@ function makeToolGate(envName, cookieName) {
       return !!(sid && sessions.has(sid));
     },
     tryLogin(input) {
-      if (!password || input !== password) return null;
+      const ok = (!!password && input === password) || (!!giftPassword && input === giftPassword);
+      if (!ok) return null;
       const sid = crypto.randomBytes(24).toString('hex');
       sessions.add(sid);
       return sid;
@@ -99,9 +104,9 @@ function makeToolGate(envName, cookieName) {
     },
   };
 }
-const shukyakuGate = makeToolGate('SHUKYAKU_TOOL_PASSWORD', 'shukyaku_sid');
-const kanyuGate = makeToolGate('KANYU_TOOL_PASSWORD', 'kanyu_sid');
-const jidoutoukouGate = makeToolGate('JIDOUTOUKOU_TOOL_PASSWORD', 'jidoutoukou_sid');
+const shukyakuGate = makeToolGate('SHUKYAKU_TOOL_PASSWORD', 'shukyaku_sid', 'SHUKYAKU_GIFT_PASSWORD');
+const kanyuGate = makeToolGate('KANYU_TOOL_PASSWORD', 'kanyu_sid', 'KANYU_GIFT_PASSWORD');
+const jidoutoukouGate = makeToolGate('JIDOUTOUKOU_TOOL_PASSWORD', 'jidoutoukou_sid', 'JIDOUTOUKOU_GIFT_PASSWORD');
 
 // ── 有料ツール「かんたん版」（/tools/shukyaku-kantan・/tools/kanyu-kantan）用。
 // 購入者自身のAPIキー入力を不要にする代わりに、運営者自身のAIプロバイダAPIキーを
