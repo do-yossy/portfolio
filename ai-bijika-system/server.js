@@ -126,7 +126,8 @@ if (!SHARED_AI_API_KEY) console.warn('[warn] SHARED_AI_API_KEY 未設定。か�
 // プロセス再起動でもリセットされる（永続化しない）。購入者ごとではなく、
 // ツール全体で1日の合計生成回数を制限する設計。
 function makeDailyLimiter(envName, defaultLimit) {
-  const limit = parseInt(process.env[envName] || '', 10) || defaultLimit;
+  const parsed = parseInt(process.env[envName], 10);
+  const limit = Number.isInteger(parsed) && parsed >= 0 ? parsed : defaultLimit;
   let day = '';
   let count = 0;
   const rollIfNeeded = () => {
@@ -1524,7 +1525,7 @@ function jidoutoukouToolPage(eyebrow) {
       const PLATFORM_LABEL = ${JSON.stringify(SNS_PLATFORM_LABEL)};
       const CAPTION_LIMIT = ${JSON.stringify(SNS_CAPTION_LIMIT)};
       const STATUS_LABEL = ${JSON.stringify(SNS_STATUS_LABEL)};
-      const esc = (s) => (s || '').replace(/</g, '&lt;');
+      const esc = (s) => (s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
       const KEY_STORE_PM = 'ai-bijika:postmeshApiKey';
       const KEY_STORE = 'ai-bijika:apiKey:';
