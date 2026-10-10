@@ -670,6 +670,9 @@ const COMPANIES = [
   { id: 'sl', name: '合同会社スマイルライフ',   short: 'SL', label: 'スマイルライフ' },
   { id: 'am', name: 'AMBITION合同会社',        short: 'AM', label: 'AMBITION' },
   { id: 'yp', name: '合同会社YUMIPRO AGENCY',  short: 'YP', label: 'YUMIPRO AGENCY' },
+  { id: 'gp', name: '株式会社五方',            short: 'GP', label: '五方' },
+  { id: 'jd', name: '株式会社JANDO',           short: 'JD', label: 'JANDO' },
+  { id: 'pk', name: '合同会社プアKY',          short: 'PK', label: 'プアKY' },
 ];
 const MEDIA = [
   { id: 'indeed',   name: 'Indeed' },
