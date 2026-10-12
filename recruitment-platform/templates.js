@@ -13,6 +13,9 @@ const COMPANIES = {
   sl: { label: 'スマイルライフ',   full: '合同会社スマイルライフ',   color: '#059669' },
   am: { label: 'AMBITION',       full: 'AMBITION合同会社',        color: '#9333ea' },
   yp: { label: 'YUMIPRO AGENCY', full: '合同会社YUMIPRO AGENCY', color: '#65a30d' },
+  gp: { label: '五方',           full: '株式会社五方',            color: '#0369a1' },
+  jd: { label: 'JANDO',          full: '株式会社JANDO',           color: '#be123c' },
+  pk: { label: 'プアKY',         full: '合同会社プアKY',          color: '#a16207' },
 };
 
 // 運用管理の媒体マスタ
