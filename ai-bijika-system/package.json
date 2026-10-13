@@ -5,7 +5,10 @@
   "private": true,
   "scripts": {
     "start": "node --experimental-sqlite --env-file=.env server.js",
-    "dev": "node --experimental-sqlite --env-file=.env --watch server.js"
+    "dev": "node --experimental-sqlite --env-file=.env --watch server.js",
+    "test": "node --experimental-sqlite test/service.test.js"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }
