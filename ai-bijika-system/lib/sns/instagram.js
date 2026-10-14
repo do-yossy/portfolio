@@ -23,9 +23,9 @@ const textLength = (t) => [...String(t)].length;
 function validatePost(args) {
   const p = normalize(args); const text = p.text; const media = p.medias[0];
   if (p.category === 'tree') return 'Instagramには、ツリー投稿はできません。';
-  if (p.medias.length > 1) return 'Instagramの複数画像（カルーセル）は、このバージョンでは対応していません。';
   if (!media) return 'Instagramは、画像または動画が必要です。';
-  if (media.kind === 'image' && media.mime !== 'image/jpeg') return 'Instagramに投稿できる画像はJPEGです（PNGは使えません）。';
+  if (p.medias.length > 10) return 'Instagramのカルーセルは10件までです。';
+  if (p.medias.some((m) => m.kind === 'image' && m.mime !== 'image/jpeg')) return 'Instagramに投稿できる画像はJPEGです（PNGは使えません）。';
   if (textLength(text || '') > maxLength) return `Instagramのキャプションは${maxLength}文字までです。`;
   return null;
 }
@@ -85,14 +85,28 @@ async function publish(args) {
   const p = normalize(args); const text = p.text; const media = p.medias[0];
   const err = validatePost(args);
   if (err) throw new SnsError(err);
-  const form = { caption: text || '', access_token: accessToken };
-  if (media.kind === 'image') form.image_url = media.url;
-  else { form.media_type = 'REELS'; form.video_url = media.url; }
-  const created = await call({ method: 'POST', path: `/${API_VERSION}/${encodeURIComponent(externalUserId)}/media`, form });
-  if (media.kind === 'video') await waitFinished(created.id, accessToken);
+  const base = `/${API_VERSION}/${encodeURIComponent(externalUserId)}`;
+  let created;
+  if (p.medias.length > 1) {
+    const kids = [];
+    for (const m of p.medias) {
+      const f = { is_carousel_item: 'true', access_token: accessToken };
+      if (m.kind === 'image') f.image_url = m.url; else { f.media_type = 'VIDEO'; f.video_url = m.url; }
+      const c = await call({ method: 'POST', path: `${base}/media`, form: f });
+      if (m.kind === 'video') await waitFinished(c.id, accessToken);
+      kids.push(c.id);
+    }
+    created = await call({ method: 'POST', path: `${base}/media`, form: { media_type: 'CAROUSEL', children: kids.join(','), caption: text || '', access_token: accessToken } });
+  } else {
+    const form = { caption: text || '', access_token: accessToken };
+    if (media.kind === 'image') form.image_url = media.url;
+    else { form.media_type = 'REELS'; form.video_url = media.url; }
+    created = await call({ method: 'POST', path: `${base}/media`, form });
+    if (media.kind === 'video') await waitFinished(created.id, accessToken);
+  }
   let published;
   try {
-    published = await call({ method: 'POST', path: `/${API_VERSION}/${encodeURIComponent(externalUserId)}/media_publish`, form: { creation_id: created.id, access_token: accessToken } });
+    published = await call({ method: 'POST', path: `${base}/media_publish`, form: { creation_id: created.id, access_token: accessToken } });
   } catch (e) { throw ambiguous(e); }
   return { externalId: String(published.id) };
 }

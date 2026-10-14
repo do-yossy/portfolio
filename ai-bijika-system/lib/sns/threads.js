@@ -80,12 +80,30 @@ async function refresh({ accessToken }) {
   };
 }
 
+const MAX_CAROUSEL = 20;
+const MAX_TREE = 25;
+
+// 1枚分（本文＋添付）の検証。エラーなら日本語の文
+function validateOne(label, text, medias) {
+  if (medias.length > MAX_CAROUSEL) return `${label}の画像・動画は${MAX_CAROUSEL}件までです。`;
+  if (medias.length > 1 && medias.some((m) => m.mime === 'image/gif')) return `${label}: 複数枚の投稿にGIFは使えません。`;
+  if (!String(text || '').trim() && !medias.length) return `${label}は、本文か画像・動画のどちらかが必要です。`;
+  if (textLength(text || '') > maxLength) return `${label}は${maxLength}文字までです。`;
+  return null;
+}
+
 function validatePost(args) {
-  const p = normalize(args); const text = p.text; const media = p.medias[0];
-  if (p.category === 'tree') return 'Threadsのツリー投稿は、このバージョンでは対応していません。';
-  if (p.medias.length > 1) return 'Threadsの複数画像は、このバージョンでは対応していません。';
-  if (!String(text || '').trim() && !media) return 'Threadsは、本文か画像・動画のどちらかが必要です。';
-  if (textLength(text || '') > maxLength) return `Threadsは${maxLength}文字までです。`;
+  const p = normalize(args);
+  const e = validateOne('Threads', p.text, p.medias);
+  if (e) return e;
+  if (p.category === 'tree') {
+    if (!p.tree.length) return 'ツリー投稿は、2件目以降の投稿が必要です。';
+    if (p.tree.length + 1 > MAX_TREE) return `Threadsのツリーは${MAX_TREE}件までです。`;
+    for (let i = 0; i < p.tree.length; i++) {
+      const e2 = validateOne(`ツリー${i + 2}件目`, p.tree[i].text, p.tree[i].medias || []);
+      if (e2) return e2;
+    }
+  }
   return null;
 }
 
@@ -99,25 +117,57 @@ async function waitFinished(containerId, accessToken) {
   throw new SnsError('Threads側の動画の処理が終わりませんでした。', { retriable: true });
 }
 
-// 投稿：コンテナ作成（テキスト／画像／動画）→（動画は処理待ち）→ 公開
-async function publish(args) {
-  const { accessToken, externalUserId } = args;
-  const p = normalize(args); const text = p.text; const media = p.medias[0];
-  const err = validatePost(args);
-  if (err) throw new SnsError(err);
-  const form = { text: text || '', access_token: accessToken };
-  if (!media) form.media_type = 'TEXT';
-  else if (media.kind === 'image') { form.media_type = 'IMAGE'; form.image_url = media.url; }
-  else { form.media_type = 'VIDEO'; form.video_url = media.url; }
-  const created = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads`, { form });
-  if (media && media.kind === 'video') await waitFinished(created.id, accessToken);
-  let published;
-  try {
-    published = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads_publish`, {
-      form: { creation_id: created.id, access_token: accessToken },
-    });
-  } catch (e) { throw ambiguous(e); }
-  return { externalId: String(published.id) };
+function mediaForm(m) {
+  return m.kind === 'image' ? { media_type: 'IMAGE', image_url: m.url } : { media_type: 'VIDEO', video_url: m.url };
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, usesPkce: false, mediaRule: '画像・動画は任意' };
+// 1件分の投稿（テキスト／画像／動画／カルーセル）。replyTo があればその投稿への返信にする。戻り値は公開された投稿ID
+async function publishOne({ accessToken, externalUserId, text, medias, replyTo }) {
+  const base = `/v1.0/${encodeURIComponent(externalUserId)}`;
+  const form = { access_token: accessToken };
+  if (replyTo) form.reply_to_id = replyTo;
+  let created;
+  if (medias.length > 1) {
+    const kids = [];
+    for (const m of medias) {
+      const c = await call('POST', `${base}/threads`, { form: { ...mediaForm(m), is_carousel_item: 'true', access_token: accessToken } });
+      if (m.kind === 'video') await waitFinished(c.id, accessToken);
+      kids.push(c.id);
+    }
+    created = await call('POST', `${base}/threads`, { form: { ...form, media_type: 'CAROUSEL', children: kids.join(','), text: text || '' } });
+  } else if (medias.length === 1) {
+    created = await call('POST', `${base}/threads`, { form: { ...form, ...mediaForm(medias[0]), text: text || '' } });
+    if (medias[0].kind === 'video') await waitFinished(created.id, accessToken);
+  } else {
+    created = await call('POST', `${base}/threads`, { form: { ...form, media_type: 'TEXT', text: text || '' } });
+  }
+  let published;
+  try {
+    published = await call('POST', `${base}/threads_publish`, { form: { creation_id: created.id, access_token: accessToken } });
+  } catch (e) { throw ambiguous(e); }
+  return String(published.id);
+}
+
+// 投稿。ツリーは1件目→2件目以降を前の投稿への返信として順に公開する
+async function publish(args) {
+  const { accessToken, externalUserId } = args;
+  const p = normalize(args);
+  const err = validatePost(args);
+  if (err) throw new SnsError(err);
+  const items = [{ text: p.text, medias: p.medias }, ...(p.category === 'tree' ? p.tree : [])];
+  let first = '';
+  let prev = '';
+  for (let i = 0; i < items.length; i++) {
+    try {
+      prev = await publishOne({ accessToken, externalUserId, text: items[i].text, medias: items[i].medias || [], replyTo: prev });
+      if (!first) first = prev;
+    } catch (e) {
+      // 1件目が公開済みなら、自動の再試行は二重投稿になるため止める
+      if (first) { e.retriable = false; e.message = `${e.message}（ツリーの${i}件目までは投稿済みです。SNSでご確認ください）`; }
+      throw e;
+    }
+  }
+  return { externalId: first };
+}
+
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, usesPkce: false, mediaRule: '画像・動画は任意（最大20件のカルーセル、ツリー25件まで）' };
