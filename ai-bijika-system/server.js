@@ -51,6 +51,10 @@ const { escapeHtml, jsonForScript, icon, layout, crest, guilloche, roman, pad2, 
 const { PERSONAS, tipsFor, prepStepsFor } = require('./lib/personas');
 const { planFields, fieldHtml, CLIENT_JS } = require('./lib/prompt-form');
 const O = require('./lib/options');
+const serviceRoutes = require('./lib/service-routes');
+const serviceUi = require('./lib/service-ui');
+const serviceStore = require('./lib/service-store');
+const snsScheduler = require('./lib/sns/scheduler');
 const promptSeeds = require('./seeds/prompts');
 const promptFields = require('./seeds/prompt-fields');
 const gateDefs = require('./seeds/gates');
@@ -1721,6 +1725,9 @@ const server = http.createServer(async (req, res) => {
       return fs.createReadStream(filePath).pipe(res);
     }
 
+    // ── 月額SNS自動投稿サービス（/service 以下とStripe Webhook。購入者向けのライセンス認証とは別系統）──
+    if (await serviceRoutes.handle({ req, res, url, method, pathname, user })) return;
+
     // ── 認証不要 ──
     if (pathname === '/' && method === 'GET') {
       if (user) return redirect(res, '/dashboard');
@@ -1986,6 +1993,12 @@ const server = http.createServer(async (req, res) => {
       return redirect(res, '/admin/inquiries');
     }
 
+    // ── 月額サービスの契約状況（運営者用・閲覧のみ）──
+    if (pathname === '/admin/service' && method === 'GET') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      return sendHtml(res, 200, serviceUi.adminServicePage({ subs: serviceStore.Subscriptions.all(), stats: serviceStore.Subscriptions.countByStatus(), postStats: serviceStore.ScheduledPosts.stats() }));
+    }
+
     // ── ライセンス管理（運営者用。購入時のメールアドレスだけを許可し、購入者だけが使えるようにする）──
     if (pathname === '/admin/licenses' && method === 'GET') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
@@ -2193,6 +2206,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => console.log(`ミチシルベ: http://localhost:${PORT}`));
+  snsScheduler.start();
 }
 
 module.exports = server;
