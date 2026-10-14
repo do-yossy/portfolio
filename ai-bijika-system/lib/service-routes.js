@@ -10,7 +10,7 @@ const billing = require('./billing');
 const core = require('./service-core');
 const ui = require('./service-ui');
 const scheduler = require('./sns/scheduler');
-const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys, AutoRules } = require('./service-store');
+const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys, AutoRules, AiJobs } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
 const mediaLib = require('./media');
 const registry = require('./sns');
@@ -291,7 +291,7 @@ async function handle(ctx) {
     redirect(res, `/service/app?f=${now ? 'now' : 'scheduled'}`);
     return true;
   }
-  const aiMatch = pathname.match(/^\/service\/app\/ai\/(text|image)$/);
+  const aiMatch = pathname.match(/^\/service\/app\/ai\/(text|image|video)$/);
   if (aiMatch && method === 'POST') {
     if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }
     if (!Subscriptions.isActive(user.id)) { sendJson(res, 403, { error: 'ご契約が有効ではありません。' }); return true; }
@@ -299,21 +299,37 @@ async function handle(ctx) {
     try { b = JSON.parse(await readRaw(req, 20_000) || '{}'); } catch { sendJson(res, 400, { error: '入力が正しくありません。' }); return true; }
     try {
       if (aiMatch[1] === 'text') sendJson(res, 200, { text: await ai.generateText({ userId: user.id, theme: b.theme, platform: b.platform }) });
-      else { const m = await ai.generateImage({ userId: user.id, prompt: b.prompt }); sendJson(res, 200, { id: m.id, url: mediaLib.publicUrl(m) }); }
+      else if (aiMatch[1] === 'image') { const m = await ai.generateImage({ userId: user.id, prompt: b.prompt }); sendJson(res, 200, { id: m.id, url: mediaLib.publicUrl(m) }); }
+      else {
+        const op = await ai.startVideo({ userId: user.id, prompt: `${String(b.prompt || '')}（SNSの縦長の短い動画。文字やロゴは入れない）` });
+        sendJson(res, 202, { job_id: AiJobs.create({ userId: user.id, kind: 'video', prompt: String(b.prompt || '').slice(0, 1000), operation: op }) });
+      }
     } catch (e) {
       if (e instanceof ai.AiError) sendJson(res, 400, { error: e.message }); else { console.error('[ai]', e.message); sendJson(res, 500, { error: '生成に失敗しました。時間をおいてもう一度お試しください。' }); }
     }
     return true;
   }
+  // 動画の生成の状態（画面から数秒ごとに確認する。できあがったら、確認用のURLも返す）
+  const jobMatch = pathname.match(/^\/service\/app\/ai\/jobs\/([a-f0-9]+)$/);
+  if (jobMatch && method === 'GET') {
+    const j = AiJobs.get(jobMatch[1], user.id);
+    if (!j) { sendJson(res, 404, { error: '見つかりません。' }); return true; }
+    const m = j.media_id ? require('./service-store').MediaAssets.getForUser(j.media_id, user.id) : null;
+    sendJson(res, 200, { status: j.status, media_id: j.media_id || undefined, url: m ? mediaLib.publicUrl(m) : undefined, error: j.error || undefined });
+    return true;
+  }
   if (pathname === '/service/app/auto' && method === 'POST') {
     const body = await needCsrf(); if (!body) return true;
     if (!Subscriptions.isActive(user.id)) { dashboard(403, { type: 'error', text: 'ご契約が有効ではありません。' }); return true; }
-    const mode = body.mode === 'auto' ? 'auto' : 'draft';
-    if (mode === 'auto' && body.confirm_auto !== '1') { dashboard(400, { type: 'error', text: '「そのまま投稿する」を選ぶ場合は、確認のチェックが必要です。' }); return true; }
-    const args = { userId: user.id, accountId: String(body.account_id || ''), theme: body.theme, withImage: body.with_image === '1', hourJst: parseInt(body.hour_jst, 10), mode };
+    const hours = [body.hour1, body.hour2, body.hour3].filter((h) => h !== undefined && h !== '').map((h) => parseInt(h, 10));
+    const options = {};
+    if (body.yt_privacy) options.privacy = String(body.yt_privacy);
+    if (body.yt_kids === 'yes' || body.yt_kids === 'no') options.made_for_kids = body.yt_kids === 'yes';
+    const args = apiV1.ruleArgs(user.id, { account_id: body.account_id, theme: body.theme, tone: body.tone, media: body.media, hours, mode: body.mode, options });
+    if (args.mode === 'auto' && body.confirm_auto !== '1') { dashboard(400, { type: 'error', text: '「そのまま投稿する」を選ぶ場合は、確認のチェックが必要です。' }); return true; }
     const problem = aiAuto.validateRule(args);
     if (problem) { dashboard(400, { type: 'error', text: problem }); return true; }
-    aiAuto.createRule({ ...args, theme: String(body.theme).trim(), tone: String(body.tone || '').slice(0, 100) });
+    aiAuto.createRule(args);
     redirect(res, '/service/app?f=auto_added');
     return true;
   }

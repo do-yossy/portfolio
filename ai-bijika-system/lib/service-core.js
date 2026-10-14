@@ -98,7 +98,7 @@ const mediaOf = (m) => ({ id: m.id, kind: m.kind, mime: m.mime, size: m.size });
 //   targets: [{ accountId, caption, options }]（SNSごとに本文・設定を変えられる）
 //   mediaIds: image は複数、video は1つ。tree: [{ text, mediaIds }]（X・Threads のみ）
 //   draft: true なら下書き（SNSへは送らない。日時は任意）
-function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso, draft, nowMs = Date.now() }) {
+function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso, draft, ruleId = '', nowMs = Date.now() }) {
   if (!CATEGORIES.includes(category)) return { ok: false, error: '投稿の種類が正しくありません。' };
   if (!Array.isArray(targets) || !targets.length) return { ok: false, error: '投稿先のSNSを選んでください。' };
   if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
@@ -160,7 +160,7 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
   const groupId = require('crypto').randomBytes(10).toString('hex');
   const created = resolved.map(({ a, caption, options }) => ScheduledPosts.create({
     userId, accountId: a.id, text: caption, scheduledAt: scheduledAtIso || new Date(nowMs).toISOString(),
-    mediaIds: ids, options, category, tree: cards, groupId, status: draft ? 'draft' : 'pending',
+    mediaIds: ids, options, category, tree: cards, groupId, status: draft ? 'draft' : 'pending', ruleId,
   }));
   return { ok: true, ids: created, groupId };
 }

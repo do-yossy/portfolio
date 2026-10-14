@@ -30,6 +30,12 @@ const mock = installHttpsMock(async (c) => {
     if (c.method === 'POST' && c.path === '/v1/subscriptions/sub_e2e') { cancelFlag = /cancel_at_period_end=true/.test(c.body); return { status: 200, json: subObj() }; }
     if (c.path === '/v1/billing_portal/sessions') return { status: 200, json: { url: 'https://portal.stripe.test/e2e' } };
   }
+  if (c.host === 'api.anthropic.com') return { status: 200, json: { content: [{ type: 'text', text: 'AIの投稿文' }], stop_reason: 'end_turn' } };
+  if (c.host === 'generativelanguage.googleapis.com') {
+    if (c.method === 'POST') return { status: 200, json: { name: 'models/veo/operations/e2e' } };
+    if (c.path.startsWith('/v1beta/models/veo/operations/e2e')) return { status: 200, json: { done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://generativelanguage.googleapis.com/v1beta/files/e2e:download?alt=media' } }] } } } };
+    if (c.path.startsWith('/v1beta/files/e2e')) return { status: 200, text: '\u0000\u0000\u0000\u0018ftypmp42' + 'v'.repeat(400) };
+  }
   if (c.host === 'open.tiktokapis.com' && c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { creator_nickname: 'e2e_tt', privacy_level_options: ['SELF_ONLY'], comment_disabled: false }, error: { code: 'ok' } } };
   if (c.host === 'graph.threads.net') {
     if (c.path === '/oauth/access_token') return { status: 200, json: { access_token: 'th_short', user_id: 4242 } };
@@ -253,6 +259,33 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 200 && Array.isArray(r.json.rules), '自動運用ルールの一覧を取得できる');
   r = await req('POST', '/service/app/ai/text', { raw: JSON.stringify({ theme: 'x' }), headers: { 'X-CSRF': 'bad', 'Content-Type': 'application/json' } });
   ok(r.status === 403, '画面からのAI生成もCSRFトークンが必要');
+  console.log('AIで動画を作って添付・自動運用の設定（画面）');
+  process.env.ANTHROPIC_API_KEY = 'ak'; process.env.GEMINI_API_KEY = 'gk'; process.env.AI_DAILY_VIDEO = '2';
+  r = await req('GET', '/service/app/compose');
+  ok(r.text.includes('AIで動画を作る') && r.text.includes('AIで文章を作る'), '投稿を作る画面に、AIで動画を作るボタンが出る');
+  r = await req('POST', '/service/app/ai/video', { raw: JSON.stringify({ prompt: '海の朝' }), headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf } });
+  const vjob = JSON.parse(r.text).job_id;
+  ok(r.status === 202 && !!vjob, '画面から動画の生成を始められる');
+  r = await req('GET', `/service/app/ai/jobs/${vjob}`);
+  ok(JSON.parse(r.text).status === 'running', '生成中の状態を確認できる');
+  await require('../lib/ai-auto').pollJobs();
+  r = await req('GET', `/service/app/ai/jobs/${vjob}`);
+  const vj = JSON.parse(r.text);
+  ok(vj.status === 'done' && vj.media_id && /\/media\/[a-f0-9]{48}\.mp4$/.test(vj.url), 'できあがった動画のIDと確認用のURLを返す');
+  r = await req('GET', `/service/app/ai/jobs/${'0'.repeat(20)}`);
+  ok(r.status === 404, '他人の（存在しない）ジョブは見られない');
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('文章＋動画') && r.text.includes('name="hour3"') && r.text.includes('1行に1つ'), '自動運用の設定で、動画・1日3回までの時刻・テーマの順番を選べる');
+  r = await req('POST', '/service/app/auto', { body: { csrf: appCsrf, account_id: accId, theme: 'テーマA\nテーマB', media: 'none', hour1: '7', hour2: '19', hour3: '', mode: 'draft' } });
+  ok(r.status === 302 && r.headers.location === '/service/app?f=auto_added', '画面から、1日2回・テーマ2つのルールを作れる');
+  r = await api('GET', '/api/v1/auto-rules', apiKey);
+  const ar = r.json.rules.find((x) => x.theme === 'テーマA\nテーマB');
+  ok(ar && ar.hours.join() === '7,19' && ar.media === 'none', 'APIでルールの時刻と作るものを確認できる');
+  r = await api('POST', '/api/v1/auto-rules', apiKey, { account_id: accId, theme: 'x', media: 'video', hours: [9], mode: 'draft' });
+  ok(r.status === 201 && r.json.media === 'video', 'APIから動画の自動運用ルールを作れる（Threads）');
+  for (const rr of (await api('GET', '/api/v1/auto-rules', apiKey)).json.rules) await api('DELETE', `/api/v1/auto-rules/${rr.id}`, apiKey);
+  delete process.env.ANTHROPIC_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
+
   console.log('MCP');
   const rpc = (key, body) => api('POST', '/mcp', key, body);
   r = await rpc('', { jsonrpc: '2.0', id: 1, method: 'tools/list' });

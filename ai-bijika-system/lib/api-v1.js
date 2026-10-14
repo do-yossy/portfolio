@@ -76,7 +76,20 @@ function uploadUrlView(token) {
 }
 
 function ruleView(r) {
-  return { id: r.id, account_id: r.account_id, theme: r.theme, tone: r.tone, with_image: !!r.with_image, hour_jst: r.hour_jst, mode: r.mode, enabled: !!r.enabled, last_run_day: r.last_day, last_error: r.last_error };
+  let options = {}; try { options = JSON.parse(r.options || '{}'); } catch { options = {}; }
+  const hours = aiAuto.hoursOf(r);
+  return { id: r.id, account_id: r.account_id, theme: r.theme, tone: r.tone, media: aiAuto.mediaOf(r), hours, hour_jst: hours[0], with_image: aiAuto.mediaOf(r) === 'image', options, mode: r.mode, enabled: !!r.enabled, last_run: r.last_day, last_error: r.last_error };
+}
+
+// 自動運用ルールの入力（API・画面で共通）。media は none／image／video、hours は 0〜23 の配列（最大3つ）
+function ruleArgs(userId, b) {
+  const media = ['none', 'image', 'video'].includes(b.media) ? b.media : (b.with_image === true ? 'image' : 'none');
+  const hours = Array.isArray(b.hours) ? b.hours.map(Number) : (b.hour_jst !== undefined ? [Number(b.hour_jst)] : []);
+  const o = b.options && typeof b.options === 'object' ? b.options : {};
+  const options = {};
+  if (o.privacy !== undefined) options.privacy = String(o.privacy);
+  if (o.made_for_kids !== undefined) options.made_for_kids = o.made_for_kids;
+  return { userId, accountId: String(b.account_id || ''), theme: String(b.theme || '').trim(), tone: String(b.tone || '').slice(0, 100), media, hours, mode: b.mode === 'auto' ? 'auto' : 'draft', options };
 }
 
 async function handle({ req, res, method, pathname, url }) {
@@ -200,6 +213,7 @@ async function handle({ req, res, method, pathname, url }) {
         const j = AiJobs.get(job[1], userId);
         if (!j) { send(res, 404, { error: 'ジョブが見つかりません。' }); return true; }
         send(res, 200, { job_id: j.id, status: j.status, media_id: j.media_id || undefined, error: j.error || undefined });
+        // （画面からの確認は /service/app/ai/jobs/{id}。公開URLはそちらで返す）
         return true;
       }
       if (pathname === '/api/v1/auto-rules' && method === 'GET') {
@@ -208,12 +222,11 @@ async function handle({ req, res, method, pathname, url }) {
       }
       if (pathname === '/api/v1/auto-rules' && method === 'POST') {
         const b = (await readJson(req)) || {};
-        const mode = b.mode === 'auto' ? 'auto' : 'draft';
-        if (mode === 'auto' && b.confirm_auto !== true) { send(res, 400, { error: '完全自動(auto)は、AIが作った内容を確認せずに投稿します。内容を理解したうえで confirm_auto:true を指定してください。' }); return true; }
-        const args = { userId, accountId: String(b.account_id || ''), theme: b.theme, withImage: b.with_image === true, hourJst: Number(b.hour_jst), mode };
+        const args = ruleArgs(userId, b);
+        if (args.mode === 'auto' && b.confirm_auto !== true) { send(res, 400, { error: '完全自動(auto)は、AIが作った内容を確認せずに投稿します。内容を理解したうえで confirm_auto:true を指定してください。' }); return true; }
         const problem = aiAuto.validateRule(args);
         if (problem) { send(res, 400, { error: problem }); return true; }
-        const id = aiAuto.createRule({ ...args, tone: String(b.tone || '').slice(0, 100), theme: String(b.theme).trim() });
+        const id = aiAuto.createRule(args);
         send(res, 201, ruleView(AutoRules.get(id, userId)));
         return true;
       }
@@ -239,4 +252,4 @@ async function handle({ req, res, method, pathname, url }) {
   return true;
 }
 
-module.exports = { handle, postView, uploadUrlView, createFromBody };
+module.exports = { handle, postView, uploadUrlView, createFromBody, ruleArgs, ruleView };
