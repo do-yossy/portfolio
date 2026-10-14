@@ -179,7 +179,7 @@ async function publishPhotos({ accessToken, p, options }) {
   let init;
   try {
     init = await call({ path: '/v2/post/publish/content/init/', headers: bearer(accessToken), body: JSON.stringify({
-      post_info: { title, description: t, privacy_level: options.privacy_level, disable_comment: !!options.disable_comment, auto_add_music: true,
+      post_info: { title, description: t, privacy_level: options.privacy_level, disable_comment: !!options.disable_comment, auto_add_music: options.auto_add_music === true,
         brand_organic_toggle: !!options.commercial_own, brand_content_toggle: !!options.commercial_paid },
       source_info: { source: 'PULL_FROM_URL', photo_cover_index: 0, photo_images: p.medias.map((m) => m.url) },
       post_mode: 'DIRECT_POST', media_type: 'PHOTO',

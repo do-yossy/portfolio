@@ -150,6 +150,8 @@ try { db.exec("ALTER TABLE auto_rules ADD COLUMN hours TEXT DEFAULT ''"); } catc
 try { db.exec("ALTER TABLE auto_rules ADD COLUMN options TEXT DEFAULT '{}'"); } catch { /* 既にある */ }
 // 動画の生成ジョブ：完成したら投稿を作るための情報（自動運用から作った場合）
 try { db.exec("ALTER TABLE ai_jobs ADD COLUMN payload TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// テスト利用を付ける前の状態（取り消すときに戻す）
+try { db.exec("ALTER TABLE subscriptions ADD COLUMN pre_test_status TEXT DEFAULT ''"); } catch { /* 既にある */ }
 db.exec(`
   CREATE TABLE IF NOT EXISTS post_media (
     post_id TEXT NOT NULL,
@@ -164,6 +166,8 @@ db.exec("INSERT OR IGNORE INTO post_media (post_id, media_id) SELECT id, media_i
 
 // test：運営者が動作確認のために付与した「テスト利用」（Stripeを通さない。料金はかからない）
 const ACTIVE_STATUSES = new Set(['active', 'trialing', 'test']);
+// Stripe の契約が「まだ開いている」状態（新しく申し込ませない・テスト利用で上書きしない）
+const OPEN_STRIPE_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused']);
 
 const Subscriptions = {
   get(userId) {
@@ -183,18 +187,18 @@ const Subscriptions = {
     const cur = this.get(userId);
     if (!cur) {
       db.prepare(`INSERT INTO subscriptions (user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end,
-        cancel_at_period_end, price_id, agreed_at, agreed_version, stripe_event_created, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        cancel_at_period_end, price_id, agreed_at, agreed_version, stripe_event_created, pre_test_status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         userId, fields.stripe_customer_id || '', fields.stripe_subscription_id || '', fields.status || 'none',
         fields.current_period_end || '', fields.cancel_at_period_end ? 1 : 0, fields.price_id || '',
-        fields.agreed_at || '', fields.agreed_version || '', fields.stripe_event_created || 0, t, t);
+        fields.agreed_at || '', fields.agreed_version || '', fields.stripe_event_created || 0, fields.pre_test_status || '', t, t);
       return this.get(userId);
     }
     const next = { ...cur, ...fields };
     db.prepare(`UPDATE subscriptions SET stripe_customer_id=?, stripe_subscription_id=?, status=?, current_period_end=?,
-      cancel_at_period_end=?, price_id=?, agreed_at=?, agreed_version=?, stripe_event_created=?, updated_at=? WHERE user_id=?`).run(
+      cancel_at_period_end=?, price_id=?, agreed_at=?, agreed_version=?, stripe_event_created=?, pre_test_status=?, updated_at=? WHERE user_id=?`).run(
       next.stripe_customer_id || '', next.stripe_subscription_id || '', next.status || 'none', next.current_period_end || '',
-      next.cancel_at_period_end ? 1 : 0, next.price_id || '', next.agreed_at || '', next.agreed_version || '', next.stripe_event_created || 0, t, userId);
+      next.cancel_at_period_end ? 1 : 0, next.price_id || '', next.agreed_at || '', next.agreed_version || '', next.stripe_event_created || 0, next.pre_test_status || '', t, userId);
     return this.get(userId);
   },
   // サービスを使える状態か（契約中、または解約手続き済みでも期間末まで）
@@ -520,4 +524,4 @@ const ApiKeys = {
   },
 };
 
-module.exports = { UploadTickets, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+module.exports = { OPEN_STRIPE_STATUSES, UploadTickets, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

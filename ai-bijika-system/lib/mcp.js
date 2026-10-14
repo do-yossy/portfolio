@@ -52,6 +52,13 @@ function accountInfo(userId) {
   };
 }
 
+// 使えるツールだけを出す（AIの生成は、運営者が設定したものだけ）
+function liveTools() {
+  const av = ai.available();
+  const need = { ai_generate_text: av.text, ai_generate_image: av.image, ai_start_video: av.video, ai_video_status: av.video };
+  return TOOLS.filter((t) => need[t.name] === undefined || need[t.name]);
+}
+
 async function callTool(userId, name, a = {}) {
   switch (name) {
     case 'list_accounts':
@@ -122,7 +129,11 @@ async function handle({ req, res, method, pathname }) {
   if (method !== 'POST') { send(res, 405, { error: 'POST のみ対応しています。' }); return true; }
   // APIキー（sqk_）または OAuth のアクセストークン（sqa_）
   const a = oauth.authenticateRequest(req, badLimiter, ApiKeys);
-  if (a.status === 429) { send(res, 429, { error: a.error }); return true; }
+  if (a.status === 429) {
+    res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', ...oauth.challengeHeader() });
+    res.end(JSON.stringify({ error: 'too_many_requests', error_description: a.error }));
+    return true;
+  }
   if (!a.userId) {
     res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8', ...oauth.challengeHeader() });
     res.end(JSON.stringify({ error: 'invalid_token', error_description: 'ログインして接続を許可するか、APIキーを指定してください。' }));
@@ -141,10 +152,10 @@ async function handle({ req, res, method, pathname }) {
       reply({ protocolVersion: '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'sns-scheduler', version: '1.0.0' } });
       break;
     case 'ping': reply({}); break;
-    case 'tools/list': reply({ tools: TOOLS }); break;
+    case 'tools/list': reply({ tools: liveTools() }); break;
     case 'tools/call': {
       const p = msg.params || {};
-      if (!TOOLS.some((t) => t.name === p.name)) { fail(-32602, `Unknown tool: ${p.name}`); break; }
+      if (!liveTools().some((t) => t.name === p.name)) { fail(-32602, `Unknown tool: ${p.name}`); break; }
       try {
         const out = await callTool(userId, p.name, p.arguments || {});
         reply({ content: [{ type: 'text', text: JSON.stringify(out) }] });

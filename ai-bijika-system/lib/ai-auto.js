@@ -78,6 +78,9 @@ async function runRule(rule, nowMs, slot = currentSlot(rule, nowMs) || { day: ai
   // 生成の前に、予約・下書きの上限に空きがあるかを確かめる（生成したのに保存できず、AIの回数と費用だけが消えるのを防ぐ）
   const cap = core.capacityError({ userId: rule.user_id, platform: acc.platform, atIso: new Date(nowMs + 2 * 60 * 1000).toISOString(), draft });
   if (cap) throw new Error(cap);
+  // 画像・動画の残り回数も、文章を作る前に確かめる（文章の分だけ回数と費用を使って失敗しないように）
+  if (!ai.canUse(rule.user_id, 'text', nowMs)) throw new Error('AIの文章の生成回数の上限に達しているか、現在ご利用いただけません。');
+  if (media !== 'none' && !ai.canUse(rule.user_id, media, nowMs)) throw new Error(`AIの${media === 'video' ? '動画' : '画像'}の生成回数の上限に達しているか、現在ご利用いただけません。`);
   const theme = themeFor(rule, slot);
   const text = await ai.generateText({ userId: rule.user_id, theme, tone: rule.tone, platform: acc.platform, avoid: ScheduledPosts.recentTextsForRule(rule.id, 5), nowMs });
   const visual = `${theme}。投稿の内容：${text.replace(/\s+/g, ' ').slice(0, 300)}`;

@@ -95,6 +95,16 @@ function webhook(event, secret = 'whsec_e2e') {
   cookie = '';
   process.env.SERVICE_OPEN = 'true';
   process.env.SERVICE_CONTACT_EMAIL = 'support@example.com';
+  r = await req('GET', '/service');
+  ok(r.text.includes('ただいま準備中'), '法務文書に未記入の【】が残っている間は、SERVICE_OPEN を設定しても販売を開始しない');
+  // 運営者が【】を埋めた法務文書（の写し）で、販売を開始した状態にする
+  const legalTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-legal-'));
+  for (const f of require('../lib/service-core').LEGAL_FILES) {
+    const t = fs.readFileSync(path.join(__dirname, '..', 'legal', f), 'utf8');
+    fs.writeFileSync(path.join(legalTmp, f), t.replace(/【(?!メールアドレス】|代表者の氏名】)([^】]+)】/g, (m, x) => (x.trim() ? `（記入済み：${x}）` : m)));
+  }
+  process.env.SERVICE_LEGAL_DIR = legalTmp;
+  process.env.SERVICE_REPRESENTATIVE = '代表 太郎';
 
   console.log('販売ページ');
   r = await req('GET', '/service');
@@ -293,7 +303,13 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
   ok(r.json.result.serverInfo.name === 'sns-scheduler', 'MCPの初期化に応答する');
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
-  ok(r.json.result.tools.map((t) => t.name).join() === 'list_accounts,get_account_info,create_post,list_posts,publish_draft,delete_post,create_upload_url,import_media_from_url,ai_generate_text,ai_generate_image,ai_start_video,ai_video_status', 'MCPのツール一覧を返す');
+  ok(r.json.result.tools.map((t) => t.name).join() === 'list_accounts,get_account_info,create_post,list_posts,publish_draft,delete_post,create_upload_url,import_media_from_url', 'MCPのツール一覧を返す（AIが未設定なら、AIのツールは出さない）');
+  process.env.ANTHROPIC_API_KEY = 'ak';
+  r = await rpc(apiKey, { jsonrpc: '2.0', id: 21, method: 'tools/list' });
+  ok(r.json.result.tools.some((t) => t.name === 'ai_generate_text') && !r.json.result.tools.some((t) => t.name === 'ai_start_video'), 'AIの文章を設定すると文章のツールだけが出る（動画は無効のまま）');
+  r = await rpc(apiKey, { jsonrpc: '2.0', id: 22, method: 'tools/call', params: { name: 'ai_start_video', arguments: { prompt: 'x' } } });
+  ok(r.json.error && r.json.error.code === -32602, '出していないツールは呼べない');
+  delete process.env.ANTHROPIC_API_KEY;
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'create_post', arguments: { category: 'text', text: 'MCP下書き', account_ids: [accId], draft: true } } });
   const mcpOut = JSON.parse(r.json.result.content[0].text);
   ok(!r.json.result.isError && mcpOut.posts[0].status === 'draft', 'MCPから下書きを作れる');
@@ -408,6 +424,7 @@ function webhook(event, secret = 'whsec_e2e') {
   console.log('投稿を作る画面とカレンダー');
   r = await req('GET', '/service/app/compose');
   ok(r.status === 200 && r.text.includes('ツリー（連投）') && r.text.includes('SNSごとに本文を変える') && r.text.includes('下書きに保存'), '投稿を作る画面を表示する');
+  ok(r.text.includes('data-own-ai="chatgpt"') && r.text.includes('data-own-ai="claude"') && r.text.includes('data-own-ai="gemini"') && !r.text.includes('id="aiTextBtn"'), 'ツールのAIが未設定でも、ご自身のAI（ChatGPT・Claude・Gemini）で作るボタンを出す');
   const sessPost = (body, csrfTok) => req('POST', '/service/app/posts', { raw: JSON.stringify(body), headers: { 'Content-Type': 'application/json', 'X-CSRF': csrfTok } });
   r = await sessPost({ category: 'text', text: 'x', account_ids: [accId], draft: true }, 'bad');
   ok(r.status === 403, '画面からの投稿作成もCSRFトークンが必要');
@@ -553,6 +570,28 @@ function webhook(event, secret = 'whsec_e2e') {
   cookie = '';
   r = await req('POST', '/admin/service/test-grant', { body: { email: 'tester@example.com' } });
   ok(r.status === 302 && !store.Subscriptions.isActive(testerId), '運営者でなければ付与できない');
+  // 解約済みの元の契約者に付けて、取り消したあとも、また申し込めること
+  cookie = '';
+  r = await req('POST', '/service/signup', { body: { email: 'ex@example.com', password: 'expassword1' } });
+  const exCookie = cookie;
+  const exId = require('../db').Users.findByEmail('ex@example.com').id;
+  store.Subscriptions.upsert(exId, { stripe_subscription_id: 'sub_ex', status: 'canceled', cancel_at_period_end: true });
+  cookie = adminCookie;
+  r = await req('POST', '/admin/service/test-grant', { body: { email: 'ex@example.com' } });
+  ok(r.status === 200 && store.Subscriptions.get(exId).status === 'test', '解約済みの元の契約者にも、テスト利用を付けられる');
+  r = await req('POST', '/admin/service/test-revoke', { body: { email: 'ex@example.com' } });
+  ok(store.Subscriptions.get(exId).status === 'canceled', '取り消すと、付ける前の状態（解約済み）に戻る');
+  cookie = exCookie;
+  r = await req('GET', '/service/checkout');
+  ok(r.status === 200 && r.text.includes('お申込みの最終確認'), '取り消したあと、また申し込める');
+  r = await req('GET', '/service/app');
+  ok(!r.text.includes('解約を取り消す') && !r.text.includes('>解約する<'), '終わった契約の解約ボタンは出さない');
+  cookie = adminCookie;
+  const pwSaved = process.env.ADMIN_PASSWORD;
+  delete process.env.ADMIN_PASSWORD;
+  r = await req('POST', '/admin/service/test-grant', { body: { email: 'ex@example.com' } });
+  ok(r.status === 400 && r.text.includes('ADMIN_PASSWORD'), 'ADMIN_PASSWORD が未設定なら、テスト利用は付与できない');
+  process.env.ADMIN_PASSWORD = pwSaved;
 
   console.log('専用アプリとして動かす場合（SERVICE_ONLY=true）');
   process.env.SERVICE_ONLY = 'true';
@@ -591,6 +630,12 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('GET', '/service');
   ok(r.status === 200, 'https でない転送先は使わない');
   delete process.env.SERVICE_MOVED_TO;
+
+  console.log('運営者画面のログインの回数制限');
+  cookie = '';
+  for (let i = 0; i < 10; i++) await req('POST', '/admin/login', { body: { password: 'wrong' } });
+  r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
+  ok(r.status === 429, '運営者画面のログインの失敗が続くと、正しいパスワードでも一時的に制限する');
 
   console.log('既存のアプリへの影響');
   cookie = '';

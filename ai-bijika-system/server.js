@@ -69,6 +69,7 @@ const TROUBLE_PROMPTS = [27, 30, 28, 29];
 
 // お問い合わせの管理画面（/admin/inquiries）用の簡易パスワード認証。購入者アカウントとは別系統。
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
+const adminLoginLimiter = require('./lib/ratelimit').createLimiter({ max: 10, windowMs: 15 * 60 * 1000 });
 if (ADMIN_PASSWORD === 'changeme') console.warn('[warn] ADMIN_PASSWORD 未設定。本番では必ず設定してください（/admin/inquiries が誰でも見られる状態です）。');
 
 const adminSessions = new Set();
@@ -1993,10 +1994,16 @@ const server = http.createServer(async (req, res) => {
       return sendHtml(res, 200, adminLoginPage());
     }
     if (pathname === '/admin/login' && method === 'POST') {
-      // 専用アプリ（SERVICE_ONLY）では、ADMIN_PASSWORD を設定するまで運営者画面に入れない（既定のパスワードで入られないように）
-      if (process.env.SERVICE_ONLY === 'true' && (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme')) return sendHtml(res, 403, adminLoginPage('ADMIN_PASSWORD が設定されていないため、運営者画面は使えません。Fly.io のシークレットに設定してください。'));
+      // 本番（NODE_ENV=production）と専用アプリ（SERVICE_ONLY）では、ADMIN_PASSWORD を設定するまで運営者画面に入れない（既定のパスワードで入られないように）
+      const weak = !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme';
+      if (weak && (process.env.SERVICE_ONLY === 'true' || process.env.NODE_ENV === 'production')) return sendHtml(res, 403, adminLoginPage('ADMIN_PASSWORD が設定されていないため、運営者画面は使えません。Fly.io のシークレットに設定してください。'));
+      const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '');
+      if (!adminLoginLimiter.allow(ip)) return sendHtml(res, 429, adminLoginPage('試行回数が多すぎます。15分ほど待ってからお試しください。'));
       const { password } = await parseBody(req);
-      if (password !== ADMIN_PASSWORD) return sendHtml(res, 401, adminLoginPage('パスワードが違います。'));
+      const given = crypto.createHash('sha256').update(String(password || '')).digest();
+      const expect = crypto.createHash('sha256').update(String(process.env.ADMIN_PASSWORD || ADMIN_PASSWORD)).digest();
+      if (!crypto.timingSafeEqual(given, expect)) { adminLoginLimiter.fail(ip); return sendHtml(res, 401, adminLoginPage('パスワードが違います。')); }
+      adminLoginLimiter.reset(ip);
       const sid = crypto.randomBytes(24).toString('hex');
       adminSessions.add(sid);
       return redirect(res, process.env.SERVICE_ONLY === 'true' ? '/admin/service' : '/admin/inquiries', { 'Set-Cookie': adminSessionCookie(sid) });

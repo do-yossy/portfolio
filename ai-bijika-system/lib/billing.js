@@ -128,18 +128,22 @@ function endAccess(userId) {
 }
 
 // 運営者による「テスト利用」の付与・取り消し（動作確認用。Stripeを通さない）
+// 付与する前の状態を覚えておき、取り消すときに戻す（解約済みの元の契約者が、取り消し後にまた申し込めるように）
 function grantTest(userId) {
+  const { OPEN_STRIPE_STATUSES } = require('./service-store');
   const cur = Subscriptions.get(userId);
-  if (cur && cur.stripe_subscription_id && ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(cur.status)) {
+  if (cur && cur.stripe_subscription_id && OPEN_STRIPE_STATUSES.has(cur.status)) {
     return { ok: false, error: 'このアカウントには、Stripeの契約があります。テスト利用は付与できません。' };
   }
-  Subscriptions.upsert(userId, { status: 'test' });
+  if (cur && cur.status === 'test') return { ok: true };
+  Subscriptions.upsert(userId, { status: 'test', pre_test_status: (cur && cur.status) || 'none' });
   return { ok: true };
 }
 function revokeTest(userId) {
   const cur = Subscriptions.get(userId);
   if (!cur || cur.status !== 'test') return { ok: false, error: 'このアカウントは、テスト利用中ではありません。' };
-  Subscriptions.upsert(userId, { status: 'none' });
+  const back = cur.stripe_subscription_id ? (cur.pre_test_status && cur.pre_test_status !== 'test' ? cur.pre_test_status : 'canceled') : 'none';
+  Subscriptions.upsert(userId, { status: back, pre_test_status: '' });
   endAccess(userId);
   return { ok: true };
 }

@@ -23,7 +23,6 @@ const aiAuto = require('./ai-auto');
 const loginLimiter = createLimiter({ max: 8, windowMs: 15 * 60 * 1000 });
 const signupLimiter = createLimiter({ max: 10, windowMs: 60 * 60 * 1000 });
 
-const LEGAL_DIR = path.join(__dirname, '..', 'legal');
 const LEGAL_DOCS = {
   terms: ['利用規約', 'サービス利用規約_案.md'],
   tokushoho: ['特定商取引法に基づく表記', 'サービス特定商取引法表記_案.md'],
@@ -127,7 +126,7 @@ async function handle(ctx) {
     const [title, file] = LEGAL_DOCS[legalMatch[1]];
     let html = '<p>準備中です。</p>';
     try {
-      let text = fs.readFileSync(path.join(LEGAL_DIR, file), 'utf8');
+      let text = fs.readFileSync(path.join(core.legalDir(), file), 'utf8');
       // 販売を開始したら（運営者が内容を確認し、SERVICE_OPEN を設定した後）、草案である旨の表示を外す
       if (salesOpen) text = text.replace(/^※ これは運営者による草案です.*$/m, '').replace(/（案）/g, '');
       html = md.render(text);
@@ -218,7 +217,7 @@ async function handle(ctx) {
   // 既に契約がある人（支払いの確認待ちを含む）には、2本目の契約を作らせない
   const hasOpenSubscription = () => {
     const cur = Subscriptions.get(user.id);
-    return !!cur && !!cur.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(cur.status);
+    return !!cur && !!cur.stripe_subscription_id && require('./service-store').OPEN_STRIPE_STATUSES.has(cur.status);
   };
   if (pathname === '/service/checkout' && method === 'GET') {
     if (!salesOpen) { redirect(res, '/service'); return true; }

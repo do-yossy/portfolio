@@ -12,6 +12,8 @@ const env = () => process.env;
 const TEXT_MODEL = () => env().AI_TEXT_MODEL || 'claude-haiku-5-5';
 const IMAGE_MODEL = () => env().AI_IMAGE_MODEL || 'gpt-image-1';
 const VIDEO_MODEL = () => env().AI_VIDEO_MODEL || 'veo-3.0-generate-001';
+// 画像の品質（low／medium／high）。高いほど1枚の費用が上がる。既定は medium
+const IMAGE_QUALITY = () => (['low', 'medium', 'high'].includes(env().AI_IMAGE_QUALITY) ? env().AI_IMAGE_QUALITY : 'medium');
 
 // 生成回数の上限（利用者ごと。1日と1か月。日本時間）。費用を管理するための上限で、環境変数で変えられる。
 // 動画は費用が高くなりやすいため、既定では無効（運営者が AI_DAILY_VIDEO を1以上にしたときだけ使える）
@@ -104,7 +106,7 @@ async function generateImage({ userId, prompt, nowMs }) {
   try {
     const j = await post('api.openai.com', '/v1/images/generations',
       { Authorization: `Bearer ${env().OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      JSON.stringify({ model: IMAGE_MODEL(), prompt: p, size: '1024x1024', n: 1, output_format: 'jpeg' }));
+      JSON.stringify({ model: IMAGE_MODEL(), prompt: p, size: '1024x1024', n: 1, output_format: 'jpeg', quality: IMAGE_QUALITY() }));
     const b64 = j.data && j.data[0] && j.data[0].b64_json;
     if (!b64) throw new AiError('画像を生成できませんでした。');
     return await saveBuffer(userId, Buffer.from(b64, 'base64'));
@@ -161,4 +163,11 @@ async function pollVideo({ userId, operation }) {
   return { done: true, media: await saveBuffer(userId, buf) };
 }
 
-module.exports = { available, limits, monthlyLimits, generateText, generateImage, startVideo, pollVideo, AiError, day };
+// その利用者が、いまこの生成を使えるか（契約・設定・今日と今月の残り回数）。生成の前の確認に使う
+function canUse(userId, kind, nowMs) {
+  if (!Subscriptions.isActive(userId) || !available()[kind]) return false;
+  const d = day(nowMs);
+  return AiUsage.used(userId, d, kind) < limits()[kind] && AiUsage.usedMonth(userId, d, kind) < monthlyLimits()[kind];
+}
+
+module.exports = { canUse, available, limits, monthlyLimits, generateText, generateImage, startVideo, pollVideo, AiError, day };

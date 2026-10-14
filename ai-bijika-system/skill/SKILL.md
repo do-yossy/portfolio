@@ -25,6 +25,23 @@ description: 連携済みのSNS（Threads・X・Instagram・TikTok・Facebookペ
    - `media_ids`：添付する画像・動画のID
    - `tree`：ツリーの2件目以降 `[{"text": "...", "media_ids": []}]`
    - いつ投稿するか：`"now": true`（即時）／`"scheduled_at": "2026-12-01T09:00:00+09:00"`（予約）／`"draft": true`（下書き）
+   - `options`：SNSごとの設定。**アカウントIDごと**に指定する（TikTok・YouTubeは必須。ほかのSNSは不要）
+     ```json
+     "options": {
+       "<TikTokのアカウントID>": {
+         "privacy_level": "<利用者が選んだ公開範囲>",
+         "disable_comment": false,
+         "disable_duet": true,
+         "disable_stitch": true,
+         "commercial_own": false,
+         "commercial_paid": false,
+         "auto_add_music": false
+       },
+       "<YouTubeのアカウントID>": { "privacy": "unlisted", "made_for_kids": false }
+     }
+     ```
+     - TikTok：`privacy_level` は `PUBLIC_TO_EVERYONE`／`MUTUAL_FOLLOW_FRIENDS`／`FOLLOWER_OF_CREATOR`／`SELF_ONLY` のうち、そのアカウントで使えるもの。`disable_comment`・`disable_duet`・`disable_stitch` は **true で「禁止」**、false で「許可」。`commercial_own` は自分の宣伝を含むか、`commercial_paid` は第三者の宣伝（提携・有償）を含むか（true のとき `SELF_ONLY` は使えない）。`auto_add_music` は写真の投稿に音楽を自動で付けるか。
+     - YouTube：`privacy` は `public`／`unlisted`／`private`（省略すると非公開）、`made_for_kids` は子ども向けかどうか（true／false）。
 4. 結果を確認する：`GET /api/v1/posts?status=pending`、`GET /api/v1/posts/{id}`
 
 その他：下書きの予約化 `POST /api/v1/posts/{id}/publish`（`{"now":true}` または `{"scheduled_at":"..."}`）、取り消し `DELETE /api/v1/posts/{id}`。
