@@ -227,6 +227,10 @@ async function handle({ req, res, method, pathname, url }) {
         const problem = aiAuto.validateRule(args);
         if (problem) { send(res, 400, { error: problem }); return true; }
         const id = aiAuto.createRule(args);
+        if (args.mode === 'auto') {
+          const u = require('../db').Users.findById(userId);
+          require('./consent').record({ userId, email: u && u.email, kind: 'auto_full', termsVersion: core.TERMS_VERSION, req, detail: { ruleId: id, accountId: args.accountId, via: 'API（confirm_auto:true）' } });
+        }
         send(res, 201, ruleView(AutoRules.get(id, userId)));
         return true;
       }

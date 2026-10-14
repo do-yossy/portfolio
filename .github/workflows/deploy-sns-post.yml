@@ -1,12 +1,14 @@
 name: Deploy SNS自動投稿サービス（専用アプリ）
 
+# 専用アプリ（別のサーバー）は Fly.io の利用料がかかるため、自動では動かさない（オーナーの判断：費用をかけない）。
+# サービスは、ミチシルベ本体のアプリで SERVICE_HOST のアドレスから出す。専用アプリが必要になったときだけ、手動で実行する。
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'ai-bijika-system/**'
-      - '.github/workflows/deploy-sns-post.yml'
   workflow_dispatch:
+
+# 続けて push されたときに、作成・デプロイが並んで走らないようにする
+concurrency:
+  group: deploy-sns-post
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -22,14 +24,18 @@ jobs:
       - name: Set up Fly CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
 
-      # 初回だけ：アプリとボリュームが無ければ作る。トークンに作成の権限がない場合は、作らずに案内を出して終える
+      # アプリの有無は、トークンで見えるアプリの一覧で判定する。
+      # - 一覧に無い：初回とみなして作成を試みる。作れなければ、警告を出して終える（トークンの権限・名前の重複）
+      # - 一覧にある：以降は失敗を見逃さない（状態を確認できなければ、ジョブを失敗にする）
       - name: Ensure app and volume
         id: ensure
         working-directory: ai-bijika-system
         run: |
-          if ! flyctl status -a "$APP" >/dev/null 2>&1; then
+          if flyctl apps list --json | grep -q "\"Name\": *\"$APP\"\|\"name\": *\"$APP\""; then
+            flyctl status -a "$APP" >/dev/null
+          else
             if ! flyctl apps create "$APP"; then
-              echo "::warning::Fly.io のアプリ $APP を作れませんでした（名前が使われている、またはトークンに作成の権限がない）。お試し手順書の「専用アプリを一度だけ作る」を実行してください。"
+              echo "::warning::Fly.io のアプリ $APP を作れませんでした。名前がすでに使われているか、GitHub の FLY_API_TOKEN に、アプリを作る権限（組織のトークン）がありません。お試し手順書の手順0を確認してください。"
               echo "ready=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi

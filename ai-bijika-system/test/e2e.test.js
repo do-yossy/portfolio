@@ -101,7 +101,7 @@ function webhook(event, secret = 'whsec_e2e') {
   const legalTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-legal-'));
   for (const f of require('../lib/service-core').LEGAL_FILES) {
     const t = fs.readFileSync(path.join(__dirname, '..', 'legal', f), 'utf8');
-    fs.writeFileSync(path.join(legalTmp, f), t.replace(/【(?!メールアドレス】|代表者の氏名】)([^】]+)】/g, (m, x) => (x.trim() ? `（記入済み：${x}）` : m)));
+    fs.writeFileSync(path.join(legalTmp, f), t.replace(/【(?!メールアドレス】|代表者の氏名】|サービス名】)([^】]+)】/g, (m, x) => (x.trim() ? `（記入済み：${x}）` : m)));
   }
   process.env.SERVICE_LEGAL_DIR = legalTmp;
   process.env.SERVICE_REPRESENTATIVE = '代表 太郎';
@@ -116,6 +116,18 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('GET', '/service/lp');
   ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
   ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
+  ok(!r.text.includes('ポストメッシュ') && r.text.includes('サービスA'), 'LPでは、他社の名前を出さない（サービスA）');
+  ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
+  ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
+  ok(r.text.includes('使えるSNS') && r.text.includes('無料体験') && !r.text.includes('Xは月30件まで'), '比較表に使えるSNSと無料体験の行があり、Xを提供していなければXの上限を出さない');
+  const uiMod = require('../lib/service-ui');
+  ok(uiMod.compareActive(1000, Date.parse('2026-11-01T00:00:00+09:00')) && !uiMod.compareActive(1000, Date.parse('2026-12-15T00:00:00+09:00')), '価格を確認した日から45日を過ぎたら、比較を自動で出さない');
+  process.env.SERVICE_LP_COMPARE = 'off';
+  r = await req('GET', '/service/lp');
+  ok(!r.text.includes('半額以下') && !r.text.includes('料金の比べ方'), '運営者は、比較の表示を止められる（SERVICE_LP_COMPARE=off）');
+  delete process.env.SERVICE_LP_COMPARE;
+  r = await req('GET', '/service/legal/terms');
+  ok(r.text.includes('「SNSまとめて予約」') && !r.text.includes('ミチシルベ'), '法務文書のサービス名は、設定（SERVICE_NAME）から入り、ミチシルベの名前を出さない');
   process.env.SERVICE_PRICE_JPY = '1500';
   r = await req('GET', '/service/lp');
   ok(!r.text.includes('半額以下'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');
@@ -159,6 +171,14 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(!!userIdForSub, 'StripeにユーザーIDを渡している');
   const afterAgree = store.Subscriptions.get(userIdForSub);
   ok(afterAgree.agreed_at && afterAgree.agreed_version, '同意した日時と規約の版を記録する');
+  const consentLib = require('../lib/consent');
+  const cl = consentLib.forUser(userIdForSub);
+  const cDocs = cl.length ? JSON.parse(cl[0].docs) : {};
+  ok(cl.length === 1 && cl[0].kind === 'checkout' && cl[0].terms_version && cl[0].ip && Object.keys(cDocs).length === 3, '申込みの同意を、規約の版・3つの文書の控え・IPアドレスつきで記録する');
+  const snap = consentLib.getSnapshot(Object.values(cDocs)[0]);
+  ok(snap && snap.text.includes('第1条') === Object.keys(cDocs)[0].includes('利用規約') && consentLib.sha256(snap.text) === Object.values(cDocs)[0], '同意した時点の文書の本文を控えとして残し、ハッシュで照合できる');
+  ok(JSON.parse(cl[0].detail).price === 1000, '同意したときの料金も記録する');
+  ok(typeof consentLib.update === 'undefined' && typeof consentLib.remove === 'undefined', '同意の記録は追記だけで、変更・削除の機能を持たない');
   ok(!store.Subscriptions.isActive(userIdForSub), '決済が完了するまでは契約中にならない');
   r = await req('GET', '/service/api/status');
   ok(JSON.parse(r.text).active === false, '決済前の状態確認はfalse');
@@ -540,6 +560,12 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('GET', '/admin/service');
   ok(r.status === 200 && r.text.includes('e2e@example.com') && r.text.includes('契約者一覧'), '運営者は契約状況を確認できる');
   ok(r.text.includes('設定の確認') && r.text.includes('SNS_TOKEN_KEY') && !r.text.includes(process.env.SNS_TOKEN_KEY) && !r.text.includes('sk_test_x'), '設定の確認は、値を出さずに設定の有無だけを示す');
+  ok(r.text.includes('同意の記録') && r.text.includes('e2e@example.com') && r.text.includes('申込み'), '運営者画面で同意の記録を見られる');
+  r = await req('GET', '/admin/service/consents.csv');
+  ok(r.status === 200 && r.headers['content-type'].includes('text/csv') && r.text.includes('e2e@example.com') && r.text.includes('利用規約'), '同意の記録をCSVでダウンロードできる');
+  const hashForAdmin = Object.values(JSON.parse(require('../lib/consent').list({ limit: 1000 }).find((x) => x.kind === 'checkout') ? JSON.stringify(require('../lib/consent').list({ limit: 1000 }).find((x) => x.kind === 'checkout').docs) : '{}'))[0];
+  r = await req('GET', `/admin/service/legal-snapshot/${hashForAdmin}`);
+  ok(r.status === 200 && r.text.includes('控え'), '同意した時点の文書の控えを、運営者画面から開ける');
 
   console.log('テスト利用（運営者が付与・決済なし）');
   const adminCookie = cookie;
@@ -577,6 +603,8 @@ function webhook(event, secret = 'whsec_e2e') {
   cookie = '';
   r = await req('POST', '/admin/service/test-grant', { body: { email: 'tester@example.com' } });
   ok(r.status === 302 && !store.Subscriptions.isActive(testerId), '運営者でなければ付与できない');
+  r = await req('GET', '/admin/service/consents.csv');
+  ok(r.status === 302, '同意の記録のCSVは、運営者でなければ取得できない');
   // 解約済みの元の契約者に付けて、取り消したあとも、また申し込めること
   cookie = '';
   r = await req('POST', '/service/signup', { body: { email: 'ex@example.com', password: 'expassword1' } });
@@ -617,6 +645,8 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 200, 'お問い合わせは出す');
   r = await api('GET', '/api/v1/accounts', '');
   ok(r.status === 401, 'APIは使える（認証が必要）');
+  r = await api('POST', '/api/tools/jikoshoukai', '', { mode: 'mlm' });
+  ok(r.status === 404, 'ミチシルベ本体のAPI（/api/tools/…）は、専用アプリでは使えない');
   r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
   ok(r.status === 302 && r.headers.location === '/admin/service', '運営者のログイン後は、サービスの運営者画面へ移動する');
   const savedPw = process.env.ADMIN_PASSWORD;
@@ -630,19 +660,38 @@ function webhook(event, secret = 'whsec_e2e') {
   console.log('サービスを専用アプリへ移した場合（SERVICE_MOVED_TO）');
   process.env.SERVICE_MOVED_TO = 'https://michishirube-post.fly.dev/';
   r = await req('GET', '/service/legal/terms?x=1');
-  ok(r.status === 302 && r.headers.location === 'https://michishirube-post.fly.dev/service/legal/terms?x=1', 'ミチシルベ側の /service は、移転先の同じページへ転送する');
+  ok(r.status === 200, 'こちらにまだ契約者・自動運用・未投稿の予約がある間は、転送しない（マイページ・解約に行けなくならないように）');
+  process.env.SERVICE_MOVED_FORCE = 'true';
+  r = await req('GET', '/service/legal/terms?x=1');
+  ok(r.status === 302 && r.headers.location === 'https://michishirube-post.fly.dev/service/legal/terms?x=1', '運営者が移行を済ませて SERVICE_MOVED_FORCE=true にすると、移転先の同じページへ転送する');
   r = await req('GET', '/');
   ok(r.status === 200, 'ミチシルベ本体の画面はそのまま');
   process.env.SERVICE_MOVED_TO = 'http://insecure.example';
   r = await req('GET', '/service');
   ok(r.status === 200, 'https でない転送先は使わない');
-  delete process.env.SERVICE_MOVED_TO;
+  delete process.env.SERVICE_MOVED_TO; delete process.env.SERVICE_MOVED_FORCE;
 
   console.log('運営者画面のログインの回数制限');
   cookie = '';
   for (let i = 0; i < 10; i++) await req('POST', '/admin/login', { body: { password: 'wrong' } });
   r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
   ok(r.status === 429, '運営者画面のログインの失敗が続くと、正しいパスワードでも一時的に制限する');
+
+  console.log('本体のアプリで、独自のアドレス（SERVICE_HOST）だけサービスを出す（追加のサーバー代なし）');
+  process.env.SERVICE_HOST = 'post.example.test';
+  cookie = '';
+  r = await req('GET', '/', { headers: { Host: 'post.example.test' } });
+  ok(r.status === 302 && r.headers.location === '/service', 'SERVICE_HOST のアドレスで開くと、トップはサービスのページへ移動する');
+  r = await req('GET', '/dashboard', { headers: { Host: 'post.example.test' } });
+  ok(r.status === 302 && r.headers.location === '/service', 'SERVICE_HOST のアドレスでは、ミチシルベ本体の画面を出さない');
+  r = await req('GET', '/service/lp', { headers: { Host: 'post.example.test' } });
+  ok(r.status === 200 && !r.text.includes('ミチシルベ'), 'SERVICE_HOST のアドレスで、LPを出す');
+  r = await req('GET', '/');
+  ok(r.status === 200, 'ほかのアドレス（本体）では、ミチシルベ本体の画面はそのまま');
+  process.env.SERVICE_MOVED_TO = 'https://post.example.test';
+  r = await req('GET', '/service/lp?a=1');
+  ok(r.status === 302 && r.headers.location === 'https://post.example.test/service/lp?a=1', '本体のアドレスの /service は、同じアプリの SERVICE_HOST へ転送する（データベースが同じなので、利用者がいても転送してよい）');
+  delete process.env.SERVICE_MOVED_TO; delete process.env.SERVICE_HOST;
 
   console.log('既存のアプリへの影響');
   cookie = '';

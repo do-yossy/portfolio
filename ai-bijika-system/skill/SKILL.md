@@ -25,7 +25,7 @@ description: 連携済みのSNS（Threads・X・Instagram・TikTok・Facebookペ
    - `media_ids`：添付する画像・動画のID
    - `tree`：ツリーの2件目以降 `[{"text": "...", "media_ids": []}]`
    - いつ投稿するか：`"now": true`（即時）／`"scheduled_at": "2026-12-01T09:00:00+09:00"`（予約）／`"draft": true`（下書き）
-   - `options`：SNSごとの設定。**アカウントIDごと**に指定する（TikTok・YouTubeは必須。ほかのSNSは不要）
+   - `options`：SNSごとの設定。**アカウントIDごと**に指定する（TikTokは必須。YouTubeは必ず利用者に確認して指定する（省略すると非公開・子ども向けではない）。ほかのSNSは不要）
      ```json
      "options": {
        "<TikTokのアカウントID>": {

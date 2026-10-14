@@ -16,7 +16,8 @@ const LIMITS = {
 const MAX_DAYS_AHEAD = 90;
 const JST_OFFSET_MS = 9 * 3600 * 1000;
 
-const serviceName = () => process.env.SERVICE_NAME || 'ミチシルベ 自動投稿';
+// サービス名（画面・法務文書の【サービス名】に入る）。ミチシルベ本体とは別の商品として扱う
+const serviceName = () => process.env.SERVICE_NAME || 'SNSまとめて予約';
 const priceYen = () => Number(process.env.SERVICE_PRICE_JPY || 1000);
 // 無料トライアルの日数（0なら無し）。初めて申し込む人だけが対象
 const trialDays = () => { const v = parseInt(process.env.SERVICE_TRIAL_DAYS || '0', 10); return Number.isFinite(v) && v > 0 && v <= 30 ? v : 0; };
@@ -47,6 +48,7 @@ function legalPlaceholders(nowMs = Date.now()) {
   for (const f of LEGAL_FILES) {
     let text = '';
     try { text = fs.readFileSync(path.join(legalDir(), f), 'utf8'); } catch { found.add(`（${f} が見つかりません）`); continue; }
+    text = text.split('【サービス名】').join('');
     if (contactEmail()) text = text.split('【メールアドレス】').join('');
     if (String(process.env.SERVICE_REPRESENTATIVE || '').trim()) text = text.split('【代表者の氏名】').join('');
     // 注意書き（「【　】は、運営者しか確認できない項目です」）の中の【　】は数えない
@@ -54,6 +56,17 @@ function legalPlaceholders(nowMs = Date.now()) {
   }
   legalCache = { at: nowMs, key, list: [...found] };
   return legalCache.list;
+}
+
+// 利用者に示す法務文書の本文（Markdown）。サービス名・連絡先・代表者を埋め、販売開始後は草案の表示を外す
+function legalMarkdown(file) {
+  let text = require('fs').readFileSync(require('path').join(legalDir(), file), 'utf8');
+  if (salesOpen()) text = text.replace(/^※ これは運営者による草案です.*$/m, '').replace(/（案）/g, '');
+  text = text.split('【サービス名】').join(serviceName());
+  if (contactEmail()) text = text.split('【メールアドレス】').join(contactEmail());
+  const rep = String(process.env.SERVICE_REPRESENTATIVE || '').trim();
+  if (rep) text = text.split('【代表者の氏名】').join(rep);
+  return text;
 }
 
 // 販売を開始してよいか：運営者の明示（SERVICE_OPEN）、決済・連絡先・SNSの設定、法務文書の未記入の箇所がないこと
@@ -279,6 +292,6 @@ async function finishConnect({ userId, platform, code, state }) {
 }
 
 module.exports = {
-  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
+  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, legalMarkdown, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
   jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, capacityError, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

@@ -470,7 +470,10 @@ const AutoRules = {
   setEnabled(id, userId, on) { return db.prepare('UPDATE auto_rules SET enabled=? WHERE id=? AND user_id=?').run(on ? 1 : 0, id, userId).changes === 1; },
   enabled() { return db.prepare('SELECT * FROM auto_rules WHERE enabled=1').all(); },
   // 実行済みにする（key は「YYYY-MM-DD#HH」。前回より新しい回のときだけ更新する＝二重実行の防止）。他の処理が先に実行していたら false
-  claim(id, key) { return db.prepare(`UPDATE auto_rules SET last_day=?, last_error='' WHERE id=? AND (last_day IS NULL OR last_day < ?)`).run(key, id, key).changes === 1; },
+  claim(id, key) {
+    // 旧形式（「YYYY-MM-DD」だけ）は、その日の最後の回まで実行済みとして比べる
+    return db.prepare(`UPDATE auto_rules SET last_day=?, last_error='' WHERE id=? AND (last_day IS NULL OR (CASE WHEN instr(last_day, '#') = 0 AND last_day <> '' THEN last_day || '#99' ELSE last_day END) < ?)`).run(key, id, key).changes === 1;
+  },
   setError(id, msg) { db.prepare('UPDATE auto_rules SET last_error=? WHERE id=?').run(String(msg).slice(0, 300), id); },
   removeForAccount(accountId) { db.prepare('DELETE FROM auto_rules WHERE account_id=?').run(accountId); },
 };
