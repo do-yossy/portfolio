@@ -65,7 +65,8 @@ async function readForm(req) {
   }
   return out;
 }
-const clientIp = (req) => String(req.headers['fly-client-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0] || req.socket.remoteAddress || '').trim();
+// 偽装できる X-Forwarded-For は使わない（Fly.io が付ける Fly-Client-IP か、接続元のアドレス）
+const clientIp = (req) => String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '').trim();
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 254;
 
 async function handle(ctx) {
@@ -94,16 +95,22 @@ async function handle(ctx) {
   }
 
   if (!pathname.startsWith('/service')) return false;
+  // 販売を開始してよい状態か（Stripeの設定、連絡先メール、SNS連携の設定、そして運営者が明示した販売開始の合図）
   const billingReady = billing.isConfigured();
+  const salesOpen = core.salesOpen();
+  const contactEmail = core.contactEmail();
 
   // ── 公開ページ ──
-  if (pathname === '/service' && method === 'GET') { sendHtml(res, 200, ui.landingPage({ user, billingReady })); return true; }
+  if (pathname === '/service' && method === 'GET') { sendHtml(res, 200, ui.landingPage({ user, billingReady: salesOpen })); return true; }
 
   const legalMatch = pathname.match(/^\/service\/legal\/(terms|tokushoho|privacy)$/);
   if (legalMatch && method === 'GET') {
     const [title, file] = LEGAL_DOCS[legalMatch[1]];
     let html = '<p>準備中です。</p>';
-    try { html = md.render(fs.readFileSync(path.join(LEGAL_DIR, file), 'utf8')); } catch { /* 準備中 */ }
+    try {
+      html = md.render(fs.readFileSync(path.join(LEGAL_DIR, file), 'utf8'));
+      if (contactEmail) html = html.split('【メールアドレス】').join(contactEmail.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
+    } catch { /* 準備中 */ }
     sendHtml(res, 200, ui.legalPage(title, html, user));
     return true;
   }
@@ -123,7 +130,7 @@ async function handle(ctx) {
     const { hash, salt } = auth.hashPassword(String(password));
     const id = Users.create({ email: e, passwordHash: hash, passwordSalt: salt });
     const token = auth.createSession(id);
-    redirect(res, billingReady ? '/service/checkout' : '/service', { 'Set-Cookie': auth.sessionCookie(token) });
+    redirect(res, salesOpen ? '/service/checkout' : '/service', { 'Set-Cookie': auth.sessionCookie(token) });
     return true;
   }
   if (pathname === '/service/login' && method === 'GET') { sendHtml(res, 200, ui.authPage('login')); return true; }
@@ -170,18 +177,23 @@ async function handle(ctx) {
   if (pathname === '/service/api/status' && method === 'GET') { sendJson(res, 200, { active: Subscriptions.isActive(user.id) }); return true; }
 
   // 申込みの最終確認 → Stripe Checkout
+  // 既に契約がある人（支払いの確認待ちを含む）には、2本目の契約を作らせない
+  const hasOpenSubscription = () => {
+    const cur = Subscriptions.get(user.id);
+    return !!cur && !!cur.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(cur.status);
+  };
   if (pathname === '/service/checkout' && method === 'GET') {
-    if (!billingReady) { redirect(res, '/service'); return true; }
-    if (Subscriptions.isActive(user.id)) { redirect(res, '/service/app'); return true; }
+    if (!salesOpen) { redirect(res, '/service'); return true; }
+    if (hasOpenSubscription()) { redirect(res, '/service/app'); return true; }
     sendHtml(res, 200, ui.checkoutPage({ user, csrf: token }));
     return true;
   }
   if (pathname === '/service/checkout' && method === 'POST') {
-    if (!billingReady) { redirect(res, '/service'); return true; }
+    if (!salesOpen) { redirect(res, '/service'); return true; }
+    if (hasOpenSubscription()) { redirect(res, '/service/app'); return true; }
     const body = await readForm(req);
     if (!csrf.verify(sessionToken, body.csrf)) { sendHtml(res, 403, ui.checkoutPage({ user, csrf: token, error: '操作の有効期限が切れました。もう一度お試しください。' })); return true; }
     if (body.agree !== '1') { sendHtml(res, 400, ui.checkoutPage({ user, csrf: token, error: '内容への同意にチェックを入れてください。' })); return true; }
-    if (Subscriptions.isActive(user.id)) { redirect(res, '/service/app'); return true; }
     try {
       const cur = Subscriptions.get(user.id);
       Subscriptions.upsert(user.id, { agreed_at: new Date().toISOString(), agreed_version: core.TERMS_VERSION });

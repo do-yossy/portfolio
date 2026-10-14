@@ -92,11 +92,15 @@ function periodEndOf(sub) {
   const sec = sub.current_period_end || (item && item.current_period_end);
   return sec ? new Date(sec * 1000).toISOString() : '';
 }
-function applySubscription(sub, hintedUserId) {
+// createdSec: この状態が確定した時刻（Webhookイベントの created、またはAPIで取得した時刻）。
+// 保存済みより古い情報（順不同で後から届いたイベント）は反映しない。
+function applySubscription(sub, hintedUserId, createdSec) {
   const customerId = typeof sub.customer === 'string' ? sub.customer : (sub.customer && sub.customer.id) || '';
   const userId = (sub.metadata && sub.metadata.user_id) || hintedUserId
     || (Subscriptions.findBySubscription(sub.id) || Subscriptions.findByCustomer(customerId) || {}).user_id;
   if (!userId) return null;
+  const known = Subscriptions.get(userId);
+  if (createdSec && known && known.stripe_event_created > createdSec) return known; // 古い情報は無視
   const item = sub.items && sub.items.data && sub.items.data[0];
   return Subscriptions.upsert(userId, {
     stripe_customer_id: customerId,
@@ -105,6 +109,7 @@ function applySubscription(sub, hintedUserId) {
     current_period_end: periodEndOf(sub),
     cancel_at_period_end: !!sub.cancel_at_period_end,
     price_id: (item && item.price && item.price.id) || '',
+    stripe_event_created: createdSec || (known && known.stripe_event_created) || 0,
   });
 }
 
@@ -124,20 +129,20 @@ async function handleEvent(event) {
       });
       if (obj.subscription) {
         const sub = await stripeRequest('GET', `/v1/subscriptions/${encodeURIComponent(obj.subscription)}`);
-        applySubscription(sub, userId);
+        applySubscription(sub, userId, Math.floor(Date.now() / 1000));
       }
       break;
     }
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted':
-      applySubscription(obj);
+      applySubscription(obj, undefined, event.created);
       break;
     case 'invoice.paid':
     case 'invoice.payment_failed': {
       const subId = typeof obj.subscription === 'string' ? obj.subscription
         : (obj.parent && obj.parent.subscription_details && obj.parent.subscription_details.subscription) || '';
-      if (subId) applySubscription(await stripeRequest('GET', `/v1/subscriptions/${encodeURIComponent(subId)}`));
+      if (subId) applySubscription(await stripeRequest('GET', `/v1/subscriptions/${encodeURIComponent(subId)}`), undefined, Math.floor(Date.now() / 1000));
       break;
     }
     default:
@@ -154,7 +159,7 @@ async function setCancelAtPeriodEnd(userId, cancel) {
   const sub = await stripeRequest('POST', `/v1/subscriptions/${encodeURIComponent(s.stripe_subscription_id)}`, {
     cancel_at_period_end: cancel ? 'true' : 'false',
   });
-  return applySubscription(sub, userId);
+  return applySubscription(sub, userId, Math.floor(Date.now() / 1000));
 }
 
 module.exports = {

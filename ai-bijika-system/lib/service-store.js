@@ -14,6 +14,7 @@ db.exec(`
     price_id TEXT DEFAULT '',
     agreed_at TEXT DEFAULT '',
     agreed_version TEXT DEFAULT '',
+    stripe_event_created INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -68,6 +69,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_scheduled_posts_user ON scheduled_posts(user_id, scheduled_at);
 `);
 
+try { db.exec('ALTER TABLE subscriptions ADD COLUMN stripe_event_created INTEGER NOT NULL DEFAULT 0'); } catch { /* 既にある */ }
+
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 const Subscriptions = {
@@ -88,18 +91,18 @@ const Subscriptions = {
     const cur = this.get(userId);
     if (!cur) {
       db.prepare(`INSERT INTO subscriptions (user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end,
-        cancel_at_period_end, price_id, agreed_at, agreed_version, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        cancel_at_period_end, price_id, agreed_at, agreed_version, stripe_event_created, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         userId, fields.stripe_customer_id || '', fields.stripe_subscription_id || '', fields.status || 'none',
         fields.current_period_end || '', fields.cancel_at_period_end ? 1 : 0, fields.price_id || '',
-        fields.agreed_at || '', fields.agreed_version || '', t, t);
+        fields.agreed_at || '', fields.agreed_version || '', fields.stripe_event_created || 0, t, t);
       return this.get(userId);
     }
     const next = { ...cur, ...fields };
     db.prepare(`UPDATE subscriptions SET stripe_customer_id=?, stripe_subscription_id=?, status=?, current_period_end=?,
-      cancel_at_period_end=?, price_id=?, agreed_at=?, agreed_version=?, updated_at=? WHERE user_id=?`).run(
+      cancel_at_period_end=?, price_id=?, agreed_at=?, agreed_version=?, stripe_event_created=?, updated_at=? WHERE user_id=?`).run(
       next.stripe_customer_id || '', next.stripe_subscription_id || '', next.status || 'none', next.current_period_end || '',
-      next.cancel_at_period_end ? 1 : 0, next.price_id || '', next.agreed_at || '', next.agreed_version || '', t, userId);
+      next.cancel_at_period_end ? 1 : 0, next.price_id || '', next.agreed_at || '', next.agreed_version || '', next.stripe_event_created || 0, t, userId);
     return this.get(userId);
   },
   // サービスを使える状態か（契約中、または解約手続き済みでも期間末まで）

@@ -12,6 +12,18 @@ const serviceName = () => process.env.SERVICE_NAME || 'ミチシルベ 自動投
 const priceYen = () => Number(process.env.SERVICE_PRICE_JPY || 1000);
 const TERMS_VERSION = '2026-10-13';
 
+const contactEmail = () => {
+  const e = String(process.env.SERVICE_CONTACT_EMAIL || '').trim();
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(e) ? e : '';
+};
+// 販売を開始してよいか。Stripe・連絡先・SNS連携の設定に加えて、運営者が SERVICE_OPEN=true で明示した場合だけ開く
+// （Metaや Xの審査が終わる前に、連携できないまま契約する人が出ないようにするため）
+function salesOpen() {
+  const billing = require('./billing');
+  return process.env.SERVICE_OPEN === 'true' && billing.isConfigured() && !!contactEmail()
+    && snsEnabled() && registry.list().some((p) => p.isConfigured());
+}
+
 function snsEnabled() {
   return !!box.keyFromEnv();
 }
@@ -112,6 +124,6 @@ async function finishConnect({ userId, platform, code, state }) {
 }
 
 module.exports = {
-  LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, snsEnabled, redirectUriFor,
+  LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, snsEnabled, contactEmail, salesOpen, redirectUriFor,
   jstLocalToIso, jstDayBounds, formatJst, formatJstShort, createPosts, startConnect, finishConnect,
 };

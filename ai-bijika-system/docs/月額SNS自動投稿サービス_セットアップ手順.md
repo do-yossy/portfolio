@@ -54,7 +54,7 @@
 
 ```
 fly secrets set -a sq-ai-bijika \
-  SERVICE_BASE_URL=https://（公開URL） \
+  SERVICE_BASE_URL=https://（公開URL） SERVICE_CONTACT_EMAIL=（問い合わせ用のメールアドレス） \
   STRIPE_SECRET_KEY=sk_live_... STRIPE_WEBHOOK_SECRET=whsec_... STRIPE_PRICE_ID=price_... \
   SNS_TOKEN_KEY=$(openssl rand -hex 32) APP_SECRET=$(openssl rand -hex 32) \
   THREADS_APP_ID=... THREADS_APP_SECRET=... \
@@ -63,11 +63,15 @@ fly secrets set -a sq-ai-bijika \
 
 - `SNS_TOKEN_KEY` は、SNSのトークンを暗号化する鍵です。**一度決めたら変更しないでください**（変更すると、連携済みのアカウントがすべて使えなくなります）。
 - Threads・Xのキーが未設定なら、そのSNSの連携ボタンは「準備中」と表示されます。
-- Stripeの3つ（`STRIPE_SECRET_KEY`・`STRIPE_WEBHOOK_SECRET`・`STRIPE_PRICE_ID`）と `SERVICE_BASE_URL` がそろうまでは、販売ページは「準備中」の表示で、申込みはできません（誤って公開しても、壊れた状態で販売されません）。
+- **販売の開始は、運営者が `SERVICE_OPEN=true` を設定したときだけ**です。次の条件がすべてそろわないと、販売ページは「準備中」の表示で、申込みはできません（誤って公開しても、壊れた状態で販売されません）。
+  - Stripeの3つ（`STRIPE_SECRET_KEY`・`STRIPE_WEBHOOK_SECRET`・`STRIPE_PRICE_ID`）と `SERVICE_BASE_URL`
+  - `SERVICE_CONTACT_EMAIL`（特商法表記とプライバシーポリシーの連絡先に、自動で表示されます）
+  - `SNS_TOKEN_KEY` と、Threads・Xのどちらか1つ以上のキー
+- **`SERVICE_OPEN=true` は、Threads・Xの審査・設定が終わり、テストモードで通しの動作確認が済んだあとに設定してください。** 審査が終わる前に開くと、契約したのに連携できない利用者が出ます。
 
 ### 2-5. 公開前の確認
 
-- `legal/サービス利用規約_案.md`、`legal/サービス特定商取引法表記_案.md`、`legal/サービスプライバシーポリシー_案.md` は**草案**です。`【メールアドレス】` を実際のアドレスに置き換え、内容を運営者が確認してから公開する。
+- `legal/サービス利用規約_案.md`、`legal/サービス特定商取引法表記_案.md`、`legal/サービスプライバシーポリシー_案.md` は**草案**です。内容を運営者が確認してから公開する。`【メールアドレス】` は、環境変数 `SERVICE_CONTACT_EMAIL` の値に自動で置き換わります。
 - 消費税・インボイス（適格請求書）の扱いを、税理士などに確認する（Stripeの請求書に登録番号を表示する設定など）。
 - 返金の対応（法令上必要な場合など）は、Stripeのダッシュボードから手動で行います。
 
@@ -96,4 +100,4 @@ cd ai-bijika-system
 npm test
 ```
 
-StripeとSNSの外部通信はモックで置き換え、決済・Webhook・SNS連携・予約実行・解約を通して確認しています（122件）。**本物のStripeやSNSとの接続は、上の2章の設定を済ませたうえで、テストモードで確認してください。**
+StripeとSNSの外部通信はモックで置き換え、決済・Webhook（再送・順不同を含む）・二重契約の防止・SNS連携・予約実行・解約を通して確認しています（132件）。**本物のStripeやSNSとの接続は、上の2章の設定を済ませたうえで、テストモードで確認してください。**

@@ -109,6 +109,15 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(!store.Subscriptions.isActive(userA), '契約が終了すると利用できなくなる');
   const portal = await billing.createPortalSession('cus_1');
   ok(portal === 'https://portal.stripe.test/p', 'カード変更用のポータルURLを取得できる');
+  // 順不同で届いた古いイベントで、新しい状態を上書きしない
+  const T = Math.floor(Date.now() / 1000) + 1000;
+  const subEv = (id, status, created) => ({ id, type: 'customer.subscription.updated', created, data: { object: { id: 'sub_1', customer: 'cus_1', status, current_period_end: periodEnd, cancel_at_period_end: false, metadata: {}, items: { data: [] } } } });
+  await billing.handleEvent(subEv('evt_o2', 'canceled', T + 20));
+  await billing.handleEvent(subEv('evt_o1', 'active', T + 10));
+  ok(!store.Subscriptions.isActive(userA) && store.Subscriptions.get(userA).status === 'canceled', '後から届いた古いイベントで、解約済みが契約中に戻らない');
+  await billing.handleEvent(subEv('evt_o3', 'active', T + 30));
+  ok(store.Subscriptions.isActive(userA), 'より新しいイベントは反映される');
+
   mockStripe.restore();
   // 再契約（同じユーザーで再度 active）
   subStatus = 'active';

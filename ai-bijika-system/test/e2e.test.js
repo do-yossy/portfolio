@@ -78,13 +78,25 @@ function webhook(event, secret = 'whsec_e2e') {
   base = `http://127.0.0.1:${server.address().port}`;
   process.env.SERVICE_BASE_URL = base; // 設定がそろった状態（上の環境変数は読み込み後に参照されるため、ここで設定）
 
-  console.log('販売ページ');
+  console.log('販売開始前（SERVICE_OPEN 未設定）');
   let r = await req('GET', '/service');
+  ok(r.status === 200 && r.text.includes('ただいま準備中'), '運営者が販売開始を明示するまでは「準備中」と表示する');
+  r = await req('POST', '/service/signup', { body: { email: 'early@example.com', password: 'password123' } });
+  ok(r.status === 302 && r.headers.location === '/service', '販売開始前は、アカウントを作っても申込み画面へは進まない');
+  r = await req('GET', '/service/checkout');
+  ok(r.status === 302 && r.headers.location === '/service', '販売開始前は、申込み画面を開けない');
+  cookie = '';
+  process.env.SERVICE_OPEN = 'true';
+  process.env.SERVICE_CONTACT_EMAIL = 'support@example.com';
+
+  console.log('販売ページ');
+  r = await req('GET', '/service');
   ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('税込'), 'LPに月額1,000円（税込）を表示する');
   ok(r.text.includes('返金') && r.text.includes('解約') && r.text.includes('自動更新'), 'LPに返金・解約・自動更新の条件を表示する');
   ok(r.text.includes('/service/legal/terms') && r.text.includes('/service/legal/tokushoho'), 'LPから規約・特商法表記へリンクする');
   r = await req('GET', '/service/legal/tokushoho');
   ok(r.status === 200 && r.text.includes('月額1,000円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
+  ok(r.text.includes('support@example.com') && !r.text.includes('【メールアドレス】') && r.text.includes('電話番号'), '特商法表記の連絡先に設定したメールアドレスを表示し、電話番号の開示請求について記載する');
   r = await req('GET', '/service/legal/terms');
   ok(r.status === 200 && r.text.includes('第4条（解約）'), '利用規約を表示できる');
 
@@ -185,6 +197,16 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(store.Subscriptions.isActive(userIdForSub), '解約の手続き後も、期間末までは利用できる');
   r = await req('POST', '/service/billing/resume', { body: { csrf: appCsrf } });
   ok(r.headers.location === '/service/app?f=sub_resumed', '解約を取り消せる');
+  // 支払いの確認が必要な状態の人が、2本目の契約を作れない（二重課金の防止）
+  const checkoutCallsBefore = mock.calls.filter((c) => c.path === '/v1/checkout/sessions').length;
+  await webhook({ id: 'evt_e2e_pd', type: 'customer.subscription.updated', created: Math.floor(Date.now() / 1000) + 5, data: { object: { ...subObj(), status: 'past_due' } } });
+  ok(!store.Subscriptions.isActive(userIdForSub), 'past_due では利用できない');
+  r = await req('GET', '/service/checkout');
+  ok(r.status === 302 && r.headers.location === '/service/app', '契約が残っている人は、申込み画面を開いても、マイページへ戻される');
+  r = await req('POST', '/service/checkout', { body: { csrf: appCsrf, agree: '1' } });
+  ok(r.status === 302 && r.headers.location === '/service/app' && mock.calls.filter((c) => c.path === '/v1/checkout/sessions').length === checkoutCallsBefore, '直接POSTしても、2本目のStripe契約は作られない');
+  await webhook({ id: 'evt_e2e_ok', type: 'customer.subscription.updated', created: Math.floor(Date.now() / 1000) + 10, data: { object: { ...subObj(), status: 'active' } } });
+  ok(store.Subscriptions.isActive(userIdForSub), '支払いが回復すると、再び利用できる');
   await req('POST', '/service/billing/cancel', { body: { csrf: appCsrf } });
   r = await webhook({ id: 'evt_e2e_2', type: 'customer.subscription.deleted', data: { object: { ...subObj(), status: 'canceled' } } });
   subStatus = 'canceled';
