@@ -201,7 +201,7 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   ok(!decodeURIComponent(mock.calls.filter((c) => c.path === '/v1/checkout/sessions').pop().body).includes('trial_period_days'), '無料期間がなければ指定しない');
   const ui = require('../lib/service-ui');
   const page = ui.checkoutPage({ user: { email: 'a@b' }, csrf: 'x', trialDays: 7 });
-  ok(page.includes('最初の7日間は無料') && page.includes('自動で有料の契約に切り替わり') && page.includes('無料期間が終わる前に'), '最終確認画面に、無料期間・自動課金・解約の期限を表示する');
+  ok(page.includes('お申込みの完了から7日間は無料') && page.includes('自動で有料の契約に切り替わり') && page.includes('終了日時より前に') && page.includes('提供の時期'), '最終確認画面に、無料期間・自動課金・解約の期限・提供の時期を表示する');
   process.env.SERVICE_TRIAL_DAYS = '';
   summary();
   mock.restore();

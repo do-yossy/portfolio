@@ -127,8 +127,13 @@ async function handle(ctx) {
     const [title, file] = LEGAL_DOCS[legalMatch[1]];
     let html = '<p>準備中です。</p>';
     try {
-      html = md.render(fs.readFileSync(path.join(LEGAL_DIR, file), 'utf8'));
+      let text = fs.readFileSync(path.join(LEGAL_DIR, file), 'utf8');
+      // 販売を開始したら（運営者が内容を確認し、SERVICE_OPEN を設定した後）、草案である旨の表示を外す
+      if (salesOpen) text = text.replace(/^※ これは運営者による草案です.*$/m, '').replace(/（案）/g, '');
+      html = md.render(text);
       if (contactEmail) html = html.split('【メールアドレス】').join(contactEmail.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
+      const rep = String(process.env.SERVICE_REPRESENTATIVE || '').trim();
+      if (rep) html = html.split('【代表者の氏名】').join(rep.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
     } catch { /* 準備中 */ }
     sendHtml(res, 200, ui.legalPage(title, html, user));
     return true;

@@ -9,6 +9,32 @@ function inline(s) {
   t = t.replace(/\[([^\]]+)\]\((\/[^)\s]*|https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
   return t;
 }
+// 箇条書き（- / * / 1.）。字下げした行は、直前の項目の中の箇条書きとして扱う
+const LIST_RE = /^(\s*)([-*]|\d+\.) /;
+const indentOf = (l) => l.match(/^\s*/)[0].length;
+function parseList(L, start, indent) {
+  const ordered = /^\s*\d+\. /.test(L[start]);
+  const items = [];
+  let i = start;
+  while (i < L.length) {
+    const l = L[i];
+    if (!LIST_RE.test(l)) break;
+    const ind = indentOf(l);
+    if (ind < indent) break;
+    if (ind > indent) {
+      const sub = parseList(L, i, ind);
+      if (items.length) items[items.length - 1] += sub.html; else items.push(sub.html);
+      i = sub.next;
+      continue;
+    }
+    if (/^\s*\d+\. /.test(l) !== ordered) break; // 種類が変わったら別のリスト
+    items.push(inline(l.replace(LIST_RE, '')));
+    i++;
+  }
+  const tag = ordered ? 'ol' : 'ul';
+  return { html: `<${tag}>${items.map((x) => `<li>${x}</li>`).join('')}</${tag}>`, next: i };
+}
+
 function render(md) {
   const L = String(md).split(/\r?\n/);
   const out = [];
@@ -23,16 +49,10 @@ function render(md) {
       i--;
       const cells = rows.filter((r) => !/^\|[\s:|-]+\|$/.test(r)).map((r) => r.replace(/^\||\|$/g, '').split('|').map((c) => c.trim()));
       out.push('<table>' + cells.map((c, k) => '<tr>' + c.map((x) => (k === 0 && cells.length > 1 && /^\|\s*項目/.test(rows[0]) ? `<th>${inline(x)}</th>` : `<td>${inline(x)}</td>`)).join('') + '</tr>').join('') + '</table>');
-    } else if (/^[-*] /.test(l)) {
-      const items = [];
-      while (i < L.length && /^[-*] /.test(L[i])) { items.push(`<li>${inline(L[i].replace(/^[-*] /, ''))}</li>`); i++; }
-      i--;
-      out.push(`<ul>${items.join('')}</ul>`);
-    } else if (/^\d+\. /.test(l)) {
-      const items = [];
-      while (i < L.length && /^\d+\. /.test(L[i])) { items.push(`<li>${inline(L[i].replace(/^\d+\. /, ''))}</li>`); i++; }
-      i--;
-      out.push(`<ol>${items.join('')}</ol>`);
+    } else if (LIST_RE.test(l)) {
+      const r = parseList(L, i, indentOf(l));
+      out.push(r.html);
+      i = r.next - 1;
     } else if (l.trim()) {
       out.push(`<p>${inline(l)}</p>`);
     }

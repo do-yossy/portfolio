@@ -95,11 +95,15 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('税込'), 'LPに月額1,000円（税込）を表示する');
   ok(r.text.includes('返金') && r.text.includes('解約') && r.text.includes('自動更新'), 'LPに返金・解約・自動更新の条件を表示する');
   ok(r.text.includes('/service/legal/terms') && r.text.includes('/service/legal/tokushoho'), 'LPから規約・特商法表記へリンクする');
+  ok(r.text.includes('現在の対応SNSは、Threadsです') && !r.text.includes('YouTube：') && !r.text.includes('TikTok：'), 'LPには、設定済みのSNSだけを対応SNSとして表示する');
+  ok(!r.text.includes('AIで投稿づくり') && !/ClaudeやChatGPT/.test(r.text), 'AIが未設定ならAIの機能を表示せず、動作を確認していないアプリ名を出さない');
   r = await req('GET', '/service/legal/tokushoho');
   ok(r.status === 200 && r.text.includes('月額1,000円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
   ok(r.text.includes('support@example.com') && !r.text.includes('【メールアドレス】') && r.text.includes('電話番号'), '特商法表記の連絡先に設定したメールアドレスを表示し、電話番号の開示請求について記載する');
   r = await req('GET', '/service/legal/terms');
   ok(r.status === 200 && r.text.includes('第5条（解約）') && r.text.includes('第7条（AIによる生成）'), '利用規約を表示できる');
+  ok(!r.text.includes('草案') && !r.text.includes('（案）'), '販売開始後は、草案である旨の表示を外す');
+  ok(/<ol><li>[^]*?<ul><li>投稿の作成/.test(r.text) && !r.text.includes('<p>- 投稿の作成'), '規約の入れ子の箇条書きを、崩さずに表示する');
 
   console.log('未ログイン');
   r = await req('GET', '/service/app');
@@ -119,6 +123,7 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('POST', '/service/signup', { body: { email: 'e2e@example.com', password: 'password123' } });
   ok(r.status === 400 && r.text.includes('既に登録'), '同じメールアドレスでは二重に登録できない');
   r = await req('GET', '/service/checkout');
+  ok(r.text.includes('提供の時期') && r.text.includes('お支払いが確認できない間は'), '最終確認画面に提供の時期と、お支払いが確認できない場合の扱いを表示する');
   ok(r.status === 200 && r.text.includes('月額 1,000円（税込）') && r.text.includes('自動更新') && r.text.includes('解約') && r.text.includes('返金'), '最終確認画面に金額・自動更新・解約・返金を表示する');
   const csrf = csrfOf(r.text);
   ok(!!csrf, '最終確認画面にCSRFトークンがある');
