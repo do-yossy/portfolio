@@ -16,6 +16,7 @@ const mediaLib = require('./media');
 const registry = require('./sns');
 const apiV1 = require('./api-v1');
 const mcp = require('./mcp');
+const oauth = require('./oauth');
 const ai = require('./ai');
 const aiAuto = require('./ai-auto');
 
@@ -36,6 +37,7 @@ const FLASH = {
   connected: ['ok', 'SNSを連携しました。'],
   auto_added: ['ok', '自動運用のルールを追加しました。'],
   auto_changed: ['ok', '自動運用のルールを更新しました。'],
+  app_revoked: ['ok', 'アプリの接続を解除しました。'],
   key_revoked: ['ok', 'APIキーを無効にしました。'],
   disconnected: ['ok', '連携を解除しました。'],
   sub_canceled: ['ok', '解約の手続きをしました。契約期間の終わりまでご利用いただけます。'],
@@ -83,6 +85,7 @@ async function handle(ctx) {
 
   if (await apiV1.handle(ctx)) return true;
   if (await mcp.handle(ctx)) return true;
+  if (await oauth.handle(ctx)) return true;
 
   // ── Stripe Webhook（署名検証。認証不要）──
   if (pathname === '/api/stripe/webhook' && method === 'POST') {
@@ -151,21 +154,28 @@ async function handle(ctx) {
     redirect(res, salesOpen ? '/service/checkout' : '/service', { 'Set-Cookie': auth.sessionCookie(token) });
     return true;
   }
-  if (pathname === '/service/login' && method === 'GET') { sendHtml(res, 200, ui.authPage('login')); return true; }
+  // ログイン後の戻り先（自サイト内の、決まったパスだけ）
+  const safeNext = (n) => (typeof n === 'string' && /^\/(service|oauth)\//.test(n) && !n.startsWith('//') && !/[\r\n\\]/.test(n) ? n : '');
+  if (pathname === '/service/login' && method === 'GET') {
+    const next = safeNext(url.searchParams.get('next'));
+    if (user && next) { redirect(res, next); return true; }
+    sendHtml(res, 200, ui.authPage('login', '', next)); return true;
+  }
   if (pathname === '/service/login' && method === 'POST') {
-    const { email, password } = await readForm(req);
+    const { email, password, next: rawNext } = await readForm(req);
+    const next = safeNext(rawNext);
     const e = String(email || '').trim().toLowerCase();
     const key = `${clientIp(req)}|${e}`;
     if (!loginLimiter.allow(key)) { sendHtml(res, 429, ui.authPage('login', '試行回数が多すぎます。15分ほど待ってからお試しください。')); return true; }
     const u = e ? Users.findByEmail(e) : null;
     if (!u || !auth.verifyPassword(String(password || ''), u.password_hash, u.password_salt)) {
       loginLimiter.fail(key);
-      sendHtml(res, 401, ui.authPage('login', 'メールアドレスまたはパスワードが違います。'));
+      sendHtml(res, 401, ui.authPage('login', 'メールアドレスまたはパスワードが違います。', next));
       return true;
     }
     loginLimiter.reset(key);
     const token = auth.createSession(u.id);
-    redirect(res, '/service/app', { 'Set-Cookie': auth.sessionCookie(token) });
+    redirect(res, next || '/service/app', { 'Set-Cookie': auth.sessionCookie(token) });
     return true;
   }
   if (pathname === '/service/logout') {
@@ -181,7 +191,7 @@ async function handle(ctx) {
   const flashOf = (key) => (FLASH[key] ? { type: FLASH[key][0], text: FLASH[key][1] } : null);
   const dashboard = (status, flash, newKey) => {
     sendHtml(res, status, ui.dashboardPage({
-      user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id), apiKeys: ApiKeys.listForUser(user.id), aiAvail: ai.available(), autoRules: AutoRules.listForUser(user.id), newKey: newKey || '',
+      user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id), apiKeys: ApiKeys.listForUser(user.id), mcpConnections: oauth.listConnections(user.id), aiAvail: ai.available(), autoRules: AutoRules.listForUser(user.id), newKey: newKey || '',
       posts: ScheduledPosts.listForUser(user.id), csrf: token, flash,
       snsReady: core.snsEnabled(), portalReady: billingReady,
     }));
@@ -312,6 +322,13 @@ async function handle(ctx) {
     const k = ApiKeys.create(user.id, body.label);
     if (!k) { dashboard(400, { type: 'error', text: 'APIキーは5件までです。不要なキーを無効にしてください。' }); return true; }
     dashboard(200, { type: 'ok', text: 'APIキーを発行しました。' }, k.key);
+    return true;
+  }
+  const appRevoke = pathname.match(/^\/service\/app\/connection\/(mcpc_[a-f0-9]+)\/revoke$/);
+  if (appRevoke && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    oauth.revokeClient(user.id, appRevoke[1]);
+    redirect(res, '/service/app?f=app_revoked');
     return true;
   }
   const keyRevoke = pathname.match(/^\/service\/app\/apikey\/([a-f0-9]+)\/revoke$/);

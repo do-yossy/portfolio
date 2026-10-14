@@ -16,6 +16,12 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 
+  CREATE TABLE IF NOT EXISTS upload_tickets (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0
+  );
   CREATE TABLE IF NOT EXISTS ai_usage (
     user_id TEXT NOT NULL,
     day TEXT NOT NULL,
@@ -436,6 +442,26 @@ const AutoRules = {
   removeForAccount(accountId) { db.prepare('DELETE FROM auto_rules WHERE account_id=?').run(accountId); },
 };
 
+// アップロード用の一時URL（AIアシスタントなど、APIキーを持たない場所からファイルを送るため）。15分・1回だけ有効
+const UploadTickets = {
+  TTL_MS: 15 * 60 * 1000,
+  create(userId) {
+    const token = `squ_${require('crypto').randomBytes(24).toString('hex')}`;
+    db.prepare('DELETE FROM upload_tickets WHERE expires_at < ?').run(new Date().toISOString());
+    db.prepare('INSERT INTO upload_tickets (token_hash, user_id, expires_at) VALUES (?,?,?)')
+      .run(ApiKeys.hash(token), userId, new Date(Date.now() + this.TTL_MS).toISOString());
+    return token;
+  },
+  consume(token) {
+    if (!/^squ_[0-9a-f]{48}$/.test(String(token || ''))) return null;
+    const h = ApiKeys.hash(token);
+    const row = db.prepare('SELECT user_id, expires_at FROM upload_tickets WHERE token_hash=? AND used=0').get(h);
+    if (!row || Date.parse(row.expires_at) < Date.now()) return null;
+    if (db.prepare('UPDATE upload_tickets SET used=1 WHERE token_hash=? AND used=0').run(h).changes !== 1) return null;
+    return row.user_id;
+  },
+};
+
 const MAX_API_KEYS = 5;
 const ApiKeys = {
   hash(key) { return require('crypto').createHash('sha256').update(String(key)).digest('hex'); },
@@ -464,4 +490,4 @@ const ApiKeys = {
   },
 };
 
-module.exports = { AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+module.exports = { UploadTickets, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

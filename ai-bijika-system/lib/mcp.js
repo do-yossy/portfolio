@@ -4,16 +4,19 @@
 const core = require('./service-core');
 const scheduler = require('./sns/scheduler');
 const { ApiKeys, SnsAccounts, ScheduledPosts } = require('./service-store');
-const { postView } = require('./api-v1');
+const { postView, uploadUrlView } = require('./api-v1');
+const fetchMedia = require('./fetch-media');
 const ai = require('./ai');
-const { AiJobs } = require('./service-store');
+const { AiJobs, UploadTickets } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
+const oauth = require('./oauth');
 
 const limiter = createLimiter({ max: 60, windowMs: 60 * 1000 });
 const badLimiter = createLimiter({ max: 20, windowMs: 15 * 60 * 1000 });
 
 const TOOLS = [
   { name: 'list_accounts', description: '連携済みのSNSアカウントの一覧（IDを投稿に使う）', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_account_info', description: 'ご契約の状態・上限・今月や今日の利用状況を確認する', inputSchema: { type: 'object', properties: {} } },
   { name: 'create_post', description: '投稿を作る。category は text／image／video／tree。now=true で即時、scheduled_at（ISO 8601）で予約、draft=true で下書き。画像・動画は先にAPIでアップロードしたmedia_idsを指定する。',
     inputSchema: { type: 'object', required: ['category', 'account_ids'], properties: {
       category: { type: 'string', enum: ['text', 'image', 'video', 'tree'] }, text: { type: 'string' },
@@ -23,6 +26,8 @@ const TOOLS = [
   { name: 'list_posts', description: '投稿の一覧（status で絞り込み：draft／pending／posted／failed／cancelled）', inputSchema: { type: 'object', properties: { status: { type: 'string' } } } },
   { name: 'publish_draft', description: '下書きを予約または即時投稿にする', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, now: { type: 'boolean' }, scheduled_at: { type: 'string' } } } },
   { name: 'delete_post', description: '予約・下書きを取り消す', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } } },
+  { name: 'create_upload_url', description: '画像・動画をアップロードするための一時URLを発行する（15分・1回だけ）。ファイルをPUTすると id が返り、create_post の media_ids に使える', inputSchema: { type: 'object', properties: {} } },
+  { name: 'import_media_from_url', description: 'URLから画像・動画を取り込む（チャットの添付ファイルのURL、Googleドライブの共有リンクなど）。戻り値のidを media_ids に使う', inputSchema: { type: 'object', required: ['url'], properties: { url: { type: 'string' } } } },
   { name: 'ai_generate_text', description: 'AIで投稿文を作る（作った文は create_post の text に使う）', inputSchema: { type: 'object', required: ['theme'], properties: { theme: { type: 'string' }, tone: { type: 'string' }, platform: { type: 'string' }, instruction: { type: 'string' } } } },
   { name: 'ai_generate_image', description: 'AIで画像（JPEG）を作る。戻り値のidを create_post の media_ids に使う', inputSchema: { type: 'object', required: ['prompt'], properties: { prompt: { type: 'string' } } } },
   { name: 'ai_start_video', description: 'AIで動画を作り始める（数分かかる）。job_id を ai_video_status で確認する', inputSchema: { type: 'object', required: ['prompt'], properties: { prompt: { type: 'string' } } } },
@@ -31,10 +36,26 @@ const TOOLS = [
 
 function isoOrNull(v) { const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d.toISOString(); }
 
+function accountInfo(userId) {
+  const st = require('./service-store');
+  const sub = st.Subscriptions.get(userId) || {};
+  const nowIso = new Date().toISOString();
+  const [mf, mt] = core.jstMonthBounds(nowIso);
+  const day = ai.day();
+  return {
+    subscription: { status: sub.status || 'none', current_period_end: sub.current_period_end || '', cancel_at_period_end: !!sub.cancel_at_period_end },
+    limits: { accounts: core.LIMITS.maxAccounts, pending: core.LIMITS.maxPending, per_day: core.LIMITS.maxPerDay, x_per_month: core.LIMITS.xPerMonth, ai_per_day: ai.limits() },
+    usage: { accounts: st.SnsAccounts.countForUser(userId), pending: st.ScheduledPosts.countPending(userId), drafts: st.ScheduledPosts.countDrafts(userId),
+      x_this_month: st.ScheduledPosts.countXUnits(userId, mf, mt), ai_today: { text: st.AiUsage.used(userId, day, 'text'), image: st.AiUsage.used(userId, day, 'image'), video: st.AiUsage.used(userId, day, 'video') } },
+    ai_available: ai.available(),
+  };
+}
+
 async function callTool(userId, name, a = {}) {
   switch (name) {
     case 'list_accounts':
       return { accounts: SnsAccounts.listForUser(userId).map((x) => ({ id: x.id, platform: x.platform, handle: x.handle, status: x.status })) };
+    case 'get_account_info': return accountInfo(userId);
     case 'create_post': {
       const ids = [].concat(a.account_ids || []).map(String);
       const caps = a.captions && typeof a.captions === 'object' ? a.captions : {};
@@ -63,6 +84,14 @@ async function callTool(userId, name, a = {}) {
     case 'delete_post':
       if (!ScheduledPosts.cancel(String(a.id || ''), userId)) throw new Error('取り消せるのは、予約中または下書きの投稿だけです。');
       return { id: a.id, status: 'cancelled' };
+    case 'create_upload_url':
+      if (!require('./service-store').Subscriptions.isActive(userId)) throw new Error('ご契約が有効ではありません。');
+      return uploadUrlView(UploadTickets.create(userId));
+    case 'import_media_from_url': {
+      if (!require('./service-store').Subscriptions.isActive(userId)) throw new Error('ご契約が有効ではありません。');
+      const m = await fetchMedia.importFromUrl({ userId, url: a.url });
+      return { id: m.id, kind: m.kind, mime: m.mime, size: m.size };
+    }
     case 'ai_generate_text': return { text: await ai.generateText({ userId, theme: a.theme, tone: a.tone, platform: a.platform, instruction: a.instruction }) };
     case 'ai_generate_image': { const m = await ai.generateImage({ userId, prompt: a.prompt }); return { id: m.id, kind: m.kind, size: m.size }; }
     case 'ai_start_video': {
@@ -98,8 +127,14 @@ async function handle({ req, res, method, pathname }) {
   const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '');
   const m = String(req.headers.authorization || '').match(/^Bearer\s+(\S+)$/i);
   if (!badLimiter.allow(ip)) { send(res, 429, { error: 'too many requests' }); return true; }
-  const userId = m ? ApiKeys.authenticate(m[1]) : null;
-  if (!userId) { badLimiter.fail(ip); send(res, 401, { error: 'APIキーが正しくありません。' }); return true; }
+  // APIキー（sqk_）または OAuth のアクセストークン（sqa_）
+  const userId = m ? (ApiKeys.authenticate(m[1]) || oauth.authenticate(m[1])) : null;
+  if (!userId) {
+    badLimiter.fail(ip);
+    res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8', ...oauth.challengeHeader() });
+    res.end(JSON.stringify({ error: 'invalid_token', error_description: 'ログインして接続を許可するか、APIキーを指定してください。' }));
+    return true;
+  }
   if (!limiter.allow(userId)) { send(res, 429, { error: 'リクエストが多すぎます。' }); return true; }
   limiter.fail(userId);
   const msg = await readBody(req);

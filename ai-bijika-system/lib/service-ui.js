@@ -97,14 +97,14 @@ function landingPage({ user, billingReady }) {
 }
 
 // ── ログイン・登録 ──
-function authPage(kind, error) {
+function authPage(kind, error, next = '') {
   const signup = kind === 'signup';
   return wrap(signup ? 'アカウント作成' : 'ログイン', `
     ${topNav(null)}
     <div class="auth"><div class="auth-head">${crest(58)}<h1>${signup ? 'アカウント作成' : 'ログイン'}</h1>
       <p class="lead">${signup ? 'メールアドレスとパスワードを登録します（無料）。' : 'ご契約のアカウントでログインしてください。'}</p></div>
       ${error ? `<div class="notice error" style="margin:0 0 14px"><div>${escapeHtml(error)}</div></div>` : ''}
-      <div class="card"><form method="POST" action="/service/${signup ? 'signup' : 'login'}">
+      <div class="card"><form method="POST" action="/service/${signup ? 'signup' : 'login'}">${next ? `<input type="hidden" name="next" value="${escapeHtml(next)}">` : ''}
         <div class="field"><label class="lbl" for="email">メールアドレス</label><input id="email" type="email" name="email" required autofocus autocomplete="email"></div>
         <div class="field"><label class="lbl" for="password">パスワード${signup ? '（8文字以上）' : ''}</label>
           <input id="password" type="password" name="password" required minlength="8" autocomplete="${signup ? 'new-password' : 'current-password'}"></div>
@@ -173,7 +173,7 @@ const toLocalInput = (ms) => {
 };
 
 // ── マイページ ──
-function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], newKey = '', aiAvail = {}, autoRules = [] }) {
+function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], mcpConnections = [], newKey = '', aiAvail = {}, autoRules = [] }) {
   const active = !!sub && ['active', 'trialing'].includes(sub.status);
   const [stLabel, stClass] = STATUS_LABEL[(sub && sub.status) || 'none'] || STATUS_LABEL.none;
   const accHtml = accounts.length ? accounts.map((a) => {
@@ -317,6 +317,10 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
         <form class="inline" method="POST" action="/service/app/apikey/${escapeHtml(k.id)}/revoke" onsubmit="return confirm('このAPIキーを無効にします。よろしいですか？')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">無効にする</button></form></div>`).join('') : '<p class="small">APIキーはまだありません。</p>'}
       <form method="POST" action="/service/app/apikey" class="btn-row" style="margin-top:10px"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
         <input type="text" name="label" maxlength="40" placeholder="名前（例：AIアシスタント用）" style="max-width:260px"><button class="btn btn-sm btn-primary" type="submit">APIキーを発行</button></form>
+      <div class="card-title" style="margin-top:14px">AIアシスタントとの接続（MCP）</div>
+      <p class="small">ClaudeやChatGPTなどのMCP対応アプリに、接続先URL <code>${escapeHtml((process.env.SERVICE_BASE_URL || '').replace(/\/+$/, ''))}/mcp</code> を追加すると、ログインと許可だけで接続できます（APIキーは不要）。</p>
+      ${mcpConnections.length ? mcpConnections.map((c) => `<div class="acct-row"><span><b>${escapeHtml(c.name)}</b> <span class="small">最終接続 ${escapeHtml(String(c.last_at || '').slice(0, 10))}</span></span>
+        <form class="inline" method="POST" action="/service/app/connection/${escapeHtml(c.id)}/revoke" onsubmit="return confirm('このアプリの接続を解除します。')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">解除</button></form></div>`).join('') : '<p class="small">接続中のアプリはありません。</p>'}
       <p class="small">使い方：<code>Authorization: Bearer &lt;APIキー&gt;</code> を付けて <code>/api/v1/…</code> を呼びます（<a href="/service/docs/api">APIの説明</a>）。キーは、あなたのアカウントに連携したSNSにだけ投稿できます。</p></div>` : ''}
     <div class="card"><div class="card-title">予約と投稿の履歴</div>
       <div class="hist"><table class="t"><tr><th>日時</th><th>SNS</th><th>本文</th><th>状態</th></tr>${postRows}</table></div></div>

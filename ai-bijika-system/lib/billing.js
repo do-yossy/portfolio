@@ -116,6 +116,7 @@ function applySubscription(sub, hintedUserId, createdSec) {
   // 契約が終了したら、保存しているSNSの連携情報（トークン）を削除し、未投稿の予約を取り消す
   if (sub.status === 'canceled' || sub.status === 'incomplete_expired') {
     for (const a of SnsAccounts.listForUser(userId)) SnsAccounts.remove(a.id, userId);
+    require('./oauth').revokeAll(userId); // AIアシスタントとの接続も解除する
   }
   return saved;
 }

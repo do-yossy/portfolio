@@ -37,6 +37,11 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
       if (c.path.startsWith('/v1beta/models/veo/operations/op1')) return { status: 200, json: videoDone ? { done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://generativelanguage.googleapis.com/v1beta/files/f1:download?alt=media' } }] } } } : { done: false } };
       if (c.path.startsWith('/v1beta/files/f1')) return { status: 200, text: MP4_TEXT };
     }
+    if (c.host === '93.184.216.34') {
+      if (c.path === '/v.mp4') return { status: 200, text: MP4_TEXT };
+      if (c.path === '/redir') return { status: 302, text: '', headers: { location: 'https://10.0.0.1/secret' } };
+      if (c.path === '/hop') return { status: 301, text: '', headers: { location: '/v.mp4' } };
+    }
     return null;
   });
 
@@ -70,6 +75,15 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   ok(pr.done && pr.media.kind === 'video', '完了した動画を保存できる');
   err = null; try { await ai.pollVideo({ userId: uid, operation: '../../etc' }); } catch (e) { err = e; }
   ok(err, '不正な処理名は拒否する');
+
+  console.log('URLからの取り込み');
+  const fm = require('../lib/fetch-media');
+  const im = await fm.importFromUrl({ userId: uid, url: 'https://93.184.216.34/v.mp4' });
+  ok(im.kind === 'video', '公開URLから動画を取り込める');
+  const im2 = await fm.importFromUrl({ userId: uid, url: 'https://93.184.216.34/hop' });
+  ok(im2.kind === 'video', 'リダイレクト先から取り込める');
+  err = null; try { await fm.importFromUrl({ userId: uid, url: 'https://93.184.216.34/redir' }); } catch (e) { err = e; }
+  ok(err instanceof fm.FetchError, 'リダイレクトでローカルのアドレスに向けられても拒否する');
 
   console.log('自動運用');
   const k = box.keyFromEnv();

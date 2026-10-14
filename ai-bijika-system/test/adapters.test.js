@@ -139,5 +139,10 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   const tkb = JSON.parse(mock.calls.find((c) => c.path === '/v2/post/publish/content/init/').body);
   mock.restore();
   ok(r.externalId === 'tp1' && tkb.media_type === 'PHOTO' && tkb.source_info.photo_images.length === 2 && tkb.post_info.title === 'タイトル', 'TikTokへ写真を投稿できる（1行目がタイトル）');
+  console.log('URLからの取り込みの安全対策');
+  const fm = require('../lib/fetch-media');
+  ok(['127.0.0.1', '10.1.2.3', '169.254.169.254', '192.168.0.1', '172.20.0.1', '100.64.0.1', '::1', 'fd00::1', '::ffff:127.0.0.1', '0.0.0.0'].every(fm.isPrivate), '社内・ローカルのアドレスを判定できる');
+  ok(!fm.isPrivate('93.184.216.34') && !fm.isPrivate('2606:4700::1111'), '公開アドレスは許可する');
+  ok(fm.normalizeUrl('https://drive.google.com/file/d/AbC_123/view?usp=sharing').href === 'https://drive.usercontent.google.com/download?id=AbC_123&export=download', 'Googleドライブの共有リンクを直接ダウンロードのURLに直す');
   summary();
 })();

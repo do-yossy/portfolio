@@ -13,8 +13,10 @@ const mediaLib = require('./media');
 const registry = require('./sns');
 const ai = require('./ai');
 const aiAuto = require('./ai-auto');
-const { ApiKeys, SnsAccounts, ScheduledPosts, MediaAssets, Subscriptions, AiJobs, AutoRules } = require('./service-store');
+const { ApiKeys, SnsAccounts, ScheduledPosts, MediaAssets, Subscriptions, AiJobs, AutoRules, UploadTickets } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
+const oauth = require('./oauth');
+const fetchMedia = require('./fetch-media');
 
 const keyLimiter = createLimiter({ max: 60, windowMs: 60 * 1000 });
 const badKeyLimiter = createLimiter({ max: 20, windowMs: 15 * 60 * 1000 });
@@ -43,6 +45,11 @@ function postView(p) {
   };
 }
 
+function uploadUrlView(token) {
+  const base = String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, '');
+  return { upload_url: `${base}/api/v1/uploads/${token}`, method: 'PUT', expires_in: 900, note: 'ファイルをそのまま本文に入れてPUTしてください（1回だけ有効）。戻り値の id を media_ids に使います。' };
+}
+
 function ruleView(r) {
   return { id: r.id, account_id: r.account_id, theme: r.theme, tone: r.tone, with_image: !!r.with_image, hour_jst: r.hour_jst, mode: r.mode, enabled: !!r.enabled, last_run_day: r.last_day, last_error: r.last_error };
 }
@@ -50,9 +57,20 @@ function ruleView(r) {
 async function handle({ req, res, method, pathname, url }) {
   if (!pathname.startsWith('/api/v1/')) return false;
   const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '');
+  // 一時URLへのアップロード（URLそのものが鍵。1回だけ・15分）
+  const up = pathname.match(/^\/api\/v1\/uploads\/(squ_[0-9a-f]{48})$/);
+  if (up && (method === 'PUT' || method === 'POST')) {
+    const uid = UploadTickets.consume(up[1]);
+    if (!uid) { send(res, 404, { error: 'アップロード用URLが無効か、期限切れです。' }); return true; }
+    if (!Subscriptions.isActive(uid)) { send(res, 403, { error: 'ご契約が有効ではありません。' }); return true; }
+    const r = await mediaLib.saveUpload({ userId: uid, req, contentLength: parseInt(req.headers['content-length'] || '0', 10) });
+    if (!r.ok) { send(res, 400, { error: r.error }); return true; }
+    send(res, 201, { id: r.media.id, kind: r.media.kind, mime: r.media.mime, size: r.media.size });
+    return true;
+  }
   const m = String(req.headers.authorization || '').match(/^Bearer\s+(\S+)$/i);
   if (!badKeyLimiter.allow(ip)) { send(res, 429, { error: '試行回数が多すぎます。しばらくしてからお試しください。' }); return true; }
-  const userId = m ? ApiKeys.authenticate(m[1]) : null;
+  const userId = m ? (ApiKeys.authenticate(m[1]) || oauth.authenticate(m[1])) : null;
   if (!userId) { badKeyLimiter.fail(ip); send(res, 401, { error: 'APIキーが正しくありません。Authorization: Bearer <APIキー> を指定してください。' }); return true; }
   if (!keyLimiter.allow(userId)) { send(res, 429, { error: 'リクエストが多すぎます。1分あたり60回までです。' }); return true; }
   keyLimiter.fail(userId);
@@ -67,6 +85,24 @@ async function handle({ req, res, method, pathname, url }) {
     const r = await mediaLib.saveUpload({ userId, req, contentLength: parseInt(req.headers['content-length'] || '0', 10) });
     if (!r.ok) { send(res, 400, { error: r.error }); return true; }
     send(res, 201, { id: r.media.id, kind: r.media.kind, mime: r.media.mime, size: r.media.size });
+    return true;
+  }
+
+  if (pathname === '/api/v1/media/upload-url' && method === 'POST') {
+    if (!Subscriptions.isActive(userId)) { send(res, 403, { error: 'ご契約が有効ではありません。' }); return true; }
+    send(res, 201, uploadUrlView(UploadTickets.create(userId)));
+    return true;
+  }
+  if (pathname === '/api/v1/media/import' && method === 'POST') {
+    if (!Subscriptions.isActive(userId)) { send(res, 403, { error: 'ご契約が有効ではありません。' }); return true; }
+    const b = (await readJson(req)) || {};
+    try {
+      const m = await fetchMedia.importFromUrl({ userId, url: b.url });
+      send(res, 201, { id: m.id, kind: m.kind, mime: m.mime, size: m.size });
+    } catch (e) {
+      if (e instanceof fetchMedia.FetchError) { send(res, 400, { error: e.message }); return true; }
+      throw e;
+    }
     return true;
   }
 
@@ -183,4 +219,4 @@ async function handle({ req, res, method, pathname, url }) {
   return true;
 }
 
-module.exports = { handle, postView };
+module.exports = { handle, postView, uploadUrlView };
