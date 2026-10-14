@@ -38,6 +38,12 @@ function formatJst(iso) {
   return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日 ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
+function formatJstShort(iso) {
+  if (!iso) return '';
+  const d = new Date(Date.parse(iso) + JST_OFFSET_MS);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
 // 予約を作る（選んだSNSアカウントごとに1件）
 function createPosts({ userId, accountIds, text, scheduledAtIso, nowMs = Date.now() }) {
   const body = String(text || '').trim();
@@ -107,5 +113,5 @@ async function finishConnect({ userId, platform, code, state }) {
 
 module.exports = {
   LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, snsEnabled, redirectUriFor,
-  jstLocalToIso, jstDayBounds, formatJst, createPosts, startConnect, finishConnect,
+  jstLocalToIso, jstDayBounds, formatJst, formatJstShort, createPosts, startConnect, finishConnect,
 };
