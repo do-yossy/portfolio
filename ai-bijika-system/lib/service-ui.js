@@ -18,6 +18,9 @@ const EXTRA_CSS = `<style>
 .svc table.t{width:100%;border-collapse:collapse;font-size:14px}
 .svc table.t th,.svc table.t td{border-bottom:1px solid #e6dfd0;padding:8px 6px;text-align:left;vertical-align:top;word-break:break-word}
 .svc .hist{overflow-x:auto}
+.svc .hist table{min-width:540px}
+.svc .btn-row{display:flex;flex-wrap:wrap;gap:8px}
+.svc .btn-row .btn{white-space:nowrap}
 .svc table.t th{white-space:nowrap}
 .svc table.t.kv th{width:1%;padding-right:14px}
 .svc .badge-ok{background:#DCEADF;color:#2F5D3A;border-radius:999px;padding:1px 10px;font-size:12px;font-weight:700}

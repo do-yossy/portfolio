@@ -153,9 +153,9 @@ flyctl certs check <サブドメイン>.social-quality.com --app sq-ai-bijika
 
 ## 月額SNS自動投稿サービス（`/service`）
 
-月額1,000円（税込）で、ThreadsとXへの予約投稿ができるサービス。販売（申込み・決済・契約の開始・解約）まで自動化している。購入者向けの本編（買い切り・ライセンス認証）とは別系統で、同じアカウント基盤（`users`）を使う。
+月額1,000円（税込）で、Threads・X・Instagram・TikTokへの予約投稿（画像・動画の添付つき）ができるサービス。販売（申込み・決済・契約の開始・解約）まで自動化している。購入者向けの本編（買い切り・ライセンス認証）とは別系統で、同じアカウント基盤（`users`）を使う。
 
-- 設計：`lib/billing.js`（Stripe月額サブスク・Webhook署名検証）、`lib/sns/`（Threads・Xのアダプタ、予約の実行）、`lib/service-store.js`（テーブル）、`lib/service-routes.js` / `lib/service-ui.js`（ルート・画面）
+- 設計：`lib/billing.js`（Stripe月額サブスク・Webhook署名検証）、`lib/sns/`（Threads・X・Instagram・TikTokのアダプタ、予約の実行）、`lib/media.js`（画像・動画の保存と配信）、`lib/service-store.js`（テーブル）、`lib/service-routes.js` / `lib/service-ui.js`（ルート・画面）
 - 法務ドラフト：`legal/サービス利用規約_案.md`、`legal/サービス特定商取引法表記_案.md`、`legal/サービスプライバシーポリシー_案.md`
 - 設定手順（Stripe・各SNSの開発者アプリ・環境変数）：[`docs/月額SNS自動投稿サービス_セットアップ手順.md`](./docs/月額SNS自動投稿サービス_セットアップ手順.md)
 - テスト：`npm test`
