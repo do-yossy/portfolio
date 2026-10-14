@@ -71,6 +71,23 @@ db.exec(`
 
 try { db.exec('ALTER TABLE subscriptions ADD COLUMN stripe_event_created INTEGER NOT NULL DEFAULT 0'); } catch { /* 既にある */ }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS media_assets (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    kind TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    ext TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    deleted_at TEXT DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_media_user ON media_assets(user_id);
+`);
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN media_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN options TEXT DEFAULT '{}'"); } catch { /* 既にある */ }
+
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 const Subscriptions = {
@@ -191,11 +208,11 @@ const OAuthStates = {
 };
 
 const ScheduledPosts = {
-  create({ userId, accountId, text, scheduledAt }) {
+  create({ userId, accountId, text, scheduledAt, mediaId, options }) {
     const id = generateId();
     const t = now();
-    db.prepare(`INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`).run(id, userId, accountId, text, scheduledAt, t, t);
+    db.prepare(`INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, media_id, options, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`).run(id, userId, accountId, text, scheduledAt, mediaId || '', JSON.stringify(options || {}), t, t);
     return id;
   },
   get(id) {
@@ -252,4 +269,38 @@ const ScheduledPosts = {
   },
 };
 
-module.exports = { Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+const MediaAssets = {
+  create({ userId, token, kind, mime, ext, size }) {
+    const id = generateId();
+    db.prepare('INSERT INTO media_assets (id, user_id, token, kind, mime, ext, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, userId, token, kind, mime, ext, size, now());
+    return id;
+  },
+  get(id) {
+    return db.prepare("SELECT * FROM media_assets WHERE id = ? AND deleted_at = ''").get(id) || null;
+  },
+  getForUser(id, userId) {
+    return db.prepare("SELECT * FROM media_assets WHERE id = ? AND user_id = ? AND deleted_at = ''").get(id, userId) || null;
+  },
+  getByToken(token) {
+    return db.prepare("SELECT * FROM media_assets WHERE token = ? AND deleted_at = ''").get(token) || null;
+  },
+  totalSize(userId) {
+    return db.prepare("SELECT COALESCE(SUM(size), 0) AS n FROM media_assets WHERE user_id = ? AND deleted_at = ''").get(userId).n;
+  },
+  markDeleted(id) {
+    db.prepare('UPDATE media_assets SET deleted_at = ? WHERE id = ?').run(now(), id);
+  },
+  // 削除してよいメディア：どの予約からも参照されていない（作成から1日以上）、または参照する予約がすべて終了して2日以上
+  deletable(nowMs = Date.now()) {
+    const unreferencedBefore = new Date(nowMs - 24 * 3600 * 1000).toISOString();
+    const finishedBefore = new Date(nowMs - 2 * 24 * 3600 * 1000).toISOString();
+    return db.prepare(`SELECT m.* FROM media_assets m WHERE m.deleted_at = '' AND (
+      (NOT EXISTS (SELECT 1 FROM scheduled_posts p WHERE p.media_id = m.id) AND m.created_at < ?)
+      OR (EXISTS (SELECT 1 FROM scheduled_posts p WHERE p.media_id = m.id)
+        AND NOT EXISTS (SELECT 1 FROM scheduled_posts p WHERE p.media_id = m.id AND (p.status IN ('pending','publishing') OR p.updated_at >= ?)))
+    )`).all(unreferencedBefore, finishedBefore);
+  },
+};
+
+module.exports = { MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

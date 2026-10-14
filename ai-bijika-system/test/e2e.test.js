@@ -30,6 +30,7 @@ const mock = installHttpsMock(async (c) => {
     if (c.method === 'POST' && c.path === '/v1/subscriptions/sub_e2e') { cancelFlag = /cancel_at_period_end=true/.test(c.body); return { status: 200, json: subObj() }; }
     if (c.path === '/v1/billing_portal/sessions') return { status: 200, json: { url: 'https://portal.stripe.test/e2e' } };
   }
+  if (c.host === 'open.tiktokapis.com' && c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { creator_nickname: 'e2e_tt', privacy_level_options: ['SELF_ONLY'], comment_disabled: false }, error: { code: 'ok' } } };
   if (c.host === 'graph.threads.net') {
     if (c.path === '/oauth/access_token') return { status: 200, json: { access_token: 'th_short', user_id: 4242 } };
     if (c.path.startsWith('/access_token?')) return { status: 200, json: { access_token: 'th_long', expires_in: 5184000 } };
@@ -170,6 +171,56 @@ function webhook(event, secret = 'whsec_e2e') {
   await scheduler.tick();
   const posted = store.ScheduledPosts.listForUser(userIdForSub).find((p) => p.text === '今すぐテスト');
   ok(posted && posted.status === 'posted' && posted.external_id === 'post_e2e', '実行時刻が来た投稿がThreadsへ投稿される');
+  // 画像の添付（アップロード → 予約 → 投稿）
+  const rawUpload = (buf, headers) => new Promise((resolve, reject) => {
+    const q = http.request(`${base}/service/app/media`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/octet-stream', 'Content-Length': buf.length, ...headers } }, (res) => {
+      const ch = []; res.on('data', (c) => ch.push(c)); res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(ch).toString('utf8') }));
+    });
+    q.on('error', reject); q.write(buf); q.end();
+  });
+  const jpegBuf = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(1500, 5)]);
+  r = await rawUpload(jpegBuf, { 'X-CSRF': 'bad' });
+  ok(r.status === 403, 'アップロードもCSRFトークンが必要');
+  r = await rawUpload(Buffer.from('not an image at all, just text'), { 'X-CSRF': appCsrf });
+  ok(r.status === 400 && JSON.parse(r.text).error.includes('対応していない'), '画像・動画以外はアップロードできない');
+  r = await rawUpload(jpegBuf, { 'X-CSRF': appCsrf });
+  const up = JSON.parse(r.text);
+  ok(r.status === 200 && up.kind === 'image' && up.id, '画像をアップロードできる');
+  const mediaRow = store.MediaAssets.get(up.id);
+  const savedCookie2 = cookie;
+  cookie = '';
+  r = await req('GET', `/media/${mediaRow.token}.${mediaRow.ext}`);
+  ok(r.status === 200 && r.headers['content-type'] === 'image/jpeg', '公開URLは、ログインなしでも（SNS側が）取得できる');
+  r = await req('GET', `/media/${'0'.repeat(48)}.jpg`);
+  ok(r.status === 404, '推測したURLでは取得できない');
+  cookie = savedCookie2;
+  r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: '画像つき', account: accId, at: FUTURE, mode: 'schedule', media_id: up.id } });
+  ok(r.status === 302 && r.headers.location === '/service/app?f=scheduled', '画像つきで予約できる');
+  r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: '他人の画像', account: accId, at: FUTURE, mode: 'schedule', media_id: 'deadbeefdeadbeefdead' } });
+  ok(r.status === 400, '存在しない（または他人の）画像は使えない');
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('添付あり') && !r.text.includes('id="tiktokBox"'), '履歴に添付ありと表示する（未連携のTikTokの設定欄は出ない）');
+  // TikTokの投稿設定（公開範囲の選択肢をTikTokから取得して画面に反映する）
+  const box = require('../lib/crypto-box');
+  const ttId = store.SnsAccounts.upsert({ userId: userIdForSub, platform: 'tiktok', externalUserId: 'tt1', handle: 'e2e_tt', accessTokenEnc: box.encrypt('t', box.keyFromEnv()), refreshTokenEnc: box.encrypt('r', box.keyFromEnv()), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  r = await req('GET', `/service/app/tiktok/creator-info?account=${ttId}`);
+  const ci = JSON.parse(r.text);
+  ok(r.status === 200 && ci.privacyLevelOptions.join() === 'SELF_ONLY' && ci.nickname === 'e2e_tt', 'TikTokの投稿設定（公開範囲の選択肢）を、TikTokから取得して返す');
+  r = await req('GET', `/service/app/tiktok/creator-info?account=${accId}`);
+  ok(r.status === 404, 'TikTok以外のアカウントでは取得できない');
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('id="tiktokBox"') && r.text.includes('第三者の商品・ブランドの宣伝'), 'TikTokを連携すると、投稿フォームにTikTokの設定欄（公開範囲・コメント等・商用の開示）が出る');
+  // TikTokの設定（商用コンテンツの開示・公開範囲）が、フォームから予約に保存される
+  const mp4Buf = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), Buffer.alloc(2000, 4)]);
+  const upv = JSON.parse((await rawUpload(mp4Buf, { 'X-CSRF': appCsrf })).text);
+  r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: 'TikTok宣伝', account: ttId, at: FUTURE, mode: 'schedule', media_id: upv.id, tiktok_privacy: 'SELF_ONLY', tiktok_comment: '1', tiktok_commercial_own: '1' } });
+  ok(r.status === 302, 'TikTokの設定つきで予約できる');
+  const ttPostRow = store.ScheduledPosts.listForUser(userIdForSub).find((p) => p.text === 'TikTok宣伝');
+  const ttOpt = JSON.parse(ttPostRow.options);
+  ok(ttOpt.privacy_level === 'SELF_ONLY' && ttOpt.commercial_own === true && ttOpt.commercial_paid === false && ttOpt.disable_comment === false && ttOpt.disable_duet === true, 'フォームの公開範囲・商用コンテンツの開示・コメント許可が、予約に保存される');
+  r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: '提携で自分のみ', account: ttId, at: FUTURE, mode: 'schedule', media_id: upv.id, tiktok_privacy: 'SELF_ONLY', tiktok_commercial_paid: '1' } });
+  ok(r.status === 400 && r.text.includes('自分のみ'), '提携（有償）の宣伝は、公開範囲を「自分のみ」にできない');
+  store.SnsAccounts.remove(ttId, userIdForSub);
   r = await req('POST', `/service/app/post/${postId}/cancel`, { body: { csrf: appCsrf } });
   ok(r.status === 302 && r.headers.location === '/service/app?f=cancelled', '未投稿の予約を取り消せる');
 

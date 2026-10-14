@@ -3,7 +3,7 @@
 // 利用できる投稿数・費用はXのAPIプラン次第。運用前にXの公式ドキュメントで必ず確認すること。
 const crypto = require('crypto');
 const { request, encodeForm } = require('../http-client');
-const { SnsError, classify } = require('./errors');
+const { SnsError, classify, ambiguous } = require('./errors');
 
 const HOST = 'api.x.com';
 const AUTH_URL = 'https://x.com/i/oauth2/authorize';
@@ -32,6 +32,13 @@ function textLength(text) {
     n += wide ? 2 : 1;
   }
   return n;
+}
+
+function validatePost({ text, media }) {
+  if (media) return 'Xは、現時点ではテキストのみに対応しています（画像・動画は添付できません）。';
+  if (!String(text || '').trim()) return 'Xは、本文が必要です。';
+  if (textLength(text) > maxLength) return `Xの文字数の上限（${maxLength}。日本語は1文字を2として計算）を超えています。`;
+  return null;
 }
 
 function newPkce() {
@@ -97,12 +104,15 @@ async function refresh({ refreshToken }) {
 }
 
 async function publish({ accessToken, text }) {
-  const r = await call({
-    method: 'POST', path: '/2/tweets',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ text }),
-  });
+  let r;
+  try {
+    r = await call({
+      method: 'POST', path: '/2/tweets',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ text }),
+    });
+  } catch (e) { throw ambiguous(e); }
   return { externalId: String(r.data.id) };
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, authUrl, exchangeCode, refresh, publish, newPkce, usesPkce: true };
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, newPkce, usesPkce: true, mediaRule: 'テキストのみ' };

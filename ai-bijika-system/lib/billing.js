@@ -3,7 +3,7 @@
 // 決済の状態（契約中か）は Webhook を唯一の真実とし、Checkoutの戻りURLだけでは契約中にしない。
 const crypto = require('crypto');
 const { request, encodeForm } = require('./http-client');
-const { Subscriptions, StripeEvents } = require('./service-store');
+const { Subscriptions, StripeEvents, SnsAccounts } = require('./service-store');
 
 const STRIPE_HOST = 'api.stripe.com';
 
@@ -100,9 +100,11 @@ function applySubscription(sub, hintedUserId, createdSec) {
     || (Subscriptions.findBySubscription(sub.id) || Subscriptions.findByCustomer(customerId) || {}).user_id;
   if (!userId) return null;
   const known = Subscriptions.get(userId);
+  // 別の（古い）契約の「終了」を知らせる遅れたイベントで、いまの契約を終了扱いにしない（再契約したあとに届く場合がある）
+  if (known && known.stripe_subscription_id && known.stripe_subscription_id !== sub.id && ['canceled', 'incomplete_expired'].includes(sub.status)) return known;
   if (createdSec && known && known.stripe_event_created > createdSec) return known; // 古い情報は無視
   const item = sub.items && sub.items.data && sub.items.data[0];
-  return Subscriptions.upsert(userId, {
+  const saved = Subscriptions.upsert(userId, {
     stripe_customer_id: customerId,
     stripe_subscription_id: sub.id,
     status: sub.status,
@@ -111,6 +113,11 @@ function applySubscription(sub, hintedUserId, createdSec) {
     price_id: (item && item.price && item.price.id) || '',
     stripe_event_created: createdSec || (known && known.stripe_event_created) || 0,
   });
+  // 契約が終了したら、保存しているSNSの連携情報（トークン）を削除し、未投稿の予約を取り消す
+  if (sub.status === 'canceled' || sub.status === 'incomplete_expired') {
+    for (const a of SnsAccounts.listForUser(userId)) SnsAccounts.remove(a.id, userId);
+  }
+  return saved;
 }
 
 // 同じイベントが再送されても二重に処理しない

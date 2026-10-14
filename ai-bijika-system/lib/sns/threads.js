@@ -2,7 +2,8 @@
 // Threads（Meta）公式API。テキスト投稿のみ。
 // 仕様は公式ドキュメント（Threads API）で運用前に必ず確認すること。
 const { request, encodeForm } = require('../http-client');
-const { SnsError, classify } = require('./errors');
+const { SnsError, classify, ambiguous } = require('./errors');
+const poll = require('./poll');
 
 const HOST = 'graph.threads.net';
 const AUTH_URL = 'https://threads.net/oauth/authorize';
@@ -45,7 +46,7 @@ async function call(method, path, { form, query } = {}) {
   if (r.status >= 200 && r.status < 300 && r.json) return r.json;
   const msg = r.json && r.json.error && r.json.error.message;
   const err = classify(r.status, msg ? `Threads: ${msg}` : '');
-  if (r.json && r.json.error && (r.json.error.code === 190 || r.json.error.type === 'OAuthException')) err.authError = true;
+  if (r.json && r.json.error && r.json.error.code === 190) { err.authError = true; err.retriable = false; }
   throw err;
 }
 
@@ -78,15 +79,39 @@ async function refresh({ accessToken }) {
   };
 }
 
-// テキスト投稿：コンテナ作成 → 公開
-async function publish({ accessToken, externalUserId, text }) {
-  const created = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads`, {
-    form: { media_type: 'TEXT', text, access_token: accessToken },
-  });
-  const published = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads_publish`, {
-    form: { creation_id: created.id, access_token: accessToken },
-  });
+function validatePost({ text, media }) {
+  if (!String(text || '').trim() && !media) return 'Threadsは、本文か画像・動画のどちらかが必要です。';
+  if (textLength(text || '') > maxLength) return `Threadsは${maxLength}文字までです。`;
+  return null;
+}
+
+async function waitFinished(containerId, accessToken) {
+  for (let i = 0; i < poll.maxTries(); i++) {
+    const s = await call('GET', `/v1.0/${encodeURIComponent(containerId)}`, { query: { fields: 'status,error_message', access_token: accessToken } });
+    if (s.status === 'FINISHED') return;
+    if (s.status === 'ERROR' || s.status === 'EXPIRED') throw new SnsError(`Threads側で動画の処理に失敗しました${s.error_message ? `（${s.error_message}）` : ''}`);
+    await poll.sleep(poll.intervalMs());
+  }
+  throw new SnsError('Threads側の動画の処理が終わりませんでした。', { retriable: true });
+}
+
+// 投稿：コンテナ作成（テキスト／画像／動画）→（動画は処理待ち）→ 公開
+async function publish({ accessToken, externalUserId, text, media }) {
+  const err = validatePost({ text, media });
+  if (err) throw new SnsError(err);
+  const form = { text: text || '', access_token: accessToken };
+  if (!media) form.media_type = 'TEXT';
+  else if (media.kind === 'image') { form.media_type = 'IMAGE'; form.image_url = media.url; }
+  else { form.media_type = 'VIDEO'; form.video_url = media.url; }
+  const created = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads`, { form });
+  if (media && media.kind === 'video') await waitFinished(created.id, accessToken);
+  let published;
+  try {
+    published = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads_publish`, {
+      form: { creation_id: created.id, access_token: accessToken },
+    });
+  } catch (e) { throw ambiguous(e); }
   return { externalId: String(published.id) };
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, authUrl, exchangeCode, refresh, publish, usesPkce: false };
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, usesPkce: false, mediaRule: '画像・動画は任意' };

@@ -109,8 +109,11 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(canceled.cancel_at_period_end === 1 && store.Subscriptions.isActive(userA), '解約手続きをしても期間末までは利用できる');
   const resumed = await billing.setCancelAtPeriodEnd(userA, false);
   ok(resumed.cancel_at_period_end === 0, '解約を取り消せる');
+  const endAcc = store.SnsAccounts.upsert({ userId: userA, platform: 'threads', externalUserId: 'end1', handle: '@end', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  const endPost = store.ScheduledPosts.create({ userId: userA, accountId: endAcc, text: 't', scheduledAt: new Date(Date.now() + 86400000).toISOString() });
   await billing.handleEvent({ id: 'evt_d', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1', customer: 'cus_1', status: 'canceled', current_period_end: periodEnd, cancel_at_period_end: false, metadata: {}, items: { data: [] } } } });
   ok(!store.Subscriptions.isActive(userA), '契約が終了すると利用できなくなる');
+  ok(store.SnsAccounts.get(endAcc) === null && store.ScheduledPosts.get(endPost).status === 'cancelled', '契約が終了すると、保存しているSNSの連携情報（トークン）を削除し、未投稿の予約を取り消す');
   const portal = await billing.createPortalSession('cus_1');
   ok(portal === 'https://portal.stripe.test/p', 'カード変更用のポータルURLを取得できる');
   // 決済ページから戻った直後の同期（Webhookの到着前でも、2本目の契約を作らせないため）
@@ -119,6 +122,13 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(!(await billing.syncCheckoutSession(userSync, '../etc')), '不正なセッションIDは拒否する');
   ok((await billing.syncCheckoutSession(userSync, 'cs_done')) && store.Subscriptions.isActive(userSync) && store.Subscriptions.get(userSync).stripe_subscription_id === 'sub_sync', '本人の完了したセッションは、Webhookより先に契約中にできる');
 
+  // 再契約したあとに届く、古い契約の「終了」イベントで、いまの契約を終了扱いにしない
+  const keepAcc = store.SnsAccounts.upsert({ userId: userSync, platform: 'threads', externalUserId: 'keep1', handle: '@keep', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  await billing.handleEvent({ id: 'evt_old_deleted', type: 'customer.subscription.deleted', created: Math.floor(Date.now() / 1000) - 5, data: { object: { id: 'sub_old', customer: 'cus_sync', status: 'canceled', current_period_end: periodEnd, cancel_at_period_end: false, metadata: { user_id: userSync }, items: { data: [] } } } });
+  ok(store.Subscriptions.isActive(userSync) && store.Subscriptions.get(userSync).stripe_subscription_id === 'sub_sync' && store.SnsAccounts.get(keepAcc) !== null, '再契約のあとに届いた古い契約の終了イベントでは、いまの契約も連携情報も変わらない');
+  // 時刻の情報がないイベント（順序制御が働かない場合）でも、古い契約の終了では、いまの契約を変えない
+  await billing.handleEvent({ id: 'evt_old_deleted2', type: 'customer.subscription.deleted', data: { object: { id: 'sub_old2', customer: 'cus_sync', status: 'canceled', current_period_end: periodEnd, cancel_at_period_end: false, metadata: { user_id: userSync }, items: { data: [] } } } });
+  ok(store.Subscriptions.isActive(userSync) && store.SnsAccounts.get(keepAcc) !== null, '時刻のない古い契約の終了イベントでも、いまの契約と連携情報は変わらない（契約IDの照合）');
   // 順不同で届いた古いイベントで、新しい状態を上書きしない
   const T = Math.floor(Date.now() / 1000) + 1000;
   const subEv = (id, status, created) => ({ id, type: 'customer.subscription.updated', created, data: { object: { id: 'sub_1', customer: 'cus_1', status, current_period_end: periodEnd, cancel_at_period_end: false, metadata: {}, items: { data: [] } } } });
@@ -272,7 +282,7 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
 
   mockSns.restore();
   console.log('対応SNS');
-  ok(registry.list().map((p) => p.id).join() === 'threads,x', 'Threads と X に対応している');
+  ok(registry.list().map((p) => p.id).join() === 'threads,x,instagram,tiktok', 'Threads・X・Instagram・TikTok に対応している');
 
   process.exit(summary() ? 0 : 1);
 })().catch((e) => { console.error(e); process.exit(1); });

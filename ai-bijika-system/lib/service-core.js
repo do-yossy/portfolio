@@ -1,6 +1,6 @@
 'use strict';
 // 月額SNS自動投稿サービスの業務ルール（画面・HTTPには依存しない）
-const { Subscriptions, SnsAccounts, OAuthStates, ScheduledPosts } = require('./service-store');
+const { Subscriptions, SnsAccounts, OAuthStates, ScheduledPosts, MediaAssets } = require('./service-store');
 const box = require('./crypto-box');
 const registry = require('./sns');
 
@@ -56,10 +56,10 @@ function formatJstShort(iso) {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
-// 予約を作る（選んだSNSアカウントごとに1件）
-function createPosts({ userId, accountIds, text, scheduledAtIso, nowMs = Date.now() }) {
+// 予約を作る（選んだSNSアカウントごとに1件）。mediaId は事前にアップロードしたメディア、options はSNSごとの設定（TikTokの公開範囲など）
+function createPosts({ userId, accountIds, text, scheduledAtIso, mediaId, options, nowMs = Date.now() }) {
   const body = String(text || '').trim();
-  if (!body) return { ok: false, error: '投稿の本文を入力してください。' };
+  if (!body && !mediaId) return { ok: false, error: '投稿の本文、または画像・動画を入力してください。' };
   const ids = [...new Set([].concat(accountIds || []).filter(Boolean))];
   if (!ids.length) return { ok: false, error: '投稿先のSNSを選んでください。' };
   if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
@@ -67,6 +67,12 @@ function createPosts({ userId, accountIds, text, scheduledAtIso, nowMs = Date.no
   const at = Date.parse(scheduledAtIso);
   if (at < nowMs - 60 * 1000) return { ok: false, error: '過去の日時は指定できません。' };
   if (at > nowMs + MAX_DAYS_AHEAD * 24 * 3600 * 1000) return { ok: false, error: `予約できるのは${MAX_DAYS_AHEAD}日先までです。` };
+  let media = null;
+  if (mediaId) {
+    media = MediaAssets.getForUser(mediaId, userId);
+    if (!media) return { ok: false, error: '添付したファイルが見つかりません。もう一度アップロードしてください。' };
+    if (!String(process.env.SERVICE_BASE_URL || '').startsWith('http')) return { ok: false, error: '画像・動画の投稿は、現在ご利用いただけません。' };
+  }
   const accounts = [];
   for (const id of ids) {
     const a = SnsAccounts.getForUser(id, userId);
@@ -74,8 +80,9 @@ function createPosts({ userId, accountIds, text, scheduledAtIso, nowMs = Date.no
     if (a.status !== 'active') return { ok: false, error: `${a.handle || a.platform}は連携のやり直しが必要です。` };
     const ad = registry.get(a.platform);
     if (!ad) return { ok: false, error: '未対応のSNSです。' };
-    if (ad.textLength(body) > ad.maxLength) return { ok: false, error: `${ad.label}の文字数の上限（${ad.maxLength}${ad.id === 'x' ? '（日本語は1文字を2として計算）' : '文字'}）を超えています。` };
-    accounts.push(a);
+    const problem = ad.validatePost({ text: body, media, options: (options && options[a.platform]) || {} });
+    if (problem) return { ok: false, error: problem };
+    accounts.push({ a, ad });
   }
   if (ScheduledPosts.countPending(userId) + accounts.length > LIMITS.maxPending) {
     return { ok: false, error: `未投稿の予約は${LIMITS.maxPending}件までです。` };
@@ -84,7 +91,10 @@ function createPosts({ userId, accountIds, text, scheduledAtIso, nowMs = Date.no
   if (ScheduledPosts.countScheduledBetween(userId, from, to) + accounts.length > LIMITS.maxPerDay) {
     return { ok: false, error: `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。` };
   }
-  const created = accounts.map((a) => ScheduledPosts.create({ userId, accountId: a.id, text: body, scheduledAt: scheduledAtIso }));
+  const created = accounts.map(({ a }) => ScheduledPosts.create({
+    userId, accountId: a.id, text: body, scheduledAt: scheduledAtIso, mediaId: media ? media.id : '',
+    options: (options && options[a.platform]) || {},
+  }));
   return { ok: true, ids: created };
 }
 
