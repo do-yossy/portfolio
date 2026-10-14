@@ -18,7 +18,15 @@ const JST_OFFSET_MS = 9 * 3600 * 1000;
 
 const serviceName = () => process.env.SERVICE_NAME || 'ミチシルベ 自動投稿';
 const priceYen = () => Number(process.env.SERVICE_PRICE_JPY || 1000);
-const TERMS_VERSION = '2026-10-13';
+// 無料トライアルの日数（0なら無し）。初めて申し込む人だけが対象
+const trialDays = () => { const v = parseInt(process.env.SERVICE_TRIAL_DAYS || '0', 10); return Number.isFinite(v) && v > 0 && v <= 30 ? v : 0; };
+function trialFor(userId) {
+  const d = trialDays();
+  if (!d) return 0;
+  const s = Subscriptions.get(userId);
+  return s && s.stripe_subscription_id ? 0 : d; // 一度でも契約したことがあれば対象外
+}
+const TERMS_VERSION = '2026-10-14';
 
 const contactEmail = () => {
   const e = String(process.env.SERVICE_CONTACT_EMAIL || '').trim();
@@ -236,6 +244,6 @@ async function finishConnect({ userId, platform, code, state }) {
 }
 
 module.exports = {
-  LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, snsEnabled, contactEmail, salesOpen, redirectUriFor,
+  LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
   jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

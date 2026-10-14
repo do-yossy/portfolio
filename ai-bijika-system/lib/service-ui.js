@@ -51,45 +51,51 @@ function topNav(user) {
 }
 
 // ── 販売ページ ──
-function landingPage({ user, billingReady }) {
+function limitsText() {
+  const L = core.LIMITS;
+  return `連携できるSNSアカウントは${L.maxAccounts}件まで、未投稿の予約は${L.maxPending}件まで、1日の予約は${L.maxPerDay}件まで、Xへの投稿は月${L.xPerMonth}件まで（ツリーは1件ずつ数えます）`;
+}
+function trialText(trialDays, price) {
+  return `初めてお申し込みの方は、最初の${trialDays}日間は無料です。お申込みの際に、お支払い方法（クレジットカード等）の登録が必要です。無料期間が終わると自動で有料の契約に切り替わり、月額${price}の請求が始まります。無料期間中に解約すれば、料金はかかりません。`;
+}
+
+function landingPage({ user, billingReady, trialDays = 0 }) {
   const price = yen(core.priceYen());
   const cta = billingReady
     ? `<a class="btn btn-primary btn-block" href="${user ? '/service/checkout' : '/service/signup'}">${user ? '申込みに進む' : '無料でアカウントを作って申し込む'}</a>
        <p class="small center" style="margin-top:8px">アカウント作成は無料です。お支払いは、次の確認画面で内容をご確認いただいたあとに始まります。</p>`
     : `<div class="notice"><div>ただいま準備中です。もうしばらくお待ちください。</div></div>`;
+  const feat = (t, d) => `<div class="card"><div class="card-title">${t}</div><p class="small">${d}</p></div>`;
   return wrap('SNS自動投稿サービス', `
     ${topNav(user)}
     <header class="page-head"><div class="eyebrow">SNS Scheduler</div><h1>${nameOf()}</h1>
-      <p class="lead">Threads・X・Instagram・TikTokへの投稿を、あらかじめ予約しておけるサービスです。書いた投稿や、用意した画像・動画を、決めた日時に自動で公開します。</p></header>
-    <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます（解約後も、契約期間の終わりまでご利用いただけます）</small></div>
+      <p class="lead">Threads・X・Instagram・TikTok・Facebookページ・YouTubeへの投稿を、1つの画面からまとめて予約できるサービスです。AIで投稿文や画像を作ることも、AIアシスタントから投稿を操作することもできます。</p></header>
+    <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます（解約後も、契約期間の終わりまでご利用いただけます）</small>${trialDays ? `<small><b>初めての方は${trialDays}日間無料</b>（お支払い方法の登録が必要です。期間が終わると自動で課金が始まります）</small>` : ''}</div>
     ${cta}
     <h2 style="margin-top:26px">できること</h2>
     <div class="grid2">
-      <div class="card"><div class="card-title">投稿の予約</div>
-        <p class="small">本文と日時を決めて予約します。日本時間で、最大90日先まで指定できます。</p></div>
-      <div class="card"><div class="card-title">複数のSNSへ</div>
-        <p class="small">Threads・X・Instagram・TikTokに対応しています。同じ内容を、選んだSNSへまとめて予約できます（SNSごとに、必要な画像・動画の条件があります）。</p></div>
-      <div class="card"><div class="card-title">自分のアカウントで投稿</div>
-        <p class="small">各SNSの公式の連携（OAuth）を使います。SNSのパスワードをお預かりすることはありません。連携は、いつでも解除できます。</p></div>
-      <div class="card"><div class="card-title">失敗しても安心</div>
-        <p class="small">一時的なエラーは自動で再試行します。投稿の結果は、マイページで確認できます。</p></div>
+      ${feat('6つのSNSへ同時投稿', 'Threads・X・Instagram・TikTok・Facebookページ・YouTube（ショート）に対応。同じ内容を、選んだSNSへまとめて投稿・予約できます。SNSごとに本文を変えることもできます。')}
+      ${feat('テキスト・画像・動画・ツリー', '画像は複数枚（カルーセル）、動画、ThreadsとXのツリー（連投）に対応。TikTokは動画のほか写真投稿にも対応しています。')}
+      ${feat('予約・下書き・カレンダー', '日本時間で最大90日先まで予約できます。下書きに保存して、あとから予約することも。予約はカレンダーで一覧できます。')}
+      ${feat('AIで投稿づくり', 'テーマを入れるだけで、AIが投稿文や画像を作ります（動画の生成にも対応）。毎日決めた時刻に、AIが作った投稿を下書きに入れる「自動運用」も使えます。')}
+      ${feat('AIアシスタントから操作', 'ClaudeやChatGPTなどのMCP対応アプリから、ログインと許可だけで接続できます。REST APIとAPIキー、Claude Code用のスキルもご用意しています。')}
+      ${feat('自分のアカウントで、安全に', '各SNSの公式の連携（OAuth）を使います。SNSのパスワードをお預かりすることはありません。一時的なエラーは自動で再試行し、結果はマイページで確認できます。')}
     </div>
     <h2 style="margin-top:26px">ご利用の前にご確認ください</h2>
     <div class="card"><ul class="plain small">
-      <li>対応SNSは、Threads・X・Instagram・TikTokです。Xはテキストのみ、Instagramは画像（JPEG）またはリール動画が必須、TikTokは動画（MP4・MOV）が必須です。Threadsは画像・動画を付けられます。</li>
-      <li>Instagramは、プロアカウント（ビジネス／クリエイター）が対象です。</li>
-      <li>TikTokへの投稿は、TikTok側の仕様・審査状況により、公開範囲が制限される場合があります。</li>
-      <li>アップロードできるファイルは、画像（JPEG・PNG）が8MBまで、動画（MP4・MOV）が100MBまで、保存できる合計は1人あたり300MBまでです。予約した投稿に使うファイルは、投稿が終わるまで保存します。投稿が終わってから2日後以降（投稿に使わなかったファイルは、アップロードから1日後以降）に、自動で削除します。投稿用のファイルは、保存している間、推測できない長いURLで外部から取得できる状態になります。</li>
-      <li>投稿できるのは、ご自身で作成・予約した内容だけです。いいね・フォロー・コメントなどの自動操作は行いません。</li>
-      <li>Xへの投稿は、X側のAPIの利用条件（投稿数の制限など）の影響を受ける場合があります。</li>
-      <li>文字数の上限は、Threadsが500文字、Xが重み付きで280（日本語は1文字を2として計算）、Instagram・TikTokが2,200文字です。</li>
-      <li>未投稿の予約は100件まで、1日の予約は30件まで、連携できるアカウントは5件までです。</li>
-      <li>SNS側の仕様変更や障害、各SNSの規約による制限で、投稿できない場合があります。</li>
-      <li>投稿の内容と、その結果（SNS側での表示・凍結等）の責任は、ご利用者にあります。</li>
-      <li>お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。契約期間が終わると、SNSの連携情報は削除され、未投稿の予約は取り消されます（再開するときは、SNSの連携をやり直してください）。</li>
+      ${trialDays ? `<li>${trialText(trialDays, price)}</li>` : ''}
+      <li>SNSごとの条件：Threadsは画像・動画が任意（カルーセル20件まで）、Xは画像4枚または動画1本が任意、Instagramはプロアカウント（ビジネス／クリエイター）が対象でJPEG画像（10件まで）またはリール動画が必須、TikTokは動画または写真（JPEG）が必須、Facebookはご自身が管理するページへの投稿、YouTubeは動画1本が必須です。ツリーはThreadsとXだけです。</li>
+      <li>TikTok・Instagram・Facebook・YouTubeへの投稿は、各SNS側の審査・仕様により、使える機能や公開範囲が制限される場合があります。</li>
+      <li>アップロードできるファイルは、画像（JPEG・PNG）が8MBまで、動画（MP4・MOV）が100MBまで、保存できる合計は1人あたり300MBまでです。投稿に使ったファイルは、投稿が終わってから2日後以降（投稿に使わなかったファイルは、アップロードから1日後以降）に、自動で削除します。投稿用のファイルは、保存している間、推測できない長いURLで外部から取得できる状態になります。</li>
+      <li>${limitsText()}です。AIによる生成は、1日の回数に上限があります。</li>
+      <li>AIが作った文章・画像・動画は、誤りや不適切な表現を含む場合があります。投稿の前に、必ずご自身で内容をご確認ください。AIで作ったことの表示が、SNSの規約で求められる場合があります。</li>
+      <li>投稿できるのは、ご自身で作成・予約・設定した内容だけです。いいね・フォロー・コメント・DMなどの自動操作や、投稿の分析機能はありません。</li>
+      <li>SNS側の仕様変更や障害、各SNSの規約による制限で、投稿できない場合があります。投稿の内容と、その結果（SNS側での表示・凍結等）の責任は、ご利用者にあります。</li>
+      <li>お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。契約期間が終わると、SNSの連携情報とAIアシスタントとの接続は削除され、未投稿の予約は取り消されます（再開するときは、連携をやり直してください）。</li>
     </ul></div>
     <h2 style="margin-top:26px">よくある質問</h2>
-    <div class="card"><div class="card-title">解約するには？</div><p class="small">マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。契約期間が終わると、SNSの連携情報は削除され、未投稿の予約は取り消されます。</p></div>
+    <div class="card"><div class="card-title">解約するには？</div><p class="small">マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。${trialDays ? '無料期間中に解約した場合、料金はかかりません。' : ''}</p></div>
+    <div class="card"><div class="card-title">XのAPIを自分で契約する必要はありますか？</div><p class="small">ありません。当サービスが用意した連携を使います（そのため、Xへの投稿には月の上限があります）。</p></div>
     <div class="card"><div class="card-title">お支払い方法は？</div><p class="small">クレジットカード等です。決済は、決済代行会社（Stripe）の画面で行い、当サービスにはカード番号を保存しません。</p></div>
     <div class="card"><div class="card-title">パスワードを忘れたら？</div><p class="small"><a href="/contact">お問い合わせ</a>からご連絡ください。</p></div>
     ${legalLinks()}
@@ -117,7 +123,7 @@ function authPage(kind, error, next = '') {
 }
 
 // ── 申込みの最終確認 ──
-function checkoutPage({ user, csrf, error }) {
+function checkoutPage({ user, csrf, error, trialDays = 0 }) {
   const price = yen(core.priceYen());
   return wrap('お申込みの最終確認', `
     ${topNav(user)}
@@ -128,12 +134,13 @@ function checkoutPage({ user, csrf, error }) {
       <table class="t kv">
         <tr><th>サービス</th><td>${nameOf()}</td></tr>
         <tr><th>料金</th><td><b>月額 ${price}（税込）</b></td></tr>
-        <tr><th>お支払い開始</th><td>「同意して支払いへ進む」を押したあとの決済ページで、お支払いが完了した時点で、契約が始まります。</td></tr>
+        ${trialDays ? `<tr><th>無料期間</th><td><b>最初の${trialDays}日間は無料</b>です。決済ページで、お支払い方法の登録が必要です。<b>無料期間が終わると自動で有料の契約に切り替わり、月額 ${price} の請求が始まります。</b>料金をかけずにやめる場合は、無料期間が終わる前に、マイページの「解約する」から手続きしてください。</td></tr>` : ''}
+        <tr><th>お支払い開始</th><td>${trialDays ? `無料期間の終わりに、最初の ${price} を請求します。` : '「同意して支払いへ進む」を押したあとの決済ページで、お支払いが完了した時点で、契約が始まります。'}</td></tr>
         <tr><th>契約期間と更新</th><td>1か月ごとの自動更新です。解約しない限り、毎月、同じ日に ${price} が、お支払い方法に請求されます。</td></tr>
-        <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。契約期間が終わると、SNSの連携情報は削除され、未投稿の予約は取り消されます（再開するときは、連携をやり直してください）。</td></tr>
+        <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、${trialDays ? '無料期間または' : ''}すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。契約期間が終わると、SNSの連携情報とAIアシスタントとの接続は削除され、未投稿の予約は取り消されます（再開するときは、連携をやり直してください）。</td></tr>
         <tr><th>返金</th><td>お支払い済みの料金は、法令上必要な場合を除き、返金いたしません（日割りでの返金もありません）。</td></tr>
-        <tr><th>対応SNSと制限</th><td>Threads・X・Instagram・TikTok。未投稿の予約は100件まで、1日の予約は30件まで、連携は5アカウントまでです。画像は8MB、動画は100MBまで、保存できるファイルの合計は1人300MBまでです。</td></tr>
-        <tr><th>SNSごとの条件</th><td>Xはテキストのみ。Instagramはプロアカウントが対象で、JPEG画像またはリール動画が必須。TikTokは動画（MP4・MOV）が必須で、TikTok側の審査状況により、公開範囲が制限される場合があります。Threadsは画像・動画を付けられます。</td></tr>
+        <tr><th>対応SNSと上限</th><td>Threads・X・Instagram・TikTok・Facebookページ・YouTube。${limitsText()}です。画像は8MB、動画は100MBまで、保存できるファイルの合計は1人300MBまでです。AIによる生成は1日の回数に上限があります。</td></tr>
+        <tr><th>SNSごとの条件</th><td>Instagramはプロアカウントが対象で、JPEG画像またはリール動画が必須。TikTokは動画または写真（JPEG）が必須。YouTubeは動画が必須。Facebookはご自身が管理するページが対象。各SNS側の審査・仕様により、使える機能や公開範囲が制限される場合があります。</td></tr>
         <tr><th>お支払い方法</th><td>クレジットカード等（決済代行：Stripe）。カード情報は当サービスには保存されません。</td></tr>
       </table>
     </div>
@@ -141,8 +148,8 @@ function checkoutPage({ user, csrf, error }) {
     <form method="POST" action="/service/checkout" class="card">
       <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
       <label class="check"><input type="checkbox" name="agree" value="1" required>
-        <span class="small"><a href="/service/legal/terms" target="_blank" rel="noopener">利用規約</a>と<a href="/service/legal/tokushoho" target="_blank" rel="noopener">特定商取引法に基づく表記</a>、<a href="/service/legal/privacy" target="_blank" rel="noopener">プライバシーポリシー</a>を読み、上記の内容（月額 ${price}・自動更新・返金なし）に同意します。</span></label>
-      <button class="btn btn-primary btn-block" type="submit" style="margin-top:10px">同意して支払いへ進む（月額 ${price}）</button>
+        <span class="small"><a href="/service/legal/terms" target="_blank" rel="noopener">利用規約</a>と<a href="/service/legal/tokushoho" target="_blank" rel="noopener">特定商取引法に基づく表記</a>、<a href="/service/legal/privacy" target="_blank" rel="noopener">プライバシーポリシー</a>を読み、上記の内容（${trialDays ? `${trialDays}日間の無料期間のあと自動で` : ''}月額 ${price}・自動更新・返金なし）に同意します。</span></label>
+      <button class="btn btn-primary btn-block" type="submit" style="margin-top:10px">${trialDays ? `同意して無料期間を始める（${trialDays}日後から月額 ${price}）` : `同意して支払いへ進む（月額 ${price}）`}</button>
     </form>
   `);
 }

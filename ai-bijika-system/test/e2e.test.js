@@ -99,7 +99,7 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 200 && r.text.includes('月額1,000円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
   ok(r.text.includes('support@example.com') && !r.text.includes('【メールアドレス】') && r.text.includes('電話番号'), '特商法表記の連絡先に設定したメールアドレスを表示し、電話番号の開示請求について記載する');
   r = await req('GET', '/service/legal/terms');
-  ok(r.status === 200 && r.text.includes('第4条（解約）'), '利用規約を表示できる');
+  ok(r.status === 200 && r.text.includes('第5条（解約）') && r.text.includes('第7条（AIによる生成）'), '利用規約を表示できる');
 
   console.log('未ログイン');
   r = await req('GET', '/service/app');

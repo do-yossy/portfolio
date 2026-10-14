@@ -493,6 +493,7 @@ const ApiKeys = {
     db.prepare('UPDATE api_keys SET last_used_at=? WHERE id=?').run(now(), row.id);
     return row.user_id;
   },
+  revokeAll(userId) { db.prepare(`UPDATE api_keys SET revoked_at=? WHERE user_id=? AND revoked_at=''`).run(now(), userId); },
   revoke(id, userId) {
     return db.prepare(`UPDATE api_keys SET revoked_at=? WHERE id=? AND user_id=? AND revoked_at=''`).run(now(), id, userId).changes === 1;
   },

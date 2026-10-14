@@ -37,6 +37,7 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
       if (c.path.startsWith('/v1beta/models/veo/operations/op1')) return { status: 200, json: videoDone ? { done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://generativelanguage.googleapis.com/v1beta/files/f1:download?alt=media' } }] } } } : { done: false } };
       if (c.path.startsWith('/v1beta/files/f1')) return { status: 200, text: MP4_TEXT };
     }
+    if (c.host === 'api.stripe.com' && c.path === '/v1/checkout/sessions') return { status: 200, json: { id: 'cs_t', url: 'https://checkout.stripe.test/t' } };
     if (c.host === '93.184.216.34') {
       if (c.path === '/v.mp4') return { status: 200, text: MP4_TEXT };
       if (c.path === '/redir') return { status: 302, text: '', headers: { location: 'https://10.0.0.1/secret' } };
@@ -139,6 +140,26 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   const xa2 = store.SnsAccounts.upsert({ userId: u2, platform: 'x', externalUserId: 'x9', handle: '@x', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
   cr = core.createPost({ userId: u2, category: 'text', targets: [{ accountId: rid(xa2), caption: 'again' }], scheduledAtIso: at });
   ok(cr.ok === false || store.ScheduledPosts.countXUnits(u2, ...core.jstMonthBounds(at)) <= 3, '連携をやり直しても、月の上限は数え直しにならない');
+
+  console.log('無料トライアル');
+  process.env.STRIPE_SECRET_KEY = 'sk_test'; process.env.STRIPE_PRICE_ID = 'price_t'; process.env.SERVICE_BASE_URL = 'https://example.test';
+  const billing = require('../lib/billing');
+  process.env.SERVICE_TRIAL_DAYS = '';
+  const fresh = mkUser('trial@example.com');
+  ok(core.trialFor(fresh) === 0, 'トライアルの設定がなければ、無料期間はない');
+  process.env.SERVICE_TRIAL_DAYS = '7';
+  ok(core.trialFor(fresh) === 7, '初めての人は7日間の無料期間の対象');
+  store.Subscriptions.upsert(fresh, { stripe_subscription_id: 'sub_old', status: 'canceled' });
+  ok(core.trialFor(fresh) === 0, '一度でも契約したことがある人は対象外');
+  await billing.createCheckoutSession({ userId: 'u_t', email: 't@example.com', trialDays: 7 });
+  const cs = decodeURIComponent(mock.calls.filter((c) => c.path === '/v1/checkout/sessions').pop().body);
+  ok(cs.includes('subscription_data[trial_period_days]=7') && cs.includes('payment_method_collection=always'), 'Stripeに無料期間と、支払い方法の登録の必須を指定する');
+  await billing.createCheckoutSession({ userId: 'u_t2', email: 't2@example.com', trialDays: 0 });
+  ok(!decodeURIComponent(mock.calls.filter((c) => c.path === '/v1/checkout/sessions').pop().body).includes('trial_period_days'), '無料期間がなければ指定しない');
+  const ui = require('../lib/service-ui');
+  const page = ui.checkoutPage({ user: { email: 'a@b' }, csrf: 'x', trialDays: 7 });
+  ok(page.includes('最初の7日間は無料') && page.includes('自動で有料の契約に切り替わり') && page.includes('無料期間が終わる前に'), '最終確認画面に、無料期間・自動課金・解約の期限を表示する');
+  process.env.SERVICE_TRIAL_DAYS = '';
   summary();
   mock.restore();
 })();

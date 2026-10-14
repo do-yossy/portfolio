@@ -120,7 +120,7 @@ async function handle(ctx) {
   const contactEmail = core.contactEmail();
 
   // ── 公開ページ ──
-  if (pathname === '/service' && method === 'GET') { sendHtml(res, 200, ui.landingPage({ user, billingReady: salesOpen })); return true; }
+  if (pathname === '/service' && method === 'GET') { sendHtml(res, 200, ui.landingPage({ user, billingReady: salesOpen, trialDays: user ? core.trialFor(user.id) : core.trialDays() })); return true; }
 
   const legalMatch = pathname.match(/^\/service\/legal\/(terms|tokushoho|privacy)$/);
   if (legalMatch && method === 'GET') {
@@ -218,23 +218,23 @@ async function handle(ctx) {
   if (pathname === '/service/checkout' && method === 'GET') {
     if (!salesOpen) { redirect(res, '/service'); return true; }
     if (hasOpenSubscription()) { redirect(res, '/service/app'); return true; }
-    sendHtml(res, 200, ui.checkoutPage({ user, csrf: token }));
+    sendHtml(res, 200, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token }));
     return true;
   }
   if (pathname === '/service/checkout' && method === 'POST') {
     if (!salesOpen) { redirect(res, '/service'); return true; }
     if (hasOpenSubscription()) { redirect(res, '/service/app'); return true; }
     const body = await readForm(req);
-    if (!csrf.verify(sessionToken, body.csrf)) { sendHtml(res, 403, ui.checkoutPage({ user, csrf: token, error: '操作の有効期限が切れました。もう一度お試しください。' })); return true; }
-    if (body.agree !== '1') { sendHtml(res, 400, ui.checkoutPage({ user, csrf: token, error: '内容への同意にチェックを入れてください。' })); return true; }
+    if (!csrf.verify(sessionToken, body.csrf)) { sendHtml(res, 403, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '操作の有効期限が切れました。もう一度お試しください。' })); return true; }
+    if (body.agree !== '1') { sendHtml(res, 400, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '内容への同意にチェックを入れてください。' })); return true; }
     try {
       const cur = Subscriptions.get(user.id);
       Subscriptions.upsert(user.id, { agreed_at: new Date().toISOString(), agreed_version: core.TERMS_VERSION });
-      const checkoutUrl = await billing.createCheckoutSession({ userId: user.id, email: user.email, customerId: cur && cur.stripe_customer_id });
+      const checkoutUrl = await billing.createCheckoutSession({ userId: user.id, email: user.email, customerId: cur && cur.stripe_customer_id, trialDays: core.trialFor(user.id) });
       redirect(res, checkoutUrl, {}, 303);
     } catch (e) {
       console.error('[checkout]', e.message);
-      sendHtml(res, 502, ui.checkoutPage({ user, csrf: token, error: '決済ページの準備に失敗しました。時間をおいてもう一度お試しください。' }));
+      sendHtml(res, 502, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '決済ページの準備に失敗しました。時間をおいてもう一度お試しください。' }));
     }
     return true;
   }
