@@ -16,6 +16,39 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 
+  CREATE TABLE IF NOT EXISTS ai_usage (
+    user_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    n INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day, kind)
+  );
+  CREATE TABLE IF NOT EXISTS ai_jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    operation TEXT DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'running',
+    media_id TEXT DEFAULT '',
+    error TEXT DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS auto_rules (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    theme TEXT NOT NULL,
+    tone TEXT DEFAULT '',
+    with_image INTEGER NOT NULL DEFAULT 0,
+    hour_jst INTEGER NOT NULL DEFAULT 9,
+    mode TEXT NOT NULL DEFAULT 'draft',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    last_day TEXT DEFAULT '',
+    last_error TEXT DEFAULT '',
+    created_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS subscriptions (
     user_id TEXT PRIMARY KEY,
     stripe_customer_id TEXT DEFAULT '',
@@ -210,6 +243,7 @@ const SnsAccounts = {
     // 連携解除。未投稿の予約は取り消す
     db.prepare(`UPDATE scheduled_posts SET status='cancelled', last_error='連携を解除したため取り消しました', updated_at=? WHERE account_id=? AND status IN ('pending','draft')`)
       .run(now(), id);
+    db.prepare('DELETE FROM auto_rules WHERE account_id=? AND user_id=?').run(id, userId);
     db.prepare('DELETE FROM sns_accounts WHERE id=? AND user_id=?').run(id, userId);
   },
 };
@@ -348,6 +382,51 @@ const MediaAssets = {
   },
 };
 
+const AiUsage = {
+  // 上限内なら1回分を使って true。上限なら false（同時に呼ばれても超えないよう、1文で更新する）
+  tryUse(userId, day, kind, limit) {
+    if (limit <= 0) return false;
+    db.prepare('INSERT OR IGNORE INTO ai_usage (user_id, day, kind, n) VALUES (?,?,?,0)').run(userId, day, kind);
+    return db.prepare('UPDATE ai_usage SET n=n+1 WHERE user_id=? AND day=? AND kind=? AND n<?').run(userId, day, kind, limit).changes === 1;
+  },
+  refund(userId, day, kind) { db.prepare('UPDATE ai_usage SET n=n-1 WHERE user_id=? AND day=? AND kind=? AND n>0').run(userId, day, kind); },
+  used(userId, day, kind) { const r = db.prepare('SELECT n FROM ai_usage WHERE user_id=? AND day=? AND kind=?').get(userId, day, kind); return r ? r.n : 0; },
+};
+
+const AiJobs = {
+  create({ userId, kind, prompt, operation }) {
+    const id = generateId(); const t = now();
+    db.prepare('INSERT INTO ai_jobs (id,user_id,kind,prompt,operation,status,created_at,updated_at) VALUES (?,?,?,?,?,\'running\',?,?)').run(id, userId, kind, prompt, operation || '', t, t);
+    return id;
+  },
+  get(id, userId) { return db.prepare('SELECT * FROM ai_jobs WHERE id=? AND user_id=?').get(id, userId) || null; },
+  listRunning(limit = 20) { return db.prepare(`SELECT * FROM ai_jobs WHERE status='running' ORDER BY created_at LIMIT ?`).all(limit); },
+  finish(id, { mediaId, error }) {
+    db.prepare('UPDATE ai_jobs SET status=?, media_id=?, error=?, updated_at=? WHERE id=?').run(error ? 'failed' : 'done', mediaId || '', error || '', now(), id);
+  },
+};
+
+const AutoRules = {
+  MAX: 5,
+  count(userId) { return db.prepare('SELECT COUNT(*) AS n FROM auto_rules WHERE user_id=?').get(userId).n; },
+  create({ userId, accountId, theme, tone, withImage, hourJst, mode }) {
+    const id = generateId();
+    db.prepare('INSERT INTO auto_rules (id,user_id,account_id,theme,tone,with_image,hour_jst,mode,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(id, userId, accountId, theme, tone || '', withImage ? 1 : 0, hourJst, mode, now());
+    return id;
+  },
+  listForUser(userId) { return db.prepare('SELECT * FROM auto_rules WHERE user_id=? ORDER BY created_at').all(userId); },
+  get(id, userId) { return db.prepare('SELECT * FROM auto_rules WHERE id=? AND user_id=?').get(id, userId) || null; },
+  remove(id, userId) { return db.prepare('DELETE FROM auto_rules WHERE id=? AND user_id=?').run(id, userId).changes === 1; },
+  setEnabled(id, userId, on) { return db.prepare('UPDATE auto_rules SET enabled=? WHERE id=? AND user_id=?').run(on ? 1 : 0, id, userId).changes === 1; },
+  // 今日まだ実行していない有効なルール（実行は1日1回）
+  due(day) { return db.prepare(`SELECT * FROM auto_rules WHERE enabled=1 AND last_day <> ?`).all(day); },
+  // 実行済みにする。他の処理が先に実行していたら false（二重実行の防止）
+  claim(id, day) { return db.prepare(`UPDATE auto_rules SET last_day=?, last_error='' WHERE id=? AND last_day <> ?`).run(day, id, day).changes === 1; },
+  setError(id, msg) { db.prepare('UPDATE auto_rules SET last_error=? WHERE id=?').run(String(msg).slice(0, 300), id); },
+  removeForAccount(accountId) { db.prepare('DELETE FROM auto_rules WHERE account_id=?').run(accountId); },
+};
+
 const MAX_API_KEYS = 5;
 const ApiKeys = {
   hash(key) { return require('crypto').createHash('sha256').update(String(key)).digest('hex'); },
@@ -376,4 +455,4 @@ const ApiKeys = {
   },
 };
 
-module.exports = { ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+module.exports = { AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

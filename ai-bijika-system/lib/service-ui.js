@@ -173,7 +173,7 @@ const toLocalInput = (ms) => {
 };
 
 // ── マイページ ──
-function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], newKey = '' }) {
+function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], newKey = '', aiAvail = {}, autoRules = [] }) {
   const active = !!sub && ['active', 'trialing'].includes(sub.status);
   const [stLabel, stClass] = STATUS_LABEL[(sub && sub.status) || 'none'] || STATUS_LABEL.none;
   const accHtml = accounts.length ? accounts.map((a) => {
@@ -199,6 +199,10 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <div class="card-title">投稿を予約する</div>
       <div class="field"><label class="lbl" for="text">本文（キャプション）</label><textarea id="text" name="text" maxlength="2200" oninput="cnt()"></textarea>
         <div class="small" id="count">0文字</div></div>
+      ${aiAvail.text || aiAvail.image ? `<div class="field" style="border:1px dashed #c9bfa6;border-radius:12px;padding:10px"><span class="lbl">AIに作らせる（内容は必ずご自身で確認してから投稿してください）</span>
+        <input type="text" id="aiTheme" maxlength="500" placeholder="テーマ・内容（例：朝活のメリットを3つ）">
+        <div class="btn-row" style="margin-top:6px">${aiAvail.text ? '<button type="button" class="btn btn-sm" id="aiTextBtn">AIで文章を作る</button>' : ''}${aiAvail.image ? '<button type="button" class="btn btn-sm" id="aiImgBtn">AIで画像を作る</button>' : ''}</div>
+        <div class="small" id="aiMsg">1日の生成回数に上限があります。AIが作った画像・動画であることを、SNSの設定で表示する必要がある場合があります。</div></div>` : ''}
       <div class="field"><label class="lbl" for="file">画像・動画（Instagram・TikTokでは必須）</label>
         <input id="file" type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime">
         <div class="small" id="fileStatus">JPEG・PNG（8MBまで）／MP4・MOV（100MBまで）</div>
@@ -236,6 +240,14 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
           .then(function(x){if(x.ok){mid.value=x.j.id;st.textContent='添付しました：'+(x.j.kind==='video'?'動画':'画像')+'（'+Math.round(x.j.size/1048576*10)/10+'MB）';}else{st.textContent=x.j.error||'アップロードに失敗しました。';f.value='';}})
           .catch(function(){st.textContent='アップロードに失敗しました。';f.value='';});
       });
+      function aiCall(kind,payload){var m=document.getElementById('aiMsg');m.textContent='生成中…（しばらくお待ちください）';
+        return fetch('/service/app/ai/'+kind,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF':csrf},body:JSON.stringify(payload)})
+          .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'生成に失敗しました。');return j;});}).catch(function(e){m.textContent=e.message;throw e;});}
+      var tb=document.getElementById('aiTextBtn');if(tb)tb.addEventListener('click',function(){var th=document.getElementById('aiTheme').value;
+        var pl=document.querySelector('input[name=account]:checked');
+        aiCall('text',{theme:th,platform:pl?pl.dataset.platform:''}).then(function(j){document.getElementById('text').value=j.text;cnt();document.getElementById('aiMsg').textContent='文章を入れました。内容をご確認のうえ、必要なら直してください。';}).catch(function(){});});
+      var ib=document.getElementById('aiImgBtn');if(ib)ib.addEventListener('click',function(){var th=document.getElementById('aiTheme').value;
+        aiCall('image',{prompt:th}).then(function(j){mid.value=j.id;var pv=document.getElementById('previewBox');pv.innerHTML='';var el=document.createElement('img');el.src=j.url;el.style.maxWidth='100%';el.style.maxHeight='220px';el.style.borderRadius='10px';pv.appendChild(el);st.textContent='AIが作った画像を添付しました。';document.getElementById('aiMsg').textContent='画像を添付しました。内容をご確認ください。';}).catch(function(){});});
       var box=document.getElementById('tiktokBox');
       var LABELS={PUBLIC_TO_EVERYONE:'全員に公開',MUTUAL_FOLLOW_FRIENDS:'相互フォローの友達',FOLLOWER_OF_CREATOR:'フォロワー',SELF_ONLY:'自分のみ'};var loaded=false;
       function loadTT(){if(loaded||!box)return;loaded=true;var sel=document.getElementById('tiktok_privacy'),msg=document.getElementById('ttMsg');
@@ -284,6 +296,21 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
     <div class="card"><div class="card-title">連携しているSNS</div>${accHtml}
       <div class="btn-row" style="margin-top:10px">${active ? connectBtns : '<span class="small">ご契約後に連携できます。</span>'}</div></div>
     ${compose}
+    ${active && aiAvail.text ? `<div class="card" id="autorules"><div class="card-title">AIで毎日自動運用する</div>
+      <p class="small">決めた時刻に、AIが投稿文（と画像）を作ります。「下書きに入れる」では、あなたが確認して投稿します。「そのまま投稿する」では、AIが作った内容を確認せずに投稿します。</p>
+      ${autoRules.length ? autoRules.map((r) => { const acc = accounts.find((a) => a.id === r.account_id); return `<div class="acct-row"><span><b>${escapeHtml(acc ? `${(registry.get(acc.platform) || {}).label || acc.platform} ${acc.handle || ''}` : '(解除済み)')}</b> 毎日${r.hour_jst}時 ／ ${r.mode === 'auto' ? 'そのまま投稿' : '下書きに入れる'}${r.with_image ? ' ／ 画像つき' : ''}<br><span class="small">テーマ：${escapeHtml(r.theme)}${r.enabled ? '' : '（停止中）'}${r.last_error ? ` ／ 前回のエラー：${escapeHtml(r.last_error)}` : ''}</span></span>
+        <span><form class="inline" method="POST" action="/service/app/auto/${escapeHtml(r.id)}/toggle"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">${r.enabled ? '停止' : '再開'}</button></form>
+        <form class="inline" method="POST" action="/service/app/auto/${escapeHtml(r.id)}/delete" onsubmit="return confirm('このルールを削除します。')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">削除</button></form></span></div>`; }).join('') : ''}
+      ${activeAccounts.filter((a) => !['tiktok', 'youtube'].includes(a.platform)).length ? `<form method="POST" action="/service/app/auto" style="margin-top:10px"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
+        <div class="field"><label class="lbl">投稿先</label><select name="account_id">${activeAccounts.filter((a) => !['tiktok', 'youtube'].includes(a.platform)).map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml((registry.get(a.platform) || {}).label || a.platform)} ${escapeHtml(a.handle || '')}</option>`).join('')}</select></div>
+        <div class="field"><label class="lbl">テーマ（AIへの指示）</label><textarea name="theme" maxlength="500" required placeholder="例：30代の働く人向けに、朝の時間の使い方のコツを紹介する"></textarea></div>
+        <div class="field"><label class="lbl">口調（任意）</label><input type="text" name="tone" maxlength="100" placeholder="例：やさしく丁寧"></div>
+        <div class="field"><label class="lbl">投稿する時刻（日本時間）</label><select name="hour_jst">${Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === 9 ? 'selected' : ''}>${h}時</option>`).join('')}</select></div>
+        ${aiAvail.image ? '<label class="check"><input type="checkbox" name="with_image" value="1"><span>画像も作る（Instagramでは必須）</span></label>' : ''}
+        <div class="field"><label class="lbl">運用の方法</label><select name="mode"><option value="draft">下書きに入れる（確認してから投稿・おすすめ）</option><option value="auto">そのまま投稿する（確認なし）</option></select></div>
+        <label class="check"><input type="checkbox" name="confirm_auto" value="1"><span>「そのまま投稿する」を選ぶ場合：AIが作った内容を確認せずに投稿されること、その内容の責任を自分で負うことを理解しました</span></label>
+        <div class="btn-row" style="margin-top:8px"><button class="btn btn-primary" type="submit">ルールを追加</button></div></form>` : '<p class="small">自動運用に使えるSNS（Threads・X・Instagram・Facebook）を先に連携してください。</p>'}
+    </div>` : ''}
     ${active ? `<div class="card" id="apikeys"><div class="card-title">APIキー（外部のツール・AIから投稿するとき）</div>
       ${newKey ? `<div class="notice"><div>新しいAPIキーです。<b>この画面を閉じると二度と表示されません</b>。安全な場所に保存してください。<br><code style="word-break:break-all">${escapeHtml(newKey)}</code></div></div>` : ''}
       ${apiKeys.length ? apiKeys.map((k) => `<div class="acct-row"><span><b>${escapeHtml(k.label || '(名前なし)')}</b> <code>${escapeHtml(k.prefix)}…</code> <span class="small">${k.last_used_at ? `最終利用 ${escapeHtml(k.last_used_at.slice(0, 10))}` : '未使用'}</span></span>

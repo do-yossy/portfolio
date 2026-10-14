@@ -11,7 +11,9 @@ const core = require('./service-core');
 const scheduler = require('./sns/scheduler');
 const mediaLib = require('./media');
 const registry = require('./sns');
-const { ApiKeys, SnsAccounts, ScheduledPosts, MediaAssets, Subscriptions } = require('./service-store');
+const ai = require('./ai');
+const aiAuto = require('./ai-auto');
+const { ApiKeys, SnsAccounts, ScheduledPosts, MediaAssets, Subscriptions, AiJobs, AutoRules } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
 
 const keyLimiter = createLimiter({ max: 60, windowMs: 60 * 1000 });
@@ -39,6 +41,10 @@ function postView(p) {
     text: p.text, media_ids: mediaIds, tree, scheduled_at: p.scheduled_at, posted_at: p.posted_at || '',
     external_id: p.external_id || '', error: p.last_error || '',
   };
+}
+
+function ruleView(r) {
+  return { id: r.id, account_id: r.account_id, theme: r.theme, tone: r.tone, with_image: !!r.with_image, hour_jst: r.hour_jst, mode: r.mode, enabled: !!r.enabled, last_run_day: r.last_day, last_error: r.last_error };
 }
 
 async function handle({ req, res, method, pathname, url }) {
@@ -108,6 +114,68 @@ async function handle({ req, res, method, pathname, url }) {
       if (b.now === true) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
       send(res, 200, postView(ScheduledPosts.listForUser(userId, 1000).find((p) => p.id === row.id)));
       return true;
+    }
+  }
+
+  // ── AIによる生成 ──
+  if (pathname.startsWith('/api/v1/ai/') || pathname === '/api/v1/auto-rules' || pathname.startsWith('/api/v1/auto-rules/')) {
+    if (!Subscriptions.isActive(userId)) { send(res, 403, { error: 'ご契約が有効ではありません。' }); return true; }
+    try {
+      if (pathname === '/api/v1/ai/text' && method === 'POST') {
+        const b = (await readJson(req)) || {};
+        send(res, 200, { text: await ai.generateText({ userId, theme: b.theme, tone: b.tone, platform: b.platform, instruction: b.instruction }) });
+        return true;
+      }
+      if (pathname === '/api/v1/ai/image' && method === 'POST') {
+        const b = (await readJson(req)) || {};
+        const m = await ai.generateImage({ userId, prompt: b.prompt });
+        send(res, 201, { id: m.id, kind: m.kind, mime: m.mime, size: m.size });
+        return true;
+      }
+      if (pathname === '/api/v1/ai/video' && method === 'POST') {
+        const b = (await readJson(req)) || {};
+        const op = await ai.startVideo({ userId, prompt: b.prompt });
+        const id = AiJobs.create({ userId, kind: 'video', prompt: String(b.prompt).slice(0, 1000), operation: op });
+        send(res, 202, { job_id: id, status: 'running' });
+        return true;
+      }
+      const job = pathname.match(/^\/api\/v1\/ai\/jobs\/([a-f0-9]+)$/);
+      if (job && method === 'GET') {
+        const j = AiJobs.get(job[1], userId);
+        if (!j) { send(res, 404, { error: 'ジョブが見つかりません。' }); return true; }
+        send(res, 200, { job_id: j.id, status: j.status, media_id: j.media_id || undefined, error: j.error || undefined });
+        return true;
+      }
+      if (pathname === '/api/v1/auto-rules' && method === 'GET') {
+        send(res, 200, { rules: AutoRules.listForUser(userId).map(ruleView) });
+        return true;
+      }
+      if (pathname === '/api/v1/auto-rules' && method === 'POST') {
+        const b = (await readJson(req)) || {};
+        const mode = b.mode === 'auto' ? 'auto' : 'draft';
+        if (mode === 'auto' && b.confirm_auto !== true) { send(res, 400, { error: '完全自動(auto)は、AIが作った内容を確認せずに投稿します。内容を理解したうえで confirm_auto:true を指定してください。' }); return true; }
+        const args = { userId, accountId: String(b.account_id || ''), theme: b.theme, withImage: b.with_image === true, hourJst: Number(b.hour_jst), mode };
+        const problem = aiAuto.validateRule(args);
+        if (problem) { send(res, 400, { error: problem }); return true; }
+        const id = AutoRules.create({ ...args, tone: String(b.tone || '').slice(0, 100), theme: String(b.theme).trim() });
+        send(res, 201, ruleView(AutoRules.get(id, userId)));
+        return true;
+      }
+      const rule = pathname.match(/^\/api\/v1\/auto-rules\/([a-f0-9]+)$/);
+      if (rule && method === 'DELETE') {
+        if (!AutoRules.remove(rule[1], userId)) { send(res, 404, { error: 'ルールが見つかりません。' }); return true; }
+        send(res, 200, { id: rule[1], deleted: true });
+        return true;
+      }
+      if (rule && method === 'PATCH') {
+        const b = (await readJson(req)) || {};
+        if (!AutoRules.setEnabled(rule[1], userId, b.enabled === true)) { send(res, 404, { error: 'ルールが見つかりません。' }); return true; }
+        send(res, 200, ruleView(AutoRules.get(rule[1], userId)));
+        return true;
+      }
+    } catch (e) {
+      if (e instanceof ai.AiError) { send(res, 400, { error: e.message }); return true; }
+      throw e;
     }
   }
 

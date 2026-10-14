@@ -10,12 +10,14 @@ const billing = require('./billing');
 const core = require('./service-core');
 const ui = require('./service-ui');
 const scheduler = require('./sns/scheduler');
-const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys } = require('./service-store');
+const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys, AutoRules } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
 const mediaLib = require('./media');
 const registry = require('./sns');
 const apiV1 = require('./api-v1');
 const mcp = require('./mcp');
+const ai = require('./ai');
+const aiAuto = require('./ai-auto');
 
 const loginLimiter = createLimiter({ max: 8, windowMs: 15 * 60 * 1000 });
 const signupLimiter = createLimiter({ max: 10, windowMs: 60 * 60 * 1000 });
@@ -32,6 +34,8 @@ const FLASH = {
   now: ['ok', '投稿の準備ができました。まもなく投稿されます。'],
   cancelled: ['ok', '予約を取り消しました。'],
   connected: ['ok', 'SNSを連携しました。'],
+  auto_added: ['ok', '自動運用のルールを追加しました。'],
+  auto_changed: ['ok', '自動運用のルールを更新しました。'],
   key_revoked: ['ok', 'APIキーを無効にしました。'],
   disconnected: ['ok', '連携を解除しました。'],
   sub_canceled: ['ok', '解約の手続きをしました。契約期間の終わりまでご利用いただけます。'],
@@ -177,7 +181,7 @@ async function handle(ctx) {
   const flashOf = (key) => (FLASH[key] ? { type: FLASH[key][0], text: FLASH[key][1] } : null);
   const dashboard = (status, flash, newKey) => {
     sendHtml(res, status, ui.dashboardPage({
-      user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id), apiKeys: ApiKeys.listForUser(user.id), newKey: newKey || '',
+      user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id), apiKeys: ApiKeys.listForUser(user.id), aiAvail: ai.available(), autoRules: AutoRules.listForUser(user.id), newKey: newKey || '',
       posts: ScheduledPosts.listForUser(user.id), csrf: token, flash,
       snsReady: core.snsEnabled(), portalReady: billingReady,
     }));
@@ -267,6 +271,41 @@ async function handle(ctx) {
     redirect(res, `/service/app?f=${now ? 'now' : 'scheduled'}`);
     return true;
   }
+  const aiMatch = pathname.match(/^\/service\/app\/ai\/(text|image)$/);
+  if (aiMatch && method === 'POST') {
+    if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }
+    if (!Subscriptions.isActive(user.id)) { sendJson(res, 403, { error: 'ご契約が有効ではありません。' }); return true; }
+    let b = {};
+    try { b = JSON.parse(await readRaw(req, 20_000) || '{}'); } catch { sendJson(res, 400, { error: '入力が正しくありません。' }); return true; }
+    try {
+      if (aiMatch[1] === 'text') sendJson(res, 200, { text: await ai.generateText({ userId: user.id, theme: b.theme, platform: b.platform }) });
+      else { const m = await ai.generateImage({ userId: user.id, prompt: b.prompt }); sendJson(res, 200, { id: m.id, url: mediaLib.publicUrl(m) }); }
+    } catch (e) {
+      if (e instanceof ai.AiError) sendJson(res, 400, { error: e.message }); else { console.error('[ai]', e.message); sendJson(res, 500, { error: '生成に失敗しました。時間をおいてもう一度お試しください。' }); }
+    }
+    return true;
+  }
+  if (pathname === '/service/app/auto' && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    if (!Subscriptions.isActive(user.id)) { dashboard(403, { type: 'error', text: 'ご契約が有効ではありません。' }); return true; }
+    const mode = body.mode === 'auto' ? 'auto' : 'draft';
+    if (mode === 'auto' && body.confirm_auto !== '1') { dashboard(400, { type: 'error', text: '「そのまま投稿する」を選ぶ場合は、確認のチェックが必要です。' }); return true; }
+    const args = { userId: user.id, accountId: String(body.account_id || ''), theme: body.theme, withImage: body.with_image === '1', hourJst: parseInt(body.hour_jst, 10), mode };
+    const problem = aiAuto.validateRule(args);
+    if (problem) { dashboard(400, { type: 'error', text: problem }); return true; }
+    AutoRules.create({ ...args, theme: String(body.theme).trim(), tone: String(body.tone || '').slice(0, 100) });
+    redirect(res, '/service/app?f=auto_added');
+    return true;
+  }
+  const autoAct = pathname.match(/^\/service\/app\/auto\/([a-f0-9]+)\/(toggle|delete)$/);
+  if (autoAct && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    const rule = AutoRules.get(autoAct[1], user.id);
+    if (rule) { if (autoAct[2] === 'delete') AutoRules.remove(rule.id, user.id); else AutoRules.setEnabled(rule.id, user.id, !rule.enabled); }
+    redirect(res, '/service/app?f=auto_changed');
+    return true;
+  }
+
   if (pathname === '/service/app/apikey' && method === 'POST') {
     const body = await needCsrf(); if (!body) return true;
     if (!Subscriptions.isActive(user.id)) { dashboard(403, { type: 'error', text: 'ご契約が有効ではありません。' }); return true; }

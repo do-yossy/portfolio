@@ -239,6 +239,15 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 400, '他人の（存在しない）SNSには投稿できない');
   r = await api('POST', '/api/v1/posts', apiKey, { category: 'text', text: '', account_ids: [accId], now: true });
   ok(r.status === 400, '空の投稿は拒否する');
+  console.log('AI（画面・API）');
+  r = await api('POST', '/api/v1/ai/text', apiKey, { theme: 'x' });
+  ok(r.status === 400 && /現在ご利用いただけません/.test(r.json.error), 'AIが未設定なら、生成機能は使えない');
+  r = await api('POST', '/api/v1/auto-rules', apiKey, { account_id: accId, theme: 'x', hour_jst: 9, mode: 'auto' });
+  ok(r.status === 400 && /confirm_auto/.test(r.json.error), '完全自動は確認の指定がないと作れない');
+  r = await api('GET', '/api/v1/auto-rules', apiKey);
+  ok(r.status === 200 && Array.isArray(r.json.rules), '自動運用ルールの一覧を取得できる');
+  r = await req('POST', '/service/app/ai/text', { raw: JSON.stringify({ theme: 'x' }), headers: { 'X-CSRF': 'bad', 'Content-Type': 'application/json' } });
+  ok(r.status === 403, '画面からのAI生成もCSRFトークンが必要');
   console.log('MCP');
   const rpc = (key, body) => api('POST', '/mcp', key, body);
   r = await rpc('', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
@@ -246,7 +255,7 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
   ok(r.json.result.serverInfo.name === 'sns-scheduler', 'MCPの初期化に応答する');
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
-  ok(r.json.result.tools.map((t) => t.name).join() === 'list_accounts,create_post,list_posts,publish_draft,delete_post', 'MCPのツール一覧を返す');
+  ok(r.json.result.tools.map((t) => t.name).join() === 'list_accounts,create_post,list_posts,publish_draft,delete_post,ai_generate_text,ai_generate_image,ai_start_video,ai_video_status', 'MCPのツール一覧を返す');
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'create_post', arguments: { category: 'text', text: 'MCP下書き', account_ids: [accId], draft: true } } });
   const mcpOut = JSON.parse(r.json.result.content[0].text);
   ok(!r.json.result.isError && mcpOut.posts[0].status === 'draft', 'MCPから下書きを作れる');

@@ -5,6 +5,8 @@ const core = require('./service-core');
 const scheduler = require('./sns/scheduler');
 const { ApiKeys, SnsAccounts, ScheduledPosts } = require('./service-store');
 const { postView } = require('./api-v1');
+const ai = require('./ai');
+const { AiJobs } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
 
 const limiter = createLimiter({ max: 60, windowMs: 60 * 1000 });
@@ -21,11 +23,15 @@ const TOOLS = [
   { name: 'list_posts', description: '投稿の一覧（status で絞り込み：draft／pending／posted／failed／cancelled）', inputSchema: { type: 'object', properties: { status: { type: 'string' } } } },
   { name: 'publish_draft', description: '下書きを予約または即時投稿にする', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, now: { type: 'boolean' }, scheduled_at: { type: 'string' } } } },
   { name: 'delete_post', description: '予約・下書きを取り消す', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } } },
+  { name: 'ai_generate_text', description: 'AIで投稿文を作る（作った文は create_post の text に使う）', inputSchema: { type: 'object', required: ['theme'], properties: { theme: { type: 'string' }, tone: { type: 'string' }, platform: { type: 'string' }, instruction: { type: 'string' } } } },
+  { name: 'ai_generate_image', description: 'AIで画像（JPEG）を作る。戻り値のidを create_post の media_ids に使う', inputSchema: { type: 'object', required: ['prompt'], properties: { prompt: { type: 'string' } } } },
+  { name: 'ai_start_video', description: 'AIで動画を作り始める（数分かかる）。job_id を ai_video_status で確認する', inputSchema: { type: 'object', required: ['prompt'], properties: { prompt: { type: 'string' } } } },
+  { name: 'ai_video_status', description: '動画生成の状態を確認する。done になったら media_id を create_post に使う', inputSchema: { type: 'object', required: ['job_id'], properties: { job_id: { type: 'string' } } } },
 ];
 
 function isoOrNull(v) { const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d.toISOString(); }
 
-function callTool(userId, name, a = {}) {
+async function callTool(userId, name, a = {}) {
   switch (name) {
     case 'list_accounts':
       return { accounts: SnsAccounts.listForUser(userId).map((x) => ({ id: x.id, platform: x.platform, handle: x.handle, status: x.status })) };
@@ -57,6 +63,17 @@ function callTool(userId, name, a = {}) {
     case 'delete_post':
       if (!ScheduledPosts.cancel(String(a.id || ''), userId)) throw new Error('取り消せるのは、予約中または下書きの投稿だけです。');
       return { id: a.id, status: 'cancelled' };
+    case 'ai_generate_text': return { text: await ai.generateText({ userId, theme: a.theme, tone: a.tone, platform: a.platform, instruction: a.instruction }) };
+    case 'ai_generate_image': { const m = await ai.generateImage({ userId, prompt: a.prompt }); return { id: m.id, kind: m.kind, size: m.size }; }
+    case 'ai_start_video': {
+      const op = await ai.startVideo({ userId, prompt: a.prompt });
+      return { job_id: AiJobs.create({ userId, kind: 'video', prompt: String(a.prompt).slice(0, 1000), operation: op }), status: 'running' };
+    }
+    case 'ai_video_status': {
+      const j = AiJobs.get(String(a.job_id || ''), userId);
+      if (!j) throw new Error('ジョブが見つかりません。');
+      return { job_id: j.id, status: j.status, media_id: j.media_id || undefined, error: j.error || undefined };
+    }
     default:
       return undefined;
   }
@@ -100,7 +117,7 @@ async function handle({ req, res, method, pathname }) {
       const p = msg.params || {};
       if (!TOOLS.some((t) => t.name === p.name)) { fail(-32602, `Unknown tool: ${p.name}`); break; }
       try {
-        const out = callTool(userId, p.name, p.arguments || {});
+        const out = await callTool(userId, p.name, p.arguments || {});
         reply({ content: [{ type: 'text', text: JSON.stringify(out) }] });
       } catch (e) {
         reply({ isError: true, content: [{ type: 'text', text: e.message }] });
