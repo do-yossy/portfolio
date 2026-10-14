@@ -45,6 +45,31 @@ function postView(p) {
   };
 }
 
+// 投稿の作成（REST API と画面の投稿作成で共通）。戻り値は { status, body }
+function createFromBody(userId, b) {
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return { status: 400, body: { error: 'JSONの形式が正しくありません。' } };
+  const ids = [].concat(b.account_ids || []).map(String);
+  const captions = b.captions && typeof b.captions === 'object' ? b.captions : {};
+  const opts = b.options && typeof b.options === 'object' ? b.options : {};
+  const targets = ids.map((accountId) => ({ accountId, caption: captions[accountId] !== undefined ? captions[accountId] : b.text, options: (opts[accountId] && typeof opts[accountId] === 'object') ? opts[accountId] : {} }));
+  const draft = b.draft === true;
+  const immediate = b.now === true && !draft;
+  let at = null;
+  if (immediate) at = new Date(Date.now() + 1000).toISOString();
+  else if (b.scheduled_at) {
+    const d = new Date(b.scheduled_at);
+    if (Number.isNaN(d.getTime())) return { status: 400, body: { error: 'scheduled_at はISO 8601形式で指定してください。' } };
+    at = d.toISOString();
+  } else if (!draft) return { status: 400, body: { error: '投稿日時（scheduled_at）を指定するか、now:true（即時）または draft:true（下書き）を指定してください。' } };
+  const tree = (Array.isArray(b.tree) ? b.tree : []).slice(0, 30).map((c) => ({ text: c && c.text, mediaIds: (c && Array.isArray(c.media_ids)) ? c.media_ids.map(String) : [] }));
+  const mediaIds = Array.isArray(b.media_ids) ? b.media_ids.map(String) : [];
+  const r = core.createPost({ userId, category: String(b.category || (tree.length ? 'tree' : (mediaIds.length ? 'image' : 'text'))), targets, mediaIds, tree, scheduledAtIso: at, draft });
+  if (!r.ok) return { status: 400, body: { error: r.error } };
+  if (immediate) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
+  const all = ScheduledPosts.listGroup(r.groupId, userId).map((p) => ({ ...p, ...(SnsAccounts.get(p.account_id) ? { platform: SnsAccounts.get(p.account_id).platform, handle: SnsAccounts.get(p.account_id).handle } : {}) }));
+  return { status: 201, body: { group_id: r.groupId, posts: all.map(postView) } };
+}
+
 function uploadUrlView(token) {
   const base = String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, '');
   return { upload_url: `${base}/api/v1/uploads/${token}`, method: 'PUT', expires_in: 900, note: 'ファイルをそのまま本文に入れてPUTしてください（1回だけ有効）。戻り値の id を media_ids に使います。' };
@@ -108,20 +133,8 @@ async function handle({ req, res, method, pathname, url }) {
 
   if (pathname === '/api/v1/posts' && method === 'POST') {
     const b = await readJson(req);
-    if (!b || typeof b !== 'object') { send(res, 400, { error: 'JSONの形式が正しくありません。' }); return true; }
-    const ids = [].concat(b.account_ids || []).map(String);
-    const captions = b.captions && typeof b.captions === 'object' ? b.captions : {};
-    const targets = ids.map((accountId) => ({ accountId, caption: captions[accountId] !== undefined ? captions[accountId] : b.text, options: (b.options && b.options[accountId]) || {} }));
-    const draft = b.draft === true;
-    const immediate = b.now === true;
-    let at = null;
-    if (immediate) at = new Date(Date.now() + 1000).toISOString();
-    else if (b.scheduled_at) { at = new Date(b.scheduled_at).toString() === 'Invalid Date' ? null : new Date(b.scheduled_at).toISOString(); if (!at) { send(res, 400, { error: 'scheduled_at はISO 8601形式で指定してください。' }); return true; } }
-    const tree = (Array.isArray(b.tree) ? b.tree : []).map((c) => ({ text: c && c.text, mediaIds: (c && c.media_ids) || [] }));
-    const r = core.createPost({ userId, category: String(b.category || (tree.length ? 'tree' : 'text')), targets, mediaIds: b.media_ids || [], tree, scheduledAtIso: at, draft });
-    if (!r.ok) { send(res, 400, { error: r.error }); return true; }
-    if (immediate && !draft) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
-    send(res, 201, { group_id: r.groupId, posts: r.ids.map((id) => ScheduledPosts.get(id)).map((p) => postView(p)) });
+    const r = createFromBody(userId, b);
+    send(res, r.status, r.body);
     return true;
   }
 
@@ -219,4 +232,4 @@ async function handle({ req, res, method, pathname, url }) {
   return true;
 }
 
-module.exports = { handle, postView, uploadUrlView };
+module.exports = { handle, postView, uploadUrlView, createFromBody };

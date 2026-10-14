@@ -347,7 +347,44 @@ async function handle(ctx) {
   if (cancelMatch && method === 'POST') {
     const body = await needCsrf(); if (!body) return true;
     ScheduledPosts.cancel(cancelMatch[1], user.id);
-    redirect(res, '/service/app?f=cancelled');
+    redirect(res, body.back === 'calendar' ? '/service/app/calendar?f=cancelled' : '/service/app?f=cancelled');
+    return true;
+  }
+
+  // 投稿を作る（ツリー・複数画像・SNSごとの本文・下書き）とカレンダー
+  if (pathname === '/service/app/compose' && method === 'GET') {
+    if (!Subscriptions.isActive(user.id)) { redirect(res, '/service/app'); return true; }
+    sendHtml(res, 200, ui.composePage({ user, accounts: SnsAccounts.listForUser(user.id), csrf: token, aiAvail: ai.available() }));
+    return true;
+  }
+  if (pathname === '/service/app/posts' && method === 'POST') {
+    if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }
+    let b = null;
+    try { b = JSON.parse(await readRaw(req, 300_000)); } catch { b = null; }
+    const r = apiV1.createFromBody(user.id, b);
+    sendJson(res, r.status, r.body);
+    return true;
+  }
+  if (pathname === '/service/app/calendar' && method === 'GET') {
+    const mq = url.searchParams.get('m');
+    const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mq || '') ? mq : new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7);
+    const [from, to] = core.jstMonthBounds(`${month}-15T00:00:00+09:00`);
+    sendHtml(res, 200, ui.calendarPage({ user, month, posts: ScheduledPosts.listBetween(user.id, from, to), drafts: ScheduledPosts.listDrafts(user.id), csrf: token, flash: flashOf(url.searchParams.get('f')) }));
+    return true;
+  }
+  const publishMatch = pathname.match(/^\/service\/app\/post\/([a-f0-9]+)\/publish$/);
+  if (publishMatch && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    const now = body.mode === 'now';
+    const at = now ? new Date(Date.now() + 1000).toISOString() : core.jstLocalToIso(body.at);
+    const r = at ? core.promoteDraft({ userId: user.id, postId: publishMatch[1], scheduledAtIso: at }) : { ok: false, error: '投稿日時の形式が正しくありません。' };
+    if (!r.ok) {
+      const [from, to] = core.jstMonthBounds(new Date().toISOString());
+      sendHtml(res, 400, ui.calendarPage({ user, month: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7), posts: ScheduledPosts.listBetween(user.id, from, to), drafts: ScheduledPosts.listDrafts(user.id), csrf: token, flash: { type: 'error', text: r.error } }));
+      return true;
+    }
+    if (now) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
+    redirect(res, `/service/app/calendar?f=${now ? 'now' : 'scheduled'}`);
     return true;
   }
   const discMatch = pathname.match(/^\/service\/app\/account\/([a-f0-9]+)\/disconnect$/);

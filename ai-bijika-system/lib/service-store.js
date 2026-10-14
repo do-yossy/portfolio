@@ -297,6 +297,14 @@ const ScheduledPosts = {
     return db.prepare(`SELECT p.*, a.platform, a.handle FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
       WHERE p.user_id = ? ORDER BY p.scheduled_at DESC LIMIT ?`).all(userId, limit);
   },
+  listBetween(userId, fromIso, toIso) {
+    return db.prepare(`SELECT p.*, a.platform AS platform, a.handle FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
+      WHERE p.user_id = ? AND p.status <> 'draft' AND p.scheduled_at >= ? AND p.scheduled_at < ? ORDER BY p.scheduled_at`).all(userId, fromIso, toIso);
+  },
+  listDrafts(userId) {
+    return db.prepare(`SELECT p.*, a.platform AS platform, a.handle FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
+      WHERE p.user_id = ? AND p.status = 'draft' ORDER BY p.created_at DESC`).all(userId);
+  },
   countDrafts(userId) {
     return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts WHERE user_id=? AND status='draft'`).get(userId).n;
   },
