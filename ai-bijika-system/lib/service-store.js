@@ -136,6 +136,7 @@ try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN category TEXT DEFAULT ''")
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN media_ids TEXT DEFAULT '[]'"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN tree TEXT DEFAULT '[]'"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN group_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN platform TEXT DEFAULT ''"); } catch { /* 既にある */ }
 db.exec(`
   CREATE TABLE IF NOT EXISTS post_media (
     post_id TEXT NOT NULL,
@@ -275,8 +276,9 @@ const ScheduledPosts = {
     const t = now();
     const ids = (mediaIds && mediaIds.length) ? mediaIds : (mediaId ? [mediaId] : []);
     const treeCards = tree || [];
-    db.prepare(`INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, media_id, options, category, media_ids, tree, group_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, userId, accountId, text, scheduledAt, status || 'pending', ids[0] || '', JSON.stringify(options || {}), category || '', JSON.stringify(ids), JSON.stringify(treeCards), groupId || '', t, t);
+    const acc = db.prepare('SELECT platform FROM sns_accounts WHERE id = ?').get(accountId);
+    db.prepare(`INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, media_id, options, category, media_ids, tree, group_id, platform, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, userId, accountId, text, scheduledAt, status || 'pending', ids[0] || '', JSON.stringify(options || {}), category || '', JSON.stringify(ids), JSON.stringify(treeCards), groupId || '', (acc && acc.platform) || '', t, t);
     const all = new Set(ids);
     for (const c of treeCards) for (const m of (c.mediaIds || [])) all.add(m);
     for (const m of all) db.prepare('INSERT OR IGNORE INTO post_media (post_id, media_id) VALUES (?, ?)').run(id, m);
@@ -302,6 +304,13 @@ const ScheduledPosts = {
   countScheduledBetween(userId, fromIso, toIso) {
     return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts WHERE user_id=? AND status IN ('pending','publishing','posted')
       AND scheduled_at >= ? AND scheduled_at < ?`).get(userId, fromIso, toIso).n;
+  },
+  // Xへの投稿の件数（ツリーは1件ずつ）。月の上限の確認用
+  countXUnits(userId, fromIso, toIso) {
+    // 連携を解除・再連携しても数え直しにならないよう、投稿を作ったときのSNS（p.platform）で数える
+    const rows = db.prepare(`SELECT p.tree FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
+      WHERE p.user_id=? AND (p.platform='x' OR a.platform='x') AND p.status IN ('pending','publishing','posted') AND p.scheduled_at >= ? AND p.scheduled_at < ?`).all(userId, fromIso, toIso);
+    return rows.reduce((n, r) => { let t = 0; try { t = JSON.parse(r.tree || '[]').length; } catch { t = 0; } return n + 1 + t; }, 0);
   },
   // 下書きを予約（または即時投稿）にする
   promote(id, userId, scheduledAt) {

@@ -103,6 +103,28 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   const bad = store.AutoRules.create({ userId: uid, accountId: rid(th), theme: 'x', hourJst: 0, mode: 'draft' });
   await auto.tick(Date.now() + 10);
   ok(/契約/.test(store.AutoRules.get(bad, uid).last_error), '契約が切れていたら実行せず、理由を記録する');
+
+  console.log('Xの月の上限');
+  const core = require('../lib/service-core');
+  process.env.X_MONTHLY_LIMIT = '3';
+  const u2 = mkUser('xq@example.com');
+  store.Subscriptions.upsert(u2, { status: 'active' });
+  const xa = store.SnsAccounts.upsert({ userId: u2, platform: 'x', externalUserId: 'x9', handle: '@x', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  const at = new Date(Date.now() + 3600000).toISOString();
+  let cr = core.createPost({ userId: u2, category: 'tree', targets: [{ accountId: rid(xa), caption: '1' }], tree: [{ text: '2' }], scheduledAtIso: at });
+  ok(cr.ok, 'ツリー（2件）を予約できる');
+  cr = core.createPost({ userId: u2, category: 'tree', targets: [{ accountId: rid(xa), caption: '1' }], tree: [{ text: '2' }], scheduledAtIso: at });
+  ok(!cr.ok && /1か月に3件/.test(cr.error), 'ツリーを1件ずつ数えて、月の上限を超えると予約できない');
+  cr = core.createPost({ userId: u2, category: 'text', targets: [{ accountId: rid(xa), caption: '3' }], scheduledAtIso: at });
+  ok(cr.ok, '上限ちょうどまでは予約できる');
+  cr = core.createPost({ userId: u2, category: 'text', targets: [{ accountId: rid(xa), caption: 'd' }], draft: true });
+  ok(cr.ok, '下書きは上限に数えない');
+  const pr2 = core.promoteDraft({ userId: u2, postId: cr.ids[0], scheduledAtIso: at });
+  ok(!pr2.ok && /1か月/.test(pr2.error), '下書きを予約にするときも上限を確認する');
+  store.SnsAccounts.remove(rid(xa), u2);
+  const xa2 = store.SnsAccounts.upsert({ userId: u2, platform: 'x', externalUserId: 'x9', handle: '@x', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  cr = core.createPost({ userId: u2, category: 'text', targets: [{ accountId: rid(xa2), caption: 'again' }], scheduledAtIso: at });
+  ok(cr.ok === false || store.ScheduledPosts.countXUnits(u2, ...core.jstMonthBounds(at)) <= 3, '連携をやり直しても、月の上限は数え直しにならない');
   summary();
   mock.restore();
 })();

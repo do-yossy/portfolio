@@ -4,7 +4,15 @@ const { Subscriptions, SnsAccounts, OAuthStates, ScheduledPosts, MediaAssets } =
 const box = require('./crypto-box');
 const registry = require('./sns');
 
-const LIMITS = { maxAccounts: 10, maxPending: 100, maxPerDay: 30 };
+const envInt = (k, d) => { const v = parseInt(process.env[k] || '', 10); return Number.isFinite(v) && v > 0 ? v : d; };
+// 上限は環境変数で変えられる（費用・保存容量・各SNSの規約上の上限に合わせる）
+const LIMITS = {
+  get maxAccounts() { return envInt('SERVICE_MAX_ACCOUNTS', 10); },
+  get maxPending() { return envInt('SERVICE_MAX_PENDING', 300); },
+  get maxPerDay() { return envInt('SERVICE_MAX_PER_DAY', 50); },
+  // XのAPIは投稿数に応じて費用がかかるため、Xへの投稿は1人あたり月の上限を設ける（ツリーは1件ずつ数える）
+  get xPerMonth() { return envInt('X_MONTHLY_LIMIT', 30); },
+};
 const MAX_DAYS_AHEAD = 90;
 const JST_OFFSET_MS = 9 * 3600 * 1000;
 
@@ -44,6 +52,23 @@ function jstDayBounds(iso) {
   const start = Date.parse(`${day}T00:00:00+09:00`);
   return [new Date(start).toISOString(), new Date(start + 24 * 3600 * 1000).toISOString()];
 }
+// 日本時間の月の範囲
+function jstMonthBounds(iso) {
+  const d = new Date(Date.parse(iso) + JST_OFFSET_MS);
+  const y = d.getUTCFullYear(); const m = d.getUTCMonth();
+  const start = Date.UTC(y, m, 1) - JST_OFFSET_MS;
+  const end = Date.UTC(y, m + 1, 1) - JST_OFFSET_MS;
+  return [new Date(start).toISOString(), new Date(end).toISOString()];
+}
+function xQuotaError(userId, iso, adding) {
+  if (!adding) return null;
+  const [from, to] = jstMonthBounds(iso);
+  if (ScheduledPosts.countXUnits(userId, from, to) + adding > LIMITS.xPerMonth) {
+    return `Xへの投稿は、1か月に${LIMITS.xPerMonth}件までです（ツリーは1件ずつ数えます。日本時間で、その月の分）。`;
+  }
+  return null;
+}
+
 function formatJst(iso) {
   if (!iso) return '';
   const d = new Date(Date.parse(iso) + JST_OFFSET_MS);
@@ -119,6 +144,11 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
       return { ok: false, error: `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。` };
     }
   }
+  if (!draft) {
+    const xUnits = resolved.filter((r) => r.a.platform === 'x').length * (1 + (category === 'tree' ? cards.length : 0));
+    const qe = xQuotaError(userId, scheduledAtIso, xUnits);
+    if (qe) return { ok: false, error: qe };
+  }
   const groupId = require('crypto').randomBytes(10).toString('hex');
   const created = resolved.map(({ a, caption, options }) => ScheduledPosts.create({
     userId, accountId: a.id, text: caption, scheduledAt: scheduledAtIso || new Date(nowMs).toISOString(),
@@ -142,6 +172,11 @@ function promoteDraft({ userId, postId, scheduledAtIso, nowMs = Date.now() }) {
   if (ScheduledPosts.countPending(userId) + 1 > LIMITS.maxPending) return { ok: false, error: `未投稿の予約は${LIMITS.maxPending}件までです。` };
   const [from, to] = jstDayBounds(iso);
   if (ScheduledPosts.countScheduledBetween(userId, from, to) + 1 > LIMITS.maxPerDay) return { ok: false, error: `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。` };
+  if (a.platform === 'x') {
+    let n = 1; try { n += JSON.parse(p.tree || '[]').length; } catch { /* */ }
+    const qe = xQuotaError(userId, iso, n);
+    if (qe) return { ok: false, error: qe };
+  }
   if (!ScheduledPosts.promote(postId, userId, iso)) return { ok: false, error: '下書きが見つかりません。' };
   return { ok: true };
 }
@@ -202,5 +237,5 @@ async function finishConnect({ userId, platform, code, state }) {
 
 module.exports = {
   LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, snsEnabled, contactEmail, salesOpen, redirectUriFor,
-  jstLocalToIso, jstDayBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
+  jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

@@ -22,11 +22,24 @@ function creds(env = process.env) { return { key: env.TIKTOK_CLIENT_KEY || '', s
 function isConfigured(env = process.env) { const c = creds(env); return !!(c.key && c.secret); }
 const textLength = (t) => [...String(t)].length;
 
+const MAX_PHOTOS = 35;
+const PHOTO_TITLE_MAX = 90;
+const PHOTO_DESC_MAX = 4000;
+
 function validatePost(args) {
   const p = normalize(args); const text = p.text; const media = p.medias[0]; const options = p.options;
-  if (p.category === 'tree' || p.medias.length > 1) return 'TikTokは、動画を1つだけ投稿できます（複数画像・ツリーは、このバージョンでは対応していません）。';
-  if (!media || media.kind !== 'video') return 'TikTokは、動画（MP4・MOV）が必要です。';
-  if (textLength(text || '') > maxLength) return `TikTokのタイトルは${maxLength}文字までです。`;
+  if (p.category === 'tree') return 'TikTokには、ツリー投稿はできません。';
+  if (!media) return 'TikTokは、動画（MP4・MOV）または写真（JPEG）が必要です。';
+  if (media.kind === 'video') {
+    if (p.medias.length > 1) return 'TikTokの動画は1本だけ投稿できます。';
+    if (textLength(text || '') > maxLength) return `TikTokのタイトルは${maxLength}文字までです。`;
+  } else {
+    // 写真投稿（フォトモード）：TikTokが当サービスの公開URLから画像を取得する（URLの所有確認がTikTok側で必要）
+    if (p.medias.some((m) => m.kind !== 'image')) return 'TikTokでは、写真と動画を同時に投稿できません。';
+    if (p.medias.length > MAX_PHOTOS) return `TikTokの写真は${MAX_PHOTOS}枚までです。`;
+    if (p.medias.some((m) => m.mime !== 'image/jpeg')) return 'TikTokに投稿できる写真はJPEGです（PNGは使えません）。';
+    if (textLength(text || '') > PHOTO_DESC_MAX) return `TikTokの写真投稿の説明は${PHOTO_DESC_MAX}文字までです。`;
+  }
   if (!options || !PRIVACY.includes(options.privacy_level)) return 'TikTokの公開範囲を選んでください。';
   if (options.commercial_paid && options.privacy_level === 'SELF_ONLY') return '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできません。';
   return null;
@@ -115,6 +128,7 @@ async function publish(args) {
   if (allowed.length && !allowed.includes(options.privacy_level)) {
     throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。アプリの審査が終わるまでは「自分のみ（SELF_ONLY）」だけの場合があります。`);
   }
+  if (media.kind === 'image') return publishPhotos({ accessToken, p, options });
   if (info.data && Number(info.data.max_video_post_duration_sec) && media.durationSec && media.durationSec > Number(info.data.max_video_post_duration_sec)) {
     throw new SnsError(`動画が長すぎます（${Math.round(media.durationSec)}秒）。このアカウントで投稿できるのは、最大${info.data.max_video_post_duration_sec}秒です。`);
   }
@@ -142,16 +156,38 @@ async function publish(args) {
   } finally { fs.closeSync(fd); }
   // ここから先は、動画を送ったあとの段階。応答だけが失われた場合に再試行すると、二重投稿になりうるため、再試行しない
   // （動画のアップロードまでの失敗は、まだ投稿されていないため、通常どおり再試行できる）
+  return waitPublished(accessToken, publishId);
+}
+
+async function waitPublished(accessToken, publishId) {
   try {
-  for (let i = 0; i < poll.maxTries(); i++) {
-    const s = await call({ path: '/v2/post/publish/status/fetch/', headers: bearer(accessToken), body: JSON.stringify({ publish_id: publishId }) });
-    const st = s.data && s.data.status;
-    if (st === 'PUBLISH_COMPLETE') return { externalId: String((s.data.publicaly_available_post_id && s.data.publicaly_available_post_id[0]) || publishId) };
-    if (st === 'FAILED') throw new SnsError(`TikTok側で投稿に失敗しました（${(s.data && s.data.fail_reason) || '理由不明'}）`);
-    await poll.sleep(poll.intervalMs());
-  }
-  throw new SnsError('TikTok側の処理が終わりませんでした。投稿されたかをご確認ください。');
+    for (let i = 0; i < poll.maxTries(); i++) {
+      const s = await call({ path: '/v2/post/publish/status/fetch/', headers: bearer(accessToken), body: JSON.stringify({ publish_id: publishId }) });
+      const st = s.data && s.data.status;
+      if (st === 'PUBLISH_COMPLETE') return { externalId: String((s.data.publicaly_available_post_id && s.data.publicaly_available_post_id[0]) || publishId) };
+      if (st === 'FAILED') throw new SnsError(`TikTok側で投稿に失敗しました（${(s.data && s.data.fail_reason) || '理由不明'}）`);
+      await poll.sleep(poll.intervalMs());
+    }
+    throw new SnsError('TikTok側の処理が終わりませんでした。投稿されたかをご確認ください。');
   } catch (e) { throw ambiguous(e); }
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, creatorInfo, authUrl, exchangeCode, refresh, publish, usesPkce: false, PRIVACY, mediaRule: '動画（MP4・MOV）が必須', needsOptions: true };
+// 写真投稿：本文の1行目をタイトル（90文字まで）、全体を説明にする
+async function publishPhotos({ accessToken, p, options }) {
+  const t = String(p.text || '').trim();
+  const title = [...(t.split('\n')[0] || '')].slice(0, PHOTO_TITLE_MAX).join('');
+  let init;
+  try {
+    init = await call({ path: '/v2/post/publish/content/init/', headers: bearer(accessToken), body: JSON.stringify({
+      post_info: { title, description: t, privacy_level: options.privacy_level, disable_comment: !!options.disable_comment, auto_add_music: true,
+        brand_organic_toggle: !!options.commercial_own, brand_content_toggle: !!options.commercial_paid },
+      source_info: { source: 'PULL_FROM_URL', photo_cover_index: 0, photo_images: p.medias.map((m) => m.url) },
+      post_mode: 'DIRECT_POST', media_type: 'PHOTO',
+    }) });
+  } catch (e) { throw ambiguous(e); }
+  const publishId = init.data && init.data.publish_id;
+  if (!publishId) throw new SnsError('TikTokの写真投稿を開始できませんでした。');
+  return waitPublished(accessToken, publishId);
+}
+
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, creatorInfo, authUrl, exchangeCode, refresh, publish, usesPkce: false, PRIVACY, mediaRule: '動画（MP4・MOV）または写真（JPEG・35枚まで）が必須', needsOptions: true };

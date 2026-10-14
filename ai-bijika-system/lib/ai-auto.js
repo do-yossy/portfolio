@@ -15,9 +15,8 @@ function validateRule({ userId, accountId, theme, withImage, hourJst, mode }) {
   if (!a) return '投稿先のSNSが見つかりません。';
   const ad = registry.get(a.platform);
   if (!ad) return '未対応のSNSです。';
-  if (['tiktok', 'youtube'].includes(a.platform)) return `${ad.label}は動画が必要なため、自動運用（文章と画像）の対象にできません。`;
+  if (['tiktok', 'youtube'].includes(a.platform)) return `${ad.label}は投稿ごとに公開範囲などの確認が必要なため、自動運用の対象にできません。`;
   if (a.platform === 'instagram' && !withImage) return 'Instagramは画像が必要です。「画像も作る」を選んでください。';
-  if (a.platform === 'x' && withImage) return 'Xは現在、画像つきの投稿に対応していません。';
   if (!String(theme || '').trim() || [...String(theme)].length > 500) return 'テーマを500文字以内で入力してください。';
   if (!Number.isInteger(hourJst) || hourJst < 0 || hourJst > 23) return '投稿する時刻（0〜23時）が正しくありません。';
   if (!['draft', 'auto'].includes(mode)) return '運用の方法が正しくありません。';

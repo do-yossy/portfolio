@@ -7,6 +7,7 @@ const ig = require('../lib/sns/instagram');
 const xa = require('../lib/sns/x');
 const fb = require('../lib/sns/facebook');
 const yt = require('../lib/sns/youtube');
+const tk = require('../lib/sns/tiktok');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -104,5 +105,39 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   const meta = JSON.parse(mock.calls[0].body);
   ok(r.externalId === 'yt_1' && meta.snippet.title === 'タイトル #Shorts' && meta.status.privacyStatus === 'unlisted', 'YouTubeへショート動画を投稿できる');
   ok(yt.validatePost({ post: { category: 'text', text: 'x', medias: [] } }), '動画なしは拒否する');
+  console.log('X 画像・動画');
+  const xdir = fs.mkdtempSync(path.join(os.tmpdir(), 'x-'));
+  const xi = path.join(xdir, 'a.jpg'); fs.writeFileSync(xi, Buffer.alloc(50, 1));
+  const xv = path.join(xdir, 'a.mp4'); fs.writeFileSync(xv, Buffer.alloc(9 * 1024 * 1024, 2));
+  let stTries = 0;
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/2/media/upload') return { status: 200, json: { data: { id: 'img1' } } };
+    if (c.path === '/2/media/upload/initialize') return { status: 200, json: { data: { id: 'vid1' } } };
+    if (/\/append$/.test(c.path)) return { status: 200, json: {} };
+    if (/\/finalize$/.test(c.path)) return { status: 200, json: { data: { id: 'vid1', processing_info: { state: 'pending', check_after_secs: 1 } } } };
+    if (c.path.startsWith('/2/media/upload?command=STATUS')) { stTries++; return { status: 200, json: { data: { processing_info: { state: stTries > 1 ? 'succeeded' : 'in_progress' } } } }; }
+    if (c.path === '/2/tweets') return { status: 201, json: { data: { id: 'tw1' } } };
+    return null;
+  });
+  r = await xa.publish({ accessToken: 't', post: { category: 'image', text: '画像', medias: [{ kind: 'image', mime: 'image/jpeg', size: 50, path: xi }] } });
+  let tw = JSON.parse(mock.calls.find((c) => c.path === '/2/tweets').body);
+  ok(r.externalId === 'tw1' && tw.media.media_ids[0] === 'img1' && /multipart\/form-data/.test(mock.calls[0].headers['Content-Type']), 'Xへ画像つきで投稿できる');
+  r = await xa.publish({ accessToken: 't', post: { category: 'video', text: '', medias: [{ kind: 'video', mime: 'video/mp4', size: 9 * 1024 * 1024, path: xv }] } });
+  const appends = mock.calls.filter((c) => /\/append$/.test(c.path)).length;
+  tw = JSON.parse(mock.calls.filter((c) => c.path === '/2/tweets').pop().body);
+  ok(appends === 3 && tw.media.media_ids[0] === 'vid1' && stTries === 2, 'Xへ動画を分割アップロードし、処理完了を待ってから投稿する');
+  mock.restore();
+
+  console.log('TikTok 写真');
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 200, json: { data: { publish_id: 'pp1' }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/status/fetch/') return { status: 200, json: { data: { status: 'PUBLISH_COMPLETE', publicaly_available_post_id: ['tp1'] }, error: { code: 'ok' } } };
+    return null;
+  });
+  r = await tk.publish({ accessToken: 't', post: { category: 'image', text: 'タイトル\n説明文', medias: [img(1), img(2)], options: { privacy_level: 'SELF_ONLY' } } });
+  const tkb = JSON.parse(mock.calls.find((c) => c.path === '/v2/post/publish/content/init/').body);
+  mock.restore();
+  ok(r.externalId === 'tp1' && tkb.media_type === 'PHOTO' && tkb.source_info.photo_images.length === 2 && tkb.post_info.title === 'タイトル', 'TikTokへ写真を投稿できる（1行目がタイトル）');
   summary();
 })();
