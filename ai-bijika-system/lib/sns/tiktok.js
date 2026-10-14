@@ -122,8 +122,6 @@ async function publish({ accessToken, text, media, options }) {
   const publishId = init.data && init.data.publish_id;
   const uploadUrl = init.data && init.data.upload_url;
   if (!publishId || !uploadUrl) throw new SnsError('TikTokのアップロード先を取得できませんでした。');
-  // ここから先は、動画を送ったあとの段階。応答だけが失われた場合に再試行すると、二重投稿になりうるため、再試行しない
-  try {
   const u = new URL(uploadUrl);
   const fd = fs.openSync(media.path, 'r');
   try {
@@ -137,6 +135,9 @@ async function publish({ accessToken, text, media, options }) {
       if (r.status !== 201 && r.status !== 206 && r.status !== 200) throw classify(r.status, `TikTokへのアップロードに失敗しました (${r.status})`);
     }
   } finally { fs.closeSync(fd); }
+  // ここから先は、動画を送ったあとの段階。応答だけが失われた場合に再試行すると、二重投稿になりうるため、再試行しない
+  // （動画のアップロードまでの失敗は、まだ投稿されていないため、通常どおり再試行できる）
+  try {
   for (let i = 0; i < poll.maxTries(); i++) {
     const s = await call({ path: '/v2/post/publish/status/fetch/', headers: bearer(accessToken), body: JSON.stringify({ publish_id: publishId }) });
     const st = s.data && s.data.status;

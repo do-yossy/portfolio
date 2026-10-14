@@ -100,6 +100,8 @@ function applySubscription(sub, hintedUserId, createdSec) {
     || (Subscriptions.findBySubscription(sub.id) || Subscriptions.findByCustomer(customerId) || {}).user_id;
   if (!userId) return null;
   const known = Subscriptions.get(userId);
+  // 別の（古い）契約の「終了」を知らせる遅れたイベントで、いまの契約を終了扱いにしない（再契約したあとに届く場合がある）
+  if (known && known.stripe_subscription_id && known.stripe_subscription_id !== sub.id && ['canceled', 'incomplete_expired'].includes(sub.status)) return known;
   if (createdSec && known && known.stripe_event_created > createdSec) return known; // 古い情報は無視
   const item = sub.items && sub.items.data && sub.items.data[0];
   const saved = Subscriptions.upsert(userId, {

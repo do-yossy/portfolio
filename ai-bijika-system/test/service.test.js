@@ -122,6 +122,10 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(!(await billing.syncCheckoutSession(userSync, '../etc')), '不正なセッションIDは拒否する');
   ok((await billing.syncCheckoutSession(userSync, 'cs_done')) && store.Subscriptions.isActive(userSync) && store.Subscriptions.get(userSync).stripe_subscription_id === 'sub_sync', '本人の完了したセッションは、Webhookより先に契約中にできる');
 
+  // 再契約したあとに届く、古い契約の「終了」イベントで、いまの契約を終了扱いにしない
+  const keepAcc = store.SnsAccounts.upsert({ userId: userSync, platform: 'threads', externalUserId: 'keep1', handle: '@keep', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  await billing.handleEvent({ id: 'evt_old_deleted', type: 'customer.subscription.deleted', created: Math.floor(Date.now() / 1000) - 5, data: { object: { id: 'sub_old', customer: 'cus_sync', status: 'canceled', current_period_end: periodEnd, cancel_at_period_end: false, metadata: { user_id: userSync }, items: { data: [] } } } });
+  ok(store.Subscriptions.isActive(userSync) && store.Subscriptions.get(userSync).stripe_subscription_id === 'sub_sync' && store.SnsAccounts.get(keepAcc) !== null, '再契約のあとに届いた古い契約の終了イベントでは、いまの契約も連携情報も変わらない');
   // 順不同で届いた古いイベントで、新しい状態を上書きしない
   const T = Math.floor(Date.now() / 1000) + 1000;
   const subEv = (id, status, created) => ({ id, type: 'customer.subscription.updated', created, data: { object: { id: 'sub_1', customer: 'cus_1', status, current_period_end: periodEnd, cancel_at_period_end: false, metadata: {}, items: { data: [] } } } });

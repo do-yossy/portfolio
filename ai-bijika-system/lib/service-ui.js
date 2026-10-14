@@ -86,10 +86,10 @@ function landingPage({ user, billingReady }) {
       <li>未投稿の予約は100件まで、1日の予約は30件まで、連携できるアカウントは5件までです。</li>
       <li>SNS側の仕様変更や障害、各SNSの規約による制限で、投稿できない場合があります。</li>
       <li>投稿の内容と、その結果（SNS側での表示・凍結等）の責任は、ご利用者にあります。</li>
-      <li>お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。</li>
+      <li>お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。契約期間が終わると、SNSの連携情報は削除され、未投稿の予約は取り消されます（再開するときは、SNSの連携をやり直してください）。</li>
     </ul></div>
     <h2 style="margin-top:26px">よくある質問</h2>
-    <div class="card"><div class="card-title">解約するには？</div><p class="small">マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。</p></div>
+    <div class="card"><div class="card-title">解約するには？</div><p class="small">マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。契約期間が終わると、SNSの連携情報は削除され、未投稿の予約は取り消されます。</p></div>
     <div class="card"><div class="card-title">お支払い方法は？</div><p class="small">クレジットカード等です。決済は、決済代行会社（Stripe）の画面で行い、当サービスにはカード番号を保存しません。</p></div>
     <div class="card"><div class="card-title">パスワードを忘れたら？</div><p class="small"><a href="/contact">お問い合わせ</a>からご連絡ください。</p></div>
     ${legalLinks()}
@@ -130,7 +130,7 @@ function checkoutPage({ user, csrf, error }) {
         <tr><th>料金</th><td><b>月額 ${price}（税込）</b></td></tr>
         <tr><th>お支払い開始</th><td>「同意して支払いへ進む」を押したあとの決済ページで、お支払いが完了した時点で、契約が始まります。</td></tr>
         <tr><th>契約期間と更新</th><td>1か月ごとの自動更新です。解約しない限り、毎月、同じ日に ${price} が、お支払い方法に請求されます。</td></tr>
-        <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。</td></tr>
+        <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。契約期間が終わると、SNSの連携情報は削除され、未投稿の予約は取り消されます（再開するときは、連携をやり直してください）。</td></tr>
         <tr><th>返金</th><td>お支払い済みの料金は、法令上必要な場合を除き、返金いたしません（日割りでの返金もありません）。</td></tr>
         <tr><th>対応SNSと制限</th><td>Threads・X・Instagram・TikTok。未投稿の予約は100件まで、1日の予約は30件まで、連携は5アカウントまでです。画像は8MB、動画は100MBまで、保存できるファイルの合計は1人300MBまでです。</td></tr>
         <tr><th>SNSごとの条件</th><td>Xはテキストのみ。Instagramはプロアカウントが対象で、JPEG画像またはリール動画が必須。TikTokは動画（MP4・MOV）が必須で、TikTok側の審査状況により、公開範囲が制限される場合があります。Threadsは画像・動画を付けられます。</td></tr>
@@ -243,12 +243,14 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
           if(!x.ok){sel.textContent='';var e1=document.createElement('option');e1.value='';e1.textContent='取得できませんでした';sel.appendChild(e1);msg.textContent=x.j.error||'';loaded=false;return;}
           var o=x.j.privacyLevelOptions||[];sel.textContent='';var ph=document.createElement('option');ph.value='';ph.textContent='選択してください';sel.appendChild(ph);
           o.forEach(function(v){var op=document.createElement('option');op.value=v;op.textContent=LABELS[v]||v;sel.appendChild(op);});
+          applyPaid();
           if(x.j.nickname)document.getElementById('ttNick').textContent=x.j.nickname;
           [['tt_comment',x.j.commentDisabled],['tt_duet',x.j.duetDisabled],['tt_stitch',x.j.stitchDisabled]].forEach(function(p){var c=document.getElementById(p[0]);if(p[1]){c.checked=false;c.disabled=true;c.parentNode.querySelector('span').textContent+='（このアカウントでは許可できません）';}});
           msg.textContent=x.j.maxVideoPostDurationSec?'投稿できる動画の長さは、最大'+x.j.maxVideoPostDurationSec+'秒です。':'';
         }).catch(function(){sel.textContent='';var e2=document.createElement('option');e2.value='';e2.textContent='取得できませんでした';sel.appendChild(e2);loaded=false;});}
-      (function(){var paid=document.getElementById('tt_paid');if(!paid)return;paid.addEventListener('change',function(){var sel=document.getElementById('tiktok_privacy'),note=document.getElementById('ttPaidNote');note.style.display=paid.checked?'block':'none';
-        Array.prototype.forEach.call(sel.options,function(op){if(op.value==='SELF_ONLY'){op.disabled=paid.checked;if(paid.checked&&sel.value==='SELF_ONLY')sel.value='';}});});})();
+      function applyPaid(){var paid=document.getElementById('tt_paid');if(!paid)return;var sel=document.getElementById('tiktok_privacy'),note=document.getElementById('ttPaidNote');note.style.display=paid.checked?'block':'none';
+        Array.prototype.forEach.call(sel.options,function(op){if(op.value==='SELF_ONLY'){op.disabled=paid.checked;if(paid.checked&&sel.value==='SELF_ONLY')sel.value='';}});}
+      (function(){var paid=document.getElementById('tt_paid');if(paid)paid.addEventListener('change',applyPaid);})();
       function tt(){if(!box)return;var on=document.querySelector('input[name=account][data-platform=tiktok]:checked');box.style.display=on?'block':'none';if(on)loadTT();}
       document.querySelectorAll('input[name=account]').forEach(function(c){c.addEventListener('change',tt)});tt();
     })();

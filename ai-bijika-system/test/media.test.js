@@ -232,6 +232,14 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   const synth = Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), box32('mdat', Buffer.alloc(300, 1)), box32('moov', box32('mvhd', mvhd))]);
   const synthPath = path.join(process.env.DATA_DIR, 'synth.mp4'); fs.writeFileSync(synthPath, synth);
   ok(media.mp4DurationSec(synthPath) === 12, 'MP4の長さ（秒）を読み取れる（moovがmdatの後ろにあっても）');
+  const box64 = (type, payload) => { const b = Buffer.alloc(16 + payload.length); b.writeUInt32BE(1, 0); b.write(type, 4, 'latin1'); b.writeBigUInt64BE(BigInt(16 + payload.length), 8); payload.copy(b, 16); return b; };
+  fs.writeFileSync(synthPath, Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), box64('moov', box32('mvhd', mvhd))]));
+  ok(media.mp4DurationSec(synthPath) === 12, '64bitのサイズ表記のMP4でも、長さを読み取れる');
+  const mvhd1 = Buffer.alloc(120); mvhd1[0] = 1; mvhd1.writeUInt32BE(600, 20); mvhd1.writeBigUInt64BE(BigInt(6000), 24); // version 1
+  fs.writeFileSync(synthPath, Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), box32('moov', box32('mvhd', mvhd1))]));
+  ok(media.mp4DurationSec(synthPath) === 10, 'mvhdがversion 1（64bitの時間）でも、長さを読み取れる');
+  fs.writeFileSync(synthPath, Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), Buffer.from([0, 0, 0, 4, 0x6d, 0x6f, 0x6f, 0x76])]));
+  ok(media.mp4DurationSec(synthPath) === null, 'サイズが壊れたboxでも、止まらずにnullを返す');
   fs.writeFileSync(synthPath, Buffer.alloc(200, 3));
   ok(media.mp4DurationSec(synthPath) === null && media.mp4DurationSec('/nonexistent') === null, '読み取れないときはnull（検証しない）');
   const mockDur = installHttpsMock(async (c) => (c.path === '/v2/post/publish/creator_info/query/' ? { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'], max_video_post_duration_sec: 600 }, error: { code: 'ok' } } } : null));
@@ -295,6 +303,22 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   const amb = store.ScheduledPosts.get(pAmb.ids[0]);
   ok(amb.status === 'failed' && /投稿されたか/.test(amb.last_error) && m6.calls.filter((c) => c.path === '/v22.0/ig1/media').length === 1, '公開の最終段階のエラーは、再試行せず、投稿されたかの確認を促す（二重投稿の防止）');
   m6.restore();
+
+  // TikTok：動画のアップロードまでの失敗は、まだ投稿されていないため、通常どおり再試行する
+  store.SnsAccounts.setStatus(ttAcc, 'active');
+  const mP = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/video/init/') return { status: 200, json: { data: { publish_id: 'pu', upload_url: 'https://upload.tiktok.test/u' }, error: { code: 'ok' } } };
+    if (c.host === 'upload.tiktok.test') return { status: 503, json: {} };
+    return null;
+  });
+  const pPut = core.createPosts({ userId: uid, accountIds: [ttAcc], text: 'x', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'SELF_ONLY' } } });
+  await new Promise((rs) => setTimeout(rs, 1200));
+  await scheduler.tick();
+  const putRow = store.ScheduledPosts.get(pPut.ids[0]);
+  ok(putRow.status === 'pending' && !/投稿されたか/.test(putRow.last_error), 'TikTokへの動画のアップロードに失敗しても、まだ投稿されていないため、自動で再試行する');
+  store.ScheduledPosts.cancel(pPut.ids[0], uid);
+  mP.restore();
 
   // TikTok：商用コンテンツの設定をAPIに渡す
   const m7 = installHttpsMock(async (c) => {
