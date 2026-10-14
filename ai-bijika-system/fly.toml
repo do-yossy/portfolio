@@ -15,6 +15,7 @@ primary_region = "nrt"
 [env]
   PORT = "3300"
   NODE_OPTIONS = "--experimental-sqlite"
+  NODE_ENV = "production"
 
 [http_service]
   internal_port = 3300
