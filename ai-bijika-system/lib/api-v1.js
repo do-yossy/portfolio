@@ -93,10 +93,10 @@ async function handle({ req, res, method, pathname, url }) {
     send(res, 201, { id: r.media.id, kind: r.media.kind, mime: r.media.mime, size: r.media.size });
     return true;
   }
-  const m = String(req.headers.authorization || '').match(/^Bearer\s+(\S+)$/i);
-  if (!badKeyLimiter.allow(ip)) { send(res, 429, { error: '試行回数が多すぎます。しばらくしてからお試しください。' }); return true; }
-  const userId = m ? (ApiKeys.authenticate(m[1]) || oauth.authenticate(m[1])) : null;
-  if (!userId) { badKeyLimiter.fail(ip); send(res, 401, { error: 'APIキーが正しくありません。Authorization: Bearer <APIキー> を指定してください。' }); return true; }
+  const au = oauth.authenticateRequest(req, badKeyLimiter, ApiKeys);
+  if (au.status === 429) { send(res, 429, { error: au.error }); return true; }
+  if (!au.userId) { send(res, 401, { error: 'APIキーが正しくありません。Authorization: Bearer <APIキー> を指定してください。' }); return true; }
+  const userId = au.userId;
   if (!keyLimiter.allow(userId)) { send(res, 429, { error: 'リクエストが多すぎます。1分あたり60回までです。' }); return true; }
   keyLimiter.fail(userId);
 
@@ -158,7 +158,14 @@ async function handle({ req, res, method, pathname, url }) {
     }
     if (one[2] && method === 'POST') {
       const b = (await readJson(req)) || {};
-      const r = core.promoteDraft({ userId, postId: row.id, scheduledAtIso: b.now === true ? new Date(Date.now() + 1000).toISOString() : (b.scheduled_at ? new Date(b.scheduled_at).toISOString() : null) });
+      let at = null;
+      if (b.now === true) at = new Date(Date.now() + 1000).toISOString();
+      else if (b.scheduled_at !== undefined) {
+        const d = new Date(b.scheduled_at);
+        if (Number.isNaN(d.getTime())) { send(res, 400, { error: 'scheduled_at はISO 8601形式で指定してください。' }); return true; }
+        at = d.toISOString();
+      }
+      const r = core.promoteDraft({ userId, postId: row.id, scheduledAtIso: at });
       if (!r.ok) { send(res, 400, { error: r.error }); return true; }
       if (b.now === true) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
       send(res, 200, postView(ScheduledPosts.listForUser(userId, 1000).find((p) => p.id === row.id)));
@@ -206,7 +213,7 @@ async function handle({ req, res, method, pathname, url }) {
         const args = { userId, accountId: String(b.account_id || ''), theme: b.theme, withImage: b.with_image === true, hourJst: Number(b.hour_jst), mode };
         const problem = aiAuto.validateRule(args);
         if (problem) { send(res, 400, { error: problem }); return true; }
-        const id = AutoRules.create({ ...args, tone: String(b.tone || '').slice(0, 100), theme: String(b.theme).trim() });
+        const id = aiAuto.createRule({ ...args, tone: String(b.tone || '').slice(0, 100), theme: String(b.theme).trim() });
         send(res, 201, ruleView(AutoRules.get(id, userId)));
         return true;
       }

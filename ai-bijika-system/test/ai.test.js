@@ -10,6 +10,7 @@ process.env.SNS_TOKEN_KEY = crypto.randomBytes(32).toString('hex');
 process.env.SERVICE_BASE_URL = 'https://example.test';
 process.env.ANTHROPIC_API_KEY = 'ak'; process.env.OPENAI_API_KEY = 'ok'; process.env.GEMINI_API_KEY = 'gk';
 process.env.AI_DAILY_TEXT = '3'; process.env.AI_DAILY_IMAGE = '2'; process.env.AI_DAILY_VIDEO = '1';
+const DAILY_ENV = ['AI_DAILY_TEXT', 'AI_DAILY_IMAGE', 'AI_DAILY_VIDEO'];
 
 const { ok, summary, installHttpsMock } = require('./helpers');
 const { Users } = require('../db');
@@ -34,6 +35,7 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
     if (c.host === 'api.openai.com') return { status: 200, json: { data: [{ b64_json: JPEG_B64 }] } };
     if (c.host === 'generativelanguage.googleapis.com') {
       if (c.method === 'POST') return { status: 200, json: { name: 'models/veo/operations/op1' } };
+      if (c.path.startsWith('/v1beta/models/veo/operations/flaky')) throw new Error('ECONNRESET');
       if (c.path.startsWith('/v1beta/models/veo/operations/op1')) return { status: 200, json: videoDone ? { done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://generativelanguage.googleapis.com/v1beta/files/f1:download?alt=media' } }] } } } : { done: false } };
       if (c.path.startsWith('/v1beta/files/f1')) return { status: 200, text: MP4_TEXT };
     }
@@ -62,6 +64,24 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   err = null; try { await ai.generateText({ userId: uid, theme: '' }); } catch (e) { err = e; }
   ok(err && /テーマ/.test(err.message), 'テーマが空なら生成しない');
 
+  console.log('契約がない人は生成できない（画面・API・MCP・自動運用の共通の入口）');
+  const nosub = mkUser('nosub@example.com');
+  const before = mock.calls.length;
+  err = null; try { await ai.generateText({ userId: nosub, theme: 'x' }); } catch (e) { err = e; }
+  ok(err && /契約/.test(err.message), '未契約では文章を生成できない');
+  err = null; try { await ai.startVideo({ userId: nosub, prompt: 'x' }); } catch (e) { err = e; }
+  ok(err && /契約/.test(err.message) && mock.calls.length === before, '未契約では動画も生成できず、外部のAIを呼ばない');
+  store.Subscriptions.upsert(nosub, { status: 'canceled' });
+  err = null; try { await ai.generateImage({ userId: nosub, prompt: 'x' }); } catch (e) { err = e; }
+  ok(err && /契約/.test(err.message), '解約済みでも生成できない');
+
+  console.log('既定の上限');
+  const saved = DAILY_ENV.map((k) => process.env[k]);
+  DAILY_ENV.forEach((k) => { delete process.env[k]; });
+  const L = ai.limits();
+  ok(L.text === 30 && L.image === 5 && L.video === 0 && ai.available().video === false, '動画は既定で無効（運営者が回数を設定したときだけ使える）');
+  DAILY_ENV.forEach((k, i) => { process.env[k] = saved[i]; });
+
   console.log('画像・動画の生成');
   const img = await ai.generateImage({ userId: uid, prompt: '海' });
   ok(img.kind === 'image' && img.mime === 'image/jpeg', '画像をJPEGで保存できる');
@@ -76,13 +96,17 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   ok(pr.done && pr.media.kind === 'video', '完了した動画を保存できる');
   err = null; try { await ai.pollVideo({ userId: uid, operation: '../../etc' }); } catch (e) { err = e; }
   ok(err, '不正な処理名は拒否する');
+  err = null; try { await ai.pollVideo({ userId: uid, operation: 'models/veo/../x' }); } catch (e) { err = e; }
+  ok(err, '途中に .. を含む処理名も拒否する');
+  // 状態確認の一時的なエラーでは、ジョブを失敗にしない
+  const auto0 = require('../lib/ai-auto');
+  const jobId = store.AiJobs.create({ userId: uid, kind: 'video', prompt: 'p', operation: 'models/veo/operations/flaky' });
+  await auto0.pollJobs();
+  ok(store.AiJobs.get(jobId, uid).status === 'running', '状態確認が一時的に失敗しても（接続できない等）、ジョブは続ける');
 
   console.log('URLからの取り込み');
   const fm = require('../lib/fetch-media');
-  const im = await fm.importFromUrl({ userId: uid, url: 'https://93.184.216.34/v.mp4' });
-  ok(im.kind === 'video', '公開URLから動画を取り込める');
-  const im2 = await fm.importFromUrl({ userId: uid, url: 'https://93.184.216.34/hop' });
-  ok(im2.kind === 'video', 'リダイレクト先から取り込める');
+  // 取り込みの成功は test/fetch.test.js で、本物の https を使って確かめる。ここでは、リダイレクトでの拒否だけを確かめる
   err = null; try { await fm.importFromUrl({ userId: uid, url: 'https://93.184.216.34/redir' }); } catch (e) { err = e; }
   ok(err instanceof fm.FetchError, 'リダイレクトでローカルのアドレスに向けられても拒否する');
 
@@ -106,12 +130,24 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   const drafts = store.ScheduledPosts.listForUser(uid).filter((p) => p.status === 'draft');
   ok(drafts.length === 1 && drafts[0].text === '今日の一言です', '「下書き」では、AIの文章が下書きに入る（人が確認してから投稿）');
   ok(await auto.tick(Date.now()) === 0, '同じ日に2回は実行しない');
+  const lateRule = auto.createRule({ userId: uid, accountId: rid(th), theme: '遅れて作ったルール', hourJst: 0, mode: 'auto' });
+  ok(await auto.tick(Date.now() + 1) === 0 && store.AutoRules.get(lateRule, uid).last_day === ai.day(), 'その日の時刻を過ぎてから作ったルールは、翌日から実行する（作った直後に投稿しない）');
+  store.AutoRules.remove(lateRule, uid);
   store.AutoRules.remove(draftRule, uid);
 
   const autoRule = store.AutoRules.create({ userId: uid, accountId: rid(ig), theme: '朝の習慣', withImage: true, hourJst: 0, mode: 'auto' });
   await auto.tick(Date.now() + 5);
   const pend = store.ScheduledPosts.listForUser(uid).filter((p) => p.status === 'pending');
   ok(pend.length === 1 && pend[0].category === 'image' && JSON.parse(pend[0].media_ids).length === 1, '「完全自動」では、AIの文章と画像が予約される');
+
+  // 予約の上限に空きがなければ、生成する前に止める（AIの回数と費用を使わない）
+  process.env.SERVICE_MAX_PENDING = '1';
+  const capRule = store.AutoRules.create({ userId: uid, accountId: rid(th), theme: '上限', hourJst: 0, mode: 'auto' });
+  const callsBefore = mock.calls.filter((c) => c.host === 'api.anthropic.com').length;
+  await auto.tick(Date.now() + 7);
+  ok(/未投稿の予約/.test(store.AutoRules.get(capRule, uid).last_error) && mock.calls.filter((c) => c.host === 'api.anthropic.com').length === callsBefore, '予約の上限に空きがなければ、AIを呼ぶ前に止める');
+  delete process.env.SERVICE_MAX_PENDING;
+  store.AutoRules.remove(capRule, uid);
 
   // 失敗しても止まらず、理由を記録する
   store.Subscriptions.upsert(uid, { status: 'canceled' });
@@ -140,6 +176,13 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   const xa2 = store.SnsAccounts.upsert({ userId: u2, platform: 'x', externalUserId: 'x9', handle: '@x', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
   cr = core.createPost({ userId: u2, category: 'text', targets: [{ accountId: rid(xa2), caption: 'again' }], scheduledAtIso: at });
   ok(cr.ok === false || store.ScheduledPosts.countXUnits(u2, ...core.jstMonthBounds(at)) <= 3, '連携をやり直しても、月の上限は数え直しにならない');
+  const xq = store.SnsAccounts.upsert({ userId: u2, platform: 'x', externalUserId: 'x10', handle: '@x2', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  const u2Base = store.ScheduledPosts.countXUnits(u2, ...core.jstMonthBounds(at));
+  const amb = store.ScheduledPosts.create({ userId: u2, accountId: rid(xq), text: 'a', scheduledAt: at, status: 'pending' });
+  store.ScheduledPosts.markFailed(amb, 'X: 503（投稿されたかどうか、SNSでご確認ください）');
+  const plain = store.ScheduledPosts.create({ userId: u2, accountId: rid(xq), text: 'b', scheduledAt: at, status: 'pending' });
+  store.ScheduledPosts.markFailed(plain, 'Xは、本文が必要です。');
+  ok(store.ScheduledPosts.countXUnits(u2, ...core.jstMonthBounds(at)) === u2Base + 1, '投稿されたか分からない「失敗」は月の上限に数え、確実に投稿されていない「失敗」は数えない');
 
   console.log('無料トライアル');
   process.env.STRIPE_SECRET_KEY = 'sk_test'; process.env.STRIPE_PRICE_ID = 'price_t'; process.env.SERVICE_BASE_URL = 'https://example.test';

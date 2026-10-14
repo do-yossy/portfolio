@@ -172,7 +172,7 @@ function checkoutResultPage({ user, kind }) {
     </script>`);
 }
 
-const STATUS_LABEL = { active: ['契約中', 'badge-ok'], trialing: ['契約中（お試し）', 'badge-ok'], past_due: ['お支払いの確認が必要', 'badge-ng'], unpaid: ['お支払いの確認が必要', 'badge-ng'], canceled: ['解約済み', 'badge-off'], incomplete: ['お支払い手続き中', 'badge-warn'], incomplete_expired: ['未完了', 'badge-off'], none: ['未契約', 'badge-off'] };
+const STATUS_LABEL = { test: ['テスト利用中（運営者が付与・料金なし）', 'badge-ok'], active: ['契約中', 'badge-ok'], trialing: ['契約中（お試し）', 'badge-ok'], past_due: ['お支払いの確認が必要', 'badge-ng'], unpaid: ['お支払いの確認が必要', 'badge-ng'], canceled: ['解約済み', 'badge-off'], incomplete: ['お支払い手続き中', 'badge-warn'], incomplete_expired: ['未完了', 'badge-off'], none: ['未契約', 'badge-off'] };
 const POST_STATUS = { draft: ['下書き', 'badge-off'], pending: ['予約中', 'badge-warn'], publishing: ['投稿中', 'badge-warn'], posted: ['投稿済み', 'badge-ok'], failed: ['失敗', 'badge-ng'], cancelled: ['取り消し', 'badge-off'] };
 const toLocalInput = (ms) => {
   const d = new Date(ms + 9 * 3600 * 1000);
@@ -181,7 +181,7 @@ const toLocalInput = (ms) => {
 
 // ── マイページ ──
 function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], mcpConnections = [], newKey = '', aiAvail = {}, autoRules = [] }) {
-  const active = !!sub && ['active', 'trialing'].includes(sub.status);
+  const active = !!sub && ['active', 'trialing', 'test'].includes(sub.status);
   const [stLabel, stClass] = STATUS_LABEL[(sub && sub.status) || 'none'] || STATUS_LABEL.none;
   const accHtml = accounts.length ? accounts.map((a) => {
     const ad = registry.get(a.platform);
@@ -282,7 +282,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <td><span class="${c}">${l}</span>${p.status === 'pending' ? `<br><form class="inline" method="POST" action="/service/app/post/${escapeHtml(p.id)}/cancel"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">取り消し</button></form>` : ''}</td></tr>`;
   }).join('') : '<tr><td colspan="4" class="small">予約はまだありません。</td></tr>';
   const renewal = sub && sub.current_period_end ? core.formatJst(sub.current_period_end) : '';
-  const billing = sub && sub.stripe_subscription_id ? `
+  const billing = sub && sub.status === 'test' ? `<div class="card"><div class="card-title">ご利用の状態</div><p class="small">状態：<span class="${stClass}">${stLabel}</span><br>運営者が動作確認のために付与したテスト利用です。料金はかかりません。運営者が取り消すと、SNSの連携とAIアシスタントとの接続は解除されます。</p></div>` : sub && sub.stripe_subscription_id ? `
     <div class="card"><div class="card-title">ご契約・お支払い</div>
       <p class="small">状態：<span class="${stClass}">${stLabel}</span>
       ${renewal ? `<br>${sub.cancel_at_period_end ? `解約手続き済み。<b>${escapeHtml(renewal)}</b> までご利用いただけます（以降は更新されません）。` : `次回の更新日：<b>${escapeHtml(renewal)}</b>（${yen(core.priceYen())}）`}` : ''}</p>
@@ -387,7 +387,10 @@ function composePage({ user, accounts, csrf, aiAvail = {} }) {
         <label class="check"><input type="checkbox" id="ttPaid"><span>第三者の商品・ブランドの宣伝（提携・有償）を含む（公開範囲を「自分のみ」にできません）</span></label>
         <p class="small">投稿することで、<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">TikTokの音楽使用の確認</a>${''}に同意したものとみなされます。提携（有償）の宣伝を含む場合は、<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">ブランドコンテンツのポリシー</a>にも同意したものとみなされます。</p></div>
       <div class="field" id="ytField" style="display:none"><label class="lbl" for="ytPrivacy">YouTubeの公開設定</label>
-        <select id="ytPrivacy"><option value="public">公開</option><option value="unlisted">限定公開</option><option value="private">非公開</option></select></div>
+        <select id="ytPrivacy"><option value="public">公開</option><option value="unlisted">限定公開</option><option value="private">非公開</option></select>
+        <label class="lbl" for="ytKids">子ども向けの動画ですか（YouTubeで申告が必要です）</label>
+        <select id="ytKids"><option value="">選択してください</option><option value="no">いいえ、子ども向けではない</option><option value="yes">はい、子ども向け</option></select>
+        <p class="small">本文の1行目がタイトル（100文字まで）になり、ショートとして扱われるよう「#Shorts」を自動で付けます。動画は3分以内にしてください。YouTubeの監査が終わるまでは、公開を選んでも「非公開」に制限される場合があります。</p></div>
       <div class="field"><span class="lbl">いつ投稿するか</span>
         <label class="check"><input type="radio" name="when" value="schedule" checked><span>日時を指定して予約</span></label>
         <input id="at" type="datetime-local" value="${defaultAt}" style="max-width:260px">
@@ -438,7 +441,8 @@ function composePage({ user, accounts, csrf, aiAvail = {} }) {
         if($('perTarget').checked){body.captions={};document.querySelectorAll('#perBox textarea').forEach(function(t){body.captions[t.dataset.acc]=t.value;});}
         if(c==='tree')body.tree=cards.map(function(x){return {text:x.text,media_ids:(x.media||[]).map(function(m){return m.id;})};});
         s.forEach(function(a){if(a.platform==='tiktok')body.options[a.id]={privacy_level:$('ttPrivacy').value,disable_comment:!$('ttComment').checked,disable_duet:!$('ttDuet').checked,disable_stitch:!$('ttStitch').checked,commercial_own:$('ttOwn').checked,commercial_paid:$('ttPaid').checked};
-          if(a.platform==='youtube')body.options[a.id]={privacy:$('ytPrivacy').value};});
+          if(a.platform==='youtube')body.options[a.id]={privacy:$('ytPrivacy').value,made_for_kids:$('ytKids').value==='yes'};});
+        if(s.some(function(a){return a.platform==='youtube';})&&!$('ytKids').value)return show(false,'YouTubeの「子ども向けかどうか」を選んでください。');
         if(when==='now'){if(!confirm('今すぐ投稿します。よろしいですか？'))return;body.now=true;}else if(when==='draft'){body.draft=true;}else{if(!$('at').value)return show(false,'日時を指定してください。');body.scheduled_at=$('at').value+':00+09:00';}
         $('submitBtn').disabled=true;fetch('/service/app/posts',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF':csrf},body:JSON.stringify(body)})
           .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});}).then(function(x){$('submitBtn').disabled=false;if(!x.ok)return show(false,x.j.error||'保存できませんでした。');
@@ -510,15 +514,46 @@ function legalPage(title, html, user) {
   return wrap(title, `${topNav(user)}<div class="legal-doc">${html}</div><p class="small"><a href="/service">サービス紹介に戻る</a></p>`);
 }
 
-function adminServicePage({ subs, stats, postStats }) {
+// 運営用：設定の確認（値は表示せず、設定されているかだけを示す）
+function settingsChecklist(env = process.env) {
+  const has = (...ks) => ks.every((k) => !!env[k]);
+  const base = String(env.SERVICE_BASE_URL || '');
+  return [
+    ['サービスのURL（SERVICE_BASE_URL）', /^https:\/\//.test(base), base ? `設定値：${base}` : '例：https://sq-ai-bijika.fly.dev。SNS連携・画像の投稿・AIアシスタントとの接続に必要'],
+    ['トークンの暗号化の鍵（SNS_TOKEN_KEY）', has('SNS_TOKEN_KEY'), 'SNS連携に必要。一度決めたら変えない'],
+    ['画面の操作の確認用の鍵（APP_SECRET）', has('APP_SECRET'), '未設定だと再起動のたびに、開いていた画面の操作が失敗する'],
+    ['Threads（THREADS_APP_ID・THREADS_APP_SECRET）', has('THREADS_APP_ID', 'THREADS_APP_SECRET'), ''],
+    ['X（X_CLIENT_ID・X_CLIENT_SECRET）', has('X_CLIENT_ID', 'X_CLIENT_SECRET'), ''],
+    ['Instagram（INSTAGRAM_APP_ID・INSTAGRAM_APP_SECRET）', has('INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET'), ''],
+    ['TikTok（TIKTOK_CLIENT_KEY・TIKTOK_CLIENT_SECRET）', has('TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'), ''],
+    ['Facebook（FACEBOOK_APP_ID・FACEBOOK_APP_SECRET）', has('FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET'), ''],
+    ['YouTube（GOOGLE_CLIENT_ID・GOOGLE_CLIENT_SECRET）', has('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'), ''],
+    ['AIの文章（ANTHROPIC_API_KEY）', has('ANTHROPIC_API_KEY'), '任意'],
+    ['AIの画像（OPENAI_API_KEY）', has('OPENAI_API_KEY'), '任意'],
+    ['AIの動画（GEMINI_API_KEY）', has('GEMINI_API_KEY'), '任意・費用が高くなりやすい'],
+    ['Stripe（STRIPE_SECRET_KEY・STRIPE_WEBHOOK_SECRET・STRIPE_PRICE_ID）', has('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID'), '販売に必要（テスト利用だけなら不要）'],
+    ['問い合わせ先（SERVICE_CONTACT_EMAIL）', has('SERVICE_CONTACT_EMAIL'), '販売に必要'],
+    ['販売の開始（SERVICE_OPEN=true）', env.SERVICE_OPEN === 'true', '審査とテストが済んでから設定する'],
+  ];
+}
+
+function adminServicePage({ subs, stats, postStats, message }) {
   const rows = subs.map((s) => `<tr><td>${escapeHtml(s.email || '')}</td><td>${escapeHtml(s.status)}</td><td>${escapeHtml(s.current_period_end || '')}</td><td>${s.cancel_at_period_end ? '解約予定' : ''}</td><td>${escapeHtml(s.created_at)}</td></tr>`).join('');
+  const checks = settingsChecklist().map(([name, ok, note]) => `<tr><td>${ok ? '✅' : '—'}</td><td>${escapeHtml(name)}</td><td>${escapeHtml(note)}</td></tr>`).join('');
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>月額サービス（運営）</title>
-<style>body{font-family:sans-serif;max-width:920px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:14px}</style></head><body>
-<h1>月額SNS自動投稿サービス（運営用）</h1><p><a href="/admin/inquiries">お問い合わせ</a> ／ <a href="/admin/licenses">ライセンス</a></p>
+<style>body{font-family:sans-serif;max-width:920px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:14px}.msg{padding:10px;border:1px solid #9c9;background:#efe;margin:10px 0}.err{border-color:#c99;background:#fee}input[type=email]{padding:6px;width:260px;max-width:100%}</style></head><body>
+<h1>月額SNS自動投稿サービス（運営用）</h1><p><a href="/admin/inquiries">お問い合わせ</a> ／ <a href="/admin/licenses">ライセンス</a> ／ <a href="/service">サービスのページ</a></p>
+${message ? `<div class="msg${message.ok ? '' : ' err'}">${escapeHtml(message.text)}</div>` : ''}
+<h2>設定の確認</h2><p>値は表示しません。設定されているかだけを示します。設定は Fly.io のシークレットで行い、設定すると自動で再起動します。</p>
+<table><tr><th></th><th>項目</th><th>メモ</th></tr>${checks}</table>
+<h2>テスト利用（動作確認用・料金なし）</h2>
+<p>決済をせずに、指定したアカウントで全機能を試せるようにします。先に <a href="/service/signup">/service/signup</a> でアカウントを作ってから、そのメールアドレスを入れてください。取り消すと、そのアカウントのSNSの連携・AIアシスタントとの接続・APIキーは解除されます。</p>
+<form method="POST" action="/admin/service/test-grant" style="margin:6px 0"><input type="email" name="email" required placeholder="メールアドレス"> <button type="submit">テスト利用を付与</button></form>
+<form method="POST" action="/admin/service/test-revoke" style="margin:6px 0" onsubmit="return confirm('テスト利用を取り消します。SNSの連携なども解除されます。')"><input type="email" name="email" required placeholder="メールアドレス"> <button type="submit">テスト利用を取り消す</button></form>
 <h2>契約の状況</h2><p>${stats.map((r) => `${escapeHtml(r.status)}: ${r.n}件`).join(' ／ ') || '契約はまだありません'}</p>
 <h2>予約の状況</h2><p>${postStats.map((r) => `${escapeHtml(r.status)}: ${r.n}件`).join(' ／ ') || '予約はまだありません'}</p>
 <h2>契約者一覧</h2><table><tr><th>メール</th><th>状態</th><th>次回更新日(UTC)</th><th>解約</th><th>登録日</th></tr>${rows}</table>
-<p>※ 請求・返金などの詳しい情報は、Stripeのダッシュボードで確認してください。</p></body></html>`;
+<p>※ 請求・返金などの詳しい情報は、Stripeのダッシュボードで確認してください。状態が test のものは、運営者が付与したテスト利用です。</p></body></html>`;
 }
 
 function apiDocsPage(user, baseUrl) {
@@ -544,4 +579,4 @@ function apiDocsPage(user, baseUrl) {
     <p class="small">${b}</p></div>`);
 }
 
-module.exports = { composePage, calendarPage, apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };
+module.exports = { settingsChecklist, composePage, calendarPage, apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };

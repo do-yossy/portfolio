@@ -30,6 +30,9 @@ async function runRule(rule, nowMs) {
   if (!Subscriptions.isActive(rule.user_id)) throw new Error('ご契約が有効ではありません。');
   const acc = SnsAccounts.getForUser(rule.account_id, rule.user_id);
   if (!acc || acc.status !== 'active') throw new Error('SNSの連携をやり直してください。');
+  // 生成の前に、予約・下書きの上限に空きがあるかを確かめる（生成したのに保存できず、AIの回数と費用だけが消えるのを防ぐ）
+  const cap = core.capacityError({ userId: rule.user_id, platform: acc.platform, atIso: new Date(nowMs + 2 * 60 * 1000).toISOString(), draft: rule.mode !== 'auto' });
+  if (cap) throw new Error(cap);
   const text = await ai.generateText({ userId: rule.user_id, theme: rule.theme, tone: rule.tone, platform: acc.platform, nowMs });
   let mediaIds = [];
   if (rule.with_image) {
@@ -44,6 +47,13 @@ async function runRule(rule, nowMs) {
   });
   if (!r.ok) throw new Error(r.error);
   return r;
+}
+
+// ルールの作成。その日の実行時刻を過ぎてから作った場合は、翌日から実行する（作った直後に投稿されないように）
+function createRule(args, nowMs = Date.now()) {
+  const id = AutoRules.create(args);
+  if (args.hourJst <= jstHour(nowMs)) AutoRules.claim(id, ai.day(nowMs));
+  return id;
 }
 
 let running = false;
@@ -71,7 +81,10 @@ async function pollJobs() {
     try {
       const r = await ai.pollVideo({ userId: job.user_id, operation: job.operation });
       if (r.done) AiJobs.finish(job.id, { mediaId: r.media.id });
-    } catch (e) { AiJobs.finish(job.id, { error: e.message }); }
+    } catch (e) {
+      if (e && e.transient) continue; // 一時的なエラーは、次の確認でやり直す（30分で打ち切り）
+      AiJobs.finish(job.id, { error: e.message });
+    }
   }
 }
 
@@ -83,4 +96,4 @@ function start(intervalMs = 60000) {
 }
 function stop() { if (timer) clearInterval(timer); timer = null; }
 
-module.exports = { validateRule, runRule, tick, pollJobs, start, stop };
+module.exports = { validateRule, createRule, runRule, tick, pollJobs, start, stop };

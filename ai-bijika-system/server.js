@@ -54,6 +54,7 @@ const O = require('./lib/options');
 const serviceRoutes = require('./lib/service-routes');
 const serviceUi = require('./lib/service-ui');
 const serviceStore = require('./lib/service-store');
+const billing = require('./lib/billing');
 const snsScheduler = require('./lib/sns/scheduler');
 const aiAuto = require('./lib/ai-auto');
 const promptSeeds = require('./seeds/prompts');
@@ -1995,9 +1996,21 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ── 月額サービスの契約状況（運営者用・閲覧のみ）──
+    const adminServicePage = (status, message) => sendHtml(res, status, serviceUi.adminServicePage({ subs: serviceStore.Subscriptions.all(), stats: serviceStore.Subscriptions.countByStatus(), postStats: serviceStore.ScheduledPosts.stats(), message }));
     if (pathname === '/admin/service' && method === 'GET') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
-      return sendHtml(res, 200, serviceUi.adminServicePage({ subs: serviceStore.Subscriptions.all(), stats: serviceStore.Subscriptions.countByStatus(), postStats: serviceStore.ScheduledPosts.stats() }));
+      return adminServicePage(200);
+    }
+    // テスト利用の付与・取り消し（動作確認用。Stripeを通さない）
+    if ((pathname === '/admin/service/test-grant' || pathname === '/admin/service/test-revoke') && method === 'POST') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      const { email } = await parseBody(req);
+      const u = Users.findByEmail(String(email || '').trim().toLowerCase());
+      if (!u) return adminServicePage(400, { ok: false, text: 'そのメールアドレスのアカウントが見つかりません。先に /service/signup でアカウントを作ってください。' });
+      const grant = pathname.endsWith('grant');
+      const r = grant ? billing.grantTest(u.id) : billing.revokeTest(u.id);
+      if (!r.ok) return adminServicePage(400, { ok: false, text: r.error });
+      return adminServicePage(200, { ok: true, text: grant ? `${u.email} にテスト利用を付与しました。` : `${u.email} のテスト利用を取り消しました。` });
     }
 
     // ── ライセンス管理（運営者用。購入時のメールアドレスだけを許可し、購入者だけが使えるようにする）──

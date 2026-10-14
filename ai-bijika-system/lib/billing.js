@@ -115,13 +115,33 @@ function applySubscription(sub, hintedUserId, createdSec) {
     price_id: (item && item.price && item.price.id) || '',
     stripe_event_created: createdSec || (known && known.stripe_event_created) || 0,
   });
-  // 契約が終了したら、保存しているSNSの連携情報（トークン）を削除し、未投稿の予約を取り消す
-  if (sub.status === 'canceled' || sub.status === 'incomplete_expired') {
-    for (const a of SnsAccounts.listForUser(userId)) SnsAccounts.remove(a.id, userId);
-    require('./oauth').revokeAll(userId); // AIアシスタントとの接続とAPIキーも無効にする
-    require('./service-store').ApiKeys.revokeAll(userId);
-  }
+  if (sub.status === 'canceled' || sub.status === 'incomplete_expired') endAccess(userId);
   return saved;
+}
+
+// 利用の終了：保存しているSNSの連携情報（トークン）を削除し、未投稿の予約を取り消し、
+// AIアシスタントとの接続とAPIキーも無効にする
+function endAccess(userId) {
+  for (const a of SnsAccounts.listForUser(userId)) SnsAccounts.remove(a.id, userId);
+  require('./oauth').revokeAll(userId);
+  require('./service-store').ApiKeys.revokeAll(userId);
+}
+
+// 運営者による「テスト利用」の付与・取り消し（動作確認用。Stripeを通さない）
+function grantTest(userId) {
+  const cur = Subscriptions.get(userId);
+  if (cur && cur.stripe_subscription_id && ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(cur.status)) {
+    return { ok: false, error: 'このアカウントには、Stripeの契約があります。テスト利用は付与できません。' };
+  }
+  Subscriptions.upsert(userId, { status: 'test' });
+  return { ok: true };
+}
+function revokeTest(userId) {
+  const cur = Subscriptions.get(userId);
+  if (!cur || cur.status !== 'test') return { ok: false, error: 'このアカウントは、テスト利用中ではありません。' };
+  Subscriptions.upsert(userId, { status: 'none' });
+  endAccess(userId);
+  return { ok: true };
 }
 
 // 同じイベントが再送されても二重に処理しない
@@ -192,5 +212,5 @@ async function setCancelAtPeriodEnd(userId, cancel) {
 
 module.exports = {
   isConfigured, config, createCheckoutSession, createPortalSession, verifyWebhook, handleEvent,
-  setCancelAtPeriodEnd, applySubscription, stripeRequest, syncCheckoutSession,
+  setCancelAtPeriodEnd, applySubscription, stripeRequest, syncCheckoutSession, endAccess, grantTest, revokeTest,
 };

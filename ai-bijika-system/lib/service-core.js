@@ -165,6 +165,16 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
   return { ok: true, ids: created, groupId };
 }
 
+// 1件追加できるか（予約・下書きの上限）。できなければ日本語の理由、できれば null
+function capacityError({ userId, platform, atIso, draft }) {
+  if (draft) return ScheduledPosts.countDrafts(userId) + 1 > MAX_DRAFTS ? `下書きは${MAX_DRAFTS}件までです。` : null;
+  if (ScheduledPosts.countPending(userId) + 1 > LIMITS.maxPending) return `未投稿の予約は${LIMITS.maxPending}件までです。`;
+  const [from, to] = jstDayBounds(atIso);
+  if (ScheduledPosts.countScheduledBetween(userId, from, to) + 1 > LIMITS.maxPerDay) return `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。`;
+  if (platform === 'x') return xQuotaError(userId, atIso, 1);
+  return null;
+}
+
 // 下書きを予約（または即時投稿）にする。日時を過ぎていないか・上限を超えないかを、予約と同じ基準で確認する
 function promoteDraft({ userId, postId, scheduledAtIso, nowMs = Date.now() }) {
   const p = ScheduledPosts.get(postId);
@@ -245,5 +255,5 @@ async function finishConnect({ userId, platform, code, state }) {
 
 module.exports = {
   LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
-  jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
+  jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, capacityError, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

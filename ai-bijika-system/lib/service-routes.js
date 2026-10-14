@@ -308,7 +308,7 @@ async function handle(ctx) {
     const args = { userId: user.id, accountId: String(body.account_id || ''), theme: body.theme, withImage: body.with_image === '1', hourJst: parseInt(body.hour_jst, 10), mode };
     const problem = aiAuto.validateRule(args);
     if (problem) { dashboard(400, { type: 'error', text: problem }); return true; }
-    AutoRules.create({ ...args, theme: String(body.theme).trim(), tone: String(body.tone || '').slice(0, 100) });
+    aiAuto.createRule({ ...args, theme: String(body.theme).trim(), tone: String(body.tone || '').slice(0, 100) });
     redirect(res, '/service/app?f=auto_added');
     return true;
   }
