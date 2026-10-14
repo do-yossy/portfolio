@@ -234,6 +234,7 @@ async function handle({ req, res, method, pathname, url, user }) {
     }
     if (!csrf.verify(session, params.csrf)) { res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<p>操作の有効期限が切れました。もう一度お試しください。</p>'); return true; }
     if (params.decision !== 'allow') { back({ error: 'access_denied' }); return true; }
+    require('./consent').record({ userId: user.id, email: user.email, kind: 'mcp_connect', req, detail: { clientId: client.id, clientName: client.name, redirectHost: (() => { try { return new URL(params.redirect_uri).host; } catch { return ''; } })() } });
     const code = rand('sqc_');
     db.prepare('INSERT INTO oauth_codes (code_hash, client_id, user_id, redirect_uri, code_challenge, expires_at) VALUES (?,?,?,?,?,?)')
       .run(hash(code), client.id, user.id, params.redirect_uri, params.code_challenge, new Date(Date.now() + CODE_TTL * 1000).toISOString());

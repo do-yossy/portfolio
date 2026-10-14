@@ -22,7 +22,7 @@ const TOOLS = [
       category: { type: 'string', enum: ['text', 'image', 'video', 'tree'] }, text: { type: 'string' },
       account_ids: { type: 'array', items: { type: 'string' } }, captions: { type: 'object', description: 'アカウントIDごとの本文（任意）' },
       media_ids: { type: 'array', items: { type: 'string' } }, tree: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, media_ids: { type: 'array', items: { type: 'string' } } } } },
-      options: { type: 'object', description: 'アカウントIDごとの設定。TikTokは {"privacy_level": 利用者が選んだ公開範囲, "disable_comment", "disable_duet", "disable_stitch", "commercial_own", "commercial_paid"}（公開範囲は必ず利用者に選んでもらう）。YouTubeは {"privacy": "public"|"unlisted"|"private", "made_for_kids": true|false}（省略時は非公開・子ども向けではない）' },
+      options: { type: 'object', description: 'アカウントIDごとの設定。TikTokは {"privacy_level": 利用者が選んだ公開範囲, "disable_comment", "disable_duet", "disable_stitch"（true で禁止）, "commercial_own", "commercial_paid", "auto_add_music"（写真の投稿に音楽を自動で付けるか。初期値は付けない）}（公開範囲は必ず利用者に選んでもらう）。YouTubeは {"privacy": "public"|"unlisted"|"private", "made_for_kids": true|false}（必ず利用者に確認して指定する。省略すると非公開・子ども向けではない）' },
       scheduled_at: { type: 'string' }, now: { type: 'boolean' }, draft: { type: 'boolean' } } } },
   { name: 'list_posts', description: '投稿の一覧（status で絞り込み：draft／pending／posted／failed／cancelled）', inputSchema: { type: 'object', properties: { status: { type: 'string' } } } },
   { name: 'publish_draft', description: '下書きを予約または即時投稿にする', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, now: { type: 'boolean' }, scheduled_at: { type: 'string' } } } },

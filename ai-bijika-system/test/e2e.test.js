@@ -171,6 +171,14 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(!!userIdForSub, 'StripeにユーザーIDを渡している');
   const afterAgree = store.Subscriptions.get(userIdForSub);
   ok(afterAgree.agreed_at && afterAgree.agreed_version, '同意した日時と規約の版を記録する');
+  const consentLib = require('../lib/consent');
+  const cl = consentLib.forUser(userIdForSub);
+  const cDocs = cl.length ? JSON.parse(cl[0].docs) : {};
+  ok(cl.length === 1 && cl[0].kind === 'checkout' && cl[0].terms_version && cl[0].ip && Object.keys(cDocs).length === 3, '申込みの同意を、規約の版・3つの文書の控え・IPアドレスつきで記録する');
+  const snap = consentLib.getSnapshot(Object.values(cDocs)[0]);
+  ok(snap && snap.text.includes('第1条') === Object.keys(cDocs)[0].includes('利用規約') && consentLib.sha256(snap.text) === Object.values(cDocs)[0], '同意した時点の文書の本文を控えとして残し、ハッシュで照合できる');
+  ok(JSON.parse(cl[0].detail).price === 1000, '同意したときの料金も記録する');
+  ok(typeof consentLib.update === 'undefined' && typeof consentLib.remove === 'undefined', '同意の記録は追記だけで、変更・削除の機能を持たない');
   ok(!store.Subscriptions.isActive(userIdForSub), '決済が完了するまでは契約中にならない');
   r = await req('GET', '/service/api/status');
   ok(JSON.parse(r.text).active === false, '決済前の状態確認はfalse');
@@ -552,6 +560,12 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('GET', '/admin/service');
   ok(r.status === 200 && r.text.includes('e2e@example.com') && r.text.includes('契約者一覧'), '運営者は契約状況を確認できる');
   ok(r.text.includes('設定の確認') && r.text.includes('SNS_TOKEN_KEY') && !r.text.includes(process.env.SNS_TOKEN_KEY) && !r.text.includes('sk_test_x'), '設定の確認は、値を出さずに設定の有無だけを示す');
+  ok(r.text.includes('同意の記録') && r.text.includes('e2e@example.com') && r.text.includes('申込み'), '運営者画面で同意の記録を見られる');
+  r = await req('GET', '/admin/service/consents.csv');
+  ok(r.status === 200 && r.headers['content-type'].includes('text/csv') && r.text.includes('e2e@example.com') && r.text.includes('利用規約'), '同意の記録をCSVでダウンロードできる');
+  const hashForAdmin = Object.values(JSON.parse(require('../lib/consent').list({ limit: 1000 }).find((x) => x.kind === 'checkout') ? JSON.stringify(require('../lib/consent').list({ limit: 1000 }).find((x) => x.kind === 'checkout').docs) : '{}'))[0];
+  r = await req('GET', `/admin/service/legal-snapshot/${hashForAdmin}`);
+  ok(r.status === 200 && r.text.includes('控え'), '同意した時点の文書の控えを、運営者画面から開ける');
 
   console.log('テスト利用（運営者が付与・決済なし）');
   const adminCookie = cookie;
@@ -589,6 +603,8 @@ function webhook(event, secret = 'whsec_e2e') {
   cookie = '';
   r = await req('POST', '/admin/service/test-grant', { body: { email: 'tester@example.com' } });
   ok(r.status === 302 && !store.Subscriptions.isActive(testerId), '運営者でなければ付与できない');
+  r = await req('GET', '/admin/service/consents.csv');
+  ok(r.status === 302, '同意の記録のCSVは、運営者でなければ取得できない');
   // 解約済みの元の契約者に付けて、取り消したあとも、また申し込めること
   cookie = '';
   r = await req('POST', '/service/signup', { body: { email: 'ex@example.com', password: 'expassword1' } });
@@ -629,6 +645,8 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 200, 'お問い合わせは出す');
   r = await api('GET', '/api/v1/accounts', '');
   ok(r.status === 401, 'APIは使える（認証が必要）');
+  r = await api('POST', '/api/tools/jikoshoukai', '', { mode: 'mlm' });
+  ok(r.status === 404, 'ミチシルベ本体のAPI（/api/tools/…）は、専用アプリでは使えない');
   r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
   ok(r.status === 302 && r.headers.location === '/admin/service', '運営者のログイン後は、サービスの運営者画面へ移動する');
   const savedPw = process.env.ADMIN_PASSWORD;
@@ -642,13 +660,16 @@ function webhook(event, secret = 'whsec_e2e') {
   console.log('サービスを専用アプリへ移した場合（SERVICE_MOVED_TO）');
   process.env.SERVICE_MOVED_TO = 'https://michishirube-post.fly.dev/';
   r = await req('GET', '/service/legal/terms?x=1');
-  ok(r.status === 302 && r.headers.location === 'https://michishirube-post.fly.dev/service/legal/terms?x=1', 'ミチシルベ側の /service は、移転先の同じページへ転送する');
+  ok(r.status === 200, 'こちらにまだ契約者・自動運用・未投稿の予約がある間は、転送しない（マイページ・解約に行けなくならないように）');
+  process.env.SERVICE_MOVED_FORCE = 'true';
+  r = await req('GET', '/service/legal/terms?x=1');
+  ok(r.status === 302 && r.headers.location === 'https://michishirube-post.fly.dev/service/legal/terms?x=1', '運営者が移行を済ませて SERVICE_MOVED_FORCE=true にすると、移転先の同じページへ転送する');
   r = await req('GET', '/');
   ok(r.status === 200, 'ミチシルベ本体の画面はそのまま');
   process.env.SERVICE_MOVED_TO = 'http://insecure.example';
   r = await req('GET', '/service');
   ok(r.status === 200, 'https でない転送先は使わない');
-  delete process.env.SERVICE_MOVED_TO;
+  delete process.env.SERVICE_MOVED_TO; delete process.env.SERVICE_MOVED_FORCE;
 
   console.log('運営者画面のログインの回数制限');
   cookie = '';

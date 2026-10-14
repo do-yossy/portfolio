@@ -307,7 +307,8 @@ function usageCard(userId) {
 const MEDIA_LABEL = { none: '文章だけ', image: '文章＋画像', video: '文章＋動画' };
 function autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail }) {
   const aiAuto = require('./ai-auto');
-  const targets = activeAccounts.filter((a) => a.platform !== 'tiktok');
+  // TikTokは対象外。YouTubeは動画が必要なため、動画の生成を提供していない間は対象外
+  const targets = activeAccounts.filter((a) => a.platform !== 'tiktok' && (a.platform !== 'youtube' || aiAvail.video));
   const hourOpts = (sel, blank) => `${blank ? '<option value="">なし</option>' : ''}${Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === sel ? 'selected' : ''}>${h}時</option>`).join('')}`;
   const list = autoRules.map((r) => {
     const acc = accounts.find((a) => a.id === r.account_id);
@@ -323,7 +324,7 @@ function autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail }) {
       <div class="field"><label class="lbl">テーマ（AIへの指示。1行に1つ書くと、回ごとに順番に使います）</label><textarea name="theme" maxlength="2000" required placeholder="例：&#10;30代の働く人向けに、朝の時間の使い方のコツ&#10;経験を商品にするときの最初の一歩&#10;発信を続けるための小さな工夫"></textarea></div>
       <div class="field"><label class="lbl">口調（任意）</label><input type="text" name="tone" maxlength="100" placeholder="例：やさしく丁寧"></div>
       <div class="field"><span class="lbl">作るもの</span><select name="media" id="autoMedia"><option value="none">文章だけ</option>${aiAvail.image ? '<option value="image">文章＋画像</option>' : ''}${aiAvail.video ? '<option value="video">文章＋動画（できるまで数分かかります）</option>' : ''}</select>
-        <div class="small">Instagramは画像か動画、YouTubeは動画が必要です。</div></div>
+        <div class="small">${aiAvail.video ? 'Instagramは画像か動画、YouTubeは動画が必要です。' : 'Instagramは画像が必要です（「文章＋画像」を選んでください）。'}</div></div>
       <div class="field"><span class="lbl">投稿する時刻（日本時間・1日に3回まで）</span><div class="btn-row"><select name="hour1">${hourOpts(9, false)}</select><select name="hour2">${hourOpts(-1, true)}</select><select name="hour3">${hourOpts(-1, true)}</select></div>
         <div class="small">毎日、選んだ時刻を過ぎたあとに1回ずつ作ります。今日の時刻をすでに過ぎている回は、次の時刻から始めます。</div></div>
       <div class="field" id="autoYt" style="display:none"><span class="lbl">YouTubeの設定</span>
@@ -333,9 +334,9 @@ function autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail }) {
       <label class="check"><input type="checkbox" name="confirm_auto" value="1"><span>「そのまま投稿する」を選ぶ場合：AIが作った内容を確認せずに投稿されること、その内容の責任を自分で負うことを理解しました</span></label>
       <div class="btn-row" style="margin-top:8px"><button class="btn btn-primary" type="submit">ルールを追加</button></div></form>
       <script>(function(){var a=document.getElementById('autoAcc'),y=document.getElementById('autoYt');function f(){var o=a.options[a.selectedIndex];y.style.display=o&&o.dataset.platform==='youtube'?'block':'none';}a.addEventListener('change',f);f();})();</script>`
-    : '<p class="small">自動運用に使えるSNS（Threads・X・Instagram・Facebook・YouTube）を先に連携してください。</p>';
+    : `<p class="small">自動運用に使えるSNS（Threads・X・Instagram・Facebook${aiAvail.video ? '・YouTube' : ''}）を先に連携してください。</p>`;
   return `<div class="card" id="autorules"><div class="card-title">AIで自動運用する</div>
-      <p class="small">決めた時刻に、AIが投稿文と、必要なら画像・動画を作ります。「下書きに入れる」では、あなたが確認して投稿します。「そのまま投稿する」では、AIが作った内容を確認せずに投稿します。TikTokは、投稿ごとにご本人の確認が必要なため対象外です（「投稿を作る」画面でAIを使って作れます）。AIの回数の上限には、自動運用で作る分も含みます。</p>
+      <p class="small">決めた時刻に、AIが投稿文と、必要なら${aiAvail.video ? '画像・動画' : '画像'}を作ります。「下書きに入れる」では、あなたが確認して投稿します。「そのまま投稿する」では、AIが作った内容を確認せずに投稿します。TikTokは、投稿ごとにご本人の確認が必要なため対象外です${aiAvail.video ? '' : '。YouTubeは動画が必要なため、対象外です'}（どちらも「投稿を作る」画面で作って投稿できます）。AIの回数の上限には、自動運用で作る分も含みます。</p>
       ${list}${form}</div>`;
 }
 
@@ -472,7 +473,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <div class="btn-row"><a class="btn btn-primary" href="/service/app/compose">投稿を作る</a><a class="btn" href="/service/app/calendar">カレンダー・下書き</a></div></div>` : ''}
     ${compose}
     ${active && aiAvail.text ? autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail }) : ''}
-    ${active && !aiAvail.text ? '<div class="card"><div class="card-title">AIで投稿を作る</div><p class="small">「投稿を作る」画面の「ご自身のAIで作る」から、ChatGPT・Claude・Gemini を、投稿先の条件を入れた指示文つきで開けます。できた文章や画像を貼り付けて、予約・投稿してください。AIアシスタント（MCP対応）から、このツールを操作して投稿することもできます（下の「AIアシスタントとの接続」）。</p><div class="btn-row"><a class="btn btn-sm btn-primary" href="/service/app/compose">投稿を作る</a></div></div>' : ''}
+    ${active && !aiAvail.text ? '<div class="card"><div class="card-title">AIで投稿を作る</div><p class="small">「投稿を作る」画面の「ご自身のAIで作る」から、投稿先の条件を入れた指示文をコピーして、ChatGPT・Claude・Gemini を開けます（自動で入力されない場合は、貼り付けて送信します）。できた文章や画像を貼り付けて、予約・投稿してください。AIアシスタント（MCP対応）から、このツールを操作して投稿することもできます（下の「AIアシスタントとの接続」）。</p><div class="btn-row"><a class="btn btn-sm btn-primary" href="/service/app/compose">投稿を作る</a></div></div>' : ''}
     ${active ? `<div class="card" id="apikeys"><div class="card-title">APIキー（外部のツール・AIから投稿するとき）</div>
       ${newKey ? `<div class="notice"><div>新しいAPIキーです。<b>この画面を閉じると二度と表示されません</b>。安全な場所に保存してください。<br><code style="word-break:break-all">${escapeHtml(newKey)}</code></div></div>` : ''}
       ${apiKeys.length ? apiKeys.map((k) => `<div class="acct-row"><span><b>${escapeHtml(k.label || '(名前なし)')}</b> <code>${escapeHtml(k.prefix)}…</code> <span class="small">${k.last_used_at ? `最終利用 ${escapeHtml(k.last_used_at.slice(0, 10))}` : '未使用'}</span></span>
@@ -725,7 +726,7 @@ function settingsChecklist(env = process.env) {
     ['YouTube（GOOGLE_CLIENT_ID・GOOGLE_CLIENT_SECRET）', has('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'), ''],
     ['AIの文章（ANTHROPIC_API_KEY）', has('ANTHROPIC_API_KEY'), '任意'],
     ['AIの画像（OPENAI_API_KEY）', has('OPENAI_API_KEY'), '任意'],
-    ['AIの動画（GEMINI_API_KEY）', has('GEMINI_API_KEY'), '任意・費用が高くなりやすい'],
+    ['AIの動画（GEMINI_API_KEY・AI_DAILY_VIDEO）', aiLib().available().video, '当面は提供しない（設定しない）。提供するときは規約・プライバシーポリシーの改定が必要'],
     ['Stripe（STRIPE_SECRET_KEY・STRIPE_WEBHOOK_SECRET・STRIPE_PRICE_ID）', has('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID'), '販売に必要（テスト利用だけなら不要）'],
     ['問い合わせ先（SERVICE_CONTACT_EMAIL）', has('SERVICE_CONTACT_EMAIL'), '販売に必要'],
     ['代表者の氏名（SERVICE_REPRESENTATIVE）', has('SERVICE_REPRESENTATIVE'), 'プライバシーポリシーの事業者情報に表示する（販売前に設定）'],
@@ -734,12 +735,12 @@ function settingsChecklist(env = process.env) {
   ];
 }
 
-function adminServicePage({ subs, stats, postStats, message }) {
+function adminServicePage({ subs, stats, postStats, message, consents = [], consentEmail = '' }) {
   const rows = subs.map((s) => `<tr><td>${escapeHtml(s.email || '')}</td><td>${escapeHtml(s.status)}</td><td>${escapeHtml(s.current_period_end || '')}</td><td>${s.cancel_at_period_end ? '解約予定' : ''}</td><td>${escapeHtml(s.created_at)}</td></tr>`).join('');
   const checks = settingsChecklist().map(([name, ok, note]) => `<tr><td>${ok ? '✅' : '—'}</td><td>${escapeHtml(name)}</td><td>${escapeHtml(note)}</td></tr>`).join('');
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>月額サービス（運営）</title>
 <style>body{font-family:sans-serif;max-width:920px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:14px}.msg{padding:10px;border:1px solid #9c9;background:#efe;margin:10px 0}.err{border-color:#c99;background:#fee}input[type=email]{padding:6px;width:260px;max-width:100%}</style></head><body>
-<h1>月額SNS自動投稿サービス（運営用）</h1><p><a href="/admin/inquiries">お問い合わせ</a> ／ <a href="/admin/licenses">ライセンス</a> ／ <a href="/service">サービスのページ</a></p>
+<h1>月額SNS自動投稿サービス（運営用）</h1><p><a href="/admin/inquiries">お問い合わせ</a>${process.env.SERVICE_ONLY === 'true' ? '' : ' ／ <a href="/admin/licenses">ライセンス</a>'} ／ <a href="/service">サービスのページ</a></p>
 ${message ? `<div class="msg${message.ok ? '' : ' err'}">${escapeHtml(message.text)}</div>` : ''}
 <h2>設定の確認</h2><p>値は表示しません。設定されているかだけを示します。設定は Fly.io のシークレットで行い、設定すると自動で再起動します。</p>
 <table><tr><th></th><th>項目</th><th>メモ</th></tr>${checks}</table>
@@ -747,6 +748,12 @@ ${message ? `<div class="msg${message.ok ? '' : ' err'}">${escapeHtml(message.te
 <p>決済をせずに、指定したアカウントで全機能を試せるようにします。先に <a href="/service/signup">/service/signup</a> でアカウントを作ってから、そのメールアドレスを入れてください。取り消すと、そのアカウントのSNSの連携・AIアシスタントとの接続・APIキーは解除されます。</p>
 <form method="POST" action="/admin/service/test-grant" style="margin:6px 0"><input type="email" name="email" required placeholder="メールアドレス"> <button type="submit">テスト利用を付与</button></form>
 <form method="POST" action="/admin/service/test-revoke" style="margin:6px 0" onsubmit="return confirm('テスト利用を取り消します。SNSの連携なども解除されます。')"><input type="email" name="email" required placeholder="メールアドレス"> <button type="submit">テスト利用を取り消す</button></form>
+<h2>同意の記録</h2>
+<p>申込み時の規約等への同意、自動運用の「そのまま投稿する」への同意、AIアシスタントとの接続の許可を、追記だけで記録しています（変更・削除はできません）。同意した時点の文書の本文の控えも保存しています。</p>
+<form method="GET" action="/admin/service" style="margin:6px 0"><input type="email" name="consent_email" value="${escapeHtml(consentEmail)}" placeholder="メールアドレスで絞り込む"> <button type="submit">絞り込む</button> <a href="/admin/service/consents.csv${consentEmail ? `?email=${encodeURIComponent(consentEmail)}` : ''}">CSVでダウンロード</a></form>
+<table><tr><th>日時(UTC)</th><th>メール</th><th>種類</th><th>規約の版・控え</th><th>内容</th><th>IP</th></tr>${consents.map((c) => `<tr><td>${escapeHtml(c.created_at)}</td><td>${escapeHtml(c.email)}</td><td>${escapeHtml(({ checkout: '申込み', auto_full: '完全自動', mcp_connect: 'AIアシスタント接続' })[c.kind] || c.kind)}</td>
+  <td>${escapeHtml(c.terms_version)}${Object.entries(c.docs).map(([f, h]) => `<br><a href="/admin/service/legal-snapshot/${escapeHtml(h)}">${escapeHtml(f.replace(/^サービス|_案\.md$/g, ''))}</a>`).join('')}</td>
+  <td><code style="font-size:12px">${escapeHtml(JSON.stringify(c.detail))}</code></td><td>${escapeHtml(c.ip)}</td></tr>`).join('') || '<tr><td colspan="6">記録はまだありません</td></tr>'}</table>
 <h2>契約の状況</h2><p>${stats.map((r) => `${escapeHtml(r.status)}: ${r.n}件`).join(' ／ ') || '契約はまだありません'}</p>
 <h2>予約の状況</h2><p>${postStats.map((r) => `${escapeHtml(r.status)}: ${r.n}件`).join(' ／ ') || '予約はまだありません'}</p>
 <h2>契約者一覧</h2><table><tr><th>メール</th><th>状態</th><th>次回更新日(UTC)</th><th>解約</th><th>登録日</th></tr>${rows}</table>
@@ -773,9 +780,9 @@ function apiDocsPage(user, baseUrl) {
   "scheduled_at": "2026-12-01T09:00:00+09:00"
 }'`)}
     <h3>SNSごとの設定（<code>options</code>）</h3>
-    <p>アカウントIDごとに指定します。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なり、アプリの審査前は「SELF_ONLY（自分のみ）」だけの場合があります）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private。省略時は非公開）と、子ども向けかどうか（<code>made_for_kids</code>：true／false。省略時は子ども向けではない）を指定します。</p>
+    <p>アカウントIDごとに指定します。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なり、アプリの審査前は「SELF_ONLY（自分のみ）」だけの場合があります）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（省略すると、非公開・子ども向けではない、として扱います）。</p>
     ${code(`"options": {
-  "<TikTokのアカウントID>": { "privacy_level": "<利用者が選んだ公開範囲>", "disable_comment": false, "disable_duet": true, "disable_stitch": true, "commercial_own": false, "commercial_paid": false },
+  "<TikTokのアカウントID>": { "privacy_level": "<利用者が選んだ公開範囲>", "disable_comment": false, "disable_duet": true, "disable_stitch": true, "commercial_own": false, "commercial_paid": false, "auto_add_music": false },
   "<YouTubeのアカウントID>": { "privacy": "unlisted", "made_for_kids": false }
 }`)}
     <h2>AIアシスタントから使う</h2>

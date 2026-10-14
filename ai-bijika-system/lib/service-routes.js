@@ -17,6 +17,7 @@ const registry = require('./sns');
 const apiV1 = require('./api-v1');
 const mcp = require('./mcp');
 const oauth = require('./oauth');
+const consent = require('./consent');
 const ai = require('./ai');
 const aiAuto = require('./ai-auto');
 
@@ -127,16 +128,7 @@ async function handle(ctx) {
   if (legalMatch && method === 'GET') {
     const [title, file] = LEGAL_DOCS[legalMatch[1]];
     let html = '<p>準備中です。</p>';
-    try {
-      let text = fs.readFileSync(path.join(core.legalDir(), file), 'utf8');
-      // 販売を開始したら（運営者が内容を確認し、SERVICE_OPEN を設定した後）、草案である旨の表示を外す
-      if (salesOpen) text = text.replace(/^※ これは運営者による草案です.*$/m, '').replace(/（案）/g, '');
-      html = md.render(text);
-      html = html.split('【サービス名】').join(core.serviceName().replace(/&/g, '&amp;').replace(/</g, '&lt;'));
-      if (contactEmail) html = html.split('【メールアドレス】').join(contactEmail.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
-      const rep = String(process.env.SERVICE_REPRESENTATIVE || '').trim();
-      if (rep) html = html.split('【代表者の氏名】').join(rep.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
-    } catch { /* 準備中 */ }
+    try { html = md.render(core.legalMarkdown(file)); } catch { /* 準備中 */ }
     sendHtml(res, 200, ui.legalPage(title, html, user));
     return true;
   }
@@ -237,6 +229,11 @@ async function handle(ctx) {
     try {
       const cur = Subscriptions.get(user.id);
       Subscriptions.upsert(user.id, { agreed_at: new Date().toISOString(), agreed_version: core.TERMS_VERSION });
+      // 同意の記録（証拠）：その時点で示した法務文書の本文の控えと、最終確認画面の条件
+      const docs = {};
+      for (const f of core.LEGAL_FILES) { try { docs[f] = core.legalMarkdown(f); } catch { /* 文書が無い場合は控えなし */ } }
+      consent.record({ userId: user.id, email: user.email, kind: 'checkout', termsVersion: core.TERMS_VERSION, docs, req,
+        detail: { price: core.priceYen(), trialDays: core.trialFor(user.id), limits: { accounts: core.LIMITS.maxAccounts, pending: core.LIMITS.maxPending, perDay: core.LIMITS.maxPerDay, xPerMonth: core.LIMITS.xPerMonth } } });
       const checkoutUrl = await billing.createCheckoutSession({ userId: user.id, email: user.email, customerId: cur && cur.stripe_customer_id, trialDays: core.trialFor(user.id) });
       redirect(res, checkoutUrl, {}, 303);
     } catch (e) {
@@ -332,7 +329,8 @@ async function handle(ctx) {
     if (args.mode === 'auto' && body.confirm_auto !== '1') { dashboard(400, { type: 'error', text: '「そのまま投稿する」を選ぶ場合は、確認のチェックが必要です。' }); return true; }
     const problem = aiAuto.validateRule(args);
     if (problem) { dashboard(400, { type: 'error', text: problem }); return true; }
-    aiAuto.createRule(args);
+    const ruleId = aiAuto.createRule(args);
+    if (args.mode === 'auto') consent.record({ userId: user.id, email: user.email, kind: 'auto_full', termsVersion: core.TERMS_VERSION, req, detail: { ruleId, accountId: args.accountId, via: '画面' } });
     redirect(res, '/service/app?f=auto_added');
     return true;
   }

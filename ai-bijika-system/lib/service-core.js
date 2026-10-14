@@ -58,6 +58,17 @@ function legalPlaceholders(nowMs = Date.now()) {
   return legalCache.list;
 }
 
+// 利用者に示す法務文書の本文（Markdown）。サービス名・連絡先・代表者を埋め、販売開始後は草案の表示を外す
+function legalMarkdown(file) {
+  let text = require('fs').readFileSync(require('path').join(legalDir(), file), 'utf8');
+  if (salesOpen()) text = text.replace(/^※ これは運営者による草案です.*$/m, '').replace(/（案）/g, '');
+  text = text.split('【サービス名】').join(serviceName());
+  if (contactEmail()) text = text.split('【メールアドレス】').join(contactEmail());
+  const rep = String(process.env.SERVICE_REPRESENTATIVE || '').trim();
+  if (rep) text = text.split('【代表者の氏名】').join(rep);
+  return text;
+}
+
 // 販売を開始してよいか：運営者の明示（SERVICE_OPEN）、決済・連絡先・SNSの設定、法務文書の未記入の箇所がないこと
 function salesOpen() {
   const billing = require('./billing');
@@ -281,6 +292,6 @@ async function finishConnect({ userId, platform, code, state }) {
 }
 
 module.exports = {
-  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
+  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, legalMarkdown, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
   jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, capacityError, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

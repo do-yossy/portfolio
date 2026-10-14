@@ -1711,6 +1711,20 @@ main{max-width:640px;margin:0 auto;padding:18px}
 }
 
 // ── リクエストハンドラ ──
+// SERVICE_MOVED_TO を設定しても、こちらのデータベースにまだ利用者がいる間は転送しない（1分ごとに数え直す）
+let stillUsedCache = { at: 0, v: false };
+function serviceStillUsedHere(nowMs = Date.now()) {
+  if (nowMs - stillUsedCache.at < 60 * 1000) return stillUsedCache.v;
+  const { db } = require('./db');
+  const n = (sql) => { try { return db.prepare(sql).get().n; } catch { return 0; } };
+  const v = n(`SELECT COUNT(*) AS n FROM subscriptions WHERE status IN ('active','trialing','past_due','unpaid','incomplete','paused','test')`) > 0
+    || n(`SELECT COUNT(*) AS n FROM auto_rules WHERE enabled=1`) > 0
+    || n(`SELECT COUNT(*) AS n FROM scheduled_posts WHERE status IN ('pending','publishing')`) > 0;
+  if (v && !stillUsedCache.v) console.warn('[service] SERVICE_MOVED_TO が設定されていますが、このアプリにまだ契約者・自動運用・未投稿の予約があるため、/service は転送しません。');
+  stillUsedCache = { at: nowMs, v };
+  return v;
+}
+
 // SERVICE_ONLY=true のときに出してよいパス（サービス本体・API・MCP・OAuth・メディア・お問い合わせ・運営者画面の一部）
 function serviceOnlyAllowed(p) {
   return p === '/service' || p.startsWith('/service/') || p.startsWith('/api/v1/') || p === '/api/stripe/webhook' || p === '/api/contact' || p === '/mcp' || p.startsWith('/oauth/')
@@ -1738,7 +1752,8 @@ const server = http.createServer(async (req, res) => {
 
     // ── サービスを専用アプリへ移した場合（SERVICE_MOVED_TO=https://…）、こちらの /service は移転先へ転送する ──
     const movedTo = String(process.env.SERVICE_MOVED_TO || '').replace(/\/+$/, '');
-    if (movedTo && /^https:\/\//.test(movedTo) && process.env.SERVICE_ONLY !== 'true' && (pathname === '/service' || pathname.startsWith('/service/')) && (method === 'GET' || method === 'HEAD')) {
+    // こちらに契約者・自動運用・未投稿の予約が残っている間は転送しない（マイページ・解約・連携の戻り先に行けなくなるため）
+    if (movedTo && /^https:\/\//.test(movedTo) && process.env.SERVICE_ONLY !== 'true' && (pathname === '/service' || pathname.startsWith('/service/')) && (method === 'GET' || method === 'HEAD') && (process.env.SERVICE_MOVED_FORCE === 'true' || !serviceStillUsedHere())) {
       return redirect(res, `${movedTo}${pathname}${url.search}`, { 'Cache-Control': 'no-store' });
     }
 
@@ -2026,7 +2041,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ── 月額サービスの契約状況（運営者用・閲覧のみ）──
-    const adminServicePage = (status, message) => sendHtml(res, status, serviceUi.adminServicePage({ subs: serviceStore.Subscriptions.all(), stats: serviceStore.Subscriptions.countByStatus(), postStats: serviceStore.ScheduledPosts.stats(), message }));
+    const adminServicePage = (status, message) => sendHtml(res, status, serviceUi.adminServicePage({ subs: serviceStore.Subscriptions.all(), stats: serviceStore.Subscriptions.countByStatus(), postStats: serviceStore.ScheduledPosts.stats(), message,
+      consents: require('./lib/consent').list({ email: url.searchParams.get('consent_email') || '', limit: 50 }), consentEmail: url.searchParams.get('consent_email') || '' }));
+    // 同意の記録のCSV（証拠として保存・提出するため）と、同意した時点の文書の控え
+    if (pathname === '/admin/service/consents.csv' && method === 'GET') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      const consentLib = require('./lib/consent');
+      res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="consent_logs.csv"', 'Cache-Control': 'no-store' });
+      return res.end(consentLib.toCsv(consentLib.list({ email: url.searchParams.get('email') || '', limit: 100000 })));
+    }
+    const snapMatch = pathname.match(/^\/admin\/service\/legal-snapshot\/([a-f0-9]{64})$/);
+    if (snapMatch && method === 'GET') {
+      if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      const snap = require('./lib/consent').getSnapshot(snapMatch[1]);
+      if (!snap) { res.writeHead(404); return res.end('not found'); }
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(`# 控え：${snap.file}（保存日時 ${snap.created_at}・SHA-256 ${snap.hash}）\n\n${snap.text}`);
+    }
     if (pathname === '/admin/service' && method === 'GET') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
       return adminServicePage(200);

@@ -197,6 +197,21 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
     const vd = store.ScheduledPosts.listDrafts(uid).find((p) => p.rule_id === vr);
     ok(vd && vd.category === 'video' && JSON.parse(vd.options).privacy === 'unlisted', '動画ができたら、ルールの設定（YouTubeの公開設定）で下書きを作る');
     store.AutoRules.remove(vr, uid);
+    // 生成中にルールを停止・削除したら、動画ができても投稿を作らない
+    const vr2 = auto.createRule({ userId: uid, accountId: rid(yt), theme: '止めるルール', media: 'video', hours: [0], mode: 'auto', options: { privacy: 'unlisted', made_for_kids: false } }, Date.parse(`${ai.day()}T00:00:00+09:00`) - 1000);
+    videoDone = false;
+    await auto.tick(Date.now() + 13);
+    store.AutoRules.setEnabled(vr2, uid, false);
+    const pendBefore = store.ScheduledPosts.listForUser(uid).filter((p) => p.rule_id === vr2).length;
+    videoDone = true;
+    await auto.pollJobs();
+    ok(store.ScheduledPosts.listForUser(uid).filter((p) => p.rule_id === vr2).length === pendBefore, '動画の生成中にルールを停止したら、できあがっても投稿を作らない');
+    store.AutoRules.remove(vr2, uid);
+    // 旧形式（日付だけ）の実行記録は、その日の回をすべて実行済みとして扱う
+    const legacy = auto.createRule({ userId: uid, accountId: rid(th), theme: '旧形式', hours: [0], mode: 'draft' }, Date.parse(`${ai.day()}T00:00:00+09:00`) - 1000);
+    require('../db').db.prepare('UPDATE auto_rules SET last_day=? WHERE id=?').run(ai.day(), legacy);
+    ok(await auto.tick(Date.now() + 17) === 0, '旧形式の実行記録（その日の日付）があれば、同じ日にもう一度は実行しない');
+    store.AutoRules.remove(legacy, uid);
     process.env.AI_DAILY_VIDEO = '1';
   }
 
