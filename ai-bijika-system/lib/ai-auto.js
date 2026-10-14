@@ -114,6 +114,12 @@ function createRule(args, nowMs = Date.now()) {
   return id;
 }
 
+// 前回の回の印。旧形式（「YYYY-MM-DD」だけ）は、その日の回をすべて実行済みとして扱う（デプロイした日に二重に実行しないように）
+function lastKey(rule) {
+  const v = String(rule.last_day || '');
+  return v && !v.includes('#') ? `${v}#99` : v;
+}
+
 let running = false;
 // 実行時刻を過ぎて、まだ実行していない回を実行する。戻り値は実行した件数
 async function tick(nowMs = Date.now()) {
@@ -123,7 +129,7 @@ async function tick(nowMs = Date.now()) {
   try {
     for (const rule of AutoRules.enabled()) {
       const slot = currentSlot(rule, nowMs);
-      if (!slot || String(rule.last_day || '') >= slot.key) continue;
+      if (!slot || lastKey(rule) >= slot.key) continue;
       if (!AutoRules.claim(rule.id, slot.key)) continue; // 先に実行済み
       try { await runRule(rule, nowMs, slot); n++; } catch (e) { AutoRules.setError(rule.id, e.message); }
     }
@@ -137,6 +143,9 @@ function finishRulePost(job, mediaId, nowMs) {
   let p = null;
   try { p = JSON.parse(job.payload || ''); } catch { p = null; }
   if (!p || !p.ruleId) return;
+  // 生成中にルールが停止・削除・変更された場合は、投稿を作らない（動画は使われないファイルとして、通常どおり自動で削除される）
+  const rule = AutoRules.get(p.ruleId, job.user_id);
+  if (!rule || !rule.enabled || rule.account_id !== p.accountId || (rule.mode !== 'auto') !== !!p.draft) return;
   const r = core.createPost({
     userId: job.user_id, category: 'video', mediaIds: [mediaId], ruleId: p.ruleId,
     targets: [{ accountId: p.accountId, caption: p.text, options: p.options || {} }],

@@ -132,6 +132,7 @@ async function handle(ctx) {
       // 販売を開始したら（運営者が内容を確認し、SERVICE_OPEN を設定した後）、草案である旨の表示を外す
       if (salesOpen) text = text.replace(/^※ これは運営者による草案です.*$/m, '').replace(/（案）/g, '');
       html = md.render(text);
+      html = html.split('【サービス名】').join(core.serviceName().replace(/&/g, '&amp;').replace(/</g, '&lt;'));
       if (contactEmail) html = html.split('【メールアドレス】').join(contactEmail.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
       const rep = String(process.env.SERVICE_REPRESENTATIVE || '').trim();
       if (rep) html = html.split('【代表者の氏名】').join(rep.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
@@ -302,6 +303,7 @@ async function handle(ctx) {
       if (aiMatch[1] === 'text') sendJson(res, 200, { text: await ai.generateText({ userId: user.id, theme: b.theme, platform: b.platform }) });
       else if (aiMatch[1] === 'image') { const m = await ai.generateImage({ userId: user.id, prompt: b.prompt }); sendJson(res, 200, { id: m.id, url: mediaLib.publicUrl(m) }); }
       else {
+        if (!String(b.prompt || '').trim()) { sendJson(res, 400, { error: '動画の内容を入力してください。' }); return true; }
         const op = await ai.startVideo({ userId: user.id, prompt: `${String(b.prompt || '')}（SNSの縦長の短い動画。文字やロゴは入れない）` });
         sendJson(res, 202, { job_id: AiJobs.create({ userId: user.id, kind: 'video', prompt: String(b.prompt || '').slice(0, 1000), operation: op }) });
       }

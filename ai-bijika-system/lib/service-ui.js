@@ -37,8 +37,9 @@ const EXTRA_CSS = `<style>
 .svc .legal-doc table{width:100%;border-collapse:collapse}.svc .legal-doc th,.svc .legal-doc td{border:1px solid #d9d0bb;padding:8px;vertical-align:top;font-size:14px}
 </style>`;
 
+// サービスの画面は、ミチシルベ本体とは別の商品として表示する（ヘッダーの名前はサービス名、リンクはサービスのトップ）
 function wrap(title, body) {
-  return layout(title, `${EXTRA_CSS}<div class="svc">${body}</div>`);
+  return layout(title, `${EXTRA_CSS}<div class="svc">${body}</div>`, { brand: { name: core.serviceName(), href: '/service' } });
 }
 
 function legalLinks() {
@@ -132,23 +133,39 @@ function landingPage({ user, billingReady, trialDays = 0 }) {
 }
 
 // ── 固定投稿から来た人向けのLP（/service/lp）──
-// 価格の比較は、2026年10月14日に公式の料金ページで確認した、条件をそろえて言える範囲だけ（下書き/_調査_予約投稿ツールの価格.md）。
-const COMPARE = { name: 'ポストメッシュ', plan: 'スタータープラン', price: 2200, note: '月払い・税込', checked: '2026年10月14日', accounts: 10, posts: '投稿・予約は無制限（Xは月30件）' };
+// 価格の比較は、公式の料金ページで確認した、条件をそろえて言える範囲だけ（下書き/_調査_予約投稿ツールの価格.md）。
+// 他社の名前は出さない（サービスA）。根拠（確認した相手・日付・ページ）は社内の調査記録に残している。
+// 確認日から COMPARE_VALID_DAYS を過ぎたら、比較を自動で出さない（相手の価格が変わっているおそれがあるため。再確認したら checked を更新する）。
+const COMPARE = {
+  name: 'サービスA', desc: '国内の、複数のSNSに予約投稿できるサービス', price: 2200, note: '月払い・税込',
+  checked: '2026-10-14', accounts: 10, posts: '投稿・予約は無制限（Xは月30件）',
+  sns: 'Threads・X・Instagram・TikTok・Facebook・YouTube', trial: '7日間',
+};
+const COMPARE_VALID_DAYS = 45;
+function compareActive(priceN, nowMs = Date.now()) {
+  const fresh = nowMs - Date.parse(`${COMPARE.checked}T00:00:00+09:00`) <= COMPARE_VALID_DAYS * 86400000;
+  return fresh && priceN * 2 <= COMPARE.price && process.env.SERVICE_LP_COMPARE !== 'off';
+}
+const jpDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `${y}年${m}月${d}日`; };
+
 function lpPage({ user, billingReady, trialDays = 0 }) {
   const priceN = core.priceYen(); const price = yen(priceN);
   const L = core.LIMITS; const names = snsNames(); const av = aiLib().available();
-  const half = priceN * 2 <= COMPARE.price; // 半額以下と言えるときだけ比較を出す
+  const cmp = compareActive(priceN); // 半額以下で、確認日から間もないときだけ比較を出す
+  const checked = jpDate(COMPARE.checked);
   const cta = billingReady
     ? `<a class="btn btn-primary btn-block" href="${user ? '/service/checkout' : '/service/signup'}">${user ? '申込みに進む' : 'アカウントを作って申し込む'}</a>
        <p class="small center" style="margin-top:6px">アカウントは無料で作れます。お支払いは、確認画面で内容をご確認いただいたあとに始まります。${trialDays ? `初めての方は${trialDays}日間無料です（お支払い方法の登録が必要。期間が終わると自動で課金が始まります）。` : ''}</p>`
     : '<div class="notice"><div>ただいま準備中です。もうしばらくお待ちください。</div></div>';
   const step = (n, t, d) => `<div class="card"><div class="card-title">${n}. ${t}</div><p class="small">${d}</p></div>`;
+  const ours = `未投稿の予約${L.maxPending}件まで、同じ日（日本時間）に投稿する予約${L.maxPerDay}件まで${xLive() ? `、Xは月${L.xPerMonth}件まで` : ''}`;
+  const th = (t) => `<th style="white-space:normal">${t}</th>`;
   return wrap(`SNSの予約投稿を月額${price}で`, `
     ${topNav(user)}
     <header class="page-head"><div class="eyebrow">SNS Scheduler</div>
       <h1>複数のSNSへの投稿を、まとめて予約。</h1>
       <p class="lead">発信を続けたいけれど、毎日その場で投稿する時間がない。そんな方のための、予約投稿のサービスです。投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p></header>
-    <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます</small>${half ? `<small>参考：${COMPARE.name}の${COMPARE.plan}（${yen(COMPARE.price)}・${COMPARE.note}）の半額以下（${COMPARE.checked}に公式の料金ページで確認。条件は下の「料金の比べ方」をご覧ください）</small>` : ''}</div>
+    <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます</small>${cmp ? `<small>参考：${COMPARE.desc}（${COMPARE.name}）の最安の有料プラン（${yen(COMPARE.price)}・${COMPARE.note}）の半額以下です。予約の上限・使えるSNS・無料体験などの条件は異なります（${checked}に${COMPARE.name}の公式の料金ページで確認。詳しくは下の「料金の比べ方」）。</small>` : ''}</div>
     ${cta}
     <h2 style="margin-top:26px">こんな方に</h2>
     <div class="card"><ul class="plain small">
@@ -159,27 +176,30 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
     <h2 style="margin-top:26px">使い方は3つの手順</h2>
     <div class="grid2">
       ${step(1, 'SNSを連携する', `${names ? `${escapeHtml(names)}に対応しています。` : '対応SNSは準備中です。'}各SNSの公式の連携（OAuth）を使うため、SNSのパスワードをお預かりすることはありません。`)}
-      ${step(2, '投稿を作る', `本文と画像・動画を用意します。投稿文は、お使いのAI（ChatGPT・Claude・Gemini）を、投稿先の条件を入れた指示文つきで開いて作ることもできます${av.text ? '（このツールのAIでも作れます）' : ''}。SNSごとに本文を変えたり、下書きに保存したりできます。`)}
+      ${step(2, '投稿を作る', `本文と画像・動画を用意します。投稿文は、お使いのAI（ChatGPT・Claude・Gemini）で作ることもできます。投稿先の条件を入れた指示文をコピーしてからAIを開くので、貼り付けて送信します${av.text || av.image ? `（このツールのAIでも${[av.text && '文章', av.image && '画像'].filter(Boolean).join('と')}を作れます）` : ''}。SNSごとに本文を変えたり、下書きに保存したりできます。`)}
       ${step(3, '日時を決めて予約する', '日本時間で最大90日先まで予約できます。決めた日時に自動で投稿し、結果はカレンダーとマイページで確認できます。一時的なエラーは自動で再試行します。')}
     </div>
-    <h2 style="margin-top:26px">料金の比べ方</h2>
+    ${cmp ? `<h2 style="margin-top:26px">料金の比べ方</h2>
     <div class="card"><table class="t" style="table-layout:fixed"><colgroup><col style="width:30%"><col><col></colgroup>
-      <tr><th style="white-space:normal"></th><th style="white-space:normal">このサービス</th><th style="white-space:normal">${COMPARE.name}（${COMPARE.plan}）</th></tr>
-      <tr><th style="white-space:normal">月額</th><td>${price}（月払い・税込）</td><td>${yen(COMPARE.price)}（${COMPARE.note}）</td></tr>
-      <tr><th style="white-space:normal">つなげるアカウント</th><td>${L.maxAccounts}アカウントまで</td><td>${COMPARE.accounts}アカウントまで</td></tr>
-      <tr><th style="white-space:normal">投稿・予約の上限</th><td>未投稿の予約${L.maxPending}件まで、同じ日（日本時間）に投稿する予約${L.maxPerDay}件まで、Xは月${L.xPerMonth}件まで</td><td>${COMPARE.posts}</td></tr>
+      <tr>${th('')}${th('このサービス')}${th(`${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン`)}</tr>
+      <tr>${th('月額')}<td>${price}（月払い・税込）</td><td>${yen(COMPARE.price)}（${COMPARE.note}）</td></tr>
+      <tr>${th('使えるSNS')}<td>${names ? escapeHtml(names) : '準備中'}（各SNSの審査が終わるまで、使える機能や公開範囲が限られる場合があります）</td><td>${COMPARE.sns}</td></tr>
+      <tr>${th('つなげるアカウント')}<td>${L.maxAccounts}アカウントまで</td><td>${COMPARE.accounts}アカウントまで</td></tr>
+      <tr>${th('投稿・予約の上限')}<td>${ours}</td><td>${COMPARE.posts}</td></tr>
+      <tr>${th('無料体験')}<td>${trialDays ? `${trialDays}日間（初めての方）` : 'なし'}</td><td>${COMPARE.trial}</td></tr>
     </table>
-    <p class="small">${COMPARE.name}の価格・条件は、${COMPARE.checked}に同社の公式の料金ページで確認したものです（その後、変わっている場合があります）。機能・上限・使えるSNSは、両者で異なります。このサービスは、各SNSの審査が終わるまで、使える機能や公開範囲が限られる場合があります。いちばん安いサービスであることをお約束するものではありません。</p></div>
+    <p class="small">${COMPARE.name}の価格・条件は、${checked}に同社の公式の料金ページで確認したものです（その後、変わっている場合があります）。機能・上限・使えるSNSは、両者で異なります。いちばん安いサービスであることをお約束するものではありません。</p></div>` : ''}
     <h2 style="margin-top:26px">ご利用の前にご確認ください</h2>
     <div class="card"><ul class="plain small">
       ${names ? `<li>SNSごとの条件：${escapeHtml(snsRulesText())}。</li>` : ''}
       <li>${limitsText()}。${aiLimitsText() ? `${aiLimitsText()}。` : ''}</li>
+      ${av.text || av.image ? '<li>AIが作った内容は、誤りや不適切な表現を含む場合があります。投稿の前に、必ずご自身で内容をご確認ください。AIで作ったことの表示が、SNSの規約で求められる場合があります。</li>' : ''}
       <li>投稿できるのは、ご自身で作成・予約・設定した内容だけです。いいね・フォロー・コメント・DMなどの自動操作や、投稿の分析機能はありません。投稿の内容と、その結果の責任は、ご利用者にあります。</li>
       <li>お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。${END_TEXT}。</li>
     </ul>
     <p class="small"><a href="/service">サービスの詳しい説明・よくある質問</a></p></div>
     ${cta}
-    ${legalLinks()}
+    <div class="legal-links"><a href="/service/legal/tokushoho">特定商取引法に基づく表記</a></div>
   `);
 }
 
@@ -272,7 +292,7 @@ function usageCard(userId) {
   const rows = [
     ['連携しているSNSアカウント', `${st.SnsAccounts.countForUser(userId)} / ${L.maxAccounts}件`],
     ['未投稿の予約', `${st.ScheduledPosts.countPending(userId)} / ${L.maxPending}件`],
-    ['今月のXへの投稿（日本時間の暦月・ツリーは1件ずつ）', `${st.ScheduledPosts.countXUnits(userId, mf, mt)} / ${L.xPerMonth}件`],
+    ...(xLive() ? [['今月のXへの投稿（日本時間の暦月・ツリーは1件ずつ）', `${st.ScheduledPosts.countXUnits(userId, mf, mt)} / ${L.xPerMonth}件`]] : []),
     ['同じ日（日本時間）に投稿する予約', `1日${L.maxPerDay}件まで`],
   ];
   const am = aiLib().monthlyLimits();
@@ -589,13 +609,17 @@ function composePage({ user, accounts, csrf, aiAvail = {} }) {
       document.querySelectorAll('[data-own-ai]').forEach(function(b){b.addEventListener('click',function(){
         if(!$('aiTheme').value.trim())return show(false,'先に「テーマ・内容」を入力してください。');
         var ai=b.dataset.ownAi,q=ownPrompt(b.dataset.kind);
+        // 新しいタブにフォーカスが移るとコピーに失敗しやすいため、先にコピーを始めてからタブを開く（同じクリックの中なので、ポップアップは止められない）
+        var copying=(navigator.clipboard&&navigator.clipboard.writeText)?navigator.clipboard.writeText(q):Promise.reject();
         // noopener を指定すると戻り値が null になるため、開いたあとで opener を切る
         var w=window.open(OWN_URL[ai](q),'_blank');if(w){try{w.opener=null;}catch(e){}}
-        var done=function(ok){$('aiMsg').textContent=(w?OWN_NAME[ai]+'を開きました。':'新しいタブを開けませんでした（ブラウザがポップアップを止めている可能性があります）。'+OWN_NAME[ai]+'を開いてください。')+(ok?'指示文をコピーしました。自動で入力されない場合は、貼り付けて送信してください。':'次の指示文を貼り付けてください：'+q);};
-        if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(q).then(function(){done(true);},function(){done(false);});else done(false);
+        var done=function(ok){$('aiMsg').textContent=(w?OWN_NAME[ai]+'を開きました。':'新しいタブを開けませんでした（ブラウザがポップアップを止めている可能性があります）。'+OWN_NAME[ai]+'を開いてください。')+(ok?'指示文をコピーしました。自動で入力されない場合は、貼り付けて送信してください。':'次の指示文をコピーして貼り付けてください：');
+          var old=document.getElementById('ownPromptBox');if(old)old.remove();
+          if(!ok){var ta=document.createElement('textarea');ta.id='ownPromptBox';ta.readOnly=true;ta.value=q;ta.style.minHeight='100px';$('aiMsg').parentNode.appendChild(ta);ta.select();}};
+        copying.then(function(){done(true);},function(){done(false);});
       });});
       // 動画は数分かかるため、作り始めたら数秒ごとに状態を確かめ、できあがったら添付する
-      if($('aiVidBtn'))$('aiVidBtn').addEventListener('click',function(){var btn=$('aiVidBtn');btn.disabled=true;
+      if($('aiVidBtn'))$('aiVidBtn').addEventListener('click',function(){if(!$('aiTheme').value.trim())return show(false,'先に「テーマ・内容」を入力してください。');var btn=$('aiVidBtn');btn.disabled=true;
         aiCall('video',{prompt:$('aiTheme').value}).then(function(j){var started=Date.now();$('aiMsg').textContent='動画を作っています（数分かかります。このページを開いたままお待ちください）…';
           (function poll(){fetch('/service/app/ai/jobs/'+encodeURIComponent(j.job_id),{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(x){
             if(x.status==='done'){btn.disabled=false;media.push({id:x.media_id,kind:'video',url:x.url});document.querySelector('input[name=cat][value=video]').checked=true;refresh();drawMedia();$('aiMsg').textContent='動画を添付しました。内容をご確認ください。';return;}
@@ -762,4 +786,4 @@ function apiDocsPage(user, baseUrl) {
     </div>`);
 }
 
-module.exports = { lpPage, settingsChecklist, composePage, calendarPage, apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };
+module.exports = { compareActive, lpPage, settingsChecklist, composePage, calendarPage, apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };

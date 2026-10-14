@@ -101,7 +101,7 @@ function webhook(event, secret = 'whsec_e2e') {
   const legalTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-legal-'));
   for (const f of require('../lib/service-core').LEGAL_FILES) {
     const t = fs.readFileSync(path.join(__dirname, '..', 'legal', f), 'utf8');
-    fs.writeFileSync(path.join(legalTmp, f), t.replace(/【(?!メールアドレス】|代表者の氏名】)([^】]+)】/g, (m, x) => (x.trim() ? `（記入済み：${x}）` : m)));
+    fs.writeFileSync(path.join(legalTmp, f), t.replace(/【(?!メールアドレス】|代表者の氏名】|サービス名】)([^】]+)】/g, (m, x) => (x.trim() ? `（記入済み：${x}）` : m)));
   }
   process.env.SERVICE_LEGAL_DIR = legalTmp;
   process.env.SERVICE_REPRESENTATIVE = '代表 太郎';
@@ -116,6 +116,18 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('GET', '/service/lp');
   ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
   ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
+  ok(!r.text.includes('ポストメッシュ') && r.text.includes('サービスA'), 'LPでは、他社の名前を出さない（サービスA）');
+  ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
+  ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
+  ok(r.text.includes('使えるSNS') && r.text.includes('無料体験') && !r.text.includes('Xは月30件まで'), '比較表に使えるSNSと無料体験の行があり、Xを提供していなければXの上限を出さない');
+  const uiMod = require('../lib/service-ui');
+  ok(uiMod.compareActive(1000, Date.parse('2026-11-01T00:00:00+09:00')) && !uiMod.compareActive(1000, Date.parse('2026-12-15T00:00:00+09:00')), '価格を確認した日から45日を過ぎたら、比較を自動で出さない');
+  process.env.SERVICE_LP_COMPARE = 'off';
+  r = await req('GET', '/service/lp');
+  ok(!r.text.includes('半額以下') && !r.text.includes('料金の比べ方'), '運営者は、比較の表示を止められる（SERVICE_LP_COMPARE=off）');
+  delete process.env.SERVICE_LP_COMPARE;
+  r = await req('GET', '/service/legal/terms');
+  ok(r.text.includes('「SNSまとめて予約」') && !r.text.includes('ミチシルベ'), '法務文書のサービス名は、設定（SERVICE_NAME）から入り、ミチシルベの名前を出さない');
   process.env.SERVICE_PRICE_JPY = '1500';
   r = await req('GET', '/service/lp');
   ok(!r.text.includes('半額以下'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');

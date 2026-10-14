@@ -1713,7 +1713,7 @@ main{max-width:640px;margin:0 auto;padding:18px}
 // ── リクエストハンドラ ──
 // SERVICE_ONLY=true のときに出してよいパス（サービス本体・API・MCP・OAuth・メディア・お問い合わせ・運営者画面の一部）
 function serviceOnlyAllowed(p) {
-  return p === '/service' || p.startsWith('/service/') || p.startsWith('/api/') || p === '/mcp' || p.startsWith('/oauth/')
+  return p === '/service' || p.startsWith('/service/') || p.startsWith('/api/v1/') || p === '/api/stripe/webhook' || p === '/api/contact' || p === '/mcp' || p.startsWith('/oauth/')
     || p.startsWith('/.well-known/') || p.startsWith('/media/') || p === '/contact' || p.startsWith('/contact/')
     || p === '/admin/login' || p === '/admin/logout' || p === '/admin/service' || p.startsWith('/admin/service/')
     || p === '/admin/inquiries' || p.startsWith('/admin/inquiries/');

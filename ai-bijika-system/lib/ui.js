@@ -494,19 +494,21 @@ pre.template{white-space:pre-wrap;word-break:break-all;font:inherit;font-size:13
 @media (min-width:600px){main{padding:30px 22px 40px}h1{font-size:27px}.landing-hero{margin:-30px -22px 8px}}
 `;
 
-function layout(title, bodyHtml, { user, active, noNav } = {}) {
+// brand：別の商品の画面（SNS自動投稿サービスなど）で、ヘッダーの名前・リンク・ページ名を差し替える（{ name, href }）
+function layout(title, bodyHtml, { user, active, noNav, brand } = {}) {
   const showNav = user && !noNav;
+  const brandName = brand ? brand.name : 'ミチシルベ';
   const tab = (href, key, ic, label) => `<a href="${href}" class="${active === key ? 'active' : ''}">${icon(ic, 22)}<span>${label}</span></a>`;
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>${escapeHtml(title)}｜ミチシルベ</title>
-<link rel="manifest" href="/manifest.json">
+<title>${escapeHtml(title)}｜${escapeHtml(brandName)}</title>
+${brand ? '' : '<link rel="manifest" href="/manifest.json">'}
 <link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="theme-color" content="#0E1A22">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ミチシルベ">
+<meta name="apple-mobile-web-app-title" content="${escapeHtml(brandName)}">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONT_CSS}">
 <style>${CSS}</style>
@@ -521,8 +523,10 @@ window.toast = function (msg) {
 };
 </script>
 </head><body class="${showNav ? '' : 'no-nav'}">
-<header class="topbar"><a class="brand" href="${user ? '/dashboard' : '/'}">${crest(34)}<span class="brand-name">ミチシルベ<small>Your First Product, 90 Days</small></span></a>
-${user ? `<a class="avatar" href="/account" aria-label="アカウント">${escapeHtml(initial(user.email))}</a>` : ''}</header>
+<header class="topbar">${brand
+  ? `<a class="brand" href="${escapeHtml(brand.href || '/')}"><span class="brand-name">${escapeHtml(brand.name)}</span></a>`
+  : `<a class="brand" href="${user ? '/dashboard' : '/'}">${crest(34)}<span class="brand-name">ミチシルベ<small>Your First Product, 90 Days</small></span></a>
+${user ? `<a class="avatar" href="/account" aria-label="アカウント">${escapeHtml(initial(user.email))}</a>` : ''}`}</header>
 <main>${bodyHtml}</main>
 ${showNav ? `<nav class="tabbar">
   ${tab('/dashboard', 'home', 'home', 'ホーム')}
