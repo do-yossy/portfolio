@@ -15,6 +15,7 @@ const { createLimiter } = require('./ratelimit');
 const mediaLib = require('./media');
 const registry = require('./sns');
 const apiV1 = require('./api-v1');
+const mcp = require('./mcp');
 
 const loginLimiter = createLimiter({ max: 8, windowMs: 15 * 60 * 1000 });
 const signupLimiter = createLimiter({ max: 10, windowMs: 60 * 60 * 1000 });
@@ -77,6 +78,7 @@ async function handle(ctx) {
   const { req, res, url, method, pathname, user } = ctx;
 
   if (await apiV1.handle(ctx)) return true;
+  if (await mcp.handle(ctx)) return true;
 
   // ── Stripe Webhook（署名検証。認証不要）──
   if (pathname === '/api/stripe/webhook' && method === 'POST') {
