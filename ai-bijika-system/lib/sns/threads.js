@@ -4,6 +4,7 @@
 const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
 const poll = require('./poll');
+const { normalize } = require('./post');
 
 const HOST = 'graph.threads.net';
 const AUTH_URL = 'https://threads.net/oauth/authorize';
@@ -79,7 +80,10 @@ async function refresh({ accessToken }) {
   };
 }
 
-function validatePost({ text, media }) {
+function validatePost(args) {
+  const p = normalize(args); const text = p.text; const media = p.medias[0];
+  if (p.category === 'tree') return 'Threadsのツリー投稿は、このバージョンでは対応していません。';
+  if (p.medias.length > 1) return 'Threadsの複数画像は、このバージョンでは対応していません。';
   if (!String(text || '').trim() && !media) return 'Threadsは、本文か画像・動画のどちらかが必要です。';
   if (textLength(text || '') > maxLength) return `Threadsは${maxLength}文字までです。`;
   return null;
@@ -96,8 +100,10 @@ async function waitFinished(containerId, accessToken) {
 }
 
 // 投稿：コンテナ作成（テキスト／画像／動画）→（動画は処理待ち）→ 公開
-async function publish({ accessToken, externalUserId, text, media }) {
-  const err = validatePost({ text, media });
+async function publish(args) {
+  const { accessToken, externalUserId } = args;
+  const p = normalize(args); const text = p.text; const media = p.medias[0];
+  const err = validatePost(args);
   if (err) throw new SnsError(err);
   const form = { text: text || '', access_token: accessToken };
   if (!media) form.media_type = 'TEXT';

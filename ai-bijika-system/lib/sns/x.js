@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
+const { normalize } = require('./post');
 
 const HOST = 'api.x.com';
 const AUTH_URL = 'https://x.com/i/oauth2/authorize';
@@ -34,7 +35,9 @@ function textLength(text) {
   return n;
 }
 
-function validatePost({ text, media }) {
+function validatePost(args) {
+  const p = normalize(args); const text = p.text; const media = p.medias[0];
+  if (p.category === 'tree') return 'Xのツリー投稿は、このバージョンでは対応していません。';
   if (media) return 'Xは、現時点ではテキストのみに対応しています（画像・動画は添付できません）。';
   if (!String(text || '').trim()) return 'Xは、本文が必要です。';
   if (textLength(text) > maxLength) return `Xの文字数の上限（${maxLength}。日本語は1文字を2として計算）を超えています。`;
@@ -103,7 +106,9 @@ async function refresh({ refreshToken }) {
   return tokenResult(t);
 }
 
-async function publish({ accessToken, text }) {
+async function publish(args) {
+  const { accessToken } = args;
+  const text = normalize(args).text;
   let r;
   try {
     r = await call({

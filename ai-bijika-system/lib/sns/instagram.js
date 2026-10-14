@@ -4,6 +4,7 @@
 const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
 const poll = require('./poll');
+const { normalize } = require('./post');
 
 const API_VERSION = 'v22.0';
 const GRAPH = 'graph.instagram.com';
@@ -19,7 +20,10 @@ function isConfigured(env = process.env) { const c = creds(env); return !!(c.app
 const textLength = (t) => [...String(t)].length;
 
 // 投稿前の検証。エラーなら日本語の文、問題なければ null
-function validatePost({ text, media }) {
+function validatePost(args) {
+  const p = normalize(args); const text = p.text; const media = p.medias[0];
+  if (p.category === 'tree') return 'Instagramには、ツリー投稿はできません。';
+  if (p.medias.length > 1) return 'Instagramの複数画像（カルーセル）は、このバージョンでは対応していません。';
   if (!media) return 'Instagramは、画像または動画が必要です。';
   if (media.kind === 'image' && media.mime !== 'image/jpeg') return 'Instagramに投稿できる画像はJPEGです（PNGは使えません）。';
   if (textLength(text || '') > maxLength) return `Instagramのキャプションは${maxLength}文字までです。`;
@@ -76,8 +80,10 @@ async function waitFinished(containerId, accessToken) {
   throw new SnsError('Instagram側の動画の処理が終わりませんでした。', { retriable: true });
 }
 
-async function publish({ accessToken, externalUserId, text, media }) {
-  const err = validatePost({ text, media });
+async function publish(args) {
+  const { accessToken, externalUserId } = args;
+  const p = normalize(args); const text = p.text; const media = p.medias[0];
+  const err = validatePost(args);
   if (err) throw new SnsError(err);
   const form = { caption: text || '', access_token: accessToken };
   if (media.kind === 'image') form.image_url = media.url;

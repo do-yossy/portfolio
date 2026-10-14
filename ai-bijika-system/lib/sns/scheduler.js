@@ -44,15 +44,24 @@ async function processOne(post) {
   if (!adapter) return ScheduledPosts.markFailed(post.id, '未対応のSNSです');
   try {
     const accessToken = await ensureAccessToken(account, adapter);
-    let media = null;
-    if (post.media_id) {
-      const m = MediaAssets.get(post.media_id);
-      if (!m) return ScheduledPosts.markFailed(post.id, '添付したファイルが削除されているため投稿できませんでした');
-      media = { kind: m.kind, mime: m.mime, size: m.size, path: mediaLib.pathOf(m), url: mediaLib.publicUrl(m), durationSec: m.kind === 'video' ? mediaLib.mp4DurationSec(mediaLib.pathOf(m)) : null };
-    }
+    const loadMedia = (id) => {
+      const m = MediaAssets.get(id);
+      if (!m) return null;
+      return { kind: m.kind, mime: m.mime, size: m.size, path: mediaLib.pathOf(m), url: mediaLib.publicUrl(m), durationSec: m.kind === 'video' ? mediaLib.mp4DurationSec(mediaLib.pathOf(m)) : null };
+    };
+    let mediaIds = [];
+    try { mediaIds = JSON.parse(post.media_ids || '[]'); } catch { mediaIds = []; }
+    if (!mediaIds.length && post.media_id) mediaIds = [post.media_id];
+    let treeCards = [];
+    try { treeCards = JSON.parse(post.tree || '[]'); } catch { treeCards = []; }
+    const medias = mediaIds.map(loadMedia);
+    const cardMedias = treeCards.map((c) => (c.mediaIds || []).map(loadMedia));
+    if (medias.includes(null) || cardMedias.some((l) => l.includes(null))) return ScheduledPosts.markFailed(post.id, '添付したファイルが削除されているため投稿できませんでした');
     let options = {};
     try { options = JSON.parse(post.options || '{}'); } catch { options = {}; }
-    const r = await adapter.publish({ accessToken, externalUserId: account.external_user_id, text: post.text, media, options });
+    const category = post.category || (!medias.length ? 'text' : (medias[0].kind === 'video' ? 'video' : 'image'));
+    const full = { category, text: post.text, medias, tree: treeCards.map((c, i) => ({ text: c.text, medias: cardMedias[i] })), options };
+    const r = await adapter.publish({ accessToken, externalUserId: account.external_user_id, post: full });
     ScheduledPosts.markPosted(post.id, r.externalId);
   } catch (e) {
     if (e && e.authError) {

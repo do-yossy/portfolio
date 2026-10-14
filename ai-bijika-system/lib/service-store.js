@@ -87,6 +87,21 @@ db.exec(`
 `);
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN media_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN options TEXT DEFAULT '{}'"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN category TEXT DEFAULT ''"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN media_ids TEXT DEFAULT '[]'"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN tree TEXT DEFAULT '[]'"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN group_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
+db.exec(`
+  CREATE TABLE IF NOT EXISTS post_media (
+    post_id TEXT NOT NULL,
+    media_id TEXT NOT NULL,
+    PRIMARY KEY (post_id, media_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_post_media_media ON post_media(media_id);
+  CREATE INDEX IF NOT EXISTS idx_scheduled_posts_group ON scheduled_posts(group_id);
+`);
+// 従来の1メディアの予約を、新しい対応表にも反映する
+db.exec("INSERT OR IGNORE INTO post_media (post_id, media_id) SELECT id, media_id FROM scheduled_posts WHERE media_id != ''");
 
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
@@ -208,11 +223,17 @@ const OAuthStates = {
 };
 
 const ScheduledPosts = {
-  create({ userId, accountId, text, scheduledAt, mediaId, options }) {
+  // status: 'pending'（予約）または 'draft'（下書き。SNSへは送らない）。mediaIds はメディアの並び、tree はツリー投稿のカード
+  create({ userId, accountId, text, scheduledAt, mediaId, mediaIds, options, category, tree, groupId, status }) {
     const id = generateId();
     const t = now();
-    db.prepare(`INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, media_id, options, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`).run(id, userId, accountId, text, scheduledAt, mediaId || '', JSON.stringify(options || {}), t, t);
+    const ids = (mediaIds && mediaIds.length) ? mediaIds : (mediaId ? [mediaId] : []);
+    const treeCards = tree || [];
+    db.prepare(`INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, media_id, options, category, media_ids, tree, group_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, userId, accountId, text, scheduledAt, status || 'pending', ids[0] || '', JSON.stringify(options || {}), category || '', JSON.stringify(ids), JSON.stringify(treeCards), groupId || '', t, t);
+    const all = new Set(ids);
+    for (const c of treeCards) for (const m of (c.mediaIds || [])) all.add(m);
+    for (const m of all) db.prepare('INSERT OR IGNORE INTO post_media (post_id, media_id) VALUES (?, ?)').run(id, m);
     return id;
   },
   get(id) {
@@ -221,6 +242,12 @@ const ScheduledPosts = {
   listForUser(userId, limit = 100) {
     return db.prepare(`SELECT p.*, a.platform, a.handle FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
       WHERE p.user_id = ? ORDER BY p.scheduled_at DESC LIMIT ?`).all(userId, limit);
+  },
+  countDrafts(userId) {
+    return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts WHERE user_id=? AND status='draft'`).get(userId).n;
+  },
+  listGroup(groupId, userId) {
+    return db.prepare('SELECT * FROM scheduled_posts WHERE group_id = ? AND user_id = ? ORDER BY created_at').all(groupId, userId);
   },
   countPending(userId) {
     return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts WHERE user_id=? AND status IN ('pending','publishing')`).get(userId).n;
@@ -231,7 +258,7 @@ const ScheduledPosts = {
       AND scheduled_at >= ? AND scheduled_at < ?`).get(userId, fromIso, toIso).n;
   },
   cancel(id, userId) {
-    const r = db.prepare(`UPDATE scheduled_posts SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status='pending'`)
+    const r = db.prepare(`UPDATE scheduled_posts SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status IN ('pending','draft')`)
       .run(now(), id, userId);
     return r.changes === 1;
   },
@@ -296,9 +323,9 @@ const MediaAssets = {
     const unreferencedBefore = new Date(nowMs - 24 * 3600 * 1000).toISOString();
     const finishedBefore = new Date(nowMs - 2 * 24 * 3600 * 1000).toISOString();
     return db.prepare(`SELECT m.* FROM media_assets m WHERE m.deleted_at = '' AND (
-      (NOT EXISTS (SELECT 1 FROM scheduled_posts p WHERE p.media_id = m.id) AND m.created_at < ?)
-      OR (EXISTS (SELECT 1 FROM scheduled_posts p WHERE p.media_id = m.id)
-        AND NOT EXISTS (SELECT 1 FROM scheduled_posts p WHERE p.media_id = m.id AND (p.status IN ('pending','publishing') OR p.updated_at >= ?)))
+      (NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id) AND m.created_at < ?)
+      OR (EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id)
+        AND NOT EXISTS (SELECT 1 FROM post_media pm JOIN scheduled_posts p ON p.id = pm.post_id WHERE pm.media_id = m.id AND (p.status IN ('pending','publishing','draft') OR p.updated_at >= ?)))
     )`).all(unreferencedBefore, finishedBefore);
   },
 };

@@ -56,46 +56,94 @@ function formatJstShort(iso) {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
-// 予約を作る（選んだSNSアカウントごとに1件）。mediaId は事前にアップロードしたメディア、options はSNSごとの設定（TikTokの公開範囲など）
+const CATEGORIES = ['text', 'image', 'video', 'tree'];
+const MAX_DRAFTS = 100;
+const mediaOf = (m) => ({ id: m.id, kind: m.kind, mime: m.mime, size: m.size });
+
+// 投稿を作る（選んだSNSアカウントごとに1件。まとめて group_id でひも付ける）。
+//   category: text / image / video / tree
+//   targets: [{ accountId, caption, options }]（SNSごとに本文・設定を変えられる）
+//   mediaIds: image は複数、video は1つ。tree: [{ text, mediaIds }]（X・Threads のみ）
+//   draft: true なら下書き（SNSへは送らない。日時は任意）
+function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso, draft, nowMs = Date.now() }) {
+  if (!CATEGORIES.includes(category)) return { ok: false, error: '投稿の種類が正しくありません。' };
+  if (!Array.isArray(targets) || !targets.length) return { ok: false, error: '投稿先のSNSを選んでください。' };
+  if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
+  let at = null;
+  if (!draft || scheduledAtIso) {
+    if (!scheduledAtIso) return { ok: false, error: '投稿日時の形式が正しくありません。' };
+    at = Date.parse(scheduledAtIso);
+    if (Number.isNaN(at)) return { ok: false, error: '投稿日時の形式が正しくありません。' };
+    if (!draft && at < nowMs - 60 * 1000) return { ok: false, error: '過去の日時は指定できません。' };
+    if (at > nowMs + MAX_DAYS_AHEAD * 24 * 3600 * 1000) return { ok: false, error: `予約できるのは${MAX_DAYS_AHEAD}日先までです。` };
+  }
+  const loadMedia = (id) => MediaAssets.getForUser(id, userId);
+  const ids = [...new Set((mediaIds || []).filter(Boolean))];
+  const medias = [];
+  for (const id of ids) {
+    const m = loadMedia(id);
+    if (!m) return { ok: false, error: '添付したファイルが見つかりません。もう一度アップロードしてください。' };
+    medias.push(m);
+  }
+  let cards = [];
+  if (category === 'tree') {
+    cards = (tree || []).map((c) => ({ text: String(c.text || '').trim(), mediaIds: [...new Set((c.mediaIds || []).filter(Boolean))] }));
+    for (const c of cards) for (const id of c.mediaIds) if (!loadMedia(id)) return { ok: false, error: '添付したファイルが見つかりません。もう一度アップロードしてください。' };
+  }
+  if (medias.length || cards.some((c) => c.mediaIds.length)) {
+    if (!String(process.env.SERVICE_BASE_URL || '').startsWith('http')) return { ok: false, error: '画像・動画の投稿は、現在ご利用いただけません。' };
+  }
+  if (category === 'text' && medias.length) return { ok: false, error: 'テキストの投稿には、画像・動画を添付できません。' };
+  if (category === 'image' && (!medias.length || medias.some((m) => m.kind !== 'image'))) return { ok: false, error: '画像の投稿には、画像（JPEG・PNG）を1枚以上選んでください。' };
+  if (category === 'video' && (medias.length !== 1 || medias[0].kind !== 'video')) return { ok: false, error: '動画の投稿には、動画を1つだけ選んでください。' };
+  const resolved = [];
+  for (const t of targets) {
+    const a = SnsAccounts.getForUser(t.accountId, userId);
+    if (!a) return { ok: false, error: '投稿先のSNSが見つかりません。' };
+    if (a.status !== 'active') return { ok: false, error: `${a.handle || a.platform}は連携のやり直しが必要です。` };
+    const ad = registry.get(a.platform);
+    if (!ad) return { ok: false, error: '未対応のSNSです。' };
+    const caption = String(t.caption || '').trim();
+    const post = { category, text: caption, medias: medias.map(mediaOf), tree: cards.map((c) => ({ text: c.text, medias: c.mediaIds.map((id) => mediaOf(loadMedia(id))) })), options: t.options || {} };
+    const problem = ad.validatePost({ post });
+    if (problem) return { ok: false, error: problem };
+    resolved.push({ a, caption, options: t.options || {} });
+  }
+  if (new Set(resolved.map((r) => r.a.id)).size !== resolved.length) return { ok: false, error: '同じSNSアカウントが、重複して選ばれています。' };
+  if (draft) {
+    if (ScheduledPosts.countDrafts(userId) + resolved.length > MAX_DRAFTS) return { ok: false, error: `下書きは${MAX_DRAFTS}件までです。` };
+  } else {
+    if (ScheduledPosts.countPending(userId) + resolved.length > LIMITS.maxPending) return { ok: false, error: `未投稿の予約は${LIMITS.maxPending}件までです。` };
+    const [from, to] = jstDayBounds(scheduledAtIso);
+    if (ScheduledPosts.countScheduledBetween(userId, from, to) + resolved.length > LIMITS.maxPerDay) {
+      return { ok: false, error: `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。` };
+    }
+  }
+  const groupId = require('crypto').randomBytes(10).toString('hex');
+  const created = resolved.map(({ a, caption, options }) => ScheduledPosts.create({
+    userId, accountId: a.id, text: caption, scheduledAt: scheduledAtIso || new Date(nowMs).toISOString(),
+    mediaIds: ids, options, category, tree: cards, groupId, status: draft ? 'draft' : 'pending',
+  }));
+  return { ok: true, ids: created, groupId };
+}
+
+// 従来の形（1つのメディア・同じ本文・SNSごとの設定）での予約。画面とテストが使う
 function createPosts({ userId, accountIds, text, scheduledAtIso, mediaId, options, nowMs = Date.now() }) {
   const body = String(text || '').trim();
   if (!body && !mediaId) return { ok: false, error: '投稿の本文、または画像・動画を入力してください。' };
   const ids = [...new Set([].concat(accountIds || []).filter(Boolean))];
   if (!ids.length) return { ok: false, error: '投稿先のSNSを選んでください。' };
-  if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
-  if (!scheduledAtIso) return { ok: false, error: '投稿日時の形式が正しくありません。' };
-  const at = Date.parse(scheduledAtIso);
-  if (at < nowMs - 60 * 1000) return { ok: false, error: '過去の日時は指定できません。' };
-  if (at > nowMs + MAX_DAYS_AHEAD * 24 * 3600 * 1000) return { ok: false, error: `予約できるのは${MAX_DAYS_AHEAD}日先までです。` };
-  let media = null;
+  let category = 'text';
   if (mediaId) {
-    media = MediaAssets.getForUser(mediaId, userId);
-    if (!media) return { ok: false, error: '添付したファイルが見つかりません。もう一度アップロードしてください。' };
-    if (!String(process.env.SERVICE_BASE_URL || '').startsWith('http')) return { ok: false, error: '画像・動画の投稿は、現在ご利用いただけません。' };
+    const m = MediaAssets.getForUser(mediaId, userId);
+    if (!m) return { ok: false, error: '添付したファイルが見つかりません。もう一度アップロードしてください。' };
+    category = m.kind === 'video' ? 'video' : 'image';
   }
-  const accounts = [];
-  for (const id of ids) {
+  const targets = ids.map((id) => {
     const a = SnsAccounts.getForUser(id, userId);
-    if (!a) return { ok: false, error: '投稿先のSNSが見つかりません。' };
-    if (a.status !== 'active') return { ok: false, error: `${a.handle || a.platform}は連携のやり直しが必要です。` };
-    const ad = registry.get(a.platform);
-    if (!ad) return { ok: false, error: '未対応のSNSです。' };
-    const problem = ad.validatePost({ text: body, media, options: (options && options[a.platform]) || {} });
-    if (problem) return { ok: false, error: problem };
-    accounts.push({ a, ad });
-  }
-  if (ScheduledPosts.countPending(userId) + accounts.length > LIMITS.maxPending) {
-    return { ok: false, error: `未投稿の予約は${LIMITS.maxPending}件までです。` };
-  }
-  const [from, to] = jstDayBounds(scheduledAtIso);
-  if (ScheduledPosts.countScheduledBetween(userId, from, to) + accounts.length > LIMITS.maxPerDay) {
-    return { ok: false, error: `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。` };
-  }
-  const created = accounts.map(({ a }) => ScheduledPosts.create({
-    userId, accountId: a.id, text: body, scheduledAt: scheduledAtIso, mediaId: media ? media.id : '',
-    options: (options && options[a.platform]) || {},
-  }));
-  return { ok: true, ids: created };
+    return { accountId: id, caption: body, options: (a && options && options[a.platform]) || {} };
+  });
+  return createPost({ userId, category, targets, mediaIds: mediaId ? [mediaId] : [], scheduledAtIso, nowMs });
 }
 
 // 連携の開始：認可画面のURLを返す
@@ -135,5 +183,5 @@ async function finishConnect({ userId, platform, code, state }) {
 
 module.exports = {
   LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, snsEnabled, contactEmail, salesOpen, redirectUriFor,
-  jstLocalToIso, jstDayBounds, formatJst, formatJstShort, createPosts, startConnect, finishConnect,
+  jstLocalToIso, jstDayBounds, formatJst, formatJstShort, createPost, createPosts, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

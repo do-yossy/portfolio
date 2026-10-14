@@ -6,6 +6,7 @@ const fs = require('fs');
 const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
 const poll = require('./poll');
+const { normalize } = require('./post');
 
 const HOST = 'open.tiktokapis.com';
 const AUTH_URL = 'https://www.tiktok.com/v2/auth/authorize/';
@@ -21,7 +22,9 @@ function creds(env = process.env) { return { key: env.TIKTOK_CLIENT_KEY || '', s
 function isConfigured(env = process.env) { const c = creds(env); return !!(c.key && c.secret); }
 const textLength = (t) => [...String(t)].length;
 
-function validatePost({ text, media, options }) {
+function validatePost(args) {
+  const p = normalize(args); const text = p.text; const media = p.medias[0]; const options = p.options;
+  if (p.category === 'tree' || p.medias.length > 1) return 'TikTokは、動画を1つだけ投稿できます（複数画像・ツリーは、このバージョンでは対応していません）。';
   if (!media || media.kind !== 'video') return 'TikTokは、動画（MP4・MOV）が必要です。';
   if (textLength(text || '') > maxLength) return `TikTokのタイトルは${maxLength}文字までです。`;
   if (!options || !PRIVACY.includes(options.privacy_level)) return 'TikTokの公開範囲を選んでください。';
@@ -102,8 +105,10 @@ function chunkPlan(size) {
   return { chunkSize, total: Math.floor(size / chunkSize) };
 }
 
-async function publish({ accessToken, text, media, options }) {
-  const err = validatePost({ text, media, options });
+async function publish(args) {
+  const { accessToken } = args;
+  const p = normalize(args); const text = p.text; const media = p.medias[0]; const options = p.options;
+  const err = validatePost(args);
   if (err) throw new SnsError(err);
   const info = await call({ path: '/v2/post/publish/creator_info/query/', headers: bearer(accessToken), body: '{}' });
   const allowed = (info.data && info.data.privacy_level_options) || [];
