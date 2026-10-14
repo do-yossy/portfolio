@@ -121,6 +121,15 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
   ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
   ok(r.text.includes('使えるSNS') && r.text.includes('無料体験') && !r.text.includes('Xは月30件まで'), '比較表に使えるSNSと無料体験の行があり、Xを提供していなければXの上限を出さない');
+  ok(r.text.includes('SNSへの投稿を、まとめて予約。') && !r.text.includes('複数のSNSへの投稿を') && !r.text.includes('いくつものSNS') && r.text.includes('公式サイト（料金と概要のページ）'), '使えるSNSが1つだけのときは、LPで「複数のSNS」と書かない。比較の確認元は「料金と概要のページ」');
+  process.env.FACEBOOK_APP_ID = 'fb'; process.env.FACEBOOK_APP_SECRET = 'fbs';
+  r = await req('GET', '/service/lp');
+  const lpMulti = r.text;
+  r = await req('GET', '/service');
+  ok(lpMulti.includes('複数のSNSへの投稿を、まとめて予約。') && r.text.includes('複数のSNSへの投稿を、1つの画面から') && r.text.includes('複数のSNSへ同時投稿'), '使えるSNSが2つ以上になったら、「複数のSNS」と書く');
+  delete process.env.FACEBOOK_APP_ID; delete process.env.FACEBOOK_APP_SECRET;
+  r = await req('GET', '/service');
+  ok(r.text.includes('SNSへの投稿を、日時を決めて予約できるサービスです') && !r.text.includes('複数のSNSへ同時投稿'), 'サービスの説明のページも、使えるSNSが1つだけなら「複数のSNS」と書かない');
   const uiMod = require('../lib/service-ui');
   ok(uiMod.compareActive(1000, Date.parse('2026-11-01T00:00:00+09:00')) && !uiMod.compareActive(1000, Date.parse('2026-12-15T00:00:00+09:00')), '価格を確認した日から45日を過ぎたら、比較を自動で出さない');
   process.env.SERVICE_LP_COMPARE = 'off';

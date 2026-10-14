@@ -96,15 +96,16 @@ function landingPage({ user, billingReady, trialDays = 0 }) {
   const feat = (t, d) => `<div class="card"><div class="card-title">${t}</div><p class="small">${d}</p></div>`;
   const aiParts = [av.text && '投稿文', av.image && '画像', av.video && '動画'].filter(Boolean);
   const treeNames = liveSns().filter((p) => p.id === 'threads' || p.id === 'x').map((p) => p.label).join('と');
+  const multi = liveSns().length >= 2; // 使えるSNSが1つ以下のときは「複数のSNS」と書かない
   return wrap('SNS自動投稿サービス', `
     ${topNav(user)}
     <header class="page-head"><div class="eyebrow">SNS Scheduler</div><h1>${nameOf()}</h1>
-      <p class="lead">複数のSNSへの投稿を、1つの画面からまとめて予約できるサービスです。${names ? `現在の対応SNSは、${escapeHtml(names)}です。` : '対応SNSは準備中です。'}</p></header>
+      <p class="lead">${multi ? '複数のSNSへの投稿を、1つの画面からまとめて予約できるサービスです。' : 'SNSへの投稿を、日時を決めて予約できるサービスです。'}${names ? `現在の対応SNSは、${escapeHtml(names)}です。` : '対応SNSは準備中です。'}</p></header>
     <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます（解約後も、契約期間の終わりまでご利用いただけます）</small>${trialDays ? `<small><b>初めての方は${trialDays}日間無料</b>（お支払い方法の登録が必要です。期間が終わると自動で課金が始まります）</small>` : ''}</div>
     ${cta}
     <h2 style="margin-top:26px">できること</h2>
     <div class="grid2">
-      ${feat('複数のSNSへ同時投稿', `${names ? `${escapeHtml(names)}に対応しています。` : '対応SNSは準備中です。'}同じ内容を、選んだSNSへまとめて投稿・予約できます。SNSごとに本文を変えることもできます。`)}
+      ${feat(multi ? '複数のSNSへ同時投稿' : 'SNSへの予約投稿', `${names ? `${escapeHtml(names)}に対応しています。` : '対応SNSは準備中です。'}${multi ? '同じ内容を、選んだSNSへまとめて投稿・予約できます。SNSごとに本文を変えることもできます。' : '決めた日時に、自動で投稿します。'}`)}
       ${feat('テキスト・画像・動画・ツリー', `複数の画像（カルーセル）、動画${treeNames ? `、${escapeHtml(treeNames)}のツリー（連投）` : ''}に対応しています（SNSごとの条件は下記）。`)}
       ${feat('予約・下書き・カレンダー', '日本時間で最大90日先まで予約できます。下書きに保存して、あとから予約することも。予約はカレンダーで一覧できます。')}
       ${aiParts.length ? feat('AIで投稿づくりから投稿まで', `テーマを入れると、AIが${aiParts.join('・')}を作ります。「自動運用」では、決めた時刻（1日3回まで）にAIが投稿を作り、下書きに入れるか、そのまま予約します。テーマを複数書けば、回ごとに順番に使い、最近の投稿と同じ内容にならないようにします（TikTokは投稿ごとにご本人の確認が必要なため、自動運用の対象外です）。`) : ''}
@@ -133,7 +134,8 @@ function landingPage({ user, billingReady, trialDays = 0 }) {
 }
 
 // ── 固定投稿から来た人向けのLP（/service/lp）──
-// 価格の比較は、公式の料金ページで確認した、条件をそろえて言える範囲だけ（下書き/_調査_予約投稿ツールの価格.md）。
+// 価格の比較は、公式サイト（価格・条件は料金ページ、使えるSNSは概要のページ）で確認した、条件をそろえて言える範囲だけ（下書き/_調査_予約投稿ツールの価格.md）。
+// 確認日（checked）を更新するときは、料金・年払い・税込・アカウント数・上限・無料体験・使えるSNSをすべて確かめ直す（1つでも確かめられなければ比較をやめる）。
 // 他社の名前は出さない（サービスA）。根拠（確認した相手・日付・ページ）は社内の調査記録に残している。
 // 「国内の同じ種類のサービスの中でいちばん安いプランの、さらに半額以下」と読まれないよう、特定の1社の1プランと比べていることが先に分かる語順にする
 // （「サービスA（…サービスの1つ）の最安の有料プラン（…）と比べて、半額以下」。Threadsの固定投稿（下書き/Threads固定投稿_出品用.md）と同じ書き方）。
@@ -153,6 +155,7 @@ const jpDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `
 function lpPage({ user, billingReady, trialDays = 0 }) {
   const priceN = core.priceYen(); const price = yen(priceN);
   const L = core.LIMITS; const names = snsNames(); const av = aiLib().available();
+  const multi = liveSns().length >= 2; // 使えるSNSが1つ以下のときは「複数のSNS」と書かない
   const cmp = compareActive(priceN); // 半額以下で、確認日から間もないときだけ比較を出す
   const checked = jpDate(COMPARE.checked);
   const cta = billingReady
@@ -165,14 +168,14 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
   return wrap(`SNSの予約投稿を月額${price}で`, `
     ${topNav(user)}
     <header class="page-head"><div class="eyebrow">SNS Scheduler</div>
-      <h1>複数のSNSへの投稿を、まとめて予約。</h1>
+      <h1>${multi ? '複数のSNSへの投稿を、まとめて予約。' : 'SNSへの投稿を、まとめて予約。'}</h1>
       <p class="lead">発信を続けたいけれど、毎日その場で投稿する時間がない。そんな方のための、予約投稿のサービスです。投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p></header>
     <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます</small>${cmp ? `<small>参考：${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン（${yen(COMPARE.price)}・${COMPARE.note}）と比べて、半額以下です。予約の上限・使えるSNS・無料体験などの条件は異なります（${checked}に${COMPARE.name}の公式の料金ページで確認。詳しくは下の「料金の比べ方」）。</small>` : ''}</div>
     ${cta}
     <h2 style="margin-top:26px">こんな方に</h2>
     <div class="card"><ul class="plain small">
       <li>毎日の投稿を、その場で考えて出すのが負担になっている</li>
-      <li>同じお知らせを、いくつものSNSに出すのが手間</li>
+      ${multi ? '<li>同じお知らせを、いくつものSNSに出すのが手間</li>' : ''}
       <li>投稿文の下書きを、AIに手伝ってもらいたい</li>
     </ul></div>
     <h2 style="margin-top:26px">使い方は3つの手順</h2>
@@ -190,7 +193,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
       <tr>${th('投稿・予約の上限')}<td>${ours}</td><td>${COMPARE.posts}</td></tr>
       <tr>${th('無料体験')}<td>${trialDays ? `${trialDays}日間（初めての方）` : 'なし'}</td><td>${COMPARE.trial}</td></tr>
     </table>
-    <p class="small">${COMPARE.name}の価格・条件は、${checked}に同社の公式の料金ページで確認したものです（その後、変わっている場合があります）。機能・上限・使えるSNSは、両者で異なります。いちばん安いサービスであることをお約束するものではありません。</p></div>` : ''}
+    <p class="small">${COMPARE.name}の価格・条件は、${checked}に同社の公式サイト（料金と概要のページ）で確認したものです（その後、変わっている場合があります）。機能・上限・使えるSNSは、両者で異なります。いちばん安いサービスであることをお約束するものではありません。</p></div>` : ''}
     <h2 style="margin-top:26px">ご利用の前にご確認ください</h2>
     <div class="card"><ul class="plain small">
       ${names ? `<li>SNSごとの条件：${escapeHtml(snsRulesText())}。</li>` : ''}
