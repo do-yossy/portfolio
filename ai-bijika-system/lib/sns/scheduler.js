@@ -76,6 +76,28 @@ async function processOne(post) {
   }
 }
 
+// 長期トークンの定期延長。Threads・Instagram のトークンは60日で切れ、60日間延長しないと延長もできなくなる（公式）。
+// 投稿があるときだけ延長する作りだと、61〜90日先の予約や、しばらく投稿しない人の連携が切れるため、期限の7日前から毎日延長を試みる
+const LONG_LIVED = ['threads', 'instagram'];
+async function refreshExpiring(nowMs = Date.now()) {
+  const k = key();
+  let n = 0;
+  for (const account of SnsAccounts.listExpiring(LONG_LIVED, new Date(nowMs + 7 * 24 * 3600 * 1000).toISOString())) {
+    const adapter = registry.get(account.platform);
+    if (!adapter || !adapter.refresh) continue;
+    try {
+      const access = box.decrypt(account.access_token_enc, k);
+      const r = await adapter.refresh({ accessToken: access, refreshToken: '' });
+      SnsAccounts.updateTokens(account.id, { accessTokenEnc: box.encrypt(r.accessToken, k), refreshTokenEnc: account.refresh_token_enc, expiresAt: r.expiresAt });
+      n++;
+    } catch (e) {
+      if (e && e.authError) SnsAccounts.setStatus(account.id, 'reauth_required');
+      console.error('[token refresh]', account.platform, e && e.message);
+    }
+  }
+  return n;
+}
+
 let running = false;
 // 実行時刻が来た予約を処理する。戻り値は処理件数
 async function tick(limit = 20) {
@@ -99,8 +121,11 @@ function start(intervalMs = 30000) {
   ScheduledPosts.failStuck(new Date(Date.now() - 5 * 60 * 1000).toISOString());
   timer = setInterval(() => { tick().catch((e) => console.error('[scheduler]', e)); }, intervalMs);
   if (timer.unref) timer.unref();
-  // 投稿が終わったメディアを1時間ごとに削除する
-  const clean = () => { try { mediaLib.cleanup(); } catch (e) { console.error('[media cleanup]', e); } };
+  // 投稿が終わったメディアの削除と、長期トークンの延長を、1時間ごとに行う
+  const clean = () => {
+    try { mediaLib.cleanup(); } catch (e) { console.error('[media cleanup]', e); }
+    refreshExpiring().catch((e) => console.error('[token refresh]', e));
+  };
   clean();
   cleanTimer = setInterval(clean, 3600 * 1000);
   if (cleanTimer.unref) cleanTimer.unref();
@@ -112,4 +137,4 @@ function stop() {
   cleanTimer = null;
 }
 
-module.exports = { tick, start, stop, processOne, ensureAccessToken, MAX_ATTEMPTS };
+module.exports = { tick, start, stop, processOne, ensureAccessToken, refreshExpiring, MAX_ATTEMPTS };

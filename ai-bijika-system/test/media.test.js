@@ -117,6 +117,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
     if (c.host === 'graph.threads.net') {
       if (c.path === '/v1.0/th1/threads') return { status: 200, json: { id: 'th_container' } };
       if (c.path === '/v1.0/th1/threads_publish') return { status: 200, json: { id: 'th_post_1' } };
+      if (c.method === 'GET' && /^\/v1\.0\/th_container\?fields=status/.test(c.path)) return { status: 200, json: { status: 'FINISHED' } };
     }
     if (c.host === 'open.tiktokapis.com') {
       if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };

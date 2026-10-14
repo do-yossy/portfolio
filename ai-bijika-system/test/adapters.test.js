@@ -35,7 +35,7 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   mock = installHttpsMock(async (c) => {
     if (/\/threads$/.test(c.path)) return { status: 200, json: { id: `c${++n}` } };
     if (/threads_publish$/.test(c.path)) return { status: 200, json: { id: `p${++pubN}` } };
-    return { status: 200, json: {} };
+    return { status: 200, json: { status: 'FINISHED' } };
   });
   r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'tree', text: '1', medias: [], tree: [{ text: '2', medias: [] }, { text: '3', medias: [img(9)] }] } });
   mock.restore();
@@ -48,7 +48,7 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   mock = installHttpsMock(async (c) => {
     if (/\/threads$/.test(c.path)) { n++; return n === 2 ? { status: 503, json: { error: { message: 'down' } } } : { status: 200, json: { id: `c${n}` } }; }
     if (/threads_publish$/.test(c.path)) return { status: 200, json: { id: `p${++pubN}` } };
-    return { status: 200, json: {} };
+    return { status: 200, json: { status: 'FINISHED' } };
   });
   let err = null;
   try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'tree', text: '1', medias: [], tree: [{ text: '2', medias: [] }] } }); } catch (e) { err = e; }
@@ -68,6 +68,27 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   ok(r.externalId === 'igp' && /is_carousel_item=true/.test(ib[0]) && /media_type=VIDEO/.test(ib[1]) && /media_type=CAROUSEL/.test(ib[2]) && /caption=cap/.test(ib[2]), 'Instagramのカルーセル（画像＋動画）を投稿できる');
   ok(ig.validatePost({ post: { category: 'image', text: '', medias: Array.from({ length: 11 }, (_, i) => img(i)) } }), '11件は拒否する');
   ok(ig.validatePost({ post: { category: 'tree', text: '', medias: [img(1)], tree: [{ text: 'x' }] } }), 'Instagramはツリー不可');
+  console.log('Threads 公開の応答が失われた場合');
+  mock = installHttpsMock(async (c) => {
+    if (/\/threads$/.test(c.path)) return { status: 200, json: { id: 'cx' } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    return { status: 200, json: { status: 'PUBLISHED' } };
+  });
+  r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } });
+  mock.restore();
+  ok(r.externalId === 'cx', '公開の応答が失われても、コンテナが PUBLISHED なら投稿済みとして記録する（利用者に確認をお願いしない）');
+  let fin = 0;
+  mock = installHttpsMock(async (c) => {
+    if (/\/threads$/.test(c.path)) return { status: 200, json: { id: 'cy' } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    fin++; return { status: 200, json: { status: 'FINISHED' } };
+  });
+  err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && err.retriable === true, 'コンテナがまだ FINISHED（未公開）なら、安全に再試行できる');
+  ok(th.textLength('あ😀') === 5 && th.textLength('abc') === 3, 'Threadsの文字数は、絵文字をUTF-8のバイト数で数える（公式の数え方）');
+  ok(/\b300\b|5分/.test(th.validatePost({ post: { category: 'video', text: '', medias: [{ kind: 'video', durationSec: 301 }] } }) || ''), 'Threadsの動画は5分まで');
+
   console.log('X ツリー');
   let tn = 0;
   mock = installHttpsMock(async () => ({ status: 201, json: { data: { id: `t${++tn}` } } }));

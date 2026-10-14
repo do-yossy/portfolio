@@ -11,9 +11,13 @@ class SnsError extends Error {
   }
 }
 
-// HTTPステータスから分類する
+// HTTPステータスから分類する。
+// 401 だけを「連携のやり直しが必要」とする。403 は「権限・上限・規約などで、その操作が許可されていない」ことが多く
+// （例：投稿数の上限、審査前の制限、割り当ての使い切り）、連携し直しても直らないため、通常の失敗として理由をそのまま示す。
+// トークンの失効など、403 でも再連携が必要なものは、各SNSのエラーコードで個別に authError にする
 function classify(status, message) {
-  if (status === 401 || status === 403) return new SnsError(message || '認証エラーです。SNSの連携をやり直してください。', { authError: true, status });
+  if (status === 401) return new SnsError(message || '認証エラーです。SNSの連携をやり直してください。', { authError: true, status });
+  if (status === 403) return new SnsError(message || 'SNS側で、この操作が許可されませんでした (403)', { status });
   if (status === 429 || status >= 500) return new SnsError(message || `一時的なエラーです (${status})`, { retriable: true, status });
   return new SnsError(message || `SNS側でエラーになりました (${status})`, { status });
 }

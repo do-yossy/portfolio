@@ -43,6 +43,7 @@ const mock = installHttpsMock(async (c) => {
     if (c.path.startsWith('/v1.0/me?')) return { status: 200, json: { id: '4242', username: 'e2e_user' } };
     if (c.path === '/v1.0/4242/threads') return { status: 200, json: { id: 'cont_1' } };
     if (c.path === '/v1.0/4242/threads_publish') return { status: 200, json: { id: 'post_e2e' } };
+    if (c.method === 'GET' && /^\/v1\.0\/cont_1\?fields=status/.test(c.path)) return { status: 200, json: { status: 'FINISHED' } };
   }
   return null;
 });
@@ -196,7 +197,7 @@ function webhook(event, secret = 'whsec_e2e') {
 
   console.log('SNS連携と予約');
   r = await req('GET', '/service/connect/threads');
-  ok(r.status === 302 && r.headers.location.startsWith('https://threads.net/oauth/authorize'), 'Threadsの認可画面へ移動する');
+  ok(r.status === 302 && r.headers.location.startsWith('https://threads.com/oauth/authorize'), 'Threadsの認可画面へ移動する');
   const st = new URL(r.headers.location).searchParams.get('state');
   r = await req('GET', `/service/oauth/callback/threads?code=abc&state=${st}`);
   ok(r.status === 302 && r.headers.location === '/service/app?f=connected', '連携を完了する');

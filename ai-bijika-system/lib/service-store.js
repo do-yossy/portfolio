@@ -251,6 +251,11 @@ const SnsAccounts = {
   countForUser(userId) {
     return db.prepare('SELECT COUNT(*) AS n FROM sns_accounts WHERE user_id = ?').get(userId).n;
   },
+  // 期限が近い連携（期限の延長が必要なもの）
+  listExpiring(platforms, beforeIso) {
+    const ph = platforms.map(() => '?').join(',');
+    return db.prepare(`SELECT * FROM sns_accounts WHERE status='active' AND expires_at <> '' AND expires_at < ? AND platform IN (${ph})`).all(beforeIso, ...platforms);
+  },
   updateTokens(id, { accessTokenEnc, refreshTokenEnc, expiresAt }) {
     db.prepare('UPDATE sns_accounts SET access_token_enc=?, refresh_token_enc=?, expires_at=?, status=\'active\', updated_at=? WHERE id=?')
       .run(accessTokenEnc, refreshTokenEnc || '', expiresAt || '', now(), id);

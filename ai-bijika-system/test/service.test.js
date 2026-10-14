@@ -158,6 +158,7 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
         return { status: 200, json: { id: 'container_1' } };
       }
       if (c.path === '/v1.0/777/threads_publish') return { status: 200, json: { id: 'thread_post_1' } };
+      if (c.method === 'GET' && /^\/v1\.0\/container_\d+\?fields=status/.test(c.path)) return { status: 200, json: { status: 'FINISHED' } };
       if (c.path.startsWith('/refresh_access_token?')) return { status: 200, json: { access_token: 'th_long_2', expires_in: 5184000 } };
     }
     if (c.host === 'api.x.com') {
@@ -173,7 +174,7 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   });
 
   const th = core.startConnect({ userId: userB, platform: 'threads' });
-  ok(th.ok && th.url.startsWith('https://threads.net/oauth/authorize?') && th.url.includes('threads_content_publish'), 'Threadsの認可URLを作れる');
+  ok(th.ok && th.url.startsWith('https://threads.com/oauth/authorize?') && th.url.includes('threads_content_publish') && th.url.includes('threads_manage_replies'), 'Threadsの認可URLを作れる');
   const thState = new URL(th.url).searchParams.get('state');
   const bad = await core.finishConnect({ userId: userB, platform: 'threads', code: 'c', state: 'wrong' });
   ok(!bad.ok, '不正なstateでは連携できない');
@@ -281,6 +282,12 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   store.ScheduledPosts.failStuck(new Date(Date.now() + 1000).toISOString());
   ok(store.ScheduledPosts.get(p8).status === 'failed' && /再起動/.test(store.ScheduledPosts.get(p8).last_error), '起動時に処理中のまま残った予約は二重投稿を避けて失敗扱いにする');
 
+  // 長期トークンの定期延長：期限まで7日を切った Threads の連携を、投稿が無くても延長する
+  const soonAcc = store.SnsAccounts.upsert({ userId: userA, platform: 'threads', externalUserId: 'soon1', handle: '@soon', accessTokenEnc: box.encrypt('old_long', k), expiresAt: new Date(Date.now() + 3 * 86400000).toISOString() });
+  const refreshedN = await scheduler.refreshExpiring();
+  const soonId = typeof soonAcc === 'object' ? soonAcc.id : soonAcc;
+  const afterRefresh = store.SnsAccounts.get(soonId);
+  ok(refreshedN >= 1 && box.decrypt(afterRefresh.access_token_enc, k) === 'th_long_2' && Date.parse(afterRefresh.expires_at) > Date.now() + 50 * 86400000, '期限が近い Threads の連携を、投稿が無くても定期的に延長する');
   mockSns.restore();
   console.log('対応SNS');
   ok(registry.list().map((p) => p.id).join() === 'threads,x,instagram,tiktok,facebook,youtube', 'Threads・X・Instagram・TikTok・Facebook・YouTube に対応している');
