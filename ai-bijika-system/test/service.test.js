@@ -126,6 +126,9 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   const keepAcc = store.SnsAccounts.upsert({ userId: userSync, platform: 'threads', externalUserId: 'keep1', handle: '@keep', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
   await billing.handleEvent({ id: 'evt_old_deleted', type: 'customer.subscription.deleted', created: Math.floor(Date.now() / 1000) - 5, data: { object: { id: 'sub_old', customer: 'cus_sync', status: 'canceled', current_period_end: periodEnd, cancel_at_period_end: false, metadata: { user_id: userSync }, items: { data: [] } } } });
   ok(store.Subscriptions.isActive(userSync) && store.Subscriptions.get(userSync).stripe_subscription_id === 'sub_sync' && store.SnsAccounts.get(keepAcc) !== null, '再契約のあとに届いた古い契約の終了イベントでは、いまの契約も連携情報も変わらない');
+  // 時刻の情報がないイベント（順序制御が働かない場合）でも、古い契約の終了では、いまの契約を変えない
+  await billing.handleEvent({ id: 'evt_old_deleted2', type: 'customer.subscription.deleted', data: { object: { id: 'sub_old2', customer: 'cus_sync', status: 'canceled', current_period_end: periodEnd, cancel_at_period_end: false, metadata: { user_id: userSync }, items: { data: [] } } } });
+  ok(store.Subscriptions.isActive(userSync) && store.SnsAccounts.get(keepAcc) !== null, '時刻のない古い契約の終了イベントでも、いまの契約と連携情報は変わらない（契約IDの照合）');
   // 順不同で届いた古いイベントで、新しい状態を上書きしない
   const T = Math.floor(Date.now() / 1000) + 1000;
   const subEv = (id, status, created) => ({ id, type: 'customer.subscription.updated', created, data: { object: { id: 'sub_1', customer: 'cus_1', status, current_period_end: periodEnd, cancel_at_period_end: false, metadata: {}, items: { data: [] } } } });
