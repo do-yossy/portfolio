@@ -677,6 +677,22 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
   ok(r.status === 429, '運営者画面のログインの失敗が続くと、正しいパスワードでも一時的に制限する');
 
+  console.log('本体のアプリで、独自のアドレス（SERVICE_HOST）だけサービスを出す（追加のサーバー代なし）');
+  process.env.SERVICE_HOST = 'post.example.test';
+  cookie = '';
+  r = await req('GET', '/', { headers: { Host: 'post.example.test' } });
+  ok(r.status === 302 && r.headers.location === '/service', 'SERVICE_HOST のアドレスで開くと、トップはサービスのページへ移動する');
+  r = await req('GET', '/dashboard', { headers: { Host: 'post.example.test' } });
+  ok(r.status === 302 && r.headers.location === '/service', 'SERVICE_HOST のアドレスでは、ミチシルベ本体の画面を出さない');
+  r = await req('GET', '/service/lp', { headers: { Host: 'post.example.test' } });
+  ok(r.status === 200 && !r.text.includes('ミチシルベ'), 'SERVICE_HOST のアドレスで、LPを出す');
+  r = await req('GET', '/');
+  ok(r.status === 200, 'ほかのアドレス（本体）では、ミチシルベ本体の画面はそのまま');
+  process.env.SERVICE_MOVED_TO = 'https://post.example.test';
+  r = await req('GET', '/service/lp?a=1');
+  ok(r.status === 302 && r.headers.location === 'https://post.example.test/service/lp?a=1', '本体のアドレスの /service は、同じアプリの SERVICE_HOST へ転送する（データベースが同じなので、利用者がいても転送してよい）');
+  delete process.env.SERVICE_MOVED_TO; delete process.env.SERVICE_HOST;
+
   console.log('既存のアプリへの影響');
   cookie = '';
   r = await req('GET', '/');

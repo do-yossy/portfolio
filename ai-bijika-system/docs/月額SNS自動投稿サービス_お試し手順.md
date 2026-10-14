@@ -1,40 +1,44 @@
 # 月額SNS自動投稿サービス お試し手順（運営者向け）
 
-決済（Stripe）を設定しなくても、運営者ご自身のアカウントで、この商品の本番のサイト（`https://michishirube-post.fly.dev/service`）を実際に試すための手順です。販売ページは「準備中」のままで、一般の方は申し込めません。
+決済（Stripe）を設定しなくても、運営者ご自身のアカウントで、この商品の本番のサイトを実際に試すための手順です。販売ページは「準備中」のままで、一般の方は申し込めません。
 
-この商品は、ミチシルベ本体（`aipro.social-quality.com`）とは別の、専用のアプリ（Fly.io のアプリ `michishirube-post`）で動きます。
+**追加の費用をかけない形**で動かします。
 
-- **ドメイン**：`michishirube-post.fly.dev` は、Fly.io が無料で付けるアドレスです。
-- **データベース**：ミチシルベ本体とは別です。アカウントや設定値も、ミチシルベ本体とは別に登録します。
-- **費用**：専用アプリは、ミチシルベ本体とは別のサーバー（Fly.io のマシン1台と、1GBのボリューム）を使います。そのため、Fly.io の利用料が別にかかります（金額は Fly.io の料金表で確認してください）。
+- **サーバー**：サービスは、すでに動いているミチシルベ本体のアプリ（Fly.io の `sq-ai-bijika`）で動かします。サーバーは増えないので、利用料は今と変わりません。
+- **アドレス**：会社のドメインの下のアドレス（以下、例として `post.social-quality.com`）を本体のアプリにつなげます。このアドレスで開いたときだけ、自動投稿サービスの画面（ミチシルベの記載なし）を出します。
+- **X**：API が有料（投稿数に応じた従量課金）のため使いません。キーを登録しなければ、X は画面にも規約にも出ません。
+- **ツール内のAI**：有料なので使いません（キーを登録しない）。利用者は「ご自身のAIで作る」（ChatGPT・Claude・Gemini）を使えます。
 
-- **所要時間の目安**：手順1〜5は15分ほど、手順6（Threadsの連携）はMetaの画面の操作に慣れていれば30分ほどです（画面の表記や手順は、各社の変更により変わることがあります）。
-- **前提**：この手順書と同じ変更（テスト利用・設定の確認画面・専用アプリ）が `main` に入っていること。
-
----
-
-## 手順0. 専用アプリができているか確かめる
-
-1. `main` に変更が入ると、GitHub Actions の「Deploy SNS自動投稿サービス（専用アプリ）」が、専用アプリ `michishirube-post` とデータの保存先（ボリューム）を初回だけ自動で作り、デプロイします。
-2. `https://michishirube-post.fly.dev/service` を開いて、サービスのページ（「準備中」の表示）が出れば完了です。
-3. 出ない場合は、GitHub の「Actions」で、このワークフローの結果を確認します。
-   - **「アプリを作れませんでした」という警告**：GitHub に登録している Fly.io のトークンに、アプリを作る権限がありません。または、名前がすでに使われています。flyctl が入ったPCで、次を一度だけ実行してから、GitHub の「Actions」でこのワークフローを選び「Run workflow」を押してください。
-     ```
-     fly apps create michishirube-post
-     fly volumes create sns_post_data -a michishirube-post --region nrt --size 1
-     ```
-   - **名前がすでに使われている場合**：`ai-bijika-system/fly.sns.toml` の `app` と、`.github/workflows/deploy-sns-post.yml` の `APP` を、別の名前（例：`michishirube-post-jp`）に変えてください。アドレスは `https://（その名前）.fly.dev` になります。
+- **所要時間の目安**：手順0〜5は30分ほど、手順6（Threadsの連携）はMetaの画面の操作に慣れていれば30分ほどです（画面の表記や手順は、各社の変更により変わることがあります）。
+- **前提**：この手順書と同じ変更が `main` に入り、本体のアプリの自動デプロイが終わっていること。
 
 ---
+
+## 手順0. 費用がかかる専用アプリを止め、無料のアドレスを用意する
+
+1. **専用アプリを止める**：以前の変更で、専用アプリ `michishirube-post`（`https://michishirube-post.fly.dev`）が作られ、Fly.io の利用料がかかり始めています。flyctl が入ったPCで、次を実行して削除してください（中に大事なデータはありません）。
+   ```
+   fly apps destroy michishirube-post
+   ```
+   以後、専用アプリは自動では作られません（GitHub Actions のワークフローは、手動で実行したときだけ動きます）。
+2. **アドレスを決める**：例は `post.social-quality.com` です。別の名前（例：`sns.social-quality.com`）にする場合は、以下の `post.social-quality.com` をすべて読み替えてください。
+3. **DNSを設定する**：`social-quality.com` のDNSの管理画面で、`post` の CNAME レコードを `sq-ai-bijika.fly.dev` に向けます（`aipro.social-quality.com` と同じ設定方法です）。
+4. **証明書を追加する**：次を実行します。証明書が無料の範囲に収まるかは、Fly.io の料金表で確認してください。
+   ```
+   fly certs add post.social-quality.com -a sq-ai-bijika
+   ```
+   数分たって `fly certs show post.social-quality.com -a sq-ai-bijika` で発行済みになれば完了です。
 
 ## 手順1. Fly.io に設定値（シークレット）を登録する
 
-次の値を、Fly.io の**専用アプリ `michishirube-post`** のシークレットに登録します（ミチシルベ本体の `sq-ai-bijika` ではありません）。コマンドで登録すると、アプリが自動で再起動します。**再起動すると、ログインしていた人はログアウトされます**（ログイン状態はサーバーのメモリにあるため）。
+次の値を、Fly.io の**ミチシルベ本体のアプリ `sq-ai-bijika`** のシークレットに登録します。コマンドで登録すると、アプリが自動で再起動します。**再起動すると、ログインしていた人はログアウトされます**（ログイン状態はサーバーのメモリにあるため）。
 
 | 名前 | 入れる値 | 説明 |
 |---|---|---|
-| `ADMIN_PASSWORD` | ご自身で決めた、推測されにくいパスワード | 運営者画面のパスワード。**専用アプリでは、設定するまで運営者画面に入れません** |
-| `SERVICE_BASE_URL` | `https://michishirube-post.fly.dev` | サービスのURL（最後に `/` を付けない） |
+| `ADMIN_PASSWORD` | ご自身で決めた、推測されにくいパスワード | 運営者画面のパスワード。**すでに設定済みなら不要**です（本番では、設定するまで運営者画面に入れません） |
+| `SERVICE_HOST` | `post.social-quality.com` | このアドレスで開いたときだけ、サービスの画面を出す |
+| `SERVICE_BASE_URL` | `https://post.social-quality.com` | サービスのURL（最後に `/` を付けない） |
+| `SERVICE_MOVED_TO` | `https://post.social-quality.com` | 本体のアドレスの `/service` を、上のアドレスへ転送する |
 | `SNS_TOKEN_KEY` | 64桁の16進数（0〜9とa〜f。下の方法で作る） | SNSの連携情報を暗号化する鍵。**一度決めたら変えない**。形式が違うと、運営者画面の「設定の確認」に「形式が正しくありません」と出ます |
 | `APP_SECRET` | 64桁の16進数（別に作る） | 画面の操作の確認用の鍵 |
 
@@ -52,44 +56,44 @@
 
 - **コマンド**（flyctl が入っている場合）：
   ```
-  fly secrets set -a michishirube-post SERVICE_BASE_URL=https://michishirube-post.fly.dev SNS_TOKEN_KEY=（作った値） APP_SECRET=（作った値）
+  fly secrets set -a sq-ai-bijika SERVICE_HOST=post.social-quality.com SERVICE_BASE_URL=https://post.social-quality.com SERVICE_MOVED_TO=https://post.social-quality.com SNS_TOKEN_KEY=（作った値） APP_SECRET=（作った値）
   ```
-  同じコマンドに `ADMIN_PASSWORD=（決めたパスワード）` も足します。
-- **Fly.io の管理画面**：Fly.io にログインし、アプリ `michishirube-post` の「Secrets」から1つずつ追加します。管理画面で登録したときに自動で反映されるかは確認できていないため、反映されない（「設定の確認」に ✅ が付かない）場合は、GitHub の「Actions」で「Deploy SNS自動投稿サービス（専用アプリ）」を選び「Run workflow」で再デプロイしてください。
+  `ADMIN_PASSWORD` が未設定なら、同じコマンドに `ADMIN_PASSWORD=（決めたパスワード）` も足します。
+- **Fly.io の管理画面**：Fly.io にログインし、アプリ `sq-ai-bijika` の「Secrets」から1つずつ追加します。管理画面で登録したときに自動で反映されるかは確認できていないため、反映されない（「設定の確認」に ✅ が付かない）場合は、GitHub の「Actions」で「Deploy AI商品化実践システム」を選び「Run workflow」で再デプロイしてください。
 
 ## 手順2. 設定を確認する
 
-1. `https://michishirube-post.fly.dev/admin/login` を開き、`ADMIN_PASSWORD` でログインします。
-2. `https://michishirube-post.fly.dev/admin/service` を開き、「設定の確認」の表を見ます。
+1. `https://post.social-quality.com/admin/login` を開き、`ADMIN_PASSWORD` でログインします。
+2. `https://post.social-quality.com/admin/service` を開き、「設定の確認」の表を見ます。
 3. 次の4つに ✅ が付いていれば、手順3に進めます：管理画面のパスワード、サービスのURL、トークンの暗号化の鍵、画面の操作の確認用の鍵。
 
 この表は、値そのものは表示せず、設定されているかどうかだけを示します。
 
 ## 手順3. お試し用のアカウントを作る
 
-1. `https://michishirube-post.fly.dev/service/signup` を開きます。
+1. `https://post.social-quality.com/service/signup` を開きます。
 2. メールアドレスと、8文字以上のパスワードで登録します。
 3. 登録後は「準備中」のページに戻りますが、アカウントは作られています。
 
 ## 手順4. 自分のアカウントに「テスト利用」を付ける
 
-1. `https://michishirube-post.fly.dev/admin/service` の「テスト利用」の欄に、手順3のメールアドレスを入れます。
+1. `https://post.social-quality.com/admin/service` の「テスト利用」の欄に、手順3のメールアドレスを入れます。
 2. 「テスト利用を付与」を押します。
 
 テスト利用は、決済をせずに全機能を使える状態です（料金はかかりません）。試し終わったら、同じ画面の「テスト利用を取り消す」で元に戻せます。取り消すと、SNSの連携・AIアシスタントとの接続・APIキーも解除されます。
 
 ## 手順5. ログインして、SNSなしで試せることを確かめる
 
-1. `https://michishirube-post.fly.dev/service/login` でログインし、マイページを開きます。
+1. `https://post.social-quality.com/service/login` でログインし、マイページを開きます。
 2. マイページに「テスト利用中」と表示されることを確かめます。
 3. SNSを連携しなくても、次のことを試せます。
    - **APIキーの発行**：マイページの「APIキーを発行」を押します。キーはその画面で1度だけ表示されるので、控えてください。
    - **APIの呼び出し**：Git Bash などで次のコマンドを実行し、`{"accounts":[]}` のような応答が返れば成功です（`$KEY` は控えたキー）。
      ```
      KEY=（控えたキー）
-     curl https://michishirube-post.fly.dev/api/v1/accounts -H "Authorization: Bearer $KEY"
+     curl https://post.social-quality.com/api/v1/accounts -H "Authorization: Bearer $KEY"
      ```
-   - **AIアシスタントとの接続（MCP）**：MCPのカスタム接続に対応したAIアシスタントのアプリで、接続先URLに `https://michishirube-post.fly.dev/mcp` を追加します。
+   - **AIアシスタントとの接続（MCP）**：MCPのカスタム接続に対応したAIアシスタントのアプリで、接続先URLに `https://post.social-quality.com/mcp` を追加します。
      - ログイン画面と「接続を許可しますか？」の画面が出たら、「許可する」を押します。
      - 接続できたら、「契約情報と利用状況を見せて」と頼むと、`get_account_info` が呼ばれます。
      - カスタム接続を使えるプランかどうかは、お使いのアプリでご確認ください。実物のアプリでの接続は、まだ確認できていません。うまくいかない場合は、表示されたエラーの文を教えてください。
@@ -108,9 +112,9 @@
 
 1. Meta for Developers（`https://developers.facebook.com/`）にログインし、新しいアプリを作ります。用途（ユースケース）は「Threads APIにアクセス」を選びます。
 2. Threads APIの設定で、次を登録します。
-   - リダイレクト（コールバック）URL：`https://michishirube-post.fly.dev/service/oauth/callback/threads`
+   - リダイレクト（コールバック）URL：`https://post.social-quality.com/service/oauth/callback/threads`
    - 権限：`threads_basic` と `threads_content_publish`
-   - アンインストール・削除のコールバックURLの入力を求められた場合は、仮に `https://michishirube-post.fly.dev/service` を入れてください（Metaの審査に出す前に、正式なURLへ差し替える必要があります）。
+   - アンインストール・削除のコールバックURLの入力を求められた場合は、仮に `https://post.social-quality.com/service` を入れてください（Metaの審査に出す前に、正式なURLへ差し替える必要があります）。
 3. 「アプリの役割」（テスター）に、ご自身のThreadsアカウントを追加します。
 4. Threads側で招待を承認します。Threadsの「設定」→「アカウント」→「ウェブサイトのアクセス許可」→「招待」から承認します（表記はアプリのバージョンで異なることがあります）。
 5. ThreadsのアプリIDとアプリシークレットを控えます。
@@ -118,7 +122,7 @@
 ### 6-2. Fly.io に登録する
 
 ```
-fly secrets set -a michishirube-post THREADS_APP_ID=（アプリID） THREADS_APP_SECRET=（アプリシークレット）
+fly secrets set -a sq-ai-bijika THREADS_APP_ID=（アプリID） THREADS_APP_SECRET=（アプリシークレット）
 ```
 
 ### 6-3. 連携して投稿する
@@ -147,7 +151,9 @@ fly secrets set -a michishirube-post THREADS_APP_ID=（アプリID） THREADS_AP
 
 各AIのご利用条件と料金は、利用者ご自身の契約に従います。
 
-### このツールのAIで作る（任意・運営者が費用を負担）
+### このツールのAIで作る（有料のため、当面は使わない）
+
+費用がかかるため、当面は設定しません。将来使う場合の手順です。
 
 1. Fly.io のシークレットに `ANTHROPIC_API_KEY`（AnthropicのAPIキー）を登録すると、「投稿を作る」画面に「AIで文章を作る」ボタンが出て、毎日の自動運用も使えるようになります。
 2. 画像は `OPENAI_API_KEY` を登録すると使えます（品質は `AI_IMAGE_QUALITY`。既定は medium）。
@@ -157,9 +163,8 @@ fly secrets set -a michishirube-post THREADS_APP_ID=（アプリID） THREADS_AP
 
 ## 試し終わったら
 
-- `https://michishirube-post.fly.dev/admin/service` で「テスト利用を取り消す」を押すと、連携やAPIキーを含めて元に戻ります。
+- `https://post.social-quality.com/admin/service` で「テスト利用を取り消す」を押すと、連携やAPIキーを含めて元に戻ります。
 - Fly.io に登録した設定値は、そのまま残して問題ありません。販売を始めるときに使います。
-- 専用アプリでの動作を確認できたら、ミチシルベ本体（`sq-ai-bijika`）のシークレットに `SERVICE_MOVED_TO=https://michishirube-post.fly.dev` を登録してください。`aipro.social-quality.com/service` を開いた人は、専用アプリの同じページへ自動で移動します（サービスが2か所に分かれないようにするため）。
 - 販売の開始には、別途、次のものが必要です。
   - Stripeの設定
   - 各SNSの審査

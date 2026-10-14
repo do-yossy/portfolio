@@ -1725,6 +1725,15 @@ function serviceStillUsedHere(nowMs = Date.now()) {
   return v;
 }
 
+// この商品だけを出すか：専用アプリ（SERVICE_ONLY=true）、または本体のアプリでも SERVICE_HOST のアドレスで開かれたとき
+// （例：SERVICE_HOST=post.social-quality.com。追加のサーバー代をかけずに、独自のアドレスでサービスだけを出すため）
+function hostOf(req) { return String(req.headers.host || '').toLowerCase().replace(/:\d+$/, ''); }
+function serviceOnlyFor(req) {
+  if (process.env.SERVICE_ONLY === 'true') return true;
+  const h = String(process.env.SERVICE_HOST || '').toLowerCase().trim();
+  return !!h && hostOf(req) === h;
+}
+
 // SERVICE_ONLY=true のときに出してよいパス（サービス本体・API・MCP・OAuth・メディア・お問い合わせ・運営者画面の一部）
 function serviceOnlyAllowed(p) {
   return p === '/service' || p.startsWith('/service/') || p.startsWith('/api/v1/') || p === '/api/stripe/webhook' || p === '/api/contact' || p === '/mcp' || p.startsWith('/oauth/')
@@ -1753,12 +1762,14 @@ const server = http.createServer(async (req, res) => {
     // ── サービスを専用アプリへ移した場合（SERVICE_MOVED_TO=https://…）、こちらの /service は移転先へ転送する ──
     const movedTo = String(process.env.SERVICE_MOVED_TO || '').replace(/\/+$/, '');
     // こちらに契約者・自動運用・未投稿の予約が残っている間は転送しない（マイページ・解約・連携の戻り先に行けなくなるため）
-    if (movedTo && /^https:\/\//.test(movedTo) && process.env.SERVICE_ONLY !== 'true' && (pathname === '/service' || pathname.startsWith('/service/')) && (method === 'GET' || method === 'HEAD') && (process.env.SERVICE_MOVED_FORCE === 'true' || !serviceStillUsedHere())) {
+    // 移転先が同じアプリの別のアドレス（SERVICE_HOST）なら、データベースも同じなので、利用者がいても転送してよい
+    const sameApp = (() => { try { return !!process.env.SERVICE_HOST && new URL(movedTo).host.toLowerCase() === String(process.env.SERVICE_HOST).toLowerCase().trim(); } catch { return false; } })();
+    if (movedTo && /^https:\/\//.test(movedTo) && !serviceOnlyFor(req) && (pathname === '/service' || pathname.startsWith('/service/')) && (method === 'GET' || method === 'HEAD') && (sameApp || process.env.SERVICE_MOVED_FORCE === 'true' || !serviceStillUsedHere())) {
       return redirect(res, `${movedTo}${pathname}${url.search}`, { 'Cache-Control': 'no-store' });
     }
 
     // ── この商品専用のアプリとして動かす場合（SERVICE_ONLY=true）は、SNS自動投稿サービスの画面だけを出す ──
-    if (process.env.SERVICE_ONLY === 'true' && !serviceOnlyAllowed(pathname)) {
+    if (serviceOnlyFor(req) && !serviceOnlyAllowed(pathname)) {
       if (method === 'GET' || method === 'HEAD') return redirect(res, '/service');
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       return res.end('not found');
@@ -2011,7 +2022,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/admin/login' && method === 'POST') {
       // 本番（NODE_ENV=production）と専用アプリ（SERVICE_ONLY）では、ADMIN_PASSWORD を設定するまで運営者画面に入れない（既定のパスワードで入られないように）
       const weak = !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme';
-      if (weak && (process.env.SERVICE_ONLY === 'true' || process.env.NODE_ENV === 'production')) return sendHtml(res, 403, adminLoginPage('ADMIN_PASSWORD が設定されていないため、運営者画面は使えません。Fly.io のシークレットに設定してください。'));
+      if (weak && (serviceOnlyFor(req) || process.env.NODE_ENV === 'production')) return sendHtml(res, 403, adminLoginPage('ADMIN_PASSWORD が設定されていないため、運営者画面は使えません。Fly.io のシークレットに設定してください。'));
       const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '');
       if (!adminLoginLimiter.allow(ip)) return sendHtml(res, 429, adminLoginPage('試行回数が多すぎます。15分ほど待ってからお試しください。'));
       const { password } = await parseBody(req);
@@ -2021,7 +2032,7 @@ const server = http.createServer(async (req, res) => {
       adminLoginLimiter.reset(ip);
       const sid = crypto.randomBytes(24).toString('hex');
       adminSessions.add(sid);
-      return redirect(res, process.env.SERVICE_ONLY === 'true' ? '/admin/service' : '/admin/inquiries', { 'Set-Cookie': adminSessionCookie(sid) });
+      return redirect(res, serviceOnlyFor(req) ? '/admin/service' : '/admin/inquiries', { 'Set-Cookie': adminSessionCookie(sid) });
     }
     if (pathname === '/admin/logout') {
       const sid = auth.parseCookies(req).get('admin_sid');

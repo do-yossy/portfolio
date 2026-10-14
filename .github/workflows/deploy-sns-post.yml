@@ -1,11 +1,8 @@
 name: Deploy SNS自動投稿サービス（専用アプリ）
 
+# 専用アプリ（別のサーバー）は Fly.io の利用料がかかるため、自動では動かさない（オーナーの判断：費用をかけない）。
+# サービスは、ミチシルベ本体のアプリで SERVICE_HOST のアドレスから出す。専用アプリが必要になったときだけ、手動で実行する。
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'ai-bijika-system/**'
-      - '.github/workflows/deploy-sns-post.yml'
   workflow_dispatch:
 
 # 続けて push されたときに、作成・デプロイが並んで走らないようにする
