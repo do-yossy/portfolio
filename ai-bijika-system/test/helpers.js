@@ -36,7 +36,7 @@ function installHttpsMock(handler) {
         if (!r) r = { status: 404, json: { error: { message: 'no mock' } } };
         const res = new EventEmitter();
         res.statusCode = r.status;
-        res.headers = {};
+        res.headers = r.headers || {};
         cb(res);
         const text = r.json !== undefined ? JSON.stringify(r.json) : (r.text || '');
         res.emit('data', Buffer.from(text));

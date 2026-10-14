@@ -10,10 +10,15 @@ const billing = require('./billing');
 const core = require('./service-core');
 const ui = require('./service-ui');
 const scheduler = require('./sns/scheduler');
-const { Subscriptions, SnsAccounts, ScheduledPosts } = require('./service-store');
+const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys, AutoRules } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
 const mediaLib = require('./media');
 const registry = require('./sns');
+const apiV1 = require('./api-v1');
+const mcp = require('./mcp');
+const oauth = require('./oauth');
+const ai = require('./ai');
+const aiAuto = require('./ai-auto');
 
 const loginLimiter = createLimiter({ max: 8, windowMs: 15 * 60 * 1000 });
 const signupLimiter = createLimiter({ max: 10, windowMs: 60 * 60 * 1000 });
@@ -30,6 +35,10 @@ const FLASH = {
   now: ['ok', '投稿の準備ができました。まもなく投稿されます。'],
   cancelled: ['ok', '予約を取り消しました。'],
   connected: ['ok', 'SNSを連携しました。'],
+  auto_added: ['ok', '自動運用のルールを追加しました。'],
+  auto_changed: ['ok', '自動運用のルールを更新しました。'],
+  app_revoked: ['ok', 'アプリの接続を解除しました。'],
+  key_revoked: ['ok', 'APIキーを無効にしました。'],
   disconnected: ['ok', '連携を解除しました。'],
   sub_canceled: ['ok', '解約の手続きをしました。契約期間の終わりまでご利用いただけます。'],
   sub_resumed: ['ok', '解約を取り消しました。引き続きご利用いただけます。'],
@@ -74,6 +83,10 @@ const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 25
 async function handle(ctx) {
   const { req, res, url, method, pathname, user } = ctx;
 
+  if (await apiV1.handle(ctx)) return true;
+  if (await mcp.handle(ctx)) return true;
+  if (await oauth.handle(ctx)) return true;
+
   // ── Stripe Webhook（署名検証。認証不要）──
   if (pathname === '/api/stripe/webhook' && method === 'POST') {
     const c = billing.config();
@@ -107,7 +120,7 @@ async function handle(ctx) {
   const contactEmail = core.contactEmail();
 
   // ── 公開ページ ──
-  if (pathname === '/service' && method === 'GET') { sendHtml(res, 200, ui.landingPage({ user, billingReady: salesOpen })); return true; }
+  if (pathname === '/service' && method === 'GET') { sendHtml(res, 200, ui.landingPage({ user, billingReady: salesOpen, trialDays: user ? core.trialFor(user.id) : core.trialDays() })); return true; }
 
   const legalMatch = pathname.match(/^\/service\/legal\/(terms|tokushoho|privacy)$/);
   if (legalMatch && method === 'GET') {
@@ -120,6 +133,13 @@ async function handle(ctx) {
     sendHtml(res, 200, ui.legalPage(title, html, user));
     return true;
   }
+
+  if (pathname === '/service/docs/skill.md' && method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+    res.end(fs.readFileSync(path.join(__dirname, '..', 'skill', 'SKILL.md')));
+    return true;
+  }
+  if (pathname === '/service/docs/api' && method === 'GET') { sendHtml(res, 200, ui.apiDocsPage(user, String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, ''))); return true; }
 
   if (pathname === '/service/signup' && method === 'GET') {
     if (user) redirect(res, '/service/app'); else sendHtml(res, 200, ui.authPage('signup'));
@@ -139,21 +159,28 @@ async function handle(ctx) {
     redirect(res, salesOpen ? '/service/checkout' : '/service', { 'Set-Cookie': auth.sessionCookie(token) });
     return true;
   }
-  if (pathname === '/service/login' && method === 'GET') { sendHtml(res, 200, ui.authPage('login')); return true; }
+  // ログイン後の戻り先（自サイト内の、決まったパスだけ）
+  const safeNext = (n) => (typeof n === 'string' && /^\/(service|oauth)\//.test(n) && !n.startsWith('//') && !/[\r\n\\]/.test(n) ? n : '');
+  if (pathname === '/service/login' && method === 'GET') {
+    const next = safeNext(url.searchParams.get('next'));
+    if (user && next) { redirect(res, next); return true; }
+    sendHtml(res, 200, ui.authPage('login', '', next)); return true;
+  }
   if (pathname === '/service/login' && method === 'POST') {
-    const { email, password } = await readForm(req);
+    const { email, password, next: rawNext } = await readForm(req);
+    const next = safeNext(rawNext);
     const e = String(email || '').trim().toLowerCase();
     const key = `${clientIp(req)}|${e}`;
     if (!loginLimiter.allow(key)) { sendHtml(res, 429, ui.authPage('login', '試行回数が多すぎます。15分ほど待ってからお試しください。')); return true; }
     const u = e ? Users.findByEmail(e) : null;
     if (!u || !auth.verifyPassword(String(password || ''), u.password_hash, u.password_salt)) {
       loginLimiter.fail(key);
-      sendHtml(res, 401, ui.authPage('login', 'メールアドレスまたはパスワードが違います。'));
+      sendHtml(res, 401, ui.authPage('login', 'メールアドレスまたはパスワードが違います。', next));
       return true;
     }
     loginLimiter.reset(key);
     const token = auth.createSession(u.id);
-    redirect(res, '/service/app', { 'Set-Cookie': auth.sessionCookie(token) });
+    redirect(res, next || '/service/app', { 'Set-Cookie': auth.sessionCookie(token) });
     return true;
   }
   if (pathname === '/service/logout') {
@@ -167,9 +194,9 @@ async function handle(ctx) {
   const sessionToken = auth.parseCookies(req).get('session');
   const token = csrf.tokenFor(sessionToken);
   const flashOf = (key) => (FLASH[key] ? { type: FLASH[key][0], text: FLASH[key][1] } : null);
-  const dashboard = (status, flash) => {
+  const dashboard = (status, flash, newKey) => {
     sendHtml(res, status, ui.dashboardPage({
-      user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id),
+      user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id), apiKeys: ApiKeys.listForUser(user.id), mcpConnections: oauth.listConnections(user.id), aiAvail: ai.available(), autoRules: AutoRules.listForUser(user.id), newKey: newKey || '',
       posts: ScheduledPosts.listForUser(user.id), csrf: token, flash,
       snsReady: core.snsEnabled(), portalReady: billingReady,
     }));
@@ -191,23 +218,23 @@ async function handle(ctx) {
   if (pathname === '/service/checkout' && method === 'GET') {
     if (!salesOpen) { redirect(res, '/service'); return true; }
     if (hasOpenSubscription()) { redirect(res, '/service/app'); return true; }
-    sendHtml(res, 200, ui.checkoutPage({ user, csrf: token }));
+    sendHtml(res, 200, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token }));
     return true;
   }
   if (pathname === '/service/checkout' && method === 'POST') {
     if (!salesOpen) { redirect(res, '/service'); return true; }
     if (hasOpenSubscription()) { redirect(res, '/service/app'); return true; }
     const body = await readForm(req);
-    if (!csrf.verify(sessionToken, body.csrf)) { sendHtml(res, 403, ui.checkoutPage({ user, csrf: token, error: '操作の有効期限が切れました。もう一度お試しください。' })); return true; }
-    if (body.agree !== '1') { sendHtml(res, 400, ui.checkoutPage({ user, csrf: token, error: '内容への同意にチェックを入れてください。' })); return true; }
+    if (!csrf.verify(sessionToken, body.csrf)) { sendHtml(res, 403, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '操作の有効期限が切れました。もう一度お試しください。' })); return true; }
+    if (body.agree !== '1') { sendHtml(res, 400, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '内容への同意にチェックを入れてください。' })); return true; }
     try {
       const cur = Subscriptions.get(user.id);
       Subscriptions.upsert(user.id, { agreed_at: new Date().toISOString(), agreed_version: core.TERMS_VERSION });
-      const checkoutUrl = await billing.createCheckoutSession({ userId: user.id, email: user.email, customerId: cur && cur.stripe_customer_id });
+      const checkoutUrl = await billing.createCheckoutSession({ userId: user.id, email: user.email, customerId: cur && cur.stripe_customer_id, trialDays: core.trialFor(user.id) });
       redirect(res, checkoutUrl, {}, 303);
     } catch (e) {
       console.error('[checkout]', e.message);
-      sendHtml(res, 502, ui.checkoutPage({ user, csrf: token, error: '決済ページの準備に失敗しました。時間をおいてもう一度お試しください。' }));
+      sendHtml(res, 502, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '決済ページの準備に失敗しました。時間をおいてもう一度お試しください。' }));
     }
     return true;
   }
@@ -259,11 +286,105 @@ async function handle(ctx) {
     redirect(res, `/service/app?f=${now ? 'now' : 'scheduled'}`);
     return true;
   }
+  const aiMatch = pathname.match(/^\/service\/app\/ai\/(text|image)$/);
+  if (aiMatch && method === 'POST') {
+    if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }
+    if (!Subscriptions.isActive(user.id)) { sendJson(res, 403, { error: 'ご契約が有効ではありません。' }); return true; }
+    let b = {};
+    try { b = JSON.parse(await readRaw(req, 20_000) || '{}'); } catch { sendJson(res, 400, { error: '入力が正しくありません。' }); return true; }
+    try {
+      if (aiMatch[1] === 'text') sendJson(res, 200, { text: await ai.generateText({ userId: user.id, theme: b.theme, platform: b.platform }) });
+      else { const m = await ai.generateImage({ userId: user.id, prompt: b.prompt }); sendJson(res, 200, { id: m.id, url: mediaLib.publicUrl(m) }); }
+    } catch (e) {
+      if (e instanceof ai.AiError) sendJson(res, 400, { error: e.message }); else { console.error('[ai]', e.message); sendJson(res, 500, { error: '生成に失敗しました。時間をおいてもう一度お試しください。' }); }
+    }
+    return true;
+  }
+  if (pathname === '/service/app/auto' && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    if (!Subscriptions.isActive(user.id)) { dashboard(403, { type: 'error', text: 'ご契約が有効ではありません。' }); return true; }
+    const mode = body.mode === 'auto' ? 'auto' : 'draft';
+    if (mode === 'auto' && body.confirm_auto !== '1') { dashboard(400, { type: 'error', text: '「そのまま投稿する」を選ぶ場合は、確認のチェックが必要です。' }); return true; }
+    const args = { userId: user.id, accountId: String(body.account_id || ''), theme: body.theme, withImage: body.with_image === '1', hourJst: parseInt(body.hour_jst, 10), mode };
+    const problem = aiAuto.validateRule(args);
+    if (problem) { dashboard(400, { type: 'error', text: problem }); return true; }
+    AutoRules.create({ ...args, theme: String(body.theme).trim(), tone: String(body.tone || '').slice(0, 100) });
+    redirect(res, '/service/app?f=auto_added');
+    return true;
+  }
+  const autoAct = pathname.match(/^\/service\/app\/auto\/([a-f0-9]+)\/(toggle|delete)$/);
+  if (autoAct && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    const rule = AutoRules.get(autoAct[1], user.id);
+    if (rule) { if (autoAct[2] === 'delete') AutoRules.remove(rule.id, user.id); else AutoRules.setEnabled(rule.id, user.id, !rule.enabled); }
+    redirect(res, '/service/app?f=auto_changed');
+    return true;
+  }
+
+  if (pathname === '/service/app/apikey' && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    if (!Subscriptions.isActive(user.id)) { dashboard(403, { type: 'error', text: 'ご契約が有効ではありません。' }); return true; }
+    const k = ApiKeys.create(user.id, body.label);
+    if (!k) { dashboard(400, { type: 'error', text: 'APIキーは5件までです。不要なキーを無効にしてください。' }); return true; }
+    dashboard(200, { type: 'ok', text: 'APIキーを発行しました。' }, k.key);
+    return true;
+  }
+  const appRevoke = pathname.match(/^\/service\/app\/connection\/(mcpc_[a-f0-9]+)\/revoke$/);
+  if (appRevoke && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    oauth.revokeClient(user.id, appRevoke[1]);
+    redirect(res, '/service/app?f=app_revoked');
+    return true;
+  }
+  const keyRevoke = pathname.match(/^\/service\/app\/apikey\/([a-f0-9]+)\/revoke$/);
+  if (keyRevoke && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    ApiKeys.revoke(keyRevoke[1], user.id);
+    redirect(res, '/service/app?f=key_revoked');
+    return true;
+  }
   const cancelMatch = pathname.match(/^\/service\/app\/post\/([a-f0-9]+)\/cancel$/);
   if (cancelMatch && method === 'POST') {
     const body = await needCsrf(); if (!body) return true;
     ScheduledPosts.cancel(cancelMatch[1], user.id);
-    redirect(res, '/service/app?f=cancelled');
+    redirect(res, body.back === 'calendar' ? '/service/app/calendar?f=cancelled' : '/service/app?f=cancelled');
+    return true;
+  }
+
+  // 投稿を作る（ツリー・複数画像・SNSごとの本文・下書き）とカレンダー
+  if (pathname === '/service/app/compose' && method === 'GET') {
+    if (!Subscriptions.isActive(user.id)) { redirect(res, '/service/app'); return true; }
+    sendHtml(res, 200, ui.composePage({ user, accounts: SnsAccounts.listForUser(user.id), csrf: token, aiAvail: ai.available() }));
+    return true;
+  }
+  if (pathname === '/service/app/posts' && method === 'POST') {
+    if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }
+    let b = null;
+    try { b = JSON.parse(await readRaw(req, 300_000)); } catch { b = null; }
+    const r = apiV1.createFromBody(user.id, b);
+    sendJson(res, r.status, r.body);
+    return true;
+  }
+  if (pathname === '/service/app/calendar' && method === 'GET') {
+    const mq = url.searchParams.get('m');
+    const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mq || '') ? mq : new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7);
+    const [from, to] = core.jstMonthBounds(`${month}-15T00:00:00+09:00`);
+    sendHtml(res, 200, ui.calendarPage({ user, month, posts: ScheduledPosts.listBetween(user.id, from, to), drafts: ScheduledPosts.listDrafts(user.id), csrf: token, flash: flashOf(url.searchParams.get('f')) }));
+    return true;
+  }
+  const publishMatch = pathname.match(/^\/service\/app\/post\/([a-f0-9]+)\/publish$/);
+  if (publishMatch && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    const now = body.mode === 'now';
+    const at = now ? new Date(Date.now() + 1000).toISOString() : core.jstLocalToIso(body.at);
+    const r = at ? core.promoteDraft({ userId: user.id, postId: publishMatch[1], scheduledAtIso: at }) : { ok: false, error: '投稿日時の形式が正しくありません。' };
+    if (!r.ok) {
+      const [from, to] = core.jstMonthBounds(new Date().toISOString());
+      sendHtml(res, 400, ui.calendarPage({ user, month: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7), posts: ScheduledPosts.listBetween(user.id, from, to), drafts: ScheduledPosts.listDrafts(user.id), csrf: token, flash: { type: 'error', text: r.error } }));
+      return true;
+    }
+    if (now) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
+    redirect(res, `/service/app/calendar?f=${now ? 'now' : 'scheduled'}`);
     return true;
   }
   const discMatch = pathname.match(/^\/service\/app\/account\/([a-f0-9]+)\/disconnect$/);

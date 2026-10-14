@@ -42,7 +42,7 @@ async function stripeRequest(method, path, params) {
 }
 
 // Checkout（サブスクリプション）の作成。戻り値は Stripe の決済ページURL
-async function createCheckoutSession({ userId, email, customerId }) {
+async function createCheckoutSession({ userId, email, customerId, trialDays = 0 }) {
   const c = config();
   const params = {
     mode: 'subscription',
@@ -52,7 +52,9 @@ async function createCheckoutSession({ userId, email, customerId }) {
     client_reference_id: userId,
     locale: 'ja',
     metadata: { user_id: userId },
-    subscription_data: { metadata: { user_id: userId } },
+    subscription_data: { metadata: { user_id: userId }, ...(trialDays > 0 ? { trial_period_days: trialDays } : {}) },
+    // トライアルでも支払い方法の登録を必須にする（期間が終わると自動で課金される）
+    ...(trialDays > 0 ? { payment_method_collection: 'always' } : {}),
   };
   if (customerId) params.customer = customerId;
   else params.customer_email = email;
@@ -116,6 +118,8 @@ function applySubscription(sub, hintedUserId, createdSec) {
   // 契約が終了したら、保存しているSNSの連携情報（トークン）を削除し、未投稿の予約を取り消す
   if (sub.status === 'canceled' || sub.status === 'incomplete_expired') {
     for (const a of SnsAccounts.listForUser(userId)) SnsAccounts.remove(a.id, userId);
+    require('./oauth').revokeAll(userId); // AIアシスタントとの接続とAPIキーも無効にする
+    require('./service-store').ApiKeys.revokeAll(userId);
   }
   return saved;
 }

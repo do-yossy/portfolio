@@ -55,6 +55,7 @@ const serviceRoutes = require('./lib/service-routes');
 const serviceUi = require('./lib/service-ui');
 const serviceStore = require('./lib/service-store');
 const snsScheduler = require('./lib/sns/scheduler');
+const aiAuto = require('./lib/ai-auto');
 const promptSeeds = require('./seeds/prompts');
 const promptFields = require('./seeds/prompt-fields');
 const gateDefs = require('./seeds/gates');
@@ -2207,6 +2208,7 @@ const server = http.createServer(async (req, res) => {
 if (require.main === module) {
   server.listen(PORT, () => console.log(`ミチシルベ: http://localhost:${PORT}`));
   snsScheduler.start();
+  aiAuto.start();
 }
 
 module.exports = server;

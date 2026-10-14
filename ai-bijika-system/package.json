@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node --experimental-sqlite --env-file=.env server.js",
     "dev": "node --experimental-sqlite --env-file=.env --watch server.js",
-    "test": "node --experimental-sqlite test/service.test.js && node --experimental-sqlite test/media.test.js && node --experimental-sqlite test/e2e.test.js"
+    "test": "node --experimental-sqlite test/service.test.js && node --experimental-sqlite test/media.test.js && node --experimental-sqlite test/e2e.test.js && node --experimental-sqlite test/adapters.test.js && node --experimental-sqlite test/ai.test.js"
   },
   "engines": {
     "node": ">=22"

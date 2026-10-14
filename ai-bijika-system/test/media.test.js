@@ -80,11 +80,15 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   ok(/JPEG/.test(ig.validatePost({ text: 'a', media: { kind: 'image', mime: 'image/png' } })), 'InstagramはPNGを使えない');
   ok(ig.validatePost({ text: 'a', media: { kind: 'image', mime: 'image/jpeg' } }) === null, 'InstagramはJPEGを投稿できる');
   ok(ig.validatePost({ text: 'あ'.repeat(2201), media: { kind: 'image', mime: 'image/jpeg' } }) !== null, 'Instagramのキャプションは2,200文字まで');
-  ok(/動画/.test(tt.validatePost({ text: 'a', media: { kind: 'image', mime: 'image/jpeg' }, options: { privacy_level: 'SELF_ONLY' } })), 'TikTokは動画が必須');
+  ok(tt.validatePost({ text: 'a', options: { privacy_level: 'SELF_ONLY' } }) !== null, 'TikTokは動画または写真が必須');
+  ok(tt.validatePost({ text: 'a', media: { kind: 'image', mime: 'image/jpeg' }, options: { privacy_level: 'SELF_ONLY' } }) === null, 'TikTokはJPEGの写真を投稿できる');
+  ok(/JPEG/.test(tt.validatePost({ text: 'a', media: { kind: 'image', mime: 'image/png' }, options: { privacy_level: 'SELF_ONLY' } })), 'TikTokの写真はPNGを使えない');
   ok(/公開範囲/.test(tt.validatePost({ text: 'a', media: { kind: 'video', mime: 'video/mp4' }, options: {} })), 'TikTokは公開範囲を選ぶ必要がある');
   ok(tt.validatePost({ text: 'a', media: { kind: 'video', mime: 'video/mp4' }, options: { privacy_level: 'SELF_ONLY' } }) === null, 'TikTokは動画と公開範囲があれば投稿できる');
   ok(th.validatePost({ text: '', media: { kind: 'image' } }) === null && th.validatePost({ text: '' }) !== null, 'Threadsは本文がなくても画像・動画があればよい');
-  ok(/テキストのみ/.test(x.validatePost({ text: 'a', media: { kind: 'image' } })), 'Xは画像・動画を付けられない');
+  ok(x.validatePost({ text: 'a', media: { kind: 'image', size: 1000 } }) === null, 'Xは画像を付けられる');
+  ok(/5MB/.test(x.validatePost({ text: 'a', media: { kind: 'image', size: 6 * 1024 * 1024 } })), 'Xの画像は5MBまで');
+  ok(/4枚/.test(x.validatePost({ post: { category: 'image', text: 'a', medias: [1, 2, 3, 4, 5].map(() => ({ kind: 'image', size: 1 })) } })), 'Xの画像は4枚まで');
 
   console.log('予約の作成（メディア・設定つき）');
   const enc = (v) => box.encrypt(v, box.keyFromEnv());
