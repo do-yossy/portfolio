@@ -135,9 +135,11 @@ function landingPage({ user, billingReady, trialDays = 0 }) {
 // ── 固定投稿から来た人向けのLP（/service/lp）──
 // 価格の比較は、公式の料金ページで確認した、条件をそろえて言える範囲だけ（下書き/_調査_予約投稿ツールの価格.md）。
 // 他社の名前は出さない（サービスA）。根拠（確認した相手・日付・ページ）は社内の調査記録に残している。
+// 「国内の同じ種類のサービスの中でいちばん安いプランの、さらに半額以下」と読まれないよう、特定の1社の1プランと比べていることが先に分かる語順にする
+// （「サービスA（…サービスの1つ）の最安の有料プラン（…）と比べて、半額以下」。Threadsの固定投稿（下書き/Threads固定投稿_出品用.md）と同じ書き方）。
 // 確認日から COMPARE_VALID_DAYS を過ぎたら、比較を自動で出さない（相手の価格が変わっているおそれがあるため。再確認したら checked を更新する）。
 const COMPARE = {
-  name: 'サービスA', desc: '国内の、複数のSNSに予約投稿できるサービス', price: 2200, note: '月払い・税込',
+  name: 'サービスA', desc: '国内の、複数のSNSに予約投稿できるサービスの1つ', price: 2200, note: '月払い・税込',
   checked: '2026-10-14', accounts: 10, posts: '投稿・予約は無制限（Xは月30件）',
   sns: 'Threads・X・Instagram・TikTok・Facebook・YouTube', trial: '7日間',
 };
@@ -165,7 +167,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
     <header class="page-head"><div class="eyebrow">SNS Scheduler</div>
       <h1>複数のSNSへの投稿を、まとめて予約。</h1>
       <p class="lead">発信を続けたいけれど、毎日その場で投稿する時間がない。そんな方のための、予約投稿のサービスです。投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p></header>
-    <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます</small>${cmp ? `<small>参考：${COMPARE.desc}（${COMPARE.name}）の最安の有料プラン（${yen(COMPARE.price)}・${COMPARE.note}）の半額以下です。予約の上限・使えるSNS・無料体験などの条件は異なります（${checked}に${COMPARE.name}の公式の料金ページで確認。詳しくは下の「料金の比べ方」）。</small>` : ''}</div>
+    <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます</small>${cmp ? `<small>参考：${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン（${yen(COMPARE.price)}・${COMPARE.note}）と比べて、半額以下です。予約の上限・使えるSNS・無料体験などの条件は異なります（${checked}に${COMPARE.name}の公式の料金ページで確認。詳しくは下の「料金の比べ方」）。</small>` : ''}</div>
     ${cta}
     <h2 style="margin-top:26px">こんな方に</h2>
     <div class="card"><ul class="plain small">
