@@ -61,9 +61,9 @@ const SNS_RULES = {
   threads: 'Threads：テキスト・画像・動画（カルーセル20件まで。動画は5分まで）。ツリー可。500文字まで（絵文字は1つで2文字以上に数えます。組み合わせの絵文字は10文字を超えることもあります）',
   x: 'X：画像4枚（各5MBまで）または動画1本（140秒まで）を添付可。ツリー可。投稿数は月の上限あり',
   instagram: 'Instagram：プロアカウント（ビジネス／クリエイター）が対象。JPEG画像（カルーセル10件まで。縦横比は4:5〜1.91:1）またはリール動画が必須',
-  get tiktok() { return `TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択${process.env.TIKTOK_AUDITED === 'true' ? '' : '（アプリの審査が終わるまでは「自分のみ」）'}。AIで作った画像・動画には、TikTokの「AI生成」の表示を自動で付けます`; },
+  get tiktok() { return `TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択${process.env.TIKTOK_AUDITED === 'true' ? '' : '（アプリの審査が終わるまでは「自分のみ」）'}${aiLib().available().image || aiLib().available().video ? '。このサービスのAIで作った画像・動画には、TikTokの「AI生成」の表示を自動で付けます（ほかのAIで作ってアップロードしたものには付きません。SNSの決まりで表示が必要な場合は、TikTokのアプリから投稿してください）' : ''}`; },
   facebook: 'Facebook：連携のときに選んだ1つのページに投稿（投稿できるページが2つ以上あると連携できないため、Facebookの画面でページを1つだけ選んでください）。テキスト・画像10枚まで・動画1本',
-  youtube: 'YouTube：3分以内の動画1本が必須。本文の1行目がタイトル（100文字まで）になり、収まる場合は「#Shorts」を付けます。説明は5,000バイト（日本語でおよそ1,600文字）まで。公開設定と子ども向けかどうかは投稿ごとに選択。1日の投稿数に上限があり（太平洋時間で数えます）、送る時点で上限に達していた場合は、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します。AIで作った動画は、合成した内容として申告します',
+  get youtube() { return `YouTube：3分以内の動画1本が必須。本文の1行目がタイトル（100文字まで）になり、収まる場合は「#Shorts」を付けます。説明は5,000バイト（日本語でおよそ1,600文字）まで。公開設定と子ども向けかどうかは投稿ごとに選択。1日の投稿数に上限があり（太平洋時間で数えます）、送る時点で上限に達していた場合は、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します${aiLib().available().video ? '。このサービスのAIで作った動画は、合成した内容として申告します（ほかのAIで作ってアップロードした動画は申告しません。必要な場合は、YouTubeのアプリから投稿してください）' : ''}`; },
 };
 const snsRulesText = () => liveSns().map((p) => SNS_RULES[p.id]).filter(Boolean).join('。');
 function aiLimitsText() {
@@ -362,11 +362,13 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
     ? `<a class="btn btn-sm btn-primary" href="/service/connect/${p.id}">${escapeHtml(p.label)}を連携</a>`
     : `<span class="small">${escapeHtml(p.label)}：準備中</span>`).join(' ');
   const activeAccounts = accounts.filter((a) => a.status === 'active');
-  // かんたん投稿では、投稿ごとの設定が必要なYouTubeは選べない（「投稿を作る」画面で設定する）
-  const quickAccounts = activeAccounts.filter((a) => a.platform !== 'youtube');
+  // かんたん投稿では、投稿ごとの設定が必要なYouTubeは選べない（「投稿を作る」画面で設定する）。
+  // TikTokのアカウントが2つ以上あるときも、アカウントごとに設定を確かめるため、「投稿を作る」画面から投稿してもらう
+  const tiktokCount = activeAccounts.filter((a) => a.platform === 'tiktok').length;
+  const quickAccounts = activeAccounts.filter((a) => a.platform !== 'youtube' && !(a.platform === 'tiktok' && tiktokCount > 1));
   const defaultAt = toLocalInput(Date.now() + 60 * 60 * 1000);
-  const hasTikTok = activeAccounts.some((a) => a.platform === 'tiktok');
-  const tiktokAcc = activeAccounts.find((a) => a.platform === 'tiktok');
+  const tiktokAcc = quickAccounts.find((a) => a.platform === 'tiktok');
+  const hasTikTok = !!tiktokAcc;
   const compose = active && quickAccounts.length ? `
     <form method="POST" action="/service/app/post" class="card" id="postForm">
       <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
@@ -384,7 +386,8 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
         <div id="previewBox" style="margin-top:8px"></div></div>
       <div class="field"><span class="lbl">投稿先</span>
         ${quickAccounts.map((a) => `<label class="check"><input type="checkbox" name="account" value="${escapeHtml(a.id)}" data-platform="${escapeHtml(a.platform)}" ${quickAccounts.length === 1 ? 'checked' : ''}><span>${escapeHtml((registry.get(a.platform) || {}).label || a.platform)} ${escapeHtml(a.handle || '')}</span></label>`).join('')}
-        ${activeAccounts.some((a) => a.platform === 'youtube') ? '<p class="small">YouTubeへは、公開設定と「子ども向けかどうか」を選ぶ必要があるため、<a href="/service/app/compose">「投稿を作る」</a>から投稿してください。</p>' : ''}</div>
+        ${activeAccounts.some((a) => a.platform === 'youtube') ? '<p class="small">YouTubeへは、公開設定と「子ども向けかどうか」を選ぶ必要があるため、<a href="/service/app/compose">「投稿を作る」</a>から投稿してください。</p>' : ''}
+        ${tiktokCount > 1 ? '<p class="small">TikTokのアカウントが2つ以上あるため、TikTokへは、アカウントごとに設定を確かめられる<a href="/service/app/compose">「投稿を作る」</a>から投稿してください。</p>' : ''}</div>
       ${hasTikTok ? `<div class="field" id="tiktokBox" data-account="${escapeHtml(tiktokAcc.id)}" style="display:none;border:1px solid #d9d0bb;border-radius:12px;padding:10px">
         <span class="lbl">TikTokの設定（投稿するアカウント：<b id="ttNick">${escapeHtml(tiktokAcc.handle || 'TikTok')}</b>）</span>
         <label class="lbl" for="tiktok_privacy">公開範囲（必ず選んでください。選べるのは、このアカウントで使えるものだけです）</label>
@@ -400,7 +403,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
         <button class="btn btn-ghost" type="submit" name="mode" value="now" onclick="return confirm('今すぐ投稿します。よろしいですか？')">今すぐ投稿</button></div>
-      <p class="small">文字数の上限：Threads 500／X 日本語140文字（重み280）／Instagram・TikTok 2,200。</p>
+      <p class="small">文字数の上限：Threads 500（絵文字は1つで2文字以上に数えます）／X 日本語140文字（重み280）／Instagram・TikTok 2,200。上の文字数は、絵文字を1文字として数えた目安です。</p>
     </form>
     <script>
     function cnt(){var t=document.getElementById('text').value;document.getElementById('count').textContent=Array.from(t).length+'文字';}
@@ -607,10 +610,12 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
       var ttFor=null,LABELS={PUBLIC_TO_EVERYONE:'全員に公開',MUTUAL_FOLLOW_FRIENDS:'相互フォローの友達',FOLLOWER_OF_CREATOR:'フォロワー',SELF_ONLY:'自分のみ'};
       function loadTT(){var a=sel().filter(function(x){return x.platform==='tiktok';})[0];if(!a||ttFor===a.id)return;ttFor=a.id;var s=$('ttPrivacy');
         s.textContent='';s.appendChild(el('option',{value:''},'読み込み中…'));$('ttNick').textContent='TikTok';$('ttMsg').textContent='';['ttComment','ttDuet','ttStitch'].forEach(function(id){$(id).disabled=false;$(id).checked=false;});
-        fetch('/service/app/tiktok/creator-info?account='+encodeURIComponent(a.id),{credentials:'same-origin'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error);return j;});}).then(function(j){if(ttFor!==a.id)return;s.textContent='';s.appendChild(el('option',{value:''},'選択してください'));(j.privacyLevelOptions||[]).forEach(function(v){s.appendChild(el('option',{value:v},LABELS[v]||v));});if(j.nickname)$('ttNick').textContent=j.nickname;
+        fetch('/service/app/tiktok/creator-info?account='+encodeURIComponent(a.id),{credentials:'same-origin'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error);return j;});}).then(function(j){if(ttFor!==a.id)return;s.textContent='';s.appendChild(el('option',{value:''},'選択してください'));(j.privacyLevelOptions||[]).forEach(function(v){s.appendChild(el('option',{value:v},LABELS[v]||v));});applyPaid();if(j.nickname)$('ttNick').textContent=j.nickname;
           [['ttComment',j.commentDisabled],['ttDuet',j.duetDisabled],['ttStitch',j.stitchDisabled]].forEach(function(p){if(p[1]){$(p[0]).checked=false;$(p[0]).disabled=true;}});$('ttMsg').textContent=(j.audited?'':'TikTokのアプリの審査が終わるまでは、公開範囲は「自分のみ」だけを選べます（投稿するアカウントも非公開にしておく必要があります）。')+(j.maxVideoPostDurationSec?'動画は最大'+j.maxVideoPostDurationSec+'秒です。':'');})
           .catch(function(e){if(ttFor!==a.id)return;ttFor=null;s.textContent='';s.appendChild(el('option',{value:''},'取得できませんでした'));$('ttMsg').textContent=e.message||'';});}
-      $('ttPaid').addEventListener('change',function(){var s=$('ttPrivacy');Array.prototype.forEach.call(s.options,function(o){if(o.value==='SELF_ONLY'){o.disabled=$('ttPaid').checked;if($('ttPaid').checked&&s.value==='SELF_ONLY')s.value='';}});});
+      // 第三者の宣伝（有償）を含むときは、「自分のみ」を選べなくする（選択肢を取り直したときも、もう一度反映する）
+      function applyPaid(){var s=$('ttPrivacy');Array.prototype.forEach.call(s.options,function(o){if(o.value==='SELF_ONLY'){o.disabled=$('ttPaid').checked;if($('ttPaid').checked&&s.value==='SELF_ONLY')s.value='';}});}
+      $('ttPaid').addEventListener('change',applyPaid);
       function aiCall(kind,payload){$('aiMsg').textContent='生成中…';return fetch('/service/app/ai/'+kind,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF':csrf},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'生成に失敗しました。');return j;});}).catch(function(e){$('aiMsg').textContent=e.message;throw e;});}
       if($('aiTextBtn'))$('aiTextBtn').addEventListener('click',function(){var s=sel();aiCall('text',{theme:$('aiTheme').value,platform:s.length?s[0].platform:''}).then(function(j){$('mainText').value=j.text;counts();perBox();$('aiMsg').textContent='文章を入れました。内容をご確認ください。';}).catch(function(){});});
       // ご自身のAIで作る：投稿先の条件を入れた指示文を作り、コピーしてから、そのAIを開く
@@ -799,7 +804,7 @@ function apiDocsPage(user, baseUrl) {
   "scheduled_at": "2026-12-01T09:00:00+09:00"
 }'`)}
     <h3>SNSごとの設定（<code>options</code>）</h3>
-    <p>アカウントIDごとに指定します。<b>TikTokへは、APIからは下書き（<code>draft:true</code>）にだけできます</b>（TikTokの決まりにより、投稿は、利用者ご本人がサービスのカレンダーから下書きを「投稿を作る」画面で開き、内容と設定を確かめて選び直してから行います。<code>POST /api/v1/posts/{id}/publish</code> では予約にできません）。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なります。サービスのアプリの審査が終わるまでは <code>SELF_ONLY</code>（自分のみ）だけです）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（下書き以外は必須です。指定がないと予約できません）。YouTubeへのアップロードには、1日（太平洋時間）の上限（利用者ごと・サービス全体）があり、上限に達した日時には予約できません。送る時点で上限に達していた場合は、YouTubeの日付が変わった後に自動で投稿します。AIで作った画像・動画には、TikTokの「AI生成」の表示（<code>is_aigc</code>）とYouTubeの合成コンテンツの申告（<code>containsSyntheticMedia</code>）を自動で付けます。</p>
+    <p>アカウントIDごとに指定します。<b>TikTokへは、APIからは下書き（<code>draft:true</code>）にだけできます</b>（TikTokの決まりにより、投稿は、利用者ご本人がサービスのカレンダーから下書きを「投稿を作る」画面で開き、内容と設定を確かめて選び直してから行います。<code>POST /api/v1/posts/{id}/publish</code> では予約にできません）。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なります。サービスのアプリの審査が終わるまでは <code>SELF_ONLY</code>（自分のみ）だけです）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（下書き以外は必須です。指定がないと予約できません）。YouTubeへのアップロードには、1日（太平洋時間）の上限（利用者ごと・サービス全体）があり、上限に達した日時には予約できません。送る時点で上限に達していた場合は、YouTubeの日付が変わった後に自動で投稿します。このサービスのAI（<code>/api/v1/ai/…</code> や画面の「このツールのAIで作る」）で作った画像・動画にだけ、TikTokの「AI生成」の表示（<code>is_aigc</code>）とYouTubeの合成コンテンツの申告（<code>containsSyntheticMedia</code>）を自動で付けます。ほかの方法で作ってアップロードしたファイルには付きません（SNSの決まりで表示が必要な場合は、SNSのアプリから投稿してください）。</p>
     ${code(`"options": {
   "<TikTokのアカウントID>": { "privacy_level": "<利用者が選んだ公開範囲>", "disable_comment": false, "disable_duet": true, "disable_stitch": true, "commercial_own": false, "commercial_paid": false, "auto_add_music": false },
   "<YouTubeのアカウントID>": { "privacy": "unlisted", "made_for_kids": false }

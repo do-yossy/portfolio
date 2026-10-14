@@ -158,7 +158,8 @@ let timer = null;
 let cleanTimer = null;
 function start(intervalMs = 30000) {
   if (timer) return;
-  ScheduledPosts.failStuck(new Date(Date.now() - 5 * 60 * 1000).toISOString());
+  // 起動時：送り始めていた行は5分より古いものを失敗に、まだ送り始めていない行はすぐ予約に戻す（Fly.ioは1台構成で、新旧のプロセスが同時に動かない前提）
+  ScheduledPosts.failStuck(new Date(Date.now() - 5 * 60 * 1000).toISOString(), new Date(Date.now() + 1000).toISOString());
   timer = setInterval(() => { tick().catch((e) => console.error('[scheduler]', e)); }, intervalMs);
   if (timer.unref) timer.unref();
   // 投稿が終わったメディアの削除と、長期トークンの延長を、1時間ごとに行う

@@ -286,6 +286,28 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(store.ScheduledPosts.get(p8).status === 'failed' && /再起動/.test(store.ScheduledPosts.get(p8).last_error), '送り始めていたのに処理中のまま残った予約は、二重投稿を避けて失敗扱いにする');
   ok(store.ScheduledPosts.get(p9).status === 'pending' && store.ScheduledPosts.get(p9).attempts === 0, 'まだ送り始めていなかった予約は、失敗にせず予約に戻す（試行回数も戻す）');
   store.ScheduledPosts.cancel(p9, userB);
+  // 列（started_at）を足す前の版で処理中だった予約は、新しい版で開いたときに「送り始めていた」扱いになり、もう一度送られない
+  {
+    const { execFileSync } = require('child_process');
+    const migDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-mig-'));
+    const { DatabaseSync } = require('node:sqlite');
+    const old = new DatabaseSync(path.join(migDir, 'ai-bijika.db'));
+    old.exec(`CREATE TABLE scheduled_posts (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, account_id TEXT NOT NULL, text TEXT NOT NULL, scheduled_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT DEFAULT '', external_id TEXT DEFAULT '', posted_at TEXT DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    const t = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    old.prepare("INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, attempts, created_at, updated_at) VALUES ('old1','u','a','x',?, 'publishing', 1, ?, ?)").run(t, t, t);
+    old.close();
+    const out = execFileSync(process.execPath, ['--experimental-sqlite', '-e', `const s=require(${JSON.stringify(path.join(__dirname, '..', 'lib', 'service-store'))});s.ScheduledPosts.failStuck(new Date(Date.now()-5*60*1000).toISOString(), new Date(Date.now()+1000).toISOString());const r=s.ScheduledPosts.get('old1');process.stdout.write(JSON.stringify({status:r.status,started:r.started_at}));`],
+      { env: { ...process.env, DATA_DIR: migDir }, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+    const mig = JSON.parse(out);
+    ok(mig.status === 'failed' && mig.started !== '', '列を足す前の版で処理中だった予約は、送り始めていた扱いにして、もう一度送らない（失敗として確認をお願いする）');
+  }
+  // 起動時は、まだ送り始めていない予約を、経過時間に関係なくすぐ予約に戻す
+  const p10 = store.ScheduledPosts.create({ userId: userB, accountId: thAcc.id, text: 'claim3', scheduledAt: new Date(Date.now() - 1000).toISOString() });
+  store.ScheduledPosts.claimDue(10, new Date().toISOString());
+  store.ScheduledPosts.failStuck(new Date(Date.now() - 5 * 60 * 1000).toISOString(), new Date(Date.now() + 1000).toISOString());
+  ok(store.ScheduledPosts.get(p10).status === 'pending', '起動時は、まだ送り始めていない予約を、確保したばかりでもすぐ予約に戻す（遅れないように）');
+  store.ScheduledPosts.cancel(p10, userB);
 
   // 長期トークンの定期延長：期限まで7日を切った Threads の連携を、投稿が無くても延長する
   const soonAcc = store.SnsAccounts.upsert({ userId: userA, platform: 'threads', externalUserId: 'soon1', handle: '@soon', accessTokenEnc: box.encrypt('old_long', k), expiresAt: new Date(Date.now() + 3 * 86400000).toISOString() });

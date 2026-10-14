@@ -250,6 +250,24 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   const aigcBody = JSON.parse(mock.calls.find((c) => c.path === '/v2/post/publish/content/init/').body);
   mock.restore();
   ok(aigcBody.is_aigc === true, 'AIで作った写真には、TikTokの「AI生成」の印（is_aigc）を付ける');
+  let fetchN = 0;
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 200, json: { data: { publish_id: 'pb' }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/status/fetch/') { fetchN++; return fetchN === 1 ? { status: 200, text: '' } : { status: 200, json: { data: { status: 'PUBLISH_COMPLETE' }, error: { code: 'ok' } } }; }
+    return null;
+  });
+  r = await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [img(1)], options: { privacy_level: 'SELF_ONLY' } } });
+  mock.restore();
+  ok(r.externalId && fetchN === 2, 'TikTokの状態の確認で本文の無い応答が返っても、確認を打ち切らずに続ける');
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 200, text: '' };
+    return null;
+  });
+  err = null; try { await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [img(1)], options: { privacy_level: 'SELF_ONLY' } } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && !err.retriable && /投稿されたか/.test(err.message), 'TikTokの写真の投稿の開始で本文の無い応答が返ったら、受け付けられた可能性があるので、確認をお願いする');
 
   console.log('Facebook の連携（権限・ページの選び方）とエラーの分け方');
   process.env.FACEBOOK_APP_ID = 'fa'; process.env.FACEBOOK_APP_SECRET = 'fs';

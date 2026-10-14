@@ -150,15 +150,23 @@ async function pollVideo({ userId, operation }) {
   const u = new URL(uri);
   if (u.protocol !== 'https:' || u.hostname !== 'generativelanguage.googleapis.com') throw new AiError('動画の取得先が正しくありません。');
   // 動画のバイナリを取得（http-client はJSON/テキスト向けなので、ここだけ直接受け取る）
+  // 接続が止まったり、途中で切れたりしても待ち続けないよう、締め切りを設け、必ず1回だけ結果を返す
   const buf = await new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn, v) => { if (settled) return; settled = true; clearTimeout(timer); fn(v); };
     const rq = require('https').request({ host: u.host, method: 'GET', path: `${u.pathname}${u.search}`, headers: { 'x-goog-api-key': key } }, (res) => {
-      if (res.statusCode !== 200) { if (res.resume) res.resume(); return reject(new AiError(`動画を取得できませんでした (${res.statusCode})`)); }
+      if (res.statusCode !== 200) { if (res.resume) res.resume(); return done(reject, new AiError(`動画を取得できませんでした (${res.statusCode})`)); }
       const ch = []; let size = 0;
-      res.on('data', (c) => { size += c.length; if (size > mediaLib.LIMITS.videoBytes) { res.destroy(); reject(new AiError('生成された動画が大きすぎます。')); } else ch.push(c); });
-      res.on('end', () => resolve(Buffer.concat(ch)));
-      res.on('error', reject);
+      res.on('data', (c) => { size += c.length; if (size > mediaLib.LIMITS.videoBytes) { res.destroy(); done(reject, new AiError('生成された動画が大きすぎます。')); } else ch.push(c); });
+      res.on('end', () => done(resolve, Buffer.concat(ch)));
+      res.on('aborted', () => done(reject, new AiError('動画を取得できませんでした（通信が途中で切れました）')));
+      res.on('error', (e) => done(reject, new AiError(`動画を取得できませんでした (${e.message})`)));
+      res.on('close', () => { if (!res.complete) done(reject, new AiError('動画を取得できませんでした（通信が途中で切れました）')); });
     });
-    rq.on('error', (e) => reject(new AiError(`動画を取得できませんでした (${e.message})`)));
+    const timer = setTimeout(() => { rq.destroy(new Error('timeout')); done(reject, new AiError('動画を取得できませんでした（時間切れ）')); }, 5 * 60 * 1000);
+    if (timer.unref) timer.unref();
+    rq.setTimeout(60 * 1000, () => rq.destroy(new Error('timeout')));
+    rq.on('error', (e) => done(reject, new AiError(`動画を取得できませんでした (${e.message})`)));
     rq.end();
   });
   return { done: true, media: await saveBuffer(userId, buf) };

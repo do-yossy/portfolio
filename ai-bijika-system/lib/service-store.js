@@ -151,7 +151,11 @@ try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN group_id TEXT DEFAULT ''")
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN platform TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN rule_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
 // SNSへ送り始めた時刻（処理中のまま止まったときに、送り始めていたかどうかを見分ける）
-try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN started_at TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// 列を新しく足したときだけ、それまで処理中だった行を「送り始めていた」扱いにする（古い版で送信中だった予約を、もう一度送らないように）
+try {
+  db.exec("ALTER TABLE scheduled_posts ADD COLUMN started_at TEXT DEFAULT ''");
+  db.exec("UPDATE scheduled_posts SET started_at=updated_at WHERE status='publishing' AND started_at=''");
+} catch { /* 既にある */ }
 // 自動運用：作るもの（none／image／video）、実行する時刻（カンマ区切り。最大3つ）、SNSごとの設定（YouTubeの公開設定など）
 try { db.exec("ALTER TABLE auto_rules ADD COLUMN media TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE auto_rules ADD COLUMN hours TEXT DEFAULT ''"); } catch { /* 既にある */ }
@@ -418,9 +422,10 @@ const ScheduledPosts = {
   // 処理中のまま残った行の後始末（起動時と、定期の確認）。
   // SNSへ送り始めていた行は、投稿されたかどうかが分からないため、二重投稿を避けて失敗にする。
   // まだ送り始めていなかった行（まとめて確保したうちの後ろのもの）は、送っていないので予約に戻す（試行回数も戻す）
-  failStuck(olderThanIso) {
+  // unstartedBefore を省略すると olderThanIso と同じ。起動時は、まだ送り始めていない行をすぐ予約に戻してよい（1台構成のため、ほかに処理中のプロセスは無い）
+  failStuck(olderThanIso, unstartedBefore = olderThanIso) {
     const back = db.prepare(`UPDATE scheduled_posts SET status='pending', attempts=MAX(attempts-1, 0), updated_at=? WHERE status='publishing' AND started_at='' AND updated_at < ?`)
-      .run(now(), olderThanIso).changes;
+      .run(now(), unstartedBefore).changes;
     const failed = db.prepare(`UPDATE scheduled_posts SET status='failed', last_error=?, updated_at=? WHERE status='publishing' AND started_at!='' AND updated_at < ?`)
       .run('処理中にサーバーが再起動したため中断されました。投稿されたかをご確認のうえ、必要なら予約し直してください。', now(), olderThanIso).changes;
     return failed + back;

@@ -400,13 +400,13 @@ async function handle(ctx) {
     if (b && typeof b === 'object' && b.replace_draft) {
       const old = ScheduledPosts.get(String(b.replace_draft));
       if (!old || old.user_id !== user.id || old.status !== 'draft' || !ScheduledPosts.cancel(old.id, user.id)) {
-        sendJson(res, 409, { error: 'この下書きは、すでに保存・投稿されています。カレンダーでご確認ください。' });
+        sendJson(res, 409, { error: 'この下書きは、すでに保存・投稿・削除されているため、保存し直せません。カレンダーでご確認ください。' });
         return true;
       }
       replaced = old.id;
     }
-    const r = apiV1.createFromBody(user.id, b, { via: 'screen' });
-    if (replaced && r.status !== 201) ScheduledPosts.restoreDraft(replaced, user.id);
+    let r = null;
+    try { r = apiV1.createFromBody(user.id, b, { via: 'screen' }); } finally { if (replaced && (!r || r.status !== 201)) ScheduledPosts.restoreDraft(replaced, user.id); }
     sendJson(res, r.status, r.body);
     return true;
   }

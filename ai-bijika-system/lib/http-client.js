@@ -23,6 +23,7 @@ function encodeForm(obj, prefix, out = []) {
 
 // body: 文字列 または Buffer。JSON/フォームへの変換は呼び出し側で行う。
 // timeoutMs は、通信が途切れたまま待つ時間の上限。これとは別に、全体の締め切り（timeoutMs の2倍、最低1分）を設ける。
+// 送るデータが大きいときは、遅い回線（およそ1Mbps）でも送り終えられるよう、その分を締め切りに足す。
 // 応答の途中で接続が閉じられた場合（本文が最後まで届かない）も、必ず失敗として返す（待ち続けて、予約の処理全体が止まらないように）
 function request({ host, method = 'GET', path, headers = {}, body, timeoutMs = 30000 }) {
   return new Promise((resolve, reject) => {
@@ -46,7 +47,8 @@ function request({ host, method = 'GET', path, headers = {}, body, timeoutMs = 3
       res.on('error', (e) => done(reject, e));
       res.on('close', () => { if (!res.complete) done(reject, new Error('connection closed before the response was complete')); });
     });
-    deadline = setTimeout(() => { req.destroy(new Error('timeout')); done(reject, new Error('timeout')); }, Math.max(timeoutMs * 2, 60000));
+    const sendMs = payload ? Math.ceil(payload.length / 128) : 0; // 128バイト/ミリ秒 ≒ 1Mbps
+    deadline = setTimeout(() => { req.destroy(new Error('timeout')); done(reject, new Error('timeout')); }, Math.max(timeoutMs * 2, 60000) + sendMs);
     if (deadline.unref) deadline.unref();
     req.setTimeout(timeoutMs, () => req.destroy(new Error('timeout')));
     req.on('error', (e) => done(reject, e));

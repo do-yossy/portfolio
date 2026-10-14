@@ -74,6 +74,8 @@ async function call({ host = HOST, method = 'POST', path, headers = {}, body, js
   const code = errorCodeOf(r.json);
   const okStatus = r.status >= 200 && r.status < 300;
   if (okStatus && (!json || (r.json && (!code || code === 'ok')))) return r.json || {};
+  // 2xx なのに本文を読み取れない（途中で切れた応答など）：受け付けられた可能性があるので、公開の段階では「投稿されたか不明」、状態の確認では次の確認でやり直す
+  if (okStatus && json && !r.json) throw classify(r.status, 'TikTokからの応答を読み取れませんでした');
   const msg = (r.json && ((r.json.error && r.json.error.message) || r.json.error_description)) || '';
   const err = classify(r.status >= 400 ? r.status : 400, KNOWN_ERRORS[code] || (msg ? `TikTok: ${msg}` : (code ? `TikTok: ${code}` : '')));
   err.code = code;

@@ -208,6 +208,8 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
     resolved.push({ a, caption, options: t.options || {} });
   }
   if (new Set(resolved.map((r) => r.a.id)).size !== resolved.length) return { ok: false, error: '同じSNSアカウントが、重複して選ばれています。' };
+  // TikTokは、アカウントごとに公開範囲などを確かめる決まりのため、1回の投稿で1つのアカウントだけ
+  if (resolved.filter((r) => r.a.platform === 'tiktok').length > 1) return { ok: false, error: 'TikTokは、1回に1つのアカウントだけ選んでください（アカウントごとに設定を確かめるため）。' };
   if (draft) {
     if (ScheduledPosts.countDrafts(userId) + resolved.length > MAX_DRAFTS) return { ok: false, error: `下書きは${MAX_DRAFTS}件までです。` };
   } else {
