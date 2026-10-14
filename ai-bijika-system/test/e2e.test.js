@@ -131,7 +131,7 @@ function webhook(event, secret = 'whsec_e2e') {
     ok(lp.includes('TikTok：') && lp.includes('YouTube：') && !lp.includes('AI生成') && !lp.includes('合成した内容'), 'TikTok・YouTubeを提供していても、このサービスのAIが無ければ、AI生成の表示の説明は出さない');
     process.env.OPENAI_API_KEY = 'ok';
     lp = (await req('GET', '/service/lp')).text;
-    ok(lp.includes('このサービスのAIで作った画像には、TikTokの「AI生成」の表示') && lp.includes('ほかのAIで作ってアップロードしたものには付きません') && !lp.includes('合成した内容'), '画像だけを作れる設定では、TikTokの説明は「画像には」とし、YouTubeの申告の説明は出さない');
+    ok(lp.includes('このサービスのAIで作った画像には、TikTokの「AI生成」の表示') && lp.includes('ほかのAIで作ってアップロードしたものには、このサービスは表示を付けません') && !lp.includes('合成した内容'), '画像だけを作れる設定では、TikTokの説明は「画像には」とし、YouTubeの申告の説明は出さない');
     process.env.GEMINI_API_KEY = 'gk'; process.env.AI_DAILY_VIDEO = '1';
     lp = (await req('GET', '/service/lp')).text;
     ok(lp.includes('このサービスのAIで作った画像・動画には') && lp.includes('このサービスのAIで作った動画は、合成した内容として申告します'), '動画も作れる設定では、TikTokは「画像・動画」、YouTubeの申告の説明も出す');

@@ -38,7 +38,7 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
       if (c.method === 'POST') return { status: 200, json: { name: 'models/veo/operations/op1' } };
       if (c.path.startsWith('/v1beta/models/veo/operations/flaky')) throw new Error('ECONNRESET');
       if (c.path.startsWith('/v1beta/models/veo/operations/op1')) return { status: 200, json: videoDone ? { done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://generativelanguage.googleapis.com/v1beta/files/f1:download?alt=media' } }] } } } : { done: false } };
-      if (c.path.startsWith('/v1beta/files/f1')) return dlFail ? { status: 503, text: '' } : { status: 200, text: MP4_TEXT };
+      if (c.path.startsWith('/v1beta/files/f1')) return dlFail ? { status: dlFail, text: '' } : { status: 200, text: MP4_TEXT };
     }
     if (c.host === 'api.stripe.com' && c.path === '/v1/checkout/sessions') return { status: 200, json: { id: 'cs_t', url: 'https://checkout.stripe.test/t' } };
     if (c.host === '93.184.216.34') {
@@ -93,9 +93,12 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   let pr = await ai.pollVideo({ userId: uid, operation: op });
   ok(pr.done === false, '生成中は未完了を返す');
   videoDone = true;
-  dlFail = true;
+  dlFail = 503;
   err = null; try { await ai.pollVideo({ userId: uid, operation: op }); } catch (e) { err = e; }
   ok(err && err.transient === true, '完成した動画の取得が一時的に失敗（503など）しても、ジョブを失敗にせず、次の確認で取り直す');
+  dlFail = 404;
+  err = null; try { await ai.pollVideo({ userId: uid, operation: op }); } catch (e) { err = e; }
+  ok(err && err.transient === false, '動画の取得で 404 などの4xx（429を除く）が返ったときは、取り直さない');
   dlFail = false;
   pr = await ai.pollVideo({ userId: uid, operation: op });
   ok(pr.done && pr.media.kind === 'video', '完了した動画を保存できる');

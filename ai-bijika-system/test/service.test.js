@@ -311,7 +311,21 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   // 複数の行の書き込みは、途中で失敗したら何も残さない
   let txErr = null; let txId = null;
   try { store.transaction(() => { txId = store.ScheduledPosts.create({ userId: userB, accountId: thAcc.id, text: 'tx', scheduledAt: new Date(Date.now() + 3600000).toISOString() }); throw new Error('途中で失敗'); }); } catch (e) { txErr = e; }
-  ok(txErr && txId && store.ScheduledPosts.get(txId) === null, '投稿先ごとの行の作成は、途中で失敗したら1件も残さない（下書きの置き換えで二重にならない）');
+  ok(txErr && txId && store.ScheduledPosts.get(txId) === null, 'transaction は、途中で失敗したら書き込みを1件も残さない');
+  // createPost：2つの投稿先のうち2件目の作成で失敗したら、1件目も残さない（下書きの置き換えで二重にならない）
+  {
+    const mkAcc = (ext) => { const r = store.SnsAccounts.upsert({ userId: userB, platform: 'threads', externalUserId: ext, handle: `@${ext}`, accessTokenEnc: box.encrypt('t', k), expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() }); return typeof r === 'object' ? r.id : r; };
+    const thAcc1Id = mkAcc('tx1'); const thAcc2Id = mkAcc('tx2');
+    const origCreate = store.ScheduledPosts.create;
+    let calls = 0;
+    store.ScheduledPosts.create = function (...a) { calls++; if (calls === 2) throw new Error('2件目で失敗'); return origCreate.apply(this, a); };
+    const before = store.ScheduledPosts.listForUser(userB).length;
+    let cpErr = null;
+    try { core.createPost({ userId: userB, category: 'text', targets: [{ accountId: thAcc1Id, caption: 'tx-a' }, { accountId: thAcc2Id, caption: 'tx-b' }], mediaIds: [], tree: [], scheduledAtIso: new Date(Date.now() + 3600000).toISOString(), draft: false }); } catch (e) { cpErr = e; }
+    store.ScheduledPosts.create = origCreate;
+    ok(cpErr && calls === 2 && store.ScheduledPosts.listForUser(userB).length === before, '予約の作成（createPost）は、2件目の作成で失敗したら1件目も残さない（下書きの置き換えで二重にならない）');
+    store.SnsAccounts.remove(thAcc1Id, userB); store.SnsAccounts.remove(thAcc2Id, userB);
+  }
 
   // 長期トークンの定期延長：期限まで7日を切った Threads の連携を、投稿が無くても延長する
   const soonAcc = store.SnsAccounts.upsert({ userId: userA, platform: 'threads', externalUserId: 'soon1', handle: '@soon', accessTokenEnc: box.encrypt('old_long', k), expiresAt: new Date(Date.now() + 3 * 86400000).toISOString() });
