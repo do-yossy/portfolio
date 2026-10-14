@@ -279,8 +279,13 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   const c1 = store.ScheduledPosts.claimDue(10, new Date().toISOString());
   const c2 = store.ScheduledPosts.claimDue(10, new Date().toISOString());
   ok(c1.some((p) => p.id === p8) && !c2.some((p) => p.id === p8), '同じ予約を二重に確保しない');
+  const p9 = store.ScheduledPosts.create({ userId: userB, accountId: thAcc.id, text: 'claim2', scheduledAt: new Date(Date.now() - 1000).toISOString() });
+  store.ScheduledPosts.claimDue(10, new Date().toISOString());
+  store.ScheduledPosts.markStarted(p8); // p8 は送り始めていた、p9 はまだ送っていなかった（まとめて確保したうちの後ろ）
   store.ScheduledPosts.failStuck(new Date(Date.now() + 1000).toISOString());
-  ok(store.ScheduledPosts.get(p8).status === 'failed' && /再起動/.test(store.ScheduledPosts.get(p8).last_error), '起動時に処理中のまま残った予約は二重投稿を避けて失敗扱いにする');
+  ok(store.ScheduledPosts.get(p8).status === 'failed' && /再起動/.test(store.ScheduledPosts.get(p8).last_error), '送り始めていたのに処理中のまま残った予約は、二重投稿を避けて失敗扱いにする');
+  ok(store.ScheduledPosts.get(p9).status === 'pending' && store.ScheduledPosts.get(p9).attempts === 0, 'まだ送り始めていなかった予約は、失敗にせず予約に戻す（試行回数も戻す）');
+  store.ScheduledPosts.cancel(p9, userB);
 
   // 長期トークンの定期延長：期限まで7日を切った Threads の連携を、投稿が無くても延長する
   const soonAcc = store.SnsAccounts.upsert({ userId: userA, platform: 'threads', externalUserId: 'soon1', handle: '@soon', accessTokenEnc: box.encrypt('old_long', k), expiresAt: new Date(Date.now() + 3 * 86400000).toISOString() });

@@ -111,26 +111,34 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'tree', text: '1', medias: [], tree: [{ text: '2', medias: [] }] } }); } catch (e) { err = e; }
   mock.restore();
   ok(err && !err.retriable && /続きを投稿できませんでした/.test(err.message) && mock.calls.filter((c) => c.method === 'POST' && /\/threads$/.test(c.path)).length === 1, 'ツリーで投稿IDが分からなくなったら、返信先を決められないので続きを止める（再試行もしない）');
-  let pubN2 = 0;
   mock = installHttpsMock(async (c) => {
     if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cy' } };
-    if (/threads_publish$/.test(c.path)) { pubN2++; if (pubN2 === 1) throw new Error('ECONNRESET'); return { status: 200, json: { id: 'post_retry' } }; }
-    return { status: 200, json: { status: 'FINISHED' } };
-  });
-  r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } });
-  const createdN = mock.calls.filter((c) => c.method === 'POST' && /\/threads$/.test(c.path)).length;
-  const publishBodies = mock.calls.filter((c) => /threads_publish$/.test(c.path)).map((c) => c.body);
-  mock.restore();
-  ok(r.externalId === 'post_retry' && createdN === 1 && publishBodies.length === 2 && publishBodies.every((b) => /creation_id=cy/.test(b)), 'コンテナがまだ FINISHED なら、新しいコンテナは作らず、同じコンテナで公開をやり直す（二重投稿にならない）');
-  mock = installHttpsMock(async (c) => {
-    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cz' } };
-    if (/threads_publish$/.test(c.path)) return { status: 500, json: { error: { message: 'server' } } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
     return { status: 200, json: { status: 'FINISHED' } };
   });
   err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } }); } catch (e) { err = e; }
-  const pubTries = mock.calls.filter((c) => /threads_publish$/.test(c.path)).length;
+  const createdN = mock.calls.filter((c) => c.method === 'POST' && /\/threads$/.test(c.path)).length;
+  const publishN = mock.calls.filter((c) => /threads_publish$/.test(c.path)).length;
+  const statusChecks = mock.calls.filter((c) => c.method === 'GET' && c.path.startsWith('/v1.0/cy?')).length;
   mock.restore();
-  ok(err && err.retriable === false && /投稿されたか/.test(err.message) && pubTries === 3, '同じコンテナでのやり直しが続けて失敗したら、自動の再試行（新しいコンテナ）には回さず、投稿されたかの確認をお願いする');
+  ok(err && err.retriable === false && /投稿されたか/.test(err.message) && createdN === 1 && publishN === 1 && statusChecks >= 2, '公開の応答が失われ、状態が FINISHED のままなら、公開をやり直さず（同じコンテナを2回公開できるかは公式に書かれていないため）、投稿されたかの確認をお願いする');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cz' } };
+    if (/threads_publish$/.test(c.path)) return { status: 200, text: '' };
+    return { status: 200, json: { status: 'FINISHED' } };
+  });
+  err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && err.retriable === false && /投稿されたか/.test(err.message), '公開の応答が 200 なのに本文が無いときも、受け付けられた可能性があるので、再試行せずに確認をお願いする');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cw' } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    if (c.method === 'GET' && c.path.startsWith('/v1.0/u1/threads?')) return { status: 200, json: { data: [{ id: 'old', text: '', timestamp: new Date().toISOString() }] } };
+    return { status: 200, json: { status: 'PUBLISHED' } };
+  });
+  r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'image', text: '', medias: [img(1)] } });
+  mock.restore();
+  ok(r.externalId === '', '本文の無い投稿では、別の投稿のIDを推測で記録しない');
   ok(th.textLength('あ😀') === 5 && th.textLength('abc') === 3, 'Threadsの文字数は、絵文字をUTF-8のバイト数で数える（公式の数え方）');
   ok(th.textLength('🇯🇵') === 8 && th.textLength('1️⃣') === 7, '国旗やキーキャップの絵文字も、UTF-8のバイト数で数える');
   const uiTh = require('../lib/service-ui').composePage({ user: { email: 'a' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], csrf: 'c' });
@@ -138,7 +146,8 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   global.window = { Intl };
   const thLen = thSrc && new Function(`${thSrc[0]}; return thLen;`)();
   delete global.window;
-  ok(thLen && thLen('🇯🇵') === 8 && thLen('1️⃣') === 7 && thLen('あ😀') === 5, '画面の文字数の表示も、Threadsはサーバーと同じ数え方にする');
+  const emojiSamples = ['🇯🇵', '1️⃣', 'あ😀', '❤', '♥', '©', '™', '✔', '▶', '☀', '🧑‍💻', '❤️‍🔥', '👨‍👩‍👧', 'abc', 'テスト'];
+  ok(thLen && emojiSamples.every((t) => thLen(t) === th.textLength(t)), `画面の文字数の表示も、Threadsはサーバーと同じ数え方にする（${emojiSamples.length}種で一致）`);
   ok(/\b300\b|5分/.test(th.validatePost({ post: { category: 'video', text: '', medias: [{ kind: 'video', durationSec: 301 }] } }) || ''), 'Threadsの動画は5分まで');
 
   console.log('X ツリー');

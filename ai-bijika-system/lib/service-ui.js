@@ -58,10 +58,10 @@ const aiLib = () => require('./ai');
 const liveSns = () => registry.list().filter((p) => p.isConfigured());
 const snsNames = () => { const l = liveSns(); return l.length ? l.map((p) => p.label).join('・') : ''; };
 const SNS_RULES = {
-  threads: 'Threads：テキスト・画像・動画（カルーセル20件まで。動画は5分まで）。ツリー可。500文字まで（絵文字は1つで2〜8文字ほどに数えます）',
+  threads: 'Threads：テキスト・画像・動画（カルーセル20件まで。動画は5分まで）。ツリー可。500文字まで（絵文字は1つで2文字以上に数えます。組み合わせの絵文字は10文字を超えることもあります）',
   x: 'X：画像4枚（各5MBまで）または動画1本（140秒まで）を添付可。ツリー可。投稿数は月の上限あり',
   instagram: 'Instagram：プロアカウント（ビジネス／クリエイター）が対象。JPEG画像（カルーセル10件まで。縦横比は4:5〜1.91:1）またはリール動画が必須',
-  tiktok: 'TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択（アプリの審査が終わるまでは「自分のみ」）。AIで作った画像・動画には、TikTokの「AI生成」の表示を自動で付けます',
+  get tiktok() { return `TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択${process.env.TIKTOK_AUDITED === 'true' ? '' : '（アプリの審査が終わるまでは「自分のみ」）'}。AIで作った画像・動画には、TikTokの「AI生成」の表示を自動で付けます`; },
   facebook: 'Facebook：連携のときに選んだ1つのページに投稿（投稿できるページが2つ以上あると連携できないため、Facebookの画面でページを1つだけ選んでください）。テキスト・画像10枚まで・動画1本',
   youtube: 'YouTube：3分以内の動画1本が必須。本文の1行目がタイトル（100文字まで）になり、収まる場合は「#Shorts」を付けます。説明は5,000バイト（日本語でおよそ1,600文字）まで。公開設定と子ども向けかどうかは投稿ごとに選択。1日の投稿数に上限があり（太平洋時間で数えます）、送る時点で上限に達していた場合は、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します。AIで作った動画は、合成した内容として申告します',
 };
@@ -396,7 +396,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
         <label class="check"><input type="checkbox" name="tiktok_commercial_own" value="1"><span>この動画は、自分のブランド・商品・サービスの宣伝を含む</span></label>
         <label class="check"><input type="checkbox" name="tiktok_commercial_paid" id="tt_paid" value="1"><span>この動画は、第三者の商品・ブランドの宣伝（提携・有償）を含む</span></label>
         <p class="small" id="ttPaidNote" style="display:none">提携（有償）の宣伝を投稿するには、公開範囲を「自分のみ」にできません。投稿することで、<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">TikTokのブランドコンテンツのポリシー</a>と音楽使用の確認に同意したものとみなされます。</p>
-        <p class="small">投稿することで、<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">TikTokの音楽使用の確認</a>に同意したものとみなされます。アプリの審査が終わるまでは、公開範囲が「自分のみ」に限られる場合があります。</p></div>` : ''}
+        <p class="small">投稿することで、<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">TikTokの音楽使用の確認</a>に同意したものとみなされます。${process.env.TIKTOK_AUDITED === 'true' ? '' : 'TikTokのアプリの審査が終わるまでは、公開範囲は「自分のみ」だけです。'}</p></div>` : ''}
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
         <button class="btn btn-ghost" type="submit" name="mode" value="now" onclick="return confirm('今すぐ投稿します。よろしいですか？')">今すぐ投稿</button></div>
@@ -432,10 +432,9 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
           var o=x.j.privacyLevelOptions||[];sel.textContent='';var ph=document.createElement('option');ph.value='';ph.textContent='選択してください';sel.appendChild(ph);
           o.forEach(function(v){var op=document.createElement('option');op.value=v;op.textContent=LABELS[v]||v;sel.appendChild(op);});
           applyPaid();
-          if(!x.j.audited)msg.textContent='TikTokのアプリの審査が終わるまでは、公開範囲は「自分のみ」だけを選べます（投稿するアカウントも非公開にしておく必要があります）。';
           if(x.j.nickname)document.getElementById('ttNick').textContent=x.j.nickname;
           [['tt_comment',x.j.commentDisabled],['tt_duet',x.j.duetDisabled],['tt_stitch',x.j.stitchDisabled]].forEach(function(p){var c=document.getElementById(p[0]);if(p[1]){c.checked=false;c.disabled=true;c.parentNode.querySelector('span').textContent+='（このアカウントでは許可できません）';}});
-          msg.textContent=x.j.maxVideoPostDurationSec?'投稿できる動画の長さは、最大'+x.j.maxVideoPostDurationSec+'秒です。':'';
+          msg.textContent=(x.j.audited?'':'TikTokのアプリの審査が終わるまでは、公開範囲は「自分のみ」だけを選べます（投稿するアカウントも非公開にしておく必要があります）。')+(x.j.maxVideoPostDurationSec?'投稿できる動画の長さは、最大'+x.j.maxVideoPostDurationSec+'秒です。':'');
         }).catch(function(){sel.textContent='';var e2=document.createElement('option');e2.value='';e2.textContent='取得できませんでした';sel.appendChild(e2);loaded=false;});}
       function applyPaid(){var paid=document.getElementById('tt_paid');if(!paid)return;var sel=document.getElementById('tiktok_privacy'),note=document.getElementById('ttPaidNote');note.style.display=paid.checked?'block':'none';
         Array.prototype.forEach.call(sel.options,function(op){if(op.value==='SELF_ONLY'){op.disabled=paid.checked;if(paid.checked&&sel.value==='SELF_ONLY')sel.value='';}});}
@@ -583,7 +582,8 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
       // Threadsの数え方（サーバーと同じ）：絵文字はUTF-8のバイト数、それ以外は1文字を1
       var SEG=(window.Intl&&Intl.Segmenter)?new Intl.Segmenter('ja',{granularity:'grapheme'}):null,EMO=null;
       try{EMO=new RegExp('\\\\p{RGI_Emoji}','v');}catch(e){try{EMO=new RegExp('\\\\p{Extended_Pictographic}|\\\\p{Regional_Indicator}|\\u20E3','u');}catch(e2){EMO=null;}}
-      function thLen(t){if(!SEG||!EMO)return Array.from(t).length;var n=0;Array.from(SEG.segment(t)).forEach(function(s){n+=EMO.test(s.segment)?new TextEncoder().encode(s.segment).length:1;});return n;}
+      var EP=null;try{EP=new RegExp('\\\\p{Extended_Pictographic}','u');}catch(e){EP=null;}
+      function thLen(t){if(!SEG||!EMO)return Array.from(t).length;var n=0;Array.from(SEG.segment(t)).forEach(function(s){var g=s.segment;n+=(EMO.test(g)||(EP&&EP.test(g)))?new TextEncoder().encode(g).length:1;});return n;}
       function len(t,p){if(p==='threads')return thLen(t);if(p==='youtube')return new TextEncoder().encode(t.replace(/[<>]/g,'＜')).length;if(p!=='x')return Array.from(t).length;var n=0;t=t.replace(/https?:\\/\\/\\S+/g,function(){n+=23;return '';});Array.from(t).forEach(function(ch){var c=ch.codePointAt(0);n+=((c>=0x1100&&c<=0x11ff)||(c>=0x2e80&&c<=0xa4cf)||(c>=0xac00&&c<=0xd7a3)||(c>=0xf900&&c<=0xfaff)||(c>=0xff00&&c<=0xff60)||(c>=0x1f300&&c<=0x1faff))?2:1;});return n;}
       function counts(){var t=$('mainText').value;var s=sel();$('mainCount').textContent=s.length?s.map(function(a){var n=len(t,a.platform);return a.label.split(' ')[0]+' '+n+'/'+a.limit+(n>a.limit?'（超過）':'');}).join('　'):Array.from(t).length+'文字';}
       $('mainText').addEventListener('input',counts);
@@ -603,11 +603,13 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
         var rm=el('button',{type:'button','class':'btn btn-sm btn-ghost'},'削除');rm.addEventListener('click',function(){cards.splice(i,1);drawCards();});row.appendChild(rm);f.appendChild(row);
         var ml=el('div',{style:'display:flex;gap:8px;margin-top:6px'});(c.media||[]).forEach(function(it){ml.appendChild(thumb(it,function(){c.media=[];drawCards();}));});f.appendChild(ml);l.appendChild(f);});}
       $('addCard').addEventListener('click',function(){if(cards.length>=24)return alert('ツリーは25件までです。');cards.push({text:'',media:[]});drawCards();});
-      var ttLoaded=false,LABELS={PUBLIC_TO_EVERYONE:'全員に公開',MUTUAL_FOLLOW_FRIENDS:'相互フォローの友達',FOLLOWER_OF_CREATOR:'フォロワー',SELF_ONLY:'自分のみ'};
-      function loadTT(){if(ttLoaded)return;var a=ACC.filter(function(x){return x.platform==='tiktok';})[0];if(!a)return;ttLoaded=true;var s=$('ttPrivacy');
-        fetch('/service/app/tiktok/creator-info?account='+encodeURIComponent(a.id),{credentials:'same-origin'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error);return j;});}).then(function(j){s.textContent='';s.appendChild(el('option',{value:''},'選択してください'));(j.privacyLevelOptions||[]).forEach(function(v){s.appendChild(el('option',{value:v},LABELS[v]||v));});if(j.nickname)$('ttNick').textContent=j.nickname;
+      // TikTokの設定欄は、選ばれているTikTokのアカウント（下書きを開いたときは、その下書きのアカウント）の情報で埋める。選び直したら取り直す
+      var ttFor=null,LABELS={PUBLIC_TO_EVERYONE:'全員に公開',MUTUAL_FOLLOW_FRIENDS:'相互フォローの友達',FOLLOWER_OF_CREATOR:'フォロワー',SELF_ONLY:'自分のみ'};
+      function loadTT(){var a=sel().filter(function(x){return x.platform==='tiktok';})[0];if(!a||ttFor===a.id)return;ttFor=a.id;var s=$('ttPrivacy');
+        s.textContent='';s.appendChild(el('option',{value:''},'読み込み中…'));$('ttNick').textContent='TikTok';$('ttMsg').textContent='';['ttComment','ttDuet','ttStitch'].forEach(function(id){$(id).disabled=false;$(id).checked=false;});
+        fetch('/service/app/tiktok/creator-info?account='+encodeURIComponent(a.id),{credentials:'same-origin'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error);return j;});}).then(function(j){if(ttFor!==a.id)return;s.textContent='';s.appendChild(el('option',{value:''},'選択してください'));(j.privacyLevelOptions||[]).forEach(function(v){s.appendChild(el('option',{value:v},LABELS[v]||v));});if(j.nickname)$('ttNick').textContent=j.nickname;
           [['ttComment',j.commentDisabled],['ttDuet',j.duetDisabled],['ttStitch',j.stitchDisabled]].forEach(function(p){if(p[1]){$(p[0]).checked=false;$(p[0]).disabled=true;}});$('ttMsg').textContent=(j.audited?'':'TikTokのアプリの審査が終わるまでは、公開範囲は「自分のみ」だけを選べます（投稿するアカウントも非公開にしておく必要があります）。')+(j.maxVideoPostDurationSec?'動画は最大'+j.maxVideoPostDurationSec+'秒です。':'');})
-          .catch(function(e){ttLoaded=false;s.textContent='';s.appendChild(el('option',{value:''},'取得できませんでした'));$('ttMsg').textContent=e.message||'';});}
+          .catch(function(e){if(ttFor!==a.id)return;ttFor=null;s.textContent='';s.appendChild(el('option',{value:''},'取得できませんでした'));$('ttMsg').textContent=e.message||'';});}
       $('ttPaid').addEventListener('change',function(){var s=$('ttPrivacy');Array.prototype.forEach.call(s.options,function(o){if(o.value==='SELF_ONLY'){o.disabled=$('ttPaid').checked;if($('ttPaid').checked&&s.value==='SELF_ONLY')s.value='';}});});
       function aiCall(kind,payload){$('aiMsg').textContent='生成中…';return fetch('/service/app/ai/'+kind,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF':csrf},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'生成に失敗しました。');return j;});}).catch(function(e){$('aiMsg').textContent=e.message;throw e;});}
       if($('aiTextBtn'))$('aiTextBtn').addEventListener('click',function(){var s=sel();aiCall('text',{theme:$('aiTheme').value,platform:s.length?s[0].platform:''}).then(function(j){$('mainText').value=j.text;counts();perBox();$('aiMsg').textContent='文章を入れました。内容をご確認ください。';}).catch(function(){});});
@@ -647,6 +649,7 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
         if(c==='tree')body.tree=cards.map(function(x){return {text:x.text,media_ids:(x.media||[]).map(function(m){return m.id;})};});
         s.forEach(function(a){if(a.platform==='tiktok')body.options[a.id]={privacy_level:$('ttPrivacy').value,disable_comment:!$('ttComment').checked,disable_duet:!$('ttDuet').checked,disable_stitch:!$('ttStitch').checked,commercial_own:$('ttOwn').checked,commercial_paid:$('ttPaid').checked,auto_add_music:$('ttMusic').checked};
           if(a.platform==='youtube')body.options[a.id]={privacy:$('ytPrivacy').value,made_for_kids:$('ytKids').value==='yes'};});
+        if(s.filter(function(a){return a.platform==='tiktok';}).length>1)return show(false,'TikTokは、1回に1つのアカウントだけ選んでください（アカウントごとに設定を確かめるため）。');
         if(s.some(function(a){return a.platform==='youtube';})&&!$('ytPrivacy').value)return show(false,'YouTubeの公開設定を選んでください。');
         if(s.some(function(a){return a.platform==='youtube';})&&!$('ytKids').value)return show(false,'YouTubeの「子ども向けかどうか」を選んでください。');
         if(when==='now'){if(!confirm('今すぐ投稿します。よろしいですか？'))return;body.now=true;}else if(when==='draft'){body.draft=true;}else{if(!$('at').value)return show(false,'日時を指定してください。');body.scheduled_at=$('at').value+':00+09:00';}
@@ -796,7 +799,7 @@ function apiDocsPage(user, baseUrl) {
   "scheduled_at": "2026-12-01T09:00:00+09:00"
 }'`)}
     <h3>SNSごとの設定（<code>options</code>）</h3>
-    <p>アカウントIDごとに指定します。<b>TikTokへは、APIからは下書き（<code>draft:true</code>）にだけできます</b>（TikTokの決まりにより、投稿は、利用者ご本人がサービスのカレンダーから下書きを「投稿を作る」画面で開き、内容と設定を確かめて選び直してから行います。<code>POST /api/v1/posts/{id}/publish</code> では予約にできません）。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なり、アプリの審査前は「SELF_ONLY（自分のみ）」だけの場合があります）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（下書き以外は必須です。指定がないと予約できません）。YouTubeへのアップロードには、1日（太平洋時間）の上限（利用者ごと・サービス全体）があり、上限に達した日時には予約できません。送る時点で上限に達していた場合は、YouTubeの日付が変わった後に自動で投稿します。AIで作った画像・動画には、TikTokの「AI生成」の表示（<code>is_aigc</code>）とYouTubeの合成コンテンツの申告（<code>containsSyntheticMedia</code>）を自動で付けます。TikTokの公開範囲は、アプリの審査が終わるまで <code>SELF_ONLY</code> だけです。</p>
+    <p>アカウントIDごとに指定します。<b>TikTokへは、APIからは下書き（<code>draft:true</code>）にだけできます</b>（TikTokの決まりにより、投稿は、利用者ご本人がサービスのカレンダーから下書きを「投稿を作る」画面で開き、内容と設定を確かめて選び直してから行います。<code>POST /api/v1/posts/{id}/publish</code> では予約にできません）。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なります。サービスのアプリの審査が終わるまでは <code>SELF_ONLY</code>（自分のみ）だけです）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（下書き以外は必須です。指定がないと予約できません）。YouTubeへのアップロードには、1日（太平洋時間）の上限（利用者ごと・サービス全体）があり、上限に達した日時には予約できません。送る時点で上限に達していた場合は、YouTubeの日付が変わった後に自動で投稿します。AIで作った画像・動画には、TikTokの「AI生成」の表示（<code>is_aigc</code>）とYouTubeの合成コンテンツの申告（<code>containsSyntheticMedia</code>）を自動で付けます。</p>
     ${code(`"options": {
   "<TikTokのアカウントID>": { "privacy_level": "<利用者が選んだ公開範囲>", "disable_comment": false, "disable_duet": true, "disable_stitch": true, "commercial_own": false, "commercial_paid": false, "auto_add_music": false },
   "<YouTubeのアカウントID>": { "privacy": "unlisted", "made_for_kids": false }

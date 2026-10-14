@@ -137,14 +137,17 @@ function chunkPlan(size) {
 
 async function publish(args) {
   const { accessToken } = args;
-  const p = normalize(args); const text = p.text; const media = p.medias[0]; const options = p.options;
+  const p = normalize(args); const text = p.text; const media = p.medias[0];
   const err = validatePost(args);
   if (err) throw new SnsError(err);
   const info = await call({ path: '/v2/post/publish/creator_info/query/', headers: bearer(accessToken), body: '{}' });
   const allowed = (info.data && info.data.privacy_level_options) || [];
-  if (allowed.length && !allowed.includes(options.privacy_level)) {
-    throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。アプリの審査が終わるまでは「自分のみ（SELF_ONLY）」だけの場合があります。`);
+  if (allowed.length && !allowed.includes(p.options.privacy_level)) {
+    throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。アプリの審査が終わるまでは「自分のみ（SELF_ONLY）」だけです。`);
   }
+  // アカウント側でコメント・デュエット・ステッチを止めている場合は、送る時点の設定でも必ず「許可しない」にする（予約した後に設定が変わった場合も含む）
+  const d = info.data || {};
+  const options = { ...p.options, disable_comment: !!p.options.disable_comment || !!d.comment_disabled, disable_duet: !!p.options.disable_duet || !!d.duet_disabled, disable_stitch: !!p.options.disable_stitch || !!d.stitch_disabled };
   if (media.kind === 'image') return publishPhotos({ accessToken, p, options });
   if (info.data && Number(info.data.max_video_post_duration_sec) && media.durationSec && media.durationSec > Number(info.data.max_video_post_duration_sec)) {
     throw new SnsError(`動画が長すぎます（${Math.round(media.durationSec)}秒）。このアカウントで投稿できるのは、最大${info.data.max_video_post_duration_sec}秒です。`);
@@ -177,7 +180,11 @@ async function publish(args) {
         // 応答だけが失われた可能性があるため、最後のチャンクの通信エラーは自動で再試行しない
         throw last ? ambiguous(err) : err;
       }
-      if (r.status !== 201 && r.status !== 206 && r.status !== 200) throw classify(r.status, `TikTokへのアップロードに失敗しました (${r.status})`);
+      if (r.status !== 201 && r.status !== 206 && r.status !== 200) {
+        const err = classify(r.status, `TikTokへのアップロードに失敗しました (${r.status})`);
+        // 最後のチャンクで 5xx が返った場合も、中継の装置だけがエラーを返し、TikTokは受け取って処理を始めている可能性がある。自動で再試行しない
+        throw last ? ambiguous(err) : err;
+      }
     }
   } finally { fs.closeSync(fd); }
   // ここから先は、動画を送ったあとの段階。応答だけが失われた場合に再試行すると、二重投稿になりうるため、再試行しない

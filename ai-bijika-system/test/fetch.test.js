@@ -72,6 +72,25 @@ const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(A
   err = null; try { await fm.importFromUrl({ userId: uid, url: 'https://127.0.0.1/a.jpg' }); } catch (e) { err = e; }
   ok(err instanceof fm.FetchError, 'IPアドレスで社内を指定しても拒否する');
 
+  console.log('APIの呼び出し：応答が途中で切れても、待ち続けない');
+  const api = https.createServer({ key, cert }, (req, res) => {
+    if (req.url === '/trunc') { res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': '40' }); res.write('{"id":"x'); return setTimeout(() => res.socket.end(), 20); }
+    if (req.url === '/ok') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end('{"id":"ok"}'); }
+    res.writeHead(404); res.end();
+  });
+  await new Promise((r) => api.listen(0, '127.0.0.1', r));
+  const apiPort = api.address().port;
+  const origReq = https.request;
+  https.request = (opts, cb) => origReq({ ...opts, host: 'localhost', port: apiPort, ca: cert }, cb);
+  const { request } = require('../lib/http-client');
+  const t0 = Date.now();
+  err = null; try { await request({ host: 'api.example.test', path: '/trunc', timeoutMs: 5000 }); } catch (e) { err = e; }
+  ok(err && Date.now() - t0 < 4000, '本文の途中で接続が閉じられたら、すぐに失敗として返す（予約の処理全体が止まらない）');
+  const okRes = await request({ host: 'api.example.test', path: '/ok', timeoutMs: 5000 });
+  ok(okRes.status === 200 && okRes.json && okRes.json.id === 'ok', '通常の応答は、これまでどおり受け取れる');
+  https.request = origReq;
+  api.close();
+
   server.close();
   summary();
 })();

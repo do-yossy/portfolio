@@ -393,12 +393,20 @@ async function handle(ctx) {
     if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }
     let b = null;
     try { b = JSON.parse(await readRaw(req, 300_000)); } catch { b = null; }
-    const r = apiV1.createFromBody(user.id, b, { via: 'screen' });
-    // 下書きを開いて保存し直した場合は、元の下書きを削除する（同じ内容が二重に残らないように）
-    if (r.status === 201 && b && b.replace_draft) {
+    // 下書きを開いて保存し直す場合：元の下書きがまだ本人の下書きのままかを、新しい投稿を作る前に確かめて取り消す。
+    // すでに使われていれば断る（2つのタブで開いた・通信エラーの後にもう一度押した、などで二重に予約・投稿しないように）。
+    // 新しい投稿を作れなかったときは、元の下書きを戻す
+    let replaced = null;
+    if (b && typeof b === 'object' && b.replace_draft) {
       const old = ScheduledPosts.get(String(b.replace_draft));
-      if (old && old.user_id === user.id && old.status === 'draft') ScheduledPosts.cancel(old.id, user.id);
+      if (!old || old.user_id !== user.id || old.status !== 'draft' || !ScheduledPosts.cancel(old.id, user.id)) {
+        sendJson(res, 409, { error: 'この下書きは、すでに保存・投稿されています。カレンダーでご確認ください。' });
+        return true;
+      }
+      replaced = old.id;
     }
+    const r = apiV1.createFromBody(user.id, b, { via: 'screen' });
+    if (replaced && r.status !== 201) ScheduledPosts.restoreDraft(replaced, user.id);
     sendJson(res, r.status, r.body);
     return true;
   }

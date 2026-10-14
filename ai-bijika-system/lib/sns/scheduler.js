@@ -18,11 +18,23 @@ const youtubePerDay = () => envInt('YOUTUBE_DAILY_LIMIT', 90);
 const youtubePerUserDay = () => envInt('YOUTUBE_PER_USER_DAILY', 5);
 const YT_DEFER_MSG = 'YouTubeへのアップロードが、サービス全体の1日の上限に達したため、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します';
 const YT_DEFER_USER_MSG = 'YouTubeへの投稿が、1日の上限に達したため、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します';
-// サービス全体と利用者ごとの1回分を、両方そろって確保できたときだけ送る。片方しか確保できなければ戻して、理由を返す
-function takeYoutube(userId, day) {
+// サービス全体と利用者ごとの1回分を、両方そろって確保できたときだけ送る。片方しか確保できなければ戻して、理由を返す。
+// サービス全体の枠は、実際の割り当ての消費に合わせて、送るたびに数える。
+// 利用者ごとの枠は、予約の時点の数え方（1件の予約を1件）に合わせて、同じ予約はその日1回だけ数える（再試行で枠を使わないように）
+function takeYoutube(post, day) {
   if (!ApiUsage.take('youtube', day, youtubePerDay())) return YT_DEFER_MSG;
-  if (!ApiUsage.take(`youtube:user:${userId}`, day, youtubePerUserDay())) { ApiUsage.release('youtube', day); return YT_DEFER_USER_MSG; }
+  const postKey = `youtube:post:${post.id}`;
+  if (ApiUsage.take(postKey, day, 1) && !ApiUsage.take(`youtube:user:${post.user_id}`, day, youtubePerUserDay())) {
+    ApiUsage.release(postKey, day);
+    ApiUsage.release('youtube', day);
+    return YT_DEFER_USER_MSG;
+  }
   return null;
+}
+// YouTubeへ何も送らずに失敗したとき（送る前の検証のエラー）は、確保した枠を戻す
+function releaseYoutube(post, day) {
+  ApiUsage.release('youtube', day);
+  if (ApiUsage.get(`youtube:post:${post.id}`, day) > 0) { ApiUsage.release(`youtube:post:${post.id}`, day); ApiUsage.release(`youtube:user:${post.user_id}`, day); }
 }
 
 function key() {
@@ -77,12 +89,14 @@ async function processOne(post) {
     const full = { category, text: post.text, medias, tree: treeCards.map((c, i) => ({ text: c.text, medias: cardMedias[i] })), options };
     if (account.platform === 'youtube') {
       const d = ptTime.dayBounds(new Date().toISOString());
-      const why = takeYoutube(post.user_id, d.day);
+      const why = takeYoutube(post, d.day);
       if (why) return ScheduledPosts.defer(post.id, new Date(Date.parse(d.to) + 5 * 60 * 1000).toISOString(), why);
     }
+    ScheduledPosts.markStarted(post.id);
     const r = await adapter.publish({ accessToken, externalUserId: account.external_user_id, post: full });
     ScheduledPosts.markPosted(post.id, r.externalId);
   } catch (e) {
+    if (e && e.notSent && account.platform === 'youtube') releaseYoutube(post, ptTime.dayBounds(new Date().toISOString()).day);
     if (e && e.authError) {
       SnsAccounts.setStatus(account.id, 'reauth_required');
       return ScheduledPosts.markFailed(post.id, `${e.message}（SNSの連携をやり直してください）`);
@@ -150,6 +164,7 @@ function start(intervalMs = 30000) {
   // 投稿が終わったメディアの削除と、長期トークンの延長を、1時間ごとに行う
   const clean = () => {
     try { mediaLib.cleanup(); } catch (e) { console.error('[media cleanup]', e); }
+    try { ApiUsage.prune(new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)); } catch (e) { console.error('[api usage prune]', e); }
     // 処理中のまま長く残った予約（処理の途中でエラーが起きた・止まったもの）を、二重投稿を避けて失敗扱いにする。
     // 処理の最中（tick の実行中）は、まだ送っている途中かもしれないので触らない
     if (!running) { try { ScheduledPosts.failStuck(new Date(Date.now() - 30 * 60 * 1000).toISOString()); } catch (e) { console.error('[fail stuck]', e); } }

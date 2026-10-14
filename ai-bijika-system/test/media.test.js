@@ -353,9 +353,23 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   await new Promise((rs) => setTimeout(rs, 1200));
   await scheduler.tick();
   const putRow = store.ScheduledPosts.get(pPut.ids[0]);
-  ok(putRow.status === 'pending' && !/投稿されたか/.test(putRow.last_error), 'TikTokへの動画のアップロードに失敗しても、まだ投稿されていないため、自動で再試行する');
-  store.ScheduledPosts.cancel(pPut.ids[0], uid);
+  ok(putRow.status === 'failed' && /投稿されたか/.test(putRow.last_error), 'TikTokへの最後のチャンク（1つだけのときも含む）で 5xx が返ったら、受け取られた可能性があるので自動で再試行せず、確認をお願いする');
   mP.restore();
+  // 最後でないチャンクの失敗は、まだ投稿の処理が始まっていないので、通常どおり再試行する
+  const bigPath = path.join(process.env.DATA_DIR, 'big.mp4');
+  fs.writeFileSync(bigPath, Buffer.alloc(70 * 1024 * 1024, 1));
+  const mP2 = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/video/init/') return { status: 200, json: { data: { publish_id: 'pu2', upload_url: 'https://upload.tiktok.test/u2' }, error: { code: 'ok' } } };
+    if (c.host === 'upload.tiktok.test') return { status: 503, json: {} };
+    return null;
+  });
+  let chunkErr = null;
+  try { await tt.publish({ accessToken: 't', post: { category: 'video', text: 'x', medias: [{ kind: 'video', mime: 'video/mp4', size: 70 * 1024 * 1024, path: bigPath }], options: { privacy_level: 'SELF_ONLY' } } }); } catch (e) { chunkErr = e; }
+  mP2.restore();
+  fs.unlinkSync(bigPath);
+  ok(chunkErr && chunkErr.retriable === true && !/投稿されたか/.test(chunkErr.message), 'TikTokへの最後でないチャンクで失敗したときは、まだ投稿されていないため、自動で再試行する');
+  store.ScheduledPosts.cancel(pPut.ids[0], uid);
 
   // TikTok：商用コンテンツの設定をAPIに渡す
   const m7 = installHttpsMock(async (c) => {
@@ -424,6 +438,22 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   const yu1Row = store.ScheduledPosts.get(yu1.ids[0]);
   ok(yu1Row.status === 'pending' && yu1Row.attempts === 0 && /1日の上限/.test(yu1Row.last_error) && !/サービス全体/.test(yu1Row.last_error) && !mYt.calls.length && store.ApiUsage.get('youtube', ytDay2) === globalBefore, '送る時点で利用者ごとの上限に達していたら、送らずに翌日へ回し、サービス全体の枠は使わない');
   store.ScheduledPosts.cancel(yu1.ids[0], ytUid);
+  // 再試行では、利用者ごとの枠を使わない（予約1件をその日1件と数える）。サービス全体の枠は、送るたびに数える
+  const ytUid2 = mkUser('yt2@example.com');
+  store.Subscriptions.upsert(ytUid2, { status: 'active' });
+  const ytMp4b = (await upload(ytUid2, MP4)).media;
+  const ytAcc2 = store.SnsAccounts.upsert({ userId: ytUid2, platform: 'youtube', externalUserId: 'ych2', handle: 'YT2', accessTokenEnc: enc('yttok'), refreshTokenEnc: enc('ytref'), expiresAt: exp });
+  process.env.YOUTUBE_PER_USER_DAILY = '2';
+  const yr = core.createPost({ userId: ytUid2, category: 'video', targets: [{ accountId: ytAcc2, caption: '再試行', options: ytOpts }], mediaIds: [ytMp4b.id], tree: [], scheduledAtIso: future(), draft: false });
+  const g0 = store.ApiUsage.get('youtube', ytDay2);
+  mYt = installHttpsMock(async (c) => (c.method === 'POST' && c.path.startsWith('/upload/youtube/') ? { status: 503, json: { error: { message: 'backend' } } } : null));
+  await new Promise((res) => setTimeout(res, 1200));
+  await scheduler.tick();
+  store.ScheduledPosts.reschedule(yr.ids[0], new Date(Date.now() - 1000).toISOString(), 'x');
+  await scheduler.tick();
+  mYt.restore();
+  ok(store.ScheduledPosts.get(yr.ids[0]).attempts === 2 && store.ApiUsage.get(`youtube:user:${ytUid2}`, ytDay2) === 1 && store.ApiUsage.get('youtube', ytDay2) === g0 + 2, '同じ予約の再試行では、利用者ごとの枠は1回分だけ使い、サービス全体の枠は送るたびに数える');
+  store.ScheduledPosts.cancel(yr.ids[0], ytUid2);
   delete process.env.YOUTUBE_PER_USER_DAILY; delete process.env.YOUTUBE_DAILY_LIMIT;
 
   console.log('メディアの削除');

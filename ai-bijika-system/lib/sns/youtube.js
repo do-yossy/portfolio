@@ -115,7 +115,7 @@ async function publish(args) {
   const { accessToken } = args;
   const p = normalize(args);
   const err = validatePost(args);
-  if (err) throw new SnsError(err);
+  if (err) { const e = new SnsError(err); e.notSent = true; throw e; } // YouTubeへは何も送っていない（割り当てを使っていない）
   const m = p.medias[0];
   const { title, description } = titleAndDescription(p.text);
   // 公開設定を指定しなかった場合は、安全のため「非公開」にする。子ども向けかどうかは利用者の選択（省略時は「子ども向けではない」）

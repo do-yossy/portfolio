@@ -150,6 +150,8 @@ try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN tree TEXT DEFAULT '[]'"); 
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN group_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN platform TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN rule_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// SNSへ送り始めた時刻（処理中のまま止まったときに、送り始めていたかどうかを見分ける）
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN started_at TEXT DEFAULT ''"); } catch { /* 既にある */ }
 // 自動運用：作るもの（none／image／video）、実行する時刻（カンマ区切り。最大3つ）、SNSごとの設定（YouTubeの公開設定など）
 try { db.exec("ALTER TABLE auto_rules ADD COLUMN media TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE auto_rules ADD COLUMN hours TEXT DEFAULT ''"); } catch { /* 既にある */ }
@@ -364,6 +366,10 @@ const ScheduledPosts = {
       .run(scheduledAt, now(), id, userId);
     return r.changes === 1;
   },
+  // 取り消した下書きを、下書きに戻す（下書きを開いて保存し直すときに、新しい投稿を作れなかった場合）
+  restoreDraft(id, userId) {
+    return db.prepare(`UPDATE scheduled_posts SET status='draft', updated_at=? WHERE id=? AND user_id=? AND status='cancelled'`).run(now(), id, userId).changes === 1;
+  },
   cancel(id, userId) {
     const r = db.prepare(`UPDATE scheduled_posts SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status IN ('pending','draft')`)
       .run(now(), id, userId);
@@ -375,7 +381,7 @@ const ScheduledPosts = {
       .all(nowIso, limit).map((r) => r.id);
     const claimed = [];
     for (const id of ids) {
-      const r = db.prepare(`UPDATE scheduled_posts SET status='publishing', attempts=attempts+1, updated_at=? WHERE id=? AND status='pending'`)
+      const r = db.prepare(`UPDATE scheduled_posts SET status='publishing', attempts=attempts+1, started_at='', updated_at=? WHERE id=? AND status='pending'`)
         .run(now(), id);
       if (r.changes === 1) claimed.push(this.get(id));
     }
@@ -405,10 +411,19 @@ const ScheduledPosts = {
         AND (? IS NULL OR p.user_id = ?)`)
       .get(platform, platform, fromIso, toIso, userId, userId).n;
   },
-  // 起動時：処理中のまま残った行は、二重投稿を避けるため失敗扱いにする（投稿されたかどうかが不明なため）
+  // SNSへ送り始める直前に印を付ける
+  markStarted(id) {
+    db.prepare(`UPDATE scheduled_posts SET started_at=?, updated_at=? WHERE id=? AND status='publishing'`).run(now(), now(), id);
+  },
+  // 処理中のまま残った行の後始末（起動時と、定期の確認）。
+  // SNSへ送り始めていた行は、投稿されたかどうかが分からないため、二重投稿を避けて失敗にする。
+  // まだ送り始めていなかった行（まとめて確保したうちの後ろのもの）は、送っていないので予約に戻す（試行回数も戻す）
   failStuck(olderThanIso) {
-    return db.prepare(`UPDATE scheduled_posts SET status='failed', last_error=?, updated_at=? WHERE status='publishing' AND updated_at < ?`)
+    const back = db.prepare(`UPDATE scheduled_posts SET status='pending', attempts=MAX(attempts-1, 0), updated_at=? WHERE status='publishing' AND started_at='' AND updated_at < ?`)
+      .run(now(), olderThanIso).changes;
+    const failed = db.prepare(`UPDATE scheduled_posts SET status='failed', last_error=?, updated_at=? WHERE status='publishing' AND started_at!='' AND updated_at < ?`)
       .run('処理中にサーバーが再起動したため中断されました。投稿されたかをご確認のうえ、必要なら予約し直してください。', now(), olderThanIso).changes;
+    return failed + back;
   },
   stats() {
     return db.prepare('SELECT status, COUNT(*) AS n FROM scheduled_posts GROUP BY status').all();
@@ -539,6 +554,8 @@ const ApiUsage = {
     const r = db.prepare('SELECT n FROM api_usage WHERE platform=? AND day=?').get(platform, day);
     return r ? r.n : 0;
   },
+  // 古い日付の記録を消す（数日分あれば足りる）
+  prune(beforeDay) { db.prepare('DELETE FROM api_usage WHERE day < ?').run(beforeDay); },
   // 確保した1回分を戻す（ほかの上限に当たって、実際には送らなかったとき）
   release(platform, day) {
     db.prepare('UPDATE api_usage SET n = n - 1 WHERE platform=? AND day=? AND n > 0').run(platform, day);

@@ -354,6 +354,14 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 200 && r.text.includes('下書きを読み込みました') && r.text.includes('TikTok下書き') && r.text.includes(ttUp.json.id) && !r.text.includes('"privacy_level"'), '「投稿を作る」画面で下書きを開ける（TikTokの設定は読み込まず、選び直してもらう）');
   r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf }, raw: JSON.stringify({ category: 'video', text: 'TikTok下書き', account_ids: [ttE2eId], media_ids: [ttUp.json.id], options: { [ttE2eId]: { privacy_level: 'SELF_ONLY', disable_comment: true, disable_duet: true, disable_stitch: true } }, scheduled_at: `${FUTURE}:00+09:00`, replace_draft: ttDraftId }) });
   ok(r.status === 201 && store.ScheduledPosts.get(ttDraftId).status === 'cancelled', '画面で設定を選び直して保存すると予約になり、元の下書きは削除される');
+  const ttPendingCount = () => store.ScheduledPosts.listForUser(userIdForSub).filter((p) => p.account_id === ttE2eId && p.status === 'pending').length;
+  const pendingBefore = ttPendingCount();
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf }, raw: JSON.stringify({ category: 'video', text: 'TikTok下書き', account_ids: [ttE2eId], media_ids: [ttUp.json.id], options: { [ttE2eId]: { privacy_level: 'SELF_ONLY' } }, scheduled_at: `${FUTURE}:00+09:00`, replace_draft: ttDraftId }) });
+  ok(r.status === 409 && ttPendingCount() === pendingBefore, '同じ下書きをもう一度保存しても（2つのタブ・通信エラーの後の押し直し）、予約は増えない');
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'video', text: 'TikTok下書き2', media_ids: [ttUp.json.id], account_ids: [ttE2eId], draft: true, options: { [ttE2eId]: { privacy_level: 'SELF_ONLY' } } });
+  const ttDraft2 = r.json.posts[0].id;
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf }, raw: JSON.stringify({ category: 'video', text: 'TikTok下書き2', account_ids: [ttE2eId], media_ids: [ttUp.json.id], options: { [ttE2eId]: {} }, scheduled_at: `${FUTURE}:00+09:00`, replace_draft: ttDraft2 }) });
+  ok(r.status === 400 && store.ScheduledPosts.get(ttDraft2).status === 'draft', '保存できなかったとき（公開範囲を選んでいない）は、元の下書きを残す');
   store.SnsAccounts.remove(ttE2eId, userIdForSub);
 
   console.log('MCP');
@@ -542,6 +550,10 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 400, '契約していない他のユーザーは、他人のSNSアカウントに予約できない');
   r = await req('POST', `/service/app/account/${accId}/disconnect`, { body: { csrf: otherCsrf } });
   ok(store.SnsAccounts.get(accId) !== null, '他のユーザーは他人の連携を解除できない');
+  const othersDraft = store.ScheduledPosts.create({ userId: userIdForSub, accountId: accId, text: '他人の下書き', scheduledAt: new Date(Date.now() + 86400000).toISOString(), status: 'draft' });
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': otherCsrf }, raw: JSON.stringify({ category: 'text', text: 'x', account_ids: [], replace_draft: othersDraft }) });
+  ok(r.status === 409 && store.ScheduledPosts.get(othersDraft).status === 'draft', '他人の下書きは、置き換え（replace_draft）で消せない');
+  store.ScheduledPosts.cancel(othersDraft, userIdForSub);
   r = await req('GET', '/service/connect/threads');
   ok(r.status === 403, '契約していないと連携できない');
   cookie = savedCookie;

@@ -139,33 +139,30 @@ async function waitFinished(containerIds, accessToken) {
   if (!r) throw new SnsError('Threads側の処理が時間内に終わりませんでした。', { retriable: true });
 }
 
-// 公開の応答が失われたとき（通信エラー・5xx）の確かめ方。
-// FINISHED（まだ公開されていない）なら、同じコンテナで公開をやり直す。1つのコンテナは1回しか公開できないので、二重投稿にならない。
-// 新しいコンテナを作り直す再試行（スケジューラの再試行）には回さない（応答が失われた直後の FINISHED は、あとから PUBLISHED になることがあるため）。
-// PUBLISHED なら、公開された投稿のIDを、自分の最近の投稿から探す（コンテナIDと投稿IDは別の値）。
-// 戻り値：{ id }（投稿ID。見つからなければ id は ''）。決められなければ、元のエラーを「投稿されたか不明」として投げる
-async function recoverPublish({ base, containerId, accessToken, text, startedAt, error }) {
-  for (let attempt = 0; attempt < 3; attempt++) {
+// 公開の応答が失われたとき（通信エラー・5xx・本文の無い応答）の確かめ方。
+// 公式は「公開の呼び出しが投稿IDを返さなかったときは、GET /{container-id} で公開の状態を確かめる」と案内している（Troubleshooting）。
+// 同じコンテナを2回公開した場合に拒否されるかは、公式に書かれていないため、公開のやり直しはしない（二重投稿を防ぐため）。
+// 状態が反映されるまで少し待ちながら確かめ、PUBLISHED なら、公開された投稿のIDを自分の最近の投稿から探す（コンテナIDと投稿IDは別の値）。
+// PUBLISHED にならなければ、元のエラーを「投稿されたか不明」として投げる（自動で再試行しない）。戻り値：{ id }（見つからなければ ''）
+async function recoverPublish({ base, containerId, accessToken, text, startedAt, replyTo, error }) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await poll.sleep(poll.intervalMs() * 5);
     let st;
-    try { st = await containerStatus(containerId, accessToken); } catch { break; }
-    if (st.status === 'PUBLISHED') return { id: await findPublishedId({ base, accessToken, text, startedAt }) };
-    if (st.status !== 'FINISHED' || attempt === 2) break;
-    await poll.sleep(poll.intervalMs() * 2);
-    try {
-      const published = await call('POST', `${base}/threads_publish`, { form: { creation_id: containerId, access_token: accessToken } });
-      return { id: String(published.id) };
-    } catch {
-      // 失敗の理由が何であっても（「すでに公開済み」での拒否を含む）、次の回でコンテナの状態を確かめ直す
-    }
+    try { st = await containerStatus(containerId, accessToken); } catch { continue; }
+    if (st.status === 'PUBLISHED') return { id: await findPublishedId({ base, accessToken, text, startedAt, replyTo }) };
+    if (st.status === 'ERROR' || st.status === 'EXPIRED') break;
   }
   throw ambiguous(error);
 }
-async function findPublishedId({ base, accessToken, text, startedAt }) {
+// 自分の最近の投稿から、本文が一致し、公開を始めた時刻より後の投稿を探す。
+// 推測で別の投稿のIDを記録しないよう、本文が空の投稿と、返信（ツリーの2件目以降。/threads の一覧には出ない）は探さずに '' を返す
+async function findPublishedId({ base, accessToken, text, startedAt, replyTo }) {
+  if (!String(text || '').trim() || replyTo) return '';
   try {
     const list = await call('GET', `${base}/threads`, { query: { fields: 'id,text,timestamp', limit: '10', access_token: accessToken } });
-    const since = startedAt - 10 * 60 * 1000;
-    const hit = (list.data || []).find((t) => String(t.text || '') === String(text || '') && (!t.timestamp || Date.parse(t.timestamp) >= since));
-    return hit ? String(hit.id) : '';
+    const since = startedAt - 60 * 1000;
+    const hits = (list.data || []).filter((t) => String(t.text || '') === String(text) && t.timestamp && Date.parse(t.timestamp) >= since);
+    return hits.length === 1 ? String(hits[0].id) : '';
   } catch { return ''; }
 }
 function mediaForm(m) {
@@ -201,7 +198,7 @@ async function publishOne({ accessToken, externalUserId, text, medias, replyTo }
     // 公開されていないと確定しているエラー（400番台の拒否・認証エラー・429）は、そのまま扱う
     if (e.authError || !e.retriable || e.status === 429) throw e;
     // 通信エラー・5xx：応答だけが失われた可能性がある。コンテナの状態で確かめる（公式の案内）
-    const r = await recoverPublish({ base, containerId: created.id, accessToken, text, startedAt, error: e });
+    const r = await recoverPublish({ base, containerId: created.id, accessToken, text, startedAt, replyTo, error: e });
     return r.id;
   }
   return String(published.id);

@@ -251,7 +251,9 @@ function promoteDraft({ userId, postId, scheduledAtIso, via = 'api', nowMs = Dat
   if (!p || p.user_id !== userId || p.status !== 'draft') return { ok: false, error: '下書きが見つかりません。' };
   // TikTokは、本人が画面で内容と設定（公開範囲・コメント等・商用の開示・音楽使用の確認）を確かめて同意してから送る決まり（公式の共有のガイドライン）。
   // 下書きのまま予約・投稿にはせず、「投稿を作る」画面で開き、TikTokから取得した選択肢で設定を選び直してから送る
-  if (p.platform === 'tiktok') {
+  // 予約の行の platform（列を足す前の古い行では空）に加えて、連携しているアカウントのSNSでも確かめる
+  const acct = SnsAccounts.getForUser(p.account_id, userId);
+  if (p.platform === 'tiktok' || (acct && acct.platform === 'tiktok')) {
     return { ok: false, error: via === 'screen'
       ? 'TikTokの下書きは、「投稿を作る」画面で開き、公開範囲などの設定を選び直してから投稿してください（カレンダーの「内容と設定を確かめて投稿する」から開けます）。'
       : 'TikTokの下書きは、API・AIアシスタントからは予約にできません。サービスの画面で内容と設定を確かめてから投稿してください。' };
