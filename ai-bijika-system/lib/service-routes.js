@@ -120,6 +120,8 @@ async function handle(ctx) {
 
   // ── 公開ページ ──
   if (pathname === '/service' && method === 'GET') { sendHtml(res, 200, ui.landingPage({ user, billingReady: salesOpen, trialDays: user ? core.trialFor(user.id) : core.trialDays() })); return true; }
+  // 固定投稿などから来た人向けのLP
+  if (pathname === '/service/lp' && method === 'GET') { sendHtml(res, 200, ui.lpPage({ user, billingReady: salesOpen, trialDays: user ? core.trialFor(user.id) : core.trialDays() })); return true; }
 
   const legalMatch = pathname.match(/^\/service\/legal\/(terms|tokushoho|privacy)$/);
   if (legalMatch && method === 'GET') {

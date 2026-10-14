@@ -113,6 +113,13 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.text.includes('/service/legal/terms') && r.text.includes('/service/legal/tokushoho'), 'LPから規約・特商法表記へリンクする');
   ok(r.text.includes('現在の対応SNSは、Threadsです') && !r.text.includes('YouTube：') && !r.text.includes('TikTok：'), 'LPには、設定済みのSNSだけを対応SNSとして表示する');
   ok(!r.text.includes('AIで投稿づくり') && !/ClaudeやChatGPT/.test(r.text), 'AIが未設定ならAIの機能を表示せず、動作を確認していないアプリ名を出さない');
+  r = await req('GET', '/service/lp');
+  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
+  ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
+  process.env.SERVICE_PRICE_JPY = '1500';
+  r = await req('GET', '/service/lp');
+  ok(!r.text.includes('半額以下'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');
+  delete process.env.SERVICE_PRICE_JPY;
   r = await req('GET', '/service/legal/tokushoho');
   ok(r.status === 200 && r.text.includes('月額1,000円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
   ok(r.text.includes('support@example.com') && !r.text.includes('【メールアドレス】') && r.text.includes('電話番号'), '特商法表記の連絡先に設定したメールアドレスを表示し、電話番号の開示請求について記載する');
