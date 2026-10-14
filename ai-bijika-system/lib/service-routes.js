@@ -10,10 +10,11 @@ const billing = require('./billing');
 const core = require('./service-core');
 const ui = require('./service-ui');
 const scheduler = require('./sns/scheduler');
-const { Subscriptions, SnsAccounts, ScheduledPosts } = require('./service-store');
+const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
 const mediaLib = require('./media');
 const registry = require('./sns');
+const apiV1 = require('./api-v1');
 
 const loginLimiter = createLimiter({ max: 8, windowMs: 15 * 60 * 1000 });
 const signupLimiter = createLimiter({ max: 10, windowMs: 60 * 60 * 1000 });
@@ -30,6 +31,7 @@ const FLASH = {
   now: ['ok', '投稿の準備ができました。まもなく投稿されます。'],
   cancelled: ['ok', '予約を取り消しました。'],
   connected: ['ok', 'SNSを連携しました。'],
+  key_revoked: ['ok', 'APIキーを無効にしました。'],
   disconnected: ['ok', '連携を解除しました。'],
   sub_canceled: ['ok', '解約の手続きをしました。契約期間の終わりまでご利用いただけます。'],
   sub_resumed: ['ok', '解約を取り消しました。引き続きご利用いただけます。'],
@@ -73,6 +75,8 @@ const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 25
 
 async function handle(ctx) {
   const { req, res, url, method, pathname, user } = ctx;
+
+  if (await apiV1.handle(ctx)) return true;
 
   // ── Stripe Webhook（署名検証。認証不要）──
   if (pathname === '/api/stripe/webhook' && method === 'POST') {
@@ -121,6 +125,8 @@ async function handle(ctx) {
     return true;
   }
 
+  if (pathname === '/service/docs/api' && method === 'GET') { sendHtml(res, 200, ui.apiDocsPage(user, String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, ''))); return true; }
+
   if (pathname === '/service/signup' && method === 'GET') {
     if (user) redirect(res, '/service/app'); else sendHtml(res, 200, ui.authPage('signup'));
     return true;
@@ -167,9 +173,9 @@ async function handle(ctx) {
   const sessionToken = auth.parseCookies(req).get('session');
   const token = csrf.tokenFor(sessionToken);
   const flashOf = (key) => (FLASH[key] ? { type: FLASH[key][0], text: FLASH[key][1] } : null);
-  const dashboard = (status, flash) => {
+  const dashboard = (status, flash, newKey) => {
     sendHtml(res, status, ui.dashboardPage({
-      user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id),
+      user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id), apiKeys: ApiKeys.listForUser(user.id), newKey: newKey || '',
       posts: ScheduledPosts.listForUser(user.id), csrf: token, flash,
       snsReady: core.snsEnabled(), portalReady: billingReady,
     }));
@@ -257,6 +263,21 @@ async function handle(ctx) {
     if (!r.ok) { dashboard(400, { type: 'error', text: r.error }); return true; }
     if (now) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
     redirect(res, `/service/app?f=${now ? 'now' : 'scheduled'}`);
+    return true;
+  }
+  if (pathname === '/service/app/apikey' && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    if (!Subscriptions.isActive(user.id)) { dashboard(403, { type: 'error', text: 'ご契約が有効ではありません。' }); return true; }
+    const k = ApiKeys.create(user.id, body.label);
+    if (!k) { dashboard(400, { type: 'error', text: 'APIキーは5件までです。不要なキーを無効にしてください。' }); return true; }
+    dashboard(200, { type: 'ok', text: 'APIキーを発行しました。' }, k.key);
+    return true;
+  }
+  const keyRevoke = pathname.match(/^\/service\/app\/apikey\/([a-f0-9]+)\/revoke$/);
+  if (keyRevoke && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    ApiKeys.revoke(keyRevoke[1], user.id);
+    redirect(res, '/service/app?f=key_revoked');
     return true;
   }
   const cancelMatch = pathname.match(/^\/service\/app\/post\/([a-f0-9]+)\/cancel$/);

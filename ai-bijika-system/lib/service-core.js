@@ -127,6 +127,25 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
   return { ok: true, ids: created, groupId };
 }
 
+// 下書きを予約（または即時投稿）にする。日時を過ぎていないか・上限を超えないかを、予約と同じ基準で確認する
+function promoteDraft({ userId, postId, scheduledAtIso, nowMs = Date.now() }) {
+  const p = ScheduledPosts.get(postId);
+  if (!p || p.user_id !== userId || p.status !== 'draft') return { ok: false, error: '下書きが見つかりません。' };
+  if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
+  const at = scheduledAtIso ? Date.parse(scheduledAtIso) : Date.parse(p.scheduled_at || '');
+  if (Number.isNaN(at)) return { ok: false, error: '投稿日時を指定してください。' };
+  if (at < nowMs - 60 * 1000) return { ok: false, error: '過去の日時は指定できません。' };
+  if (at > nowMs + MAX_DAYS_AHEAD * 24 * 3600 * 1000) return { ok: false, error: `予約できるのは${MAX_DAYS_AHEAD}日先までです。` };
+  const iso = new Date(at).toISOString();
+  const a = SnsAccounts.getForUser(p.account_id, userId);
+  if (!a || a.status !== 'active') return { ok: false, error: '投稿先のSNSの連携をやり直してください。' };
+  if (ScheduledPosts.countPending(userId) + 1 > LIMITS.maxPending) return { ok: false, error: `未投稿の予約は${LIMITS.maxPending}件までです。` };
+  const [from, to] = jstDayBounds(iso);
+  if (ScheduledPosts.countScheduledBetween(userId, from, to) + 1 > LIMITS.maxPerDay) return { ok: false, error: `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。` };
+  if (!ScheduledPosts.promote(postId, userId, iso)) return { ok: false, error: '下書きが見つかりません。' };
+  return { ok: true };
+}
+
 // 従来の形（1つのメディア・同じ本文・SNSごとの設定）での予約。画面とテストが使う
 function createPosts({ userId, accountIds, text, scheduledAtIso, mediaId, options, nowMs = Date.now() }) {
   const body = String(text || '').trim();
@@ -183,5 +202,5 @@ async function finishConnect({ userId, platform, code, state }) {
 
 module.exports = {
   LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, snsEnabled, contactEmail, salesOpen, redirectUriFor,
-  jstLocalToIso, jstDayBounds, formatJst, formatJstShort, createPost, createPosts, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
+  jstLocalToIso, jstDayBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

@@ -173,7 +173,7 @@ const toLocalInput = (ms) => {
 };
 
 // ── マイページ ──
-function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady }) {
+function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], newKey = '' }) {
   const active = !!sub && ['active', 'trialing'].includes(sub.status);
   const [stLabel, stClass] = STATUS_LABEL[(sub && sub.status) || 'none'] || STATUS_LABEL.none;
   const accHtml = accounts.length ? accounts.map((a) => {
@@ -284,6 +284,13 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
     <div class="card"><div class="card-title">連携しているSNS</div>${accHtml}
       <div class="btn-row" style="margin-top:10px">${active ? connectBtns : '<span class="small">ご契約後に連携できます。</span>'}</div></div>
     ${compose}
+    ${active ? `<div class="card" id="apikeys"><div class="card-title">APIキー（外部のツール・AIから投稿するとき）</div>
+      ${newKey ? `<div class="notice"><div>新しいAPIキーです。<b>この画面を閉じると二度と表示されません</b>。安全な場所に保存してください。<br><code style="word-break:break-all">${escapeHtml(newKey)}</code></div></div>` : ''}
+      ${apiKeys.length ? apiKeys.map((k) => `<div class="acct-row"><span><b>${escapeHtml(k.label || '(名前なし)')}</b> <code>${escapeHtml(k.prefix)}…</code> <span class="small">${k.last_used_at ? `最終利用 ${escapeHtml(k.last_used_at.slice(0, 10))}` : '未使用'}</span></span>
+        <form class="inline" method="POST" action="/service/app/apikey/${escapeHtml(k.id)}/revoke" onsubmit="return confirm('このAPIキーを無効にします。よろしいですか？')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">無効にする</button></form></div>`).join('') : '<p class="small">APIキーはまだありません。</p>'}
+      <form method="POST" action="/service/app/apikey" class="btn-row" style="margin-top:10px"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
+        <input type="text" name="label" maxlength="40" placeholder="名前（例：AIアシスタント用）" style="max-width:260px"><button class="btn btn-sm btn-primary" type="submit">APIキーを発行</button></form>
+      <p class="small">使い方：<code>Authorization: Bearer &lt;APIキー&gt;</code> を付けて <code>/api/v1/…</code> を呼びます（<a href="/service/docs/api">APIの説明</a>）。キーは、あなたのアカウントに連携したSNSにだけ投稿できます。</p></div>` : ''}
     <div class="card"><div class="card-title">予約と投稿の履歴</div>
       <div class="hist"><table class="t"><tr><th>日時</th><th>SNS</th><th>本文</th><th>状態</th></tr>${postRows}</table></div></div>
     ${legalLinks()}
@@ -305,4 +312,23 @@ function adminServicePage({ subs, stats, postStats }) {
 <p>※ 請求・返金などの詳しい情報は、Stripeのダッシュボードで確認してください。</p></body></html>`;
 }
 
-module.exports = { landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };
+function apiDocsPage(user, baseUrl) {
+  const b = escapeHtml(baseUrl || 'https://（サービスのURL）');
+  const code = (t) => `<pre style="background:#f4f4f6;padding:12px;border-radius:8px;overflow:auto;font-size:13px">${escapeHtml(t)}</pre>`;
+  return wrap('APIの説明', `${topNav(user)}<div class="legal-doc"><h1>APIの説明</h1>
+    <p>マイページで発行したAPIキーを、<code>Authorization: Bearer &lt;APIキー&gt;</code> として付けてください。1分あたり60回までです。投稿の条件（文字数・画像の形式・1日の上限など）は、画面からの投稿と同じです。</p>
+    <h2>連携しているSNSの一覧</h2>${code(`curl ${baseUrl || '$URL'}/api/v1/accounts -H "Authorization: Bearer $KEY"`)}
+    <h2>画像・動画のアップロード</h2><p>ファイルをそのまま本文に送ります。戻り値の <code>id</code> を投稿の <code>media_ids</code> に指定します。</p>${code(`curl -X POST ${baseUrl || '$URL'}/api/v1/media -H "Authorization: Bearer $KEY" --data-binary @photo.jpg`)}
+    <h2>投稿の作成</h2><p><code>category</code>：text／image／video／tree。<code>now:true</code> で即時、<code>scheduled_at</code>（ISO 8601）で予約、<code>draft:true</code> で下書きになります。SNSごとに本文を変えるときは <code>captions</code> にアカウントIDごとの本文を指定します。</p>
+    ${code(`curl -X POST ${baseUrl || '$URL'}/api/v1/posts -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{
+  "category": "tree",
+  "text": "1件目",
+  "tree": [{"text": "2件目"}, {"text": "3件目"}],
+  "account_ids": ["<アカウントID>"],
+  "scheduled_at": "2026-12-01T09:00:00+09:00"
+}'`)}
+    <h2>そのほか</h2><ul><li><code>GET /api/v1/posts?status=draft</code>：投稿の一覧</li><li><code>GET /api/v1/posts/{id}</code>：投稿の確認</li><li><code>POST /api/v1/posts/{id}/publish</code>：下書きを予約／投稿にする（<code>{"now":true}</code> または <code>{"scheduled_at":"…"}</code>）</li><li><code>DELETE /api/v1/posts/{id}</code>：予約・下書きの取り消し</li></ul>
+    <p class="small">${b}</p></div>`);
+}
+
+module.exports = { apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };

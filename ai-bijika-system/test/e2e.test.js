@@ -198,6 +198,51 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 302 && r.headers.location === '/service/app?f=scheduled', '画像つきで予約できる');
   r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: '他人の画像', account: accId, at: FUTURE, mode: 'schedule', media_id: 'deadbeefdeadbeefdead' } });
   ok(r.status === 400, '存在しない（または他人の）画像は使えない');
+
+  console.log('APIキーとREST API');
+  const api = (method, p2, key, json, buf) => new Promise((resolve, reject) => {
+    const data = buf || (json !== undefined ? Buffer.from(JSON.stringify(json)) : null);
+    const q = http.request(`${base}${p2}`, { method, headers: { ...(key ? { Authorization: `Bearer ${key}` } : {}), ...(data ? { 'Content-Length': data.length, 'Content-Type': json !== undefined ? 'application/json' : 'application/octet-stream' } : {}) } }, (res) => {
+      const ch = []; res.on('data', (c) => ch.push(c)); res.on('end', () => { const t = Buffer.concat(ch).toString('utf8'); let j = null; try { j = JSON.parse(t); } catch { /* */ } resolve({ status: res.statusCode, json: j, text: t }); });
+    });
+    q.on('error', reject); if (data) q.write(data); q.end();
+  });
+  r = await req('POST', '/service/app/apikey', { body: { csrf: 'bad', label: 'x' } });
+  ok(r.status === 403, 'APIキーの発行もCSRFトークンが必要');
+  r = await req('POST', '/service/app/apikey', { body: { csrf: appCsrf, label: 'テスト用' } });
+  const apiKey = (r.text.match(/sqk_[0-9a-f]{48}/) || [])[0];
+  ok(r.status === 200 && !!apiKey, 'APIキーを発行でき、その場で1度だけ表示される');
+  r = await req('GET', '/service/app');
+  ok(!r.text.includes(apiKey) && r.text.includes('sqk_'), '次回以降はキーの全体を表示しない（先頭だけ）');
+  ok(!JSON.stringify(store.ApiKeys.listForUser(userIdForSub)).includes(apiKey), 'キーの平文を保存しない');
+  r = await api('GET', '/api/v1/accounts', '');
+  ok(r.status === 401, 'キーなしは401');
+  r = await api('GET', '/api/v1/accounts', 'sqk_' + '0'.repeat(48));
+  ok(r.status === 401, '違うキーは401');
+  r = await api('GET', '/api/v1/accounts', apiKey);
+  ok(r.status === 200 && r.json.accounts.length === 1 && r.json.accounts[0].id === accId && !('access_token_enc' in r.json.accounts[0]), 'SNS一覧を取得できる（トークンは含まない）');
+  r = await api('POST', '/api/v1/media', apiKey, undefined, jpegBuf);
+  ok(r.status === 201 && r.json.kind === 'image', 'APIから画像をアップロードできる');
+  const apiMedia = r.json.id;
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'tree', text: 'API1', tree: [{ text: 'API2' }], account_ids: [accId], draft: true });
+  ok(r.status === 201 && r.json.posts[0].status === 'draft' && r.json.posts[0].category === 'tree', 'ツリーを下書きとして作れる');
+  const draftId = r.json.posts[0].id;
+  r = await api('GET', '/api/v1/posts?status=draft', apiKey);
+  ok(r.json.posts.length === 1 && r.json.posts[0].id === draftId, '下書きの一覧を取得できる');
+  r = await api('POST', `/api/v1/posts/${draftId}/publish`, apiKey, { scheduled_at: new Date(Date.now() + 86400000).toISOString() });
+  ok(r.status === 200 && r.json.status === 'pending', '下書きを予約にできる');
+  r = await api('DELETE', `/api/v1/posts/${draftId}`, apiKey);
+  ok(r.status === 200 && r.json.status === 'cancelled', '予約を取り消せる');
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'image', text: 'API画像', media_ids: [apiMedia], account_ids: [accId], scheduled_at: new Date(Date.now() + 86400000).toISOString() });
+  ok(r.status === 201 && r.json.posts[0].media_ids[0] === apiMedia, '画像つきの投稿を予約できる');
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'text', text: 'x', account_ids: ['deadbeef'], now: true });
+  ok(r.status === 400, '他人の（存在しない）SNSには投稿できない');
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'text', text: '', account_ids: [accId], now: true });
+  ok(r.status === 400, '空の投稿は拒否する');
+  const keyId = store.ApiKeys.listForUser(userIdForSub)[0].id;
+  r = await req('POST', `/service/app/apikey/${keyId}/revoke`, { body: { csrf: appCsrf } });
+  r = await api('GET', '/api/v1/accounts', apiKey);
+  ok(r.status === 401, '無効にしたキーは使えない');
   r = await req('GET', '/service/app');
   ok(r.text.includes('添付あり') && !r.text.includes('id="tiktokBox"'), '履歴に添付ありと表示する（未連携のTikTokの設定欄は出ない）');
   // TikTokの投稿設定（公開範囲の選択肢をTikTokから取得して画面に反映する）

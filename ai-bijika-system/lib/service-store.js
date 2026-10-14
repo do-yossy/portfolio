@@ -4,6 +4,18 @@
 const { db, generateId, now } = require('../db');
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS api_keys (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    label TEXT DEFAULT '',
+    prefix TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT DEFAULT '',
+    revoked_at TEXT DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
+
   CREATE TABLE IF NOT EXISTS subscriptions (
     user_id TEXT PRIMARY KEY,
     stripe_customer_id TEXT DEFAULT '',
@@ -196,7 +208,7 @@ const SnsAccounts = {
   },
   remove(id, userId) {
     // 連携解除。未投稿の予約は取り消す
-    db.prepare(`UPDATE scheduled_posts SET status='cancelled', last_error='連携を解除したため取り消しました', updated_at=? WHERE account_id=? AND status='pending'`)
+    db.prepare(`UPDATE scheduled_posts SET status='cancelled', last_error='連携を解除したため取り消しました', updated_at=? WHERE account_id=? AND status IN ('pending','draft')`)
       .run(now(), id);
     db.prepare('DELETE FROM sns_accounts WHERE id=? AND user_id=?').run(id, userId);
   },
@@ -256,6 +268,12 @@ const ScheduledPosts = {
   countScheduledBetween(userId, fromIso, toIso) {
     return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts WHERE user_id=? AND status IN ('pending','publishing','posted')
       AND scheduled_at >= ? AND scheduled_at < ?`).get(userId, fromIso, toIso).n;
+  },
+  // 下書きを予約（または即時投稿）にする
+  promote(id, userId, scheduledAt) {
+    const r = db.prepare(`UPDATE scheduled_posts SET status='pending', scheduled_at=?, updated_at=? WHERE id=? AND user_id=? AND status='draft'`)
+      .run(scheduledAt, now(), id, userId);
+    return r.changes === 1;
   },
   cancel(id, userId) {
     const r = db.prepare(`UPDATE scheduled_posts SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status IN ('pending','draft')`)
@@ -330,4 +348,32 @@ const MediaAssets = {
   },
 };
 
-module.exports = { MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+const MAX_API_KEYS = 5;
+const ApiKeys = {
+  hash(key) { return require('crypto').createHash('sha256').update(String(key)).digest('hex'); },
+  // 新しいキーを作る。平文のキーはこの戻り値でしか見られない（保存するのはハッシュだけ）
+  create(userId, label) {
+    if (this.listForUser(userId).length >= MAX_API_KEYS) return null;
+    const key = `sqk_${require('crypto').randomBytes(24).toString('hex')}`;
+    const id = generateId();
+    db.prepare('INSERT INTO api_keys (id, user_id, label, prefix, key_hash, created_at) VALUES (?,?,?,?,?,?)')
+      .run(id, userId, String(label || '').slice(0, 40), key.slice(0, 10), this.hash(key), now());
+    return { id, key };
+  },
+  listForUser(userId) {
+    return db.prepare(`SELECT id, label, prefix, created_at, last_used_at FROM api_keys WHERE user_id=? AND revoked_at='' ORDER BY created_at`).all(userId);
+  },
+  // キーからユーザーを引く（失効したキーは無効）
+  authenticate(key) {
+    if (!/^sqk_[0-9a-f]{48}$/.test(String(key || ''))) return null;
+    const row = db.prepare(`SELECT id, user_id FROM api_keys WHERE key_hash=? AND revoked_at=''`).get(this.hash(key));
+    if (!row) return null;
+    db.prepare('UPDATE api_keys SET last_used_at=? WHERE id=?').run(now(), row.id);
+    return row.user_id;
+  },
+  revoke(id, userId) {
+    return db.prepare(`UPDATE api_keys SET revoked_at=? WHERE id=? AND user_id=? AND revoked_at=''`).run(now(), id, userId).changes === 1;
+  },
+};
+
+module.exports = { ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
