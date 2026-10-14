@@ -131,7 +131,7 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   ok(drafts.length === 1 && drafts[0].text === '今日の一言です', '「下書き」では、AIの文章が下書きに入る（人が確認してから投稿）');
   ok(await auto.tick(Date.now()) === 0, '同じ日に2回は実行しない');
   const lateRule = auto.createRule({ userId: uid, accountId: rid(th), theme: '遅れて作ったルール', hourJst: 0, mode: 'auto' });
-  ok(await auto.tick(Date.now() + 1) === 0 && store.AutoRules.get(lateRule, uid).last_day === ai.day(), 'その日の時刻を過ぎてから作ったルールは、翌日から実行する（作った直後に投稿しない）');
+  ok(await auto.tick(Date.now() + 1) === 0 && store.AutoRules.get(lateRule, uid).last_day === `${ai.day()}#00`, 'その日の時刻を過ぎてから作ったルールは、翌日から実行する（作った直後に投稿しない）');
   store.AutoRules.remove(lateRule, uid);
   store.AutoRules.remove(draftRule, uid);
 
@@ -148,6 +148,71 @@ const mkUser = (e) => Users.create({ email: e, passwordHash: 'h', passwordSalt: 
   ok(/未投稿の予約/.test(store.AutoRules.get(capRule, uid).last_error) && mock.calls.filter((c) => c.host === 'api.anthropic.com').length === callsBefore, '予約の上限に空きがなければ、AIを呼ぶ前に止める');
   delete process.env.SERVICE_MAX_PENDING;
   store.AutoRules.remove(capRule, uid);
+
+  console.log('自動運用：1日に複数回・テーマの順番・最近の投稿と重ならない指示');
+  {
+    const hrs = auto.hoursOf({ hours: '21,9,9', hour_jst: 0 });
+    ok(hrs.join() === '9,21', '時刻は昇順・重複なしで扱う');
+    const nineJst = Date.parse(`${ai.day()}T09:30:00+09:00`);
+    const slot9 = auto.currentSlot({ hours: '9,21' }, nineJst);
+    ok(slot9 && slot9.key === `${ai.day(nineJst)}#09`, '9時半は9時の回');
+    ok(auto.currentSlot({ hours: '9,21' }, Date.parse(`${ai.day()}T08:59:00+09:00`)) === null, '最初の時刻より前は実行しない');
+    const rot = { theme: 'A\nB\nC', hours: '9,21', hour_jst: 9 };
+    const t1 = auto.themeFor(rot, { day: '2026-10-14', hour: 9 });
+    const t2 = auto.themeFor(rot, { day: '2026-10-14', hour: 21 });
+    const t3 = auto.themeFor(rot, { day: '2026-10-15', hour: 9 });
+    ok(new Set([t1, t2, t3]).size === 3, 'テーマは1行に1つ、回ごとに順番に使う');
+    // 2回の時刻のルール：朝に1回、夜にもう1回だけ実行する
+    process.env.AI_DAILY_TEXT = '50';
+    const multi = auto.createRule({ userId: uid, accountId: rid(th), theme: '朝\n夜', hours: [9, 21], mode: 'draft' }, Date.parse(`${ai.day()}T08:00:00+09:00`));
+    const callsAt = () => mock.calls.filter((c) => c.host === 'api.anthropic.com').length;
+    let before = callsAt();
+    const n9 = await auto.tick(Date.parse(`${ai.day()}T09:05:00+09:00`));
+    const n9b = await auto.tick(Date.parse(`${ai.day()}T10:00:00+09:00`));
+    const n21 = await auto.tick(Date.parse(`${ai.day()}T21:01:00+09:00`));
+    ok(n9 >= 1 && n9b === 0 && n21 >= 1 && callsAt() - before === 2, '設定した2つの時刻に、1回ずつ実行する');
+    const lastBody = JSON.parse(mock.calls.filter((c) => c.host === 'api.anthropic.com').pop().body);
+    ok(/最近の投稿/.test(lastBody.messages[0].content), '2回目からは、最近の投稿と重ならないようAIに伝える');
+    ok(store.ScheduledPosts.recentTextsForRule(multi).length === 2, '自動運用で作った投稿は、ルールとひも付けて記録する');
+    store.AutoRules.remove(multi, uid);
+  }
+
+  console.log('自動運用：動画');
+  {
+    const yt = store.SnsAccounts.upsert({ userId: uid, platform: 'youtube', externalUserId: 'yt9', handle: 'ch', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+    ok(/TikTok/.test(auto.validateRule({ userId: uid, accountId: rid(tt), theme: 'x', media: 'video', hours: [9], mode: 'draft' })), 'TikTokは自動運用の対象にしない（投稿ごとに本人の確認が必要）');
+    process.env.AI_DAILY_VIDEO = '0';
+    ok(/動画の生成/.test(auto.validateRule({ userId: uid, accountId: rid(yt), theme: 'x', media: 'video', hours: [9], mode: 'draft', options: { privacy: 'private', made_for_kids: false } })), '動画が無効なら、動画のルールは作れない');
+    process.env.AI_DAILY_VIDEO = '5';
+    ok(/公開設定/.test(auto.validateRule({ userId: uid, accountId: rid(yt), theme: 'x', media: 'video', hours: [9], mode: 'draft', options: {} })), 'YouTubeは公開設定を選ばないと作れない');
+    ok(/動画が必要/.test(auto.validateRule({ userId: uid, accountId: rid(yt), theme: 'x', media: 'image', hours: [9], mode: 'draft', options: { privacy: 'private', made_for_kids: false } })), 'YouTubeは動画が必要');
+    ok(auto.validateRule({ userId: uid, accountId: rid(yt), theme: 'x', media: 'video', hours: [9, 12, 15, 18], mode: 'draft', options: { privacy: 'private', made_for_kids: false } }), '時刻は3つまで');
+    const vr = auto.createRule({ userId: uid, accountId: rid(yt), theme: '動画テーマ', media: 'video', hours: [0], mode: 'draft', options: { privacy: 'unlisted', made_for_kids: false } }, Date.parse(`${ai.day()}T00:00:00+09:00`) - 1000);
+    videoDone = false;
+    const draftsBefore = store.ScheduledPosts.listDrafts(uid).length;
+    await auto.tick(Date.now() + 11);
+    ok(store.ScheduledPosts.listDrafts(uid).length === draftsBefore, '動画の生成中は、まだ投稿を作らない');
+    videoDone = true;
+    await auto.pollJobs();
+    const vd = store.ScheduledPosts.listDrafts(uid).find((p) => p.rule_id === vr);
+    ok(vd && vd.category === 'video' && JSON.parse(vd.options).privacy === 'unlisted', '動画ができたら、ルールの設定（YouTubeの公開設定）で下書きを作る');
+    store.AutoRules.remove(vr, uid);
+    process.env.AI_DAILY_VIDEO = '1';
+  }
+
+  console.log('月の上限');
+  {
+    const mu = mkUser('monthly@example.com');
+    store.Subscriptions.upsert(mu, { status: 'active' });
+    process.env.AI_MONTHLY_TEXT = '2'; process.env.AI_DAILY_TEXT = '50';
+    await ai.generateText({ userId: mu, theme: 'a' });
+    await ai.generateText({ userId: mu, theme: 'b' });
+    let me = null; try { await ai.generateText({ userId: mu, theme: 'c' }); } catch (e) { me = e; }
+    ok(me && /今月の生成回数の上限/.test(me.message), '1か月の上限を超えると止まる（費用の管理）');
+    process.env.AI_MONTHLY_TEXT = '0';
+    ok(ai.available().text === false, '月の上限を0にすると、その生成は使えなくなる');
+    delete process.env.AI_MONTHLY_TEXT;
+  }
 
   // 失敗しても止まらず、理由を記録する
   store.Subscriptions.upsert(uid, { status: 'canceled' });

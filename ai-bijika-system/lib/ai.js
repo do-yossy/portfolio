@@ -12,19 +12,28 @@ const env = () => process.env;
 const TEXT_MODEL = () => env().AI_TEXT_MODEL || 'claude-haiku-5-5';
 const IMAGE_MODEL = () => env().AI_IMAGE_MODEL || 'gpt-image-1';
 const VIDEO_MODEL = () => env().AI_VIDEO_MODEL || 'veo-3.0-generate-001';
+// 画像の品質（low／medium／high）。高いほど1枚の費用が上がる。既定は medium
+const IMAGE_QUALITY = () => (['low', 'medium', 'high'].includes(env().AI_IMAGE_QUALITY) ? env().AI_IMAGE_QUALITY : 'medium');
 
-// 1日あたりの生成回数の上限（利用者ごと）。費用を管理するための上限で、環境変数で変えられる。
-// 動画は費用が高くなりやすいため、既定では無効（運営者が AI_DAILY_VIDEO を設定したときだけ使える）
+// 生成回数の上限（利用者ごと。1日と1か月。日本時間）。費用を管理するための上限で、環境変数で変えられる。
+// 動画は費用が高くなりやすいため、既定では無効（運営者が AI_DAILY_VIDEO を1以上にしたときだけ使える）
 function limits() {
   const n = (v, d) => (v !== undefined && v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.floor(Number(v)) : d);
   return { text: n(env().AI_DAILY_TEXT, 30), image: n(env().AI_DAILY_IMAGE, 5), video: n(env().AI_DAILY_VIDEO, 0) };
 }
+function monthlyLimits() {
+  const n = (v, d) => (v !== undefined && v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.floor(Number(v)) : d);
+  return { text: n(env().AI_MONTHLY_TEXT, 300), image: n(env().AI_MONTHLY_IMAGE, 60), video: n(env().AI_MONTHLY_VIDEO, 10) };
+}
 const available = () => {
-  const l = limits();
-  return { text: !!env().ANTHROPIC_API_KEY && l.text > 0, image: !!env().OPENAI_API_KEY && l.image > 0, video: !!env().GEMINI_API_KEY && l.video > 0 };
+  const l = limits(); const m = monthlyLimits();
+  return {
+    text: !!env().ANTHROPIC_API_KEY && l.text > 0 && m.text > 0,
+    image: !!env().OPENAI_API_KEY && l.image > 0 && m.image > 0,
+    video: !!env().GEMINI_API_KEY && l.video > 0 && m.video > 0,
+  };
 };
 
-// transient：通信エラー・サーバー側の一時的なエラー（時間をおいて確認し直せばよいもの）
 class AiError extends Error {
   constructor(message, { transient = false } = {}) { super(message); this.transient = transient; }
 }
@@ -42,6 +51,8 @@ function reserve(userId, kind, nowMs) {
   const lim = limits()[kind];
   if (!Subscriptions.isActive(userId)) throw new AiError('ご契約が有効でないため、生成できません。');
   if (!available()[kind]) throw new AiError('この生成機能は、現在ご利用いただけません。');
+  const mlim = monthlyLimits()[kind];
+  if (AiUsage.usedMonth(userId, day(nowMs), kind) >= mlim) throw new AiError(`今月の生成回数の上限（${mlim}回）に達しました。来月またお試しください。`);
   if (!AiUsage.tryUse(userId, day(nowMs), kind, lim)) throw new AiError(`本日の生成回数の上限（${lim}回）に達しました。明日またお試しください。`);
 }
 function refund(userId, kind, nowMs) { AiUsage.refund(userId, day(nowMs), kind); }
@@ -57,7 +68,7 @@ async function post(host, path, headers, body, timeoutMs = 120000) {
 }
 
 // 投稿文の生成。platform ごとの文字数に合わせる。戻り値は本文（文字列）
-async function generateText({ userId, theme, tone, platform, instruction, nowMs }) {
+async function generateText({ userId, theme, tone, platform, instruction, avoid = [], nowMs }) {
   const subject = String(theme || '').trim();
   if (!subject) throw new AiError('テーマを入力してください。');
   if ([...subject].length > 500 || [...String(instruction || '')].length > 500 || [...String(tone || '')].length > 100) throw new AiError('入力が長すぎます。');
@@ -65,7 +76,9 @@ async function generateText({ userId, theme, tone, platform, instruction, nowMs 
   try {
     const system = 'あなたはSNS運用の担当者です。指定されたテーマで、そのまま投稿できる日本語の投稿文を1本だけ書きます。前置きや説明は書かず、投稿文だけを返します。'
       + '事実として確認できない数字・実績・お客様の声・効果の断定は書きません。誇大な表現や他者を中傷する表現は避けます。';
-    const user = `テーマ：${subject}\n口調：${tone || 'やさしく丁寧'}\n投稿先：${PLATFORM_HINT[platform] || 'SNS'}${instruction ? `\n追加の指示：${instruction}` : ''}`;
+    const recent = (avoid || []).filter(Boolean).slice(0, 5).map((t) => `- ${String(t).replace(/\s+/g, ' ').slice(0, 200)}`).join('\n');
+    const user = `テーマ：${subject}\n口調：${tone || 'やさしく丁寧'}\n投稿先：${PLATFORM_HINT[platform] || 'SNS'}${instruction ? `\n追加の指示：${instruction}` : ''}`
+      + (recent ? `\n\n最近の投稿（これらと同じ内容・同じ書き出しにならないよう、切り口を変える）：\n${recent}` : '');
     const j = await post('api.anthropic.com', '/v1/messages',
       { 'x-api-key': env().ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       JSON.stringify({ model: TEXT_MODEL(), max_tokens: 4000, system, messages: [{ role: 'user', content: user }] }));
@@ -93,7 +106,7 @@ async function generateImage({ userId, prompt, nowMs }) {
   try {
     const j = await post('api.openai.com', '/v1/images/generations',
       { Authorization: `Bearer ${env().OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      JSON.stringify({ model: IMAGE_MODEL(), prompt: p, size: '1024x1024', n: 1, output_format: 'jpeg' }));
+      JSON.stringify({ model: IMAGE_MODEL(), prompt: p, size: '1024x1024', n: 1, output_format: 'jpeg', quality: IMAGE_QUALITY() }));
     const b64 = j.data && j.data[0] && j.data[0].b64_json;
     if (!b64) throw new AiError('画像を生成できませんでした。');
     return await saveBuffer(userId, Buffer.from(b64, 'base64'));
@@ -150,4 +163,11 @@ async function pollVideo({ userId, operation }) {
   return { done: true, media: await saveBuffer(userId, buf) };
 }
 
-module.exports = { available, limits, generateText, generateImage, startVideo, pollVideo, AiError, day };
+// その利用者が、いまこの生成を使えるか（契約・設定・今日と今月の残り回数）。生成の前の確認に使う
+function canUse(userId, kind, nowMs) {
+  if (!Subscriptions.isActive(userId) || !available()[kind]) return false;
+  const d = day(nowMs);
+  return AiUsage.used(userId, d, kind) < limits()[kind] && AiUsage.usedMonth(userId, d, kind) < monthlyLimits()[kind];
+}
+
+module.exports = { canUse, available, limits, monthlyLimits, generateText, generateImage, startVideo, pollVideo, AiError, day };

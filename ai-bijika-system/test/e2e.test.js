@@ -30,6 +30,12 @@ const mock = installHttpsMock(async (c) => {
     if (c.method === 'POST' && c.path === '/v1/subscriptions/sub_e2e') { cancelFlag = /cancel_at_period_end=true/.test(c.body); return { status: 200, json: subObj() }; }
     if (c.path === '/v1/billing_portal/sessions') return { status: 200, json: { url: 'https://portal.stripe.test/e2e' } };
   }
+  if (c.host === 'api.anthropic.com') return { status: 200, json: { content: [{ type: 'text', text: 'AIの投稿文' }], stop_reason: 'end_turn' } };
+  if (c.host === 'generativelanguage.googleapis.com') {
+    if (c.method === 'POST') return { status: 200, json: { name: 'models/veo/operations/e2e' } };
+    if (c.path.startsWith('/v1beta/models/veo/operations/e2e')) return { status: 200, json: { done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://generativelanguage.googleapis.com/v1beta/files/e2e:download?alt=media' } }] } } } };
+    if (c.path.startsWith('/v1beta/files/e2e')) return { status: 200, text: '\u0000\u0000\u0000\u0018ftypmp42' + 'v'.repeat(400) };
+  }
   if (c.host === 'open.tiktokapis.com' && c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { creator_nickname: 'e2e_tt', privacy_level_options: ['SELF_ONLY'], comment_disabled: false }, error: { code: 'ok' } } };
   if (c.host === 'graph.threads.net') {
     if (c.path === '/oauth/access_token') return { status: 200, json: { access_token: 'th_short', user_id: 4242 } };
@@ -89,6 +95,16 @@ function webhook(event, secret = 'whsec_e2e') {
   cookie = '';
   process.env.SERVICE_OPEN = 'true';
   process.env.SERVICE_CONTACT_EMAIL = 'support@example.com';
+  r = await req('GET', '/service');
+  ok(r.text.includes('ただいま準備中'), '法務文書に未記入の【】が残っている間は、SERVICE_OPEN を設定しても販売を開始しない');
+  // 運営者が【】を埋めた法務文書（の写し）で、販売を開始した状態にする
+  const legalTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-legal-'));
+  for (const f of require('../lib/service-core').LEGAL_FILES) {
+    const t = fs.readFileSync(path.join(__dirname, '..', 'legal', f), 'utf8');
+    fs.writeFileSync(path.join(legalTmp, f), t.replace(/【(?!メールアドレス】|代表者の氏名】)([^】]+)】/g, (m, x) => (x.trim() ? `（記入済み：${x}）` : m)));
+  }
+  process.env.SERVICE_LEGAL_DIR = legalTmp;
+  process.env.SERVICE_REPRESENTATIVE = '代表 太郎';
 
   console.log('販売ページ');
   r = await req('GET', '/service');
@@ -97,6 +113,13 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.text.includes('/service/legal/terms') && r.text.includes('/service/legal/tokushoho'), 'LPから規約・特商法表記へリンクする');
   ok(r.text.includes('現在の対応SNSは、Threadsです') && !r.text.includes('YouTube：') && !r.text.includes('TikTok：'), 'LPには、設定済みのSNSだけを対応SNSとして表示する');
   ok(!r.text.includes('AIで投稿づくり') && !/ClaudeやChatGPT/.test(r.text), 'AIが未設定ならAIの機能を表示せず、動作を確認していないアプリ名を出さない');
+  r = await req('GET', '/service/lp');
+  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
+  ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
+  process.env.SERVICE_PRICE_JPY = '1500';
+  r = await req('GET', '/service/lp');
+  ok(!r.text.includes('半額以下'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');
+  delete process.env.SERVICE_PRICE_JPY;
   r = await req('GET', '/service/legal/tokushoho');
   ok(r.status === 200 && r.text.includes('月額1,000円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
   ok(r.text.includes('support@example.com') && !r.text.includes('【メールアドレス】') && r.text.includes('電話番号'), '特商法表記の連絡先に設定したメールアドレスを表示し、電話番号の開示請求について記載する');
@@ -253,6 +276,33 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 200 && Array.isArray(r.json.rules), '自動運用ルールの一覧を取得できる');
   r = await req('POST', '/service/app/ai/text', { raw: JSON.stringify({ theme: 'x' }), headers: { 'X-CSRF': 'bad', 'Content-Type': 'application/json' } });
   ok(r.status === 403, '画面からのAI生成もCSRFトークンが必要');
+  console.log('AIで動画を作って添付・自動運用の設定（画面）');
+  process.env.ANTHROPIC_API_KEY = 'ak'; process.env.GEMINI_API_KEY = 'gk'; process.env.AI_DAILY_VIDEO = '2';
+  r = await req('GET', '/service/app/compose');
+  ok(r.text.includes('AIで動画を作る') && r.text.includes('AIで文章を作る'), '投稿を作る画面に、AIで動画を作るボタンが出る');
+  r = await req('POST', '/service/app/ai/video', { raw: JSON.stringify({ prompt: '海の朝' }), headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf } });
+  const vjob = JSON.parse(r.text).job_id;
+  ok(r.status === 202 && !!vjob, '画面から動画の生成を始められる');
+  r = await req('GET', `/service/app/ai/jobs/${vjob}`);
+  ok(JSON.parse(r.text).status === 'running', '生成中の状態を確認できる');
+  await require('../lib/ai-auto').pollJobs();
+  r = await req('GET', `/service/app/ai/jobs/${vjob}`);
+  const vj = JSON.parse(r.text);
+  ok(vj.status === 'done' && vj.media_id && /\/media\/[a-f0-9]{48}\.mp4$/.test(vj.url), 'できあがった動画のIDと確認用のURLを返す');
+  r = await req('GET', `/service/app/ai/jobs/${'0'.repeat(20)}`);
+  ok(r.status === 404, '他人の（存在しない）ジョブは見られない');
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('文章＋動画') && r.text.includes('name="hour3"') && r.text.includes('1行に1つ'), '自動運用の設定で、動画・1日3回までの時刻・テーマの順番を選べる');
+  r = await req('POST', '/service/app/auto', { body: { csrf: appCsrf, account_id: accId, theme: 'テーマA\nテーマB', media: 'none', hour1: '7', hour2: '19', hour3: '', mode: 'draft' } });
+  ok(r.status === 302 && r.headers.location === '/service/app?f=auto_added', '画面から、1日2回・テーマ2つのルールを作れる');
+  r = await api('GET', '/api/v1/auto-rules', apiKey);
+  const ar = r.json.rules.find((x) => x.theme === 'テーマA\nテーマB');
+  ok(ar && ar.hours.join() === '7,19' && ar.media === 'none', 'APIでルールの時刻と作るものを確認できる');
+  r = await api('POST', '/api/v1/auto-rules', apiKey, { account_id: accId, theme: 'x', media: 'video', hours: [9], mode: 'draft' });
+  ok(r.status === 201 && r.json.media === 'video', 'APIから動画の自動運用ルールを作れる（Threads）');
+  for (const rr of (await api('GET', '/api/v1/auto-rules', apiKey)).json.rules) await api('DELETE', `/api/v1/auto-rules/${rr.id}`, apiKey);
+  delete process.env.ANTHROPIC_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
+
   console.log('MCP');
   const rpc = (key, body) => api('POST', '/mcp', key, body);
   r = await rpc('', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
@@ -260,7 +310,13 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
   ok(r.json.result.serverInfo.name === 'sns-scheduler', 'MCPの初期化に応答する');
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
-  ok(r.json.result.tools.map((t) => t.name).join() === 'list_accounts,get_account_info,create_post,list_posts,publish_draft,delete_post,create_upload_url,import_media_from_url,ai_generate_text,ai_generate_image,ai_start_video,ai_video_status', 'MCPのツール一覧を返す');
+  ok(r.json.result.tools.map((t) => t.name).join() === 'list_accounts,get_account_info,create_post,list_posts,publish_draft,delete_post,create_upload_url,import_media_from_url', 'MCPのツール一覧を返す（AIが未設定なら、AIのツールは出さない）');
+  process.env.ANTHROPIC_API_KEY = 'ak';
+  r = await rpc(apiKey, { jsonrpc: '2.0', id: 21, method: 'tools/list' });
+  ok(r.json.result.tools.some((t) => t.name === 'ai_generate_text') && !r.json.result.tools.some((t) => t.name === 'ai_start_video'), 'AIの文章を設定すると文章のツールだけが出る（動画は無効のまま）');
+  r = await rpc(apiKey, { jsonrpc: '2.0', id: 22, method: 'tools/call', params: { name: 'ai_start_video', arguments: { prompt: 'x' } } });
+  ok(r.json.error && r.json.error.code === -32602, '出していないツールは呼べない');
+  delete process.env.ANTHROPIC_API_KEY;
   r = await rpc(apiKey, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'create_post', arguments: { category: 'text', text: 'MCP下書き', account_ids: [accId], draft: true } } });
   const mcpOut = JSON.parse(r.json.result.content[0].text);
   ok(!r.json.result.isError && mcpOut.posts[0].status === 'draft', 'MCPから下書きを作れる');
@@ -375,6 +431,7 @@ function webhook(event, secret = 'whsec_e2e') {
   console.log('投稿を作る画面とカレンダー');
   r = await req('GET', '/service/app/compose');
   ok(r.status === 200 && r.text.includes('ツリー（連投）') && r.text.includes('SNSごとに本文を変える') && r.text.includes('下書きに保存'), '投稿を作る画面を表示する');
+  ok(r.text.includes('data-own-ai="chatgpt"') && r.text.includes('data-own-ai="claude"') && r.text.includes('data-own-ai="gemini"') && !r.text.includes('id="aiTextBtn"'), 'ツールのAIが未設定でも、ご自身のAI（ChatGPT・Claude・Gemini）で作るボタンを出す');
   const sessPost = (body, csrfTok) => req('POST', '/service/app/posts', { raw: JSON.stringify(body), headers: { 'Content-Type': 'application/json', 'X-CSRF': csrfTok } });
   r = await sessPost({ category: 'text', text: 'x', account_ids: [accId], draft: true }, 'bad');
   ok(r.status === 403, '画面からの投稿作成もCSRFトークンが必要');
@@ -520,6 +577,72 @@ function webhook(event, secret = 'whsec_e2e') {
   cookie = '';
   r = await req('POST', '/admin/service/test-grant', { body: { email: 'tester@example.com' } });
   ok(r.status === 302 && !store.Subscriptions.isActive(testerId), '運営者でなければ付与できない');
+  // 解約済みの元の契約者に付けて、取り消したあとも、また申し込めること
+  cookie = '';
+  r = await req('POST', '/service/signup', { body: { email: 'ex@example.com', password: 'expassword1' } });
+  const exCookie = cookie;
+  const exId = require('../db').Users.findByEmail('ex@example.com').id;
+  store.Subscriptions.upsert(exId, { stripe_subscription_id: 'sub_ex', status: 'canceled', cancel_at_period_end: true });
+  cookie = adminCookie;
+  r = await req('POST', '/admin/service/test-grant', { body: { email: 'ex@example.com' } });
+  ok(r.status === 200 && store.Subscriptions.get(exId).status === 'test', '解約済みの元の契約者にも、テスト利用を付けられる');
+  r = await req('POST', '/admin/service/test-revoke', { body: { email: 'ex@example.com' } });
+  ok(store.Subscriptions.get(exId).status === 'canceled', '取り消すと、付ける前の状態（解約済み）に戻る');
+  cookie = exCookie;
+  r = await req('GET', '/service/checkout');
+  ok(r.status === 200 && r.text.includes('お申込みの最終確認'), '取り消したあと、また申し込める');
+  r = await req('GET', '/service/app');
+  ok(!r.text.includes('解約を取り消す') && !r.text.includes('>解約する<'), '終わった契約の解約ボタンは出さない');
+  cookie = adminCookie;
+  const pwSaved = process.env.ADMIN_PASSWORD;
+  delete process.env.ADMIN_PASSWORD;
+  r = await req('POST', '/admin/service/test-grant', { body: { email: 'ex@example.com' } });
+  ok(r.status === 400 && r.text.includes('ADMIN_PASSWORD'), 'ADMIN_PASSWORD が未設定なら、テスト利用は付与できない');
+  process.env.ADMIN_PASSWORD = pwSaved;
+
+  console.log('専用アプリとして動かす場合（SERVICE_ONLY=true）');
+  process.env.SERVICE_ONLY = 'true';
+  cookie = '';
+  r = await req('GET', '/');
+  ok(r.status === 302 && r.headers.location === '/service', 'トップページはサービスのページへ移動する');
+  r = await req('GET', '/dashboard');
+  ok(r.status === 302 && r.headers.location === '/service', 'ミチシルベ本体の画面は出さない');
+  r = await req('POST', '/signup', { body: { email: 'x@example.com', password: 'password123' } });
+  ok(r.status === 404, 'ミチシルベ本体の登録は受け付けない');
+  r = await req('GET', '/service');
+  ok(r.status === 200 && r.text.includes('月額'), 'サービスのページは出す');
+  r = await req('GET', '/.well-known/oauth-authorization-server');
+  ok(r.status === 200, 'MCP用のOAuthのメタデータは出す');
+  r = await req('GET', '/contact');
+  ok(r.status === 200, 'お問い合わせは出す');
+  r = await api('GET', '/api/v1/accounts', '');
+  ok(r.status === 401, 'APIは使える（認証が必要）');
+  r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
+  ok(r.status === 302 && r.headers.location === '/admin/service', '運営者のログイン後は、サービスの運営者画面へ移動する');
+  const savedPw = process.env.ADMIN_PASSWORD;
+  delete process.env.ADMIN_PASSWORD;
+  cookie = '';
+  r = await req('POST', '/admin/login', { body: { password: 'changeme' } });
+  ok(r.status === 403, 'ADMIN_PASSWORD が未設定なら、既定のパスワードでは運営者画面に入れない');
+  process.env.ADMIN_PASSWORD = savedPw;
+  delete process.env.SERVICE_ONLY;
+
+  console.log('サービスを専用アプリへ移した場合（SERVICE_MOVED_TO）');
+  process.env.SERVICE_MOVED_TO = 'https://michishirube-post.fly.dev/';
+  r = await req('GET', '/service/legal/terms?x=1');
+  ok(r.status === 302 && r.headers.location === 'https://michishirube-post.fly.dev/service/legal/terms?x=1', 'ミチシルベ側の /service は、移転先の同じページへ転送する');
+  r = await req('GET', '/');
+  ok(r.status === 200, 'ミチシルベ本体の画面はそのまま');
+  process.env.SERVICE_MOVED_TO = 'http://insecure.example';
+  r = await req('GET', '/service');
+  ok(r.status === 200, 'https でない転送先は使わない');
+  delete process.env.SERVICE_MOVED_TO;
+
+  console.log('運営者画面のログインの回数制限');
+  cookie = '';
+  for (let i = 0; i < 10; i++) await req('POST', '/admin/login', { body: { password: 'wrong' } });
+  r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
+  ok(r.status === 429, '運営者画面のログインの失敗が続くと、正しいパスワードでも一時的に制限する');
 
   console.log('既存のアプリへの影響');
   cookie = '';

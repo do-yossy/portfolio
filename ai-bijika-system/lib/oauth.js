@@ -108,7 +108,8 @@ function authenticateRequest(req, limiter, apiKeys) {
   const m = String(req.headers.authorization || '').match(/^Bearer\s+(\S+)$/i);
   const userId = m ? (apiKeys.authenticate(m[1]) || authenticate(m[1])) : null;
   if (userId) return { userId };
-  if (!m || !knownToken(m[1])) {
+  // トークンなしの要求（MCPの接続の最初の探索など）は数えない。数えるのは、発行したことのないトークンだけ
+  if (m && !knownToken(m[1])) {
     if (!limiter.allow(ip)) return { status: 429, error: '試行回数が多すぎます。しばらくしてからお試しください。' };
     limiter.fail(ip);
   }

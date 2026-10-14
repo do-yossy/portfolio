@@ -34,10 +34,33 @@ const contactEmail = () => {
 };
 // 販売を開始してよいか。Stripe・連絡先・SNS連携の設定に加えて、運営者が SERVICE_OPEN=true で明示した場合だけ開く
 // （Metaや Xの審査が終わる前に、連携できないまま契約する人が出ないようにするため）
+// 法務文書（規約・特商法表記・プライバシーポリシー）の置き場所（テストでは差し替える）
+const LEGAL_FILES = ['サービス利用規約_案.md', 'サービス特定商取引法表記_案.md', 'サービスプライバシーポリシー_案.md'];
+const legalDir = () => process.env.SERVICE_LEGAL_DIR || require('path').join(__dirname, '..', 'legal');
+// 法務文書に残っている、未記入の【】（環境変数で自動で埋まるものは、設定されていれば除く）
+let legalCache = { at: 0, key: '', list: [] };
+function legalPlaceholders(nowMs = Date.now()) {
+  const key = `${legalDir()}|${contactEmail()}|${process.env.SERVICE_REPRESENTATIVE || ''}`;
+  if (legalCache.key === key && nowMs - legalCache.at < 60 * 1000) return legalCache.list;
+  const fs = require('fs'); const path = require('path');
+  const found = new Set();
+  for (const f of LEGAL_FILES) {
+    let text = '';
+    try { text = fs.readFileSync(path.join(legalDir(), f), 'utf8'); } catch { found.add(`（${f} が見つかりません）`); continue; }
+    if (contactEmail()) text = text.split('【メールアドレス】').join('');
+    if (String(process.env.SERVICE_REPRESENTATIVE || '').trim()) text = text.split('【代表者の氏名】').join('');
+    // 注意書き（「【　】は、運営者しか確認できない項目です」）の中の【　】は数えない
+    for (const m of text.matchAll(/【([^】]+)】/g)) if (m[1].trim()) found.add(`【${m[1]}】（${f}）`);
+  }
+  legalCache = { at: nowMs, key, list: [...found] };
+  return legalCache.list;
+}
+
+// 販売を開始してよいか：運営者の明示（SERVICE_OPEN）、決済・連絡先・SNSの設定、法務文書の未記入の箇所がないこと
 function salesOpen() {
   const billing = require('./billing');
   return process.env.SERVICE_OPEN === 'true' && billing.isConfigured() && !!contactEmail()
-    && snsEnabled() && registry.list().some((p) => p.isConfigured());
+    && snsEnabled() && registry.list().some((p) => p.isConfigured()) && legalPlaceholders().length === 0;
 }
 
 function snsEnabled() {
@@ -98,7 +121,7 @@ const mediaOf = (m) => ({ id: m.id, kind: m.kind, mime: m.mime, size: m.size });
 //   targets: [{ accountId, caption, options }]（SNSごとに本文・設定を変えられる）
 //   mediaIds: image は複数、video は1つ。tree: [{ text, mediaIds }]（X・Threads のみ）
 //   draft: true なら下書き（SNSへは送らない。日時は任意）
-function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso, draft, nowMs = Date.now() }) {
+function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso, draft, ruleId = '', nowMs = Date.now() }) {
   if (!CATEGORIES.includes(category)) return { ok: false, error: '投稿の種類が正しくありません。' };
   if (!Array.isArray(targets) || !targets.length) return { ok: false, error: '投稿先のSNSを選んでください。' };
   if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
@@ -160,7 +183,7 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
   const groupId = require('crypto').randomBytes(10).toString('hex');
   const created = resolved.map(({ a, caption, options }) => ScheduledPosts.create({
     userId, accountId: a.id, text: caption, scheduledAt: scheduledAtIso || new Date(nowMs).toISOString(),
-    mediaIds: ids, options, category, tree: cards, groupId, status: draft ? 'draft' : 'pending',
+    mediaIds: ids, options, category, tree: cards, groupId, status: draft ? 'draft' : 'pending', ruleId,
   }));
   return { ok: true, ids: created, groupId };
 }
@@ -213,8 +236,10 @@ function createPosts({ userId, accountIds, text, scheduledAtIso, mediaId, option
   }
   const targets = ids.map((id) => {
     const a = SnsAccounts.getForUser(id, userId);
-    return { accountId: id, caption: body, options: (a && options && options[a.platform]) || {} };
+    return { accountId: id, platform: a && a.platform, caption: body, options: (a && options && options[a.platform]) || {} };
   });
+  // かんたん投稿（この関数）では、公開設定と「子ども向けかどうか」を選べないため、YouTubeは受け付けない
+  if (targets.some((t) => t.platform === 'youtube')) return { ok: false, error: 'YouTubeへは、公開設定と「子ども向けかどうか」を選ぶ必要があるため、「投稿を作る」画面から投稿してください。' };
   return createPost({ userId, category, targets, mediaIds: mediaId ? [mediaId] : [], scheduledAtIso, nowMs });
 }
 
@@ -254,6 +279,6 @@ async function finishConnect({ userId, platform, code, state }) {
 }
 
 module.exports = {
-  LIMITS, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
+  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
   jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, capacityError, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

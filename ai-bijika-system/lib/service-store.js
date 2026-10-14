@@ -143,6 +143,15 @@ try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN media_ids TEXT DEFAULT '[]
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN tree TEXT DEFAULT '[]'"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN group_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN platform TEXT DEFAULT ''"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN rule_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// 自動運用：作るもの（none／image／video）、実行する時刻（カンマ区切り。最大3つ）、SNSごとの設定（YouTubeの公開設定など）
+try { db.exec("ALTER TABLE auto_rules ADD COLUMN media TEXT DEFAULT ''"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE auto_rules ADD COLUMN hours TEXT DEFAULT ''"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE auto_rules ADD COLUMN options TEXT DEFAULT '{}'"); } catch { /* 既にある */ }
+// 動画の生成ジョブ：完成したら投稿を作るための情報（自動運用から作った場合）
+try { db.exec("ALTER TABLE ai_jobs ADD COLUMN payload TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// テスト利用を付ける前の状態（取り消すときに戻す）
+try { db.exec("ALTER TABLE subscriptions ADD COLUMN pre_test_status TEXT DEFAULT ''"); } catch { /* 既にある */ }
 db.exec(`
   CREATE TABLE IF NOT EXISTS post_media (
     post_id TEXT NOT NULL,
@@ -157,6 +166,8 @@ db.exec("INSERT OR IGNORE INTO post_media (post_id, media_id) SELECT id, media_i
 
 // test：運営者が動作確認のために付与した「テスト利用」（Stripeを通さない。料金はかからない）
 const ACTIVE_STATUSES = new Set(['active', 'trialing', 'test']);
+// Stripe の契約が「まだ開いている」状態（新しく申し込ませない・テスト利用で上書きしない）
+const OPEN_STRIPE_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused']);
 
 const Subscriptions = {
   get(userId) {
@@ -176,18 +187,18 @@ const Subscriptions = {
     const cur = this.get(userId);
     if (!cur) {
       db.prepare(`INSERT INTO subscriptions (user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end,
-        cancel_at_period_end, price_id, agreed_at, agreed_version, stripe_event_created, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        cancel_at_period_end, price_id, agreed_at, agreed_version, stripe_event_created, pre_test_status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         userId, fields.stripe_customer_id || '', fields.stripe_subscription_id || '', fields.status || 'none',
         fields.current_period_end || '', fields.cancel_at_period_end ? 1 : 0, fields.price_id || '',
-        fields.agreed_at || '', fields.agreed_version || '', fields.stripe_event_created || 0, t, t);
+        fields.agreed_at || '', fields.agreed_version || '', fields.stripe_event_created || 0, fields.pre_test_status || '', t, t);
       return this.get(userId);
     }
     const next = { ...cur, ...fields };
     db.prepare(`UPDATE subscriptions SET stripe_customer_id=?, stripe_subscription_id=?, status=?, current_period_end=?,
-      cancel_at_period_end=?, price_id=?, agreed_at=?, agreed_version=?, stripe_event_created=?, updated_at=? WHERE user_id=?`).run(
+      cancel_at_period_end=?, price_id=?, agreed_at=?, agreed_version=?, stripe_event_created=?, pre_test_status=?, updated_at=? WHERE user_id=?`).run(
       next.stripe_customer_id || '', next.stripe_subscription_id || '', next.status || 'none', next.current_period_end || '',
-      next.cancel_at_period_end ? 1 : 0, next.price_id || '', next.agreed_at || '', next.agreed_version || '', next.stripe_event_created || 0, t, userId);
+      next.cancel_at_period_end ? 1 : 0, next.price_id || '', next.agreed_at || '', next.agreed_version || '', next.stripe_event_created || 0, next.pre_test_status || '', t, userId);
     return this.get(userId);
   },
   // サービスを使える状態か（契約中、または解約手続き済みでも期間末まで）
@@ -278,14 +289,14 @@ const OAuthStates = {
 
 const ScheduledPosts = {
   // status: 'pending'（予約）または 'draft'（下書き。SNSへは送らない）。mediaIds はメディアの並び、tree はツリー投稿のカード
-  create({ userId, accountId, text, scheduledAt, mediaId, mediaIds, options, category, tree, groupId, status }) {
+  create({ userId, accountId, text, scheduledAt, mediaId, mediaIds, options, category, tree, groupId, status, ruleId }) {
     const id = generateId();
     const t = now();
     const ids = (mediaIds && mediaIds.length) ? mediaIds : (mediaId ? [mediaId] : []);
     const treeCards = tree || [];
     const acc = db.prepare('SELECT platform FROM sns_accounts WHERE id = ?').get(accountId);
-    db.prepare(`INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, media_id, options, category, media_ids, tree, group_id, platform, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, userId, accountId, text, scheduledAt, status || 'pending', ids[0] || '', JSON.stringify(options || {}), category || '', JSON.stringify(ids), JSON.stringify(treeCards), groupId || '', (acc && acc.platform) || '', t, t);
+    db.prepare(`INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, media_id, options, category, media_ids, tree, group_id, platform, rule_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, userId, accountId, text, scheduledAt, status || 'pending', ids[0] || '', JSON.stringify(options || {}), category || '', JSON.stringify(ids), JSON.stringify(treeCards), groupId || '', (acc && acc.platform) || '', ruleId || '', t, t);
     const all = new Set(ids);
     for (const c of treeCards) for (const m of (c.mediaIds || [])) all.add(m);
     for (const m of all) db.prepare('INSERT OR IGNORE INTO post_media (post_id, media_id) VALUES (?, ?)').run(id, m);
@@ -305,6 +316,10 @@ const ScheduledPosts = {
   listDrafts(userId) {
     return db.prepare(`SELECT p.*, a.platform AS platform, a.handle FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
       WHERE p.user_id = ? AND p.status = 'draft' ORDER BY p.created_at DESC`).all(userId);
+  },
+  // 自動運用のルールが最近作った投稿の本文（同じような投稿が続かないよう、AIに渡す）
+  recentTextsForRule(ruleId, limit = 5) {
+    return db.prepare(`SELECT text FROM scheduled_posts WHERE rule_id = ? ORDER BY created_at DESC LIMIT ?`).all(ruleId, limit).map((r) => r.text);
   },
   countDrafts(userId) {
     return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts WHERE user_id=? AND status='draft'`).get(userId).n;
@@ -418,12 +433,17 @@ const AiUsage = {
   },
   refund(userId, day, kind) { db.prepare('UPDATE ai_usage SET n=n-1 WHERE user_id=? AND day=? AND kind=? AND n>0').run(userId, day, kind); },
   used(userId, day, kind) { const r = db.prepare('SELECT n FROM ai_usage WHERE user_id=? AND day=? AND kind=?').get(userId, day, kind); return r ? r.n : 0; },
+  // その月（日本時間。day は YYYY-MM-DD）の合計
+  usedMonth(userId, day, kind) {
+    const r = db.prepare('SELECT COALESCE(SUM(n),0) AS n FROM ai_usage WHERE user_id=? AND kind=? AND day LIKE ?').get(userId, kind, `${String(day).slice(0, 7)}-%`);
+    return r ? r.n : 0;
+  },
 };
 
 const AiJobs = {
-  create({ userId, kind, prompt, operation }) {
+  create({ userId, kind, prompt, operation, payload }) {
     const id = generateId(); const t = now();
-    db.prepare('INSERT INTO ai_jobs (id,user_id,kind,prompt,operation,status,created_at,updated_at) VALUES (?,?,?,?,?,\'running\',?,?)').run(id, userId, kind, prompt, operation || '', t, t);
+    db.prepare('INSERT INTO ai_jobs (id,user_id,kind,prompt,operation,status,payload,created_at,updated_at) VALUES (?,?,?,?,?,\'running\',?,?,?)').run(id, userId, kind, prompt, operation || '', payload ? JSON.stringify(payload) : '', t, t);
     return id;
   },
   get(id, userId) { return db.prepare('SELECT * FROM ai_jobs WHERE id=? AND user_id=?').get(id, userId) || null; },
@@ -436,20 +456,21 @@ const AiJobs = {
 const AutoRules = {
   MAX: 5,
   count(userId) { return db.prepare('SELECT COUNT(*) AS n FROM auto_rules WHERE user_id=?').get(userId).n; },
-  create({ userId, accountId, theme, tone, withImage, hourJst, mode }) {
+  create({ userId, accountId, theme, tone, media, hours, mode, options, withImage, hourJst }) {
     const id = generateId();
-    db.prepare('INSERT INTO auto_rules (id,user_id,account_id,theme,tone,with_image,hour_jst,mode,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run(id, userId, accountId, theme, tone || '', withImage ? 1 : 0, hourJst, mode, now());
+    const hs = (hours && hours.length ? hours : [hourJst || 0]).slice(0, 3);
+    if (!media) media = withImage ? 'image' : 'none';
+    db.prepare('INSERT INTO auto_rules (id,user_id,account_id,theme,tone,with_image,hour_jst,mode,media,hours,options,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, userId, accountId, theme, tone || '', media === 'image' ? 1 : 0, hs[0] || 0, mode, media || 'none', hs.join(','), JSON.stringify(options || {}), now());
     return id;
   },
   listForUser(userId) { return db.prepare('SELECT * FROM auto_rules WHERE user_id=? ORDER BY created_at').all(userId); },
   get(id, userId) { return db.prepare('SELECT * FROM auto_rules WHERE id=? AND user_id=?').get(id, userId) || null; },
   remove(id, userId) { return db.prepare('DELETE FROM auto_rules WHERE id=? AND user_id=?').run(id, userId).changes === 1; },
   setEnabled(id, userId, on) { return db.prepare('UPDATE auto_rules SET enabled=? WHERE id=? AND user_id=?').run(on ? 1 : 0, id, userId).changes === 1; },
-  // 今日まだ実行していない有効なルール（実行は1日1回）
-  due(day) { return db.prepare(`SELECT * FROM auto_rules WHERE enabled=1 AND last_day <> ?`).all(day); },
-  // 実行済みにする。他の処理が先に実行していたら false（二重実行の防止）
-  claim(id, day) { return db.prepare(`UPDATE auto_rules SET last_day=?, last_error='' WHERE id=? AND last_day <> ?`).run(day, id, day).changes === 1; },
+  enabled() { return db.prepare('SELECT * FROM auto_rules WHERE enabled=1').all(); },
+  // 実行済みにする（key は「YYYY-MM-DD#HH」。前回より新しい回のときだけ更新する＝二重実行の防止）。他の処理が先に実行していたら false
+  claim(id, key) { return db.prepare(`UPDATE auto_rules SET last_day=?, last_error='' WHERE id=? AND (last_day IS NULL OR last_day < ?)`).run(key, id, key).changes === 1; },
   setError(id, msg) { db.prepare('UPDATE auto_rules SET last_error=? WHERE id=?').run(String(msg).slice(0, 300), id); },
   removeForAccount(accountId) { db.prepare('DELETE FROM auto_rules WHERE account_id=?').run(accountId); },
 };
@@ -503,4 +524,4 @@ const ApiKeys = {
   },
 };
 
-module.exports = { UploadTickets, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+module.exports = { OPEN_STRIPE_STATUSES, UploadTickets, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

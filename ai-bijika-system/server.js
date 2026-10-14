@@ -69,6 +69,7 @@ const TROUBLE_PROMPTS = [27, 30, 28, 29];
 
 // お問い合わせの管理画面（/admin/inquiries）用の簡易パスワード認証。購入者アカウントとは別系統。
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
+const adminLoginLimiter = require('./lib/ratelimit').createLimiter({ max: 10, windowMs: 15 * 60 * 1000 });
 if (ADMIN_PASSWORD === 'changeme') console.warn('[warn] ADMIN_PASSWORD 未設定。本番では必ず設定してください（/admin/inquiries が誰でも見られる状態です）。');
 
 const adminSessions = new Set();
@@ -1710,6 +1711,14 @@ main{max-width:640px;margin:0 auto;padding:18px}
 }
 
 // ── リクエストハンドラ ──
+// SERVICE_ONLY=true のときに出してよいパス（サービス本体・API・MCP・OAuth・メディア・お問い合わせ・運営者画面の一部）
+function serviceOnlyAllowed(p) {
+  return p === '/service' || p.startsWith('/service/') || p.startsWith('/api/') || p === '/mcp' || p.startsWith('/oauth/')
+    || p.startsWith('/.well-known/') || p.startsWith('/media/') || p === '/contact' || p.startsWith('/contact/')
+    || p === '/admin/login' || p === '/admin/logout' || p === '/admin/service' || p.startsWith('/admin/service/')
+    || p === '/admin/inquiries' || p.startsWith('/admin/inquiries/');
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -1725,6 +1734,19 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end('not found'); }
       res.writeHead(200, { 'Content-Type': asset.type, 'Cache-Control': 'public, max-age=3600' });
       return fs.createReadStream(filePath).pipe(res);
+    }
+
+    // ── サービスを専用アプリへ移した場合（SERVICE_MOVED_TO=https://…）、こちらの /service は移転先へ転送する ──
+    const movedTo = String(process.env.SERVICE_MOVED_TO || '').replace(/\/+$/, '');
+    if (movedTo && /^https:\/\//.test(movedTo) && process.env.SERVICE_ONLY !== 'true' && (pathname === '/service' || pathname.startsWith('/service/')) && (method === 'GET' || method === 'HEAD')) {
+      return redirect(res, `${movedTo}${pathname}${url.search}`, { 'Cache-Control': 'no-store' });
+    }
+
+    // ── この商品専用のアプリとして動かす場合（SERVICE_ONLY=true）は、SNS自動投稿サービスの画面だけを出す ──
+    if (process.env.SERVICE_ONLY === 'true' && !serviceOnlyAllowed(pathname)) {
+      if (method === 'GET' || method === 'HEAD') return redirect(res, '/service');
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('not found');
     }
 
     // ── 月額SNS自動投稿サービス（/service 以下とStripe Webhook。購入者向けのライセンス認証とは別系統）──
@@ -1972,11 +1994,19 @@ const server = http.createServer(async (req, res) => {
       return sendHtml(res, 200, adminLoginPage());
     }
     if (pathname === '/admin/login' && method === 'POST') {
+      // 本番（NODE_ENV=production）と専用アプリ（SERVICE_ONLY）では、ADMIN_PASSWORD を設定するまで運営者画面に入れない（既定のパスワードで入られないように）
+      const weak = !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme';
+      if (weak && (process.env.SERVICE_ONLY === 'true' || process.env.NODE_ENV === 'production')) return sendHtml(res, 403, adminLoginPage('ADMIN_PASSWORD が設定されていないため、運営者画面は使えません。Fly.io のシークレットに設定してください。'));
+      const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '');
+      if (!adminLoginLimiter.allow(ip)) return sendHtml(res, 429, adminLoginPage('試行回数が多すぎます。15分ほど待ってからお試しください。'));
       const { password } = await parseBody(req);
-      if (password !== ADMIN_PASSWORD) return sendHtml(res, 401, adminLoginPage('パスワードが違います。'));
+      const given = crypto.createHash('sha256').update(String(password || '')).digest();
+      const expect = crypto.createHash('sha256').update(String(process.env.ADMIN_PASSWORD || ADMIN_PASSWORD)).digest();
+      if (!crypto.timingSafeEqual(given, expect)) { adminLoginLimiter.fail(ip); return sendHtml(res, 401, adminLoginPage('パスワードが違います。')); }
+      adminLoginLimiter.reset(ip);
       const sid = crypto.randomBytes(24).toString('hex');
       adminSessions.add(sid);
-      return redirect(res, '/admin/inquiries', { 'Set-Cookie': adminSessionCookie(sid) });
+      return redirect(res, process.env.SERVICE_ONLY === 'true' ? '/admin/service' : '/admin/inquiries', { 'Set-Cookie': adminSessionCookie(sid) });
     }
     if (pathname === '/admin/logout') {
       const sid = auth.parseCookies(req).get('admin_sid');
