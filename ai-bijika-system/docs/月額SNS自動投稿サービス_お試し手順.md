@@ -1,6 +1,8 @@
 # 月額SNS自動投稿サービス お試し手順（運営者向け）
 
-決済（Stripe）を設定しなくても、運営者ご自身のアカウントで、本番のサイト（`https://sq-ai-bijika.fly.dev/service`）を実際に試すための手順です。販売ページは「準備中」のままで、一般の方は申し込めません。
+決済（Stripe）を設定しなくても、運営者ご自身のアカウントで、本番のサイト（`https://aipro.social-quality.com/service`）を実際に試すための手順です。販売ページは「準備中」のままで、一般の方は申し込めません。
+
+サイトは Fly.io のアプリ `sq-ai-bijika` で動いていて、`https://sq-ai-bijika.fly.dev` でも同じサイトが開きます。SNSの連携やAIアシスタントとの接続は `SERVICE_BASE_URL` に設定したドメインで行うため、**試すときは必ず `https://aipro.social-quality.com` のほうを開いてください**。
 
 - **所要時間の目安**：手順1〜5は15分ほど、手順6（Threadsの連携）はMetaの画面の操作に慣れていれば30分ほどです（画面の表記や手順は、各社の変更により変わることがあります）。
 - **前提**：この手順書と同じ変更（テスト利用・設定の確認画面）が `main` に入り、自動デプロイが終わっていること。
@@ -14,7 +16,7 @@
 | 名前 | 入れる値 | 説明 |
 |---|---|---|
 | `ADMIN_PASSWORD` | ご自身で決めた、推測されにくいパスワード | 運営者画面のパスワード。**すでに設定済みなら不要**です |
-| `SERVICE_BASE_URL` | `https://sq-ai-bijika.fly.dev` | サービスのURL（最後に `/` を付けない） |
+| `SERVICE_BASE_URL` | `https://aipro.social-quality.com` | サービスのURL（最後に `/` を付けない） |
 | `SNS_TOKEN_KEY` | 64桁のランダムな英数字（下の方法で作る） | SNSの連携情報を暗号化する鍵。**一度決めたら変えない** |
 | `APP_SECRET` | 64桁のランダムな英数字（別に作る） | 画面の操作の確認用の鍵 |
 
@@ -32,43 +34,43 @@
 
 - **コマンド**（flyctl が入っている場合）：
   ```
-  fly secrets set -a sq-ai-bijika SERVICE_BASE_URL=https://sq-ai-bijika.fly.dev SNS_TOKEN_KEY=（作った値） APP_SECRET=（作った値）
+  fly secrets set -a sq-ai-bijika SERVICE_BASE_URL=https://aipro.social-quality.com SNS_TOKEN_KEY=（作った値） APP_SECRET=（作った値）
   ```
   `ADMIN_PASSWORD` が未設定なら、同じコマンドに `ADMIN_PASSWORD=（決めたパスワード）` を足します。
 - **Fly.io の管理画面**：Fly.io にログインし、アプリ `sq-ai-bijika` の「Secrets」から1つずつ追加します。
 
 ## 手順2. 設定を確認する
 
-1. `https://sq-ai-bijika.fly.dev/admin/login` を開き、`ADMIN_PASSWORD` でログインします。
-2. `https://sq-ai-bijika.fly.dev/admin/service` を開き、「設定の確認」の表を見ます。
+1. `https://aipro.social-quality.com/admin/login` を開き、`ADMIN_PASSWORD` でログインします。
+2. `https://aipro.social-quality.com/admin/service` を開き、「設定の確認」の表を見ます。
 3. 次の4つに ✅ が付いていれば、手順3に進めます：管理画面のパスワード、サービスのURL、トークンの暗号化の鍵、画面の操作の確認用の鍵。
 
 この表は、値そのものは表示せず、設定されているかどうかだけを示します。
 
 ## 手順3. お試し用のアカウントを作る
 
-1. `https://sq-ai-bijika.fly.dev/service/signup` を開きます。
+1. `https://aipro.social-quality.com/service/signup` を開きます。
 2. メールアドレスと、8文字以上のパスワードで登録します。
 3. 登録後は「準備中」のページに戻りますが、アカウントは作られています。
 
 ## 手順4. 自分のアカウントに「テスト利用」を付ける
 
-1. `https://sq-ai-bijika.fly.dev/admin/service` の「テスト利用」の欄に、手順3のメールアドレスを入れます。
+1. `https://aipro.social-quality.com/admin/service` の「テスト利用」の欄に、手順3のメールアドレスを入れます。
 2. 「テスト利用を付与」を押します。
 
 テスト利用は、決済をせずに全機能を使える状態です（料金はかかりません）。試し終わったら、同じ画面の「テスト利用を取り消す」で元に戻せます。取り消すと、SNSの連携・AIアシスタントとの接続・APIキーも解除されます。
 
 ## 手順5. ログインして、SNSなしで試せることを確かめる
 
-1. `https://sq-ai-bijika.fly.dev/service/login` でログインし、マイページを開きます。
+1. `https://aipro.social-quality.com/service/login` でログインし、マイページを開きます。
 2. マイページに「テスト利用中」と表示されることを確かめます。
 3. SNSを連携しなくても、次のことを試せます。
    - **APIキーの発行**：マイページの「APIキーを発行」を押します。キーはその画面で1度だけ表示されるので、控えてください。
    - **APIの呼び出し**：Git Bash などで次のコマンドを実行し、`{"accounts":[]}` のような応答が返れば成功です（`$KEY` は控えたキー）。
      ```
-     curl https://sq-ai-bijika.fly.dev/api/v1/accounts -H "Authorization: Bearer $KEY"
+     curl https://aipro.social-quality.com/api/v1/accounts -H "Authorization: Bearer $KEY"
      ```
-   - **AIアシスタントとの接続（MCP）**：MCPのカスタム接続に対応したAIアシスタントのアプリで、接続先URLに `https://sq-ai-bijika.fly.dev/mcp` を追加します。
+   - **AIアシスタントとの接続（MCP）**：MCPのカスタム接続に対応したAIアシスタントのアプリで、接続先URLに `https://aipro.social-quality.com/mcp` を追加します。
      - ログイン画面と「接続を許可しますか？」の画面が出たら、「許可する」を押します。
      - 接続できたら、「契約情報と利用状況を見せて」と頼むと、`get_account_info` が呼ばれます。
      - カスタム接続を使えるプランかどうかは、お使いのアプリでご確認ください。実物のアプリでの接続は、まだ確認できていません。うまくいかない場合は、表示されたエラーの文を教えてください。
@@ -77,13 +79,19 @@
 
 6つのSNSのうち、審査を待たずに試しやすいのがThreadsです。Metaの開発者アプリは「開発モード」のままで、アプリに登録したテスター本人のThreadsアカウントなら連携できます。
 
+> **注意：@michishirube_jp（ミチシルベの公開アカウント）で試すと、テストの投稿はそのまま公開されます。**
+> - 公開してよい内容（たとえば、実際に出したいお知らせ）で試してください。
+> - または、投稿されたことを確かめたら、すぐにThreadsのアプリで削除してください。
+> - フォロワーに見せたくない場合は、テスト専用のThreadsアカウントを用意して、そのアカウントをテスターに登録してください（Threadsのアカウントの作成には、Instagramのアカウントが必要な場合があります）。
+> - ツリー（連投）を試すと、複数の投稿が続けて公開されます。
+
 ### 6-1. Meta の開発者アプリを作る
 
 1. Meta for Developers（`https://developers.facebook.com/`）にログインし、新しいアプリを作ります。用途（ユースケース）は「Threads APIにアクセス」を選びます。
 2. Threads APIの設定で、次を登録します。
-   - リダイレクト（コールバック）URL：`https://sq-ai-bijika.fly.dev/service/oauth/callback/threads`
+   - リダイレクト（コールバック）URL：`https://aipro.social-quality.com/service/oauth/callback/threads`
    - 権限：`threads_basic` と `threads_content_publish`
-   - アンインストール・削除のコールバックURLの入力を求められた場合は、仮に `https://sq-ai-bijika.fly.dev/service` を入れてください。
+   - アンインストール・削除のコールバックURLの入力を求められた場合は、仮に `https://aipro.social-quality.com/service` を入れてください。
 3. 「アプリの役割」（テスター）に、ご自身のThreadsアカウントを追加します。
 4. Threads側で招待を承認します。Threadsの「設定」→「アカウント」→「ウェブサイトのアクセス許可」→「招待」から承認します（表記はアプリのバージョンで異なることがあります）。
 5. ThreadsのアプリIDとアプリシークレットを控えます。
@@ -116,7 +124,7 @@ fly secrets set -a sq-ai-bijika THREADS_APP_ID=（アプリID） THREADS_APP_SEC
 
 ## 試し終わったら
 
-- `https://sq-ai-bijika.fly.dev/admin/service` で「テスト利用を取り消す」を押すと、連携やAPIキーを含めて元に戻ります。
+- `https://aipro.social-quality.com/admin/service` で「テスト利用を取り消す」を押すと、連携やAPIキーを含めて元に戻ります。
 - Fly.io に登録した設定値は、そのまま残して問題ありません。販売を始めるときに使います。
 - 販売の開始には、別途、次のものが必要です。
   - Stripeの設定
