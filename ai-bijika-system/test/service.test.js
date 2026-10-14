@@ -308,6 +308,10 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   store.ScheduledPosts.failStuck(new Date(Date.now() - 5 * 60 * 1000).toISOString(), new Date(Date.now() + 1000).toISOString());
   ok(store.ScheduledPosts.get(p10).status === 'pending', '起動時は、まだ送り始めていない予約を、確保したばかりでもすぐ予約に戻す（遅れないように）');
   store.ScheduledPosts.cancel(p10, userB);
+  // 複数の行の書き込みは、途中で失敗したら何も残さない
+  let txErr = null; let txId = null;
+  try { store.transaction(() => { txId = store.ScheduledPosts.create({ userId: userB, accountId: thAcc.id, text: 'tx', scheduledAt: new Date(Date.now() + 3600000).toISOString() }); throw new Error('途中で失敗'); }); } catch (e) { txErr = e; }
+  ok(txErr && txId && store.ScheduledPosts.get(txId) === null, '投稿先ごとの行の作成は、途中で失敗したら1件も残さない（下書きの置き換えで二重にならない）');
 
   // 長期トークンの定期延長：期限まで7日を切った Threads の連携を、投稿が無くても延長する
   const soonAcc = store.SnsAccounts.upsert({ userId: userA, platform: 'threads', externalUserId: 'soon1', handle: '@soon', accessTokenEnc: box.encrypt('old_long', k), expiresAt: new Date(Date.now() + 3 * 86400000).toISOString() });

@@ -122,6 +122,21 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
   ok(r.text.includes('使えるSNS') && r.text.includes('無料体験') && !r.text.includes('Xは月30件まで'), '比較表に使えるSNSと無料体験の行があり、Xを提供していなければXの上限を出さない');
   ok(!r.text.includes('AI生成') && !r.text.includes('合成した内容'), 'このサービスのAIを使わない設定のときは、AI生成の表示についての説明を出さない');
+  {
+    // TikTok・YouTube を設定した状態で、AIの設定ごとに、SNSの条件の説明（AI生成の表示）を確かめる
+    const saveEnv = {}; ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'AI_DAILY_VIDEO'].forEach((k) => { saveEnv[k] = process.env[k]; });
+    Object.assign(process.env, { TIKTOK_CLIENT_KEY: 'k', TIKTOK_CLIENT_SECRET: 's', GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 'gs' });
+    delete process.env.OPENAI_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
+    let lp = (await req('GET', '/service/lp')).text;
+    ok(lp.includes('TikTok：') && lp.includes('YouTube：') && !lp.includes('AI生成') && !lp.includes('合成した内容'), 'TikTok・YouTubeを提供していても、このサービスのAIが無ければ、AI生成の表示の説明は出さない');
+    process.env.OPENAI_API_KEY = 'ok';
+    lp = (await req('GET', '/service/lp')).text;
+    ok(lp.includes('このサービスのAIで作った画像には、TikTokの「AI生成」の表示') && lp.includes('ほかのAIで作ってアップロードしたものには付きません') && !lp.includes('合成した内容'), '画像だけを作れる設定では、TikTokの説明は「画像には」とし、YouTubeの申告の説明は出さない');
+    process.env.GEMINI_API_KEY = 'gk'; process.env.AI_DAILY_VIDEO = '1';
+    lp = (await req('GET', '/service/lp')).text;
+    ok(lp.includes('このサービスのAIで作った画像・動画には') && lp.includes('このサービスのAIで作った動画は、合成した内容として申告します'), '動画も作れる設定では、TikTokは「画像・動画」、YouTubeの申告の説明も出す');
+    Object.keys(saveEnv).forEach((k) => { if (saveEnv[k] === undefined) delete process.env[k]; else process.env[k] = saveEnv[k]; });
+  }
   ok(r.text.includes('SNSへの投稿を、まとめて予約。') && !r.text.includes('複数のSNSへの投稿を') && !r.text.includes('いくつものSNS') && !r.text.includes('SNSごとに本文') && !r.text.includes('公式の料金ページで確認') && r.text.includes('公式サイト（料金と概要のページ）'), '使えるSNSが1つだけのときは、LPで「複数のSNS」と書かない。比較の確認元は「料金と概要のページ」');
   process.env.FACEBOOK_APP_ID = 'fb'; process.env.FACEBOOK_APP_SECRET = 'fbs';
   r = await req('GET', '/service/lp');

@@ -54,6 +54,8 @@ function topNav(user) {
 // ── 販売ページ ──
 // ── 表示する文（販売ページ・最終確認画面・マイページで同じ文を使う。規約・特商法表記もこの内容に合わせる）──
 const aiLib = () => require('./ai');
+// このサービスのAIで作れるもの（画像・動画）を、説明に使う言葉にする。どちらも作れなければ ''
+const aiKinds = () => { const av = aiLib().available(); return [av.image && '画像', av.video && '動画'].filter(Boolean).join('・'); };
 // 実際に使えるSNS（キーが設定されているもの）
 const liveSns = () => registry.list().filter((p) => p.isConfigured());
 const snsNames = () => { const l = liveSns(); return l.length ? l.map((p) => p.label).join('・') : ''; };
@@ -61,7 +63,7 @@ const SNS_RULES = {
   threads: 'Threads：テキスト・画像・動画（カルーセル20件まで。動画は5分まで）。ツリー可。500文字まで（絵文字は1つで2文字以上に数えます。組み合わせの絵文字は10文字を超えることもあります）',
   x: 'X：画像4枚（各5MBまで）または動画1本（140秒まで）を添付可。ツリー可。投稿数は月の上限あり',
   instagram: 'Instagram：プロアカウント（ビジネス／クリエイター）が対象。JPEG画像（カルーセル10件まで。縦横比は4:5〜1.91:1）またはリール動画が必須',
-  get tiktok() { return `TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択${process.env.TIKTOK_AUDITED === 'true' ? '' : '（アプリの審査が終わるまでは「自分のみ」）'}${aiLib().available().image || aiLib().available().video ? '。このサービスのAIで作った画像・動画には、TikTokの「AI生成」の表示を自動で付けます（ほかのAIで作ってアップロードしたものには付きません。SNSの決まりで表示が必要な場合は、TikTokのアプリから投稿してください）' : ''}`; },
+  get tiktok() { return `TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択${process.env.TIKTOK_AUDITED === 'true' ? '' : '（アプリの審査が終わるまでは「自分のみ」）'}${aiKinds() ? `。このサービスのAIで作った${aiKinds()}には、TikTokの「AI生成」の表示を自動で付けます（ほかのAIで作ってアップロードしたものには付きません。SNSの決まりで表示が必要な場合は、TikTokのアプリから投稿してください）` : ''}`; },
   facebook: 'Facebook：連携のときに選んだ1つのページに投稿（投稿できるページが2つ以上あると連携できないため、Facebookの画面でページを1つだけ選んでください）。テキスト・画像10枚まで・動画1本',
   get youtube() { return `YouTube：3分以内の動画1本が必須。本文の1行目がタイトル（100文字まで）になり、収まる場合は「#Shorts」を付けます。説明は5,000バイト（日本語でおよそ1,600文字）まで。公開設定と子ども向けかどうかは投稿ごとに選択。1日の投稿数に上限があり（太平洋時間で数えます）、送る時点で上限に達していた場合は、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します${aiLib().available().video ? '。このサービスのAIで作った動画は、合成した内容として申告します（ほかのAIで作ってアップロードした動画は申告しません。必要な場合は、YouTubeのアプリから投稿してください）' : ''}`; },
 };
@@ -403,7 +405,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
         <button class="btn btn-ghost" type="submit" name="mode" value="now" onclick="return confirm('今すぐ投稿します。よろしいですか？')">今すぐ投稿</button></div>
-      <p class="small">文字数の上限：Threads 500（絵文字は1つで2文字以上に数えます）／X 日本語140文字（重み280）／Instagram・TikTok 2,200。上の文字数は、絵文字を1文字として数えた目安です。</p>
+      <p class="small">文字数の上限：Threads 500（絵文字は1つで2文字以上に数えます）／X 日本語140文字（重み280）／Instagram・TikTok 2,200。上の文字数は目安です（絵文字などの数え方は、SNSごとに異なります）。</p>
     </form>
     <script>
     function cnt(){var t=document.getElementById('text').value;document.getElementById('count').textContent=Array.from(t).length+'文字';}
@@ -537,7 +539,7 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
           <button type="button" class="btn btn-sm btn-ghost" data-own-ai="chatgpt" data-kind="image">ChatGPTで画像</button>
           <button type="button" class="btn btn-sm btn-ghost" data-own-ai="gemini" data-kind="image">Geminiで画像</button>
         </div>
-        <div class="small">指示文（投稿先のSNSの文字数などの条件つき）をコピーしてから開きます。自動で入力されない場合は、貼り付けて送信してください。できた文章は下の「本文」に貼り付け、画像は保存して「画像・動画」から添付します。</div>
+        <div class="small">指示文（投稿先のSNSの文字数などの条件つき）をコピーしてから開きます。自動で入力されない場合は、貼り付けて送信してください。できた文章は下の「本文」に貼り付け、画像は保存して「画像・動画」から添付します。ご自身のAIで作った画像・動画には、SNSのAI生成の表示は自動では付きません。必要な場合は、SNSのアプリから表示を付けて投稿してください。</div>
         ${aiAvail.text || aiAvail.image || aiAvail.video ? `<div class="small" style="margin-top:8px"><b>このツールのAIで作る</b>（1日・1か月の回数に上限があります）</div>
         <div class="btn-row" style="margin-top:4px">${aiAvail.text ? '<button type="button" class="btn btn-sm" id="aiTextBtn">AIで文章を作る</button>' : ''}${aiAvail.image ? '<button type="button" class="btn btn-sm" id="aiImgBtn">AIで画像を作る</button>' : ''}${aiAvail.video ? '<button type="button" class="btn btn-sm" id="aiVidBtn">AIで動画を作る</button>' : ''}</div>` : ''}
         <div class="small" id="aiMsg"></div></div>
@@ -804,7 +806,7 @@ function apiDocsPage(user, baseUrl) {
   "scheduled_at": "2026-12-01T09:00:00+09:00"
 }'`)}
     <h3>SNSごとの設定（<code>options</code>）</h3>
-    <p>アカウントIDごとに指定します。<b>TikTokへは、APIからは下書き（<code>draft:true</code>）にだけできます</b>（TikTokの決まりにより、投稿は、利用者ご本人がサービスのカレンダーから下書きを「投稿を作る」画面で開き、内容と設定を確かめて選び直してから行います。<code>POST /api/v1/posts/{id}/publish</code> では予約にできません）。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なります。サービスのアプリの審査が終わるまでは <code>SELF_ONLY</code>（自分のみ）だけです）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（下書き以外は必須です。指定がないと予約できません）。YouTubeへのアップロードには、1日（太平洋時間）の上限（利用者ごと・サービス全体）があり、上限に達した日時には予約できません。送る時点で上限に達していた場合は、YouTubeの日付が変わった後に自動で投稿します。このサービスのAI（<code>/api/v1/ai/…</code> や画面の「このツールのAIで作る」）で作った画像・動画にだけ、TikTokの「AI生成」の表示（<code>is_aigc</code>）とYouTubeの合成コンテンツの申告（<code>containsSyntheticMedia</code>）を自動で付けます。ほかの方法で作ってアップロードしたファイルには付きません（SNSの決まりで表示が必要な場合は、SNSのアプリから投稿してください）。</p>
+    <p>アカウントIDごとに指定します。<b>TikTokへは、APIからは下書き（<code>draft:true</code>）にだけできます</b>（TikTokの決まりにより、投稿は、利用者ご本人がサービスのカレンダーから下書きを「投稿を作る」画面で開き、内容と設定を確かめて選び直してから行います。<code>POST /api/v1/posts/{id}/publish</code> では予約にできません）。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なります。サービスのアプリの審査が終わるまでは <code>SELF_ONLY</code>（自分のみ）だけです）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（下書き以外は必須です。指定がないと予約できません）。YouTubeへのアップロードには、1日（太平洋時間）の上限（利用者ごと・サービス全体）があり、上限に達した日時には予約できません。送る時点で上限に達していた場合は、YouTubeの日付が変わった後に自動で投稿します。${aiKinds() ? `このサービスのAI（<code>/api/v1/ai/…</code> や画面の「このツールのAIで作る」）で作った${aiKinds()}にだけ、TikTokの「AI生成」の表示（<code>is_aigc</code>）${aiLib().available().video ? 'とYouTubeの合成コンテンツの申告（<code>containsSyntheticMedia</code>）' : ''}を自動で付けます。` : ''}ほかの方法で作ってアップロードした画像・動画には、AI生成の表示は自動では付きません（SNSの決まりで表示が必要な場合は、SNSのアプリから投稿してください）。</p>
     ${code(`"options": {
   "<TikTokのアカウントID>": { "privacy_level": "<利用者が選んだ公開範囲>", "disable_comment": false, "disable_duet": true, "disable_stitch": true, "commercial_own": false, "commercial_paid": false, "auto_add_music": false },
   "<YouTubeのアカウントID>": { "privacy": "unlisted", "made_for_kids": false }

@@ -229,10 +229,11 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
     if (ye) return { ok: false, error: ye };
   }
   const groupId = require('crypto').randomBytes(10).toString('hex');
-  const created = resolved.map(({ a, caption, options }) => ScheduledPosts.create({
+  // 投稿先ごとの行は、全部作るか、何も作らないかにする（途中で失敗して一部だけ残らないように）
+  const created = require('./service-store').transaction(() => resolved.map(({ a, caption, options }) => ScheduledPosts.create({
     userId, accountId: a.id, text: caption, scheduledAt: scheduledAtIso || new Date(nowMs).toISOString(),
     mediaIds: ids, options, category, tree: cards, groupId, status: draft ? 'draft' : 'pending', ruleId,
-  }));
+  })));
   return { ok: true, ids: created, groupId };
 }
 
