@@ -35,12 +35,19 @@ function textLength(text) {
   return n;
 }
 
+const MAX_TREE = 25;
 function validatePost(args) {
-  const p = normalize(args); const text = p.text; const media = p.medias[0];
-  if (p.category === 'tree') return 'Xのツリー投稿は、このバージョンでは対応していません。';
-  if (media) return 'Xは、現時点ではテキストのみに対応しています（画像・動画は添付できません）。';
-  if (!String(text || '').trim()) return 'Xは、本文が必要です。';
-  if (textLength(text) > maxLength) return `Xの文字数の上限（${maxLength}。日本語は1文字を2として計算）を超えています。`;
+  const p = normalize(args);
+  const items = [{ text: p.text, medias: p.medias }, ...(p.category === 'tree' ? p.tree : [])];
+  if (p.category === 'tree' && items.length < 2) return 'ツリー投稿は、2件目以降の投稿が必要です。';
+  if (items.length > MAX_TREE) return `Xのツリーは${MAX_TREE}件までです。`;
+  for (let i = 0; i < items.length; i++) {
+    const t = items[i].text;
+    const who = i === 0 ? 'X' : `ツリー${i + 1}件目`;
+    if ((items[i].medias || []).length) return 'Xは、現時点ではテキストのみに対応しています（画像・動画は添付できません）。';
+    if (!String(t || '').trim()) return `${who}は、本文が必要です。`;
+    if (textLength(t) > maxLength) return `${who}の文字数の上限（${maxLength}。日本語は1文字を2として計算）を超えています。`;
+  }
   return null;
 }
 
@@ -106,18 +113,35 @@ async function refresh({ refreshToken }) {
   return tokenResult(t);
 }
 
-async function publish(args) {
-  const { accessToken } = args;
-  const text = normalize(args).text;
-  let r;
-  try {
-    r = await call({
-      method: 'POST', path: '/2/tweets',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ text }),
-    });
-  } catch (e) { throw ambiguous(e); }
-  return { externalId: String(r.data.id) };
+async function tweet(accessToken, text, replyTo) {
+  const body = { text };
+  if (replyTo) body.reply = { in_reply_to_tweet_id: replyTo };
+  const r = await call({
+    method: 'POST', path: '/2/tweets',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(body),
+  });
+  return String(r.data.id);
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, newPkce, usesPkce: true, mediaRule: 'テキストのみ' };
+// ツリーは、前の投稿への返信として順に投稿する
+async function publish(args) {
+  const { accessToken } = args;
+  const p = normalize(args);
+  const err = validatePost(args);
+  if (err) throw new SnsError(err);
+  const texts = [p.text, ...(p.category === 'tree' ? p.tree.map((c) => c.text) : [])];
+  let first = ''; let prev = '';
+  for (let i = 0; i < texts.length; i++) {
+    try {
+      prev = await tweet(accessToken, texts[i], prev);
+      if (!first) first = prev;
+    } catch (e) {
+      if (first) { e.retriable = false; e.message = `${e.message}（ツリーの${i}件目までは投稿済みです。Xでご確認ください）`; throw e; }
+      throw ambiguous(e);
+    }
+  }
+  return { externalId: first };
+}
+
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, newPkce, usesPkce: true, mediaRule: 'テキストのみ（ツリー25件まで）' };

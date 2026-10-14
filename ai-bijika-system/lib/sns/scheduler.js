@@ -9,7 +9,7 @@ const registry = require('./index');
 const MAX_ATTEMPTS = 3;
 const RETRY_BASE_MS = 5 * 60 * 1000; // 5分、10分…
 // 期限の前に更新する余裕。有効期間の長い Threads・Instagram は3日前、短い X・TikTok は直前に更新する
-const REFRESH_MARGIN_MS = { x: 10 * 60 * 1000, tiktok: 60 * 60 * 1000 };
+const REFRESH_MARGIN_MS = { x: 10 * 60 * 1000, tiktok: 60 * 60 * 1000, youtube: 5 * 60 * 1000 };
 const DEFAULT_REFRESH_MARGIN_MS = 3 * 24 * 3600 * 1000;
 
 function key() {
