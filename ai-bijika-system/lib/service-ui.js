@@ -62,8 +62,8 @@ const SNS_RULES = {
   x: 'X：画像4枚（各5MBまで）または動画1本（140秒まで）を添付可。ツリー可。投稿数は月の上限あり',
   instagram: 'Instagram：プロアカウント（ビジネス／クリエイター）が対象。JPEG画像（カルーセル10件まで）またはリール動画が必須',
   tiktok: 'TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択',
-  facebook: 'Facebook：ご自身が管理するページのうち、連携時に先頭に表示される1つのページに投稿（連携後にページ名をご確認ください）。テキスト・画像10枚まで・動画1本',
-  youtube: 'YouTube：3分以内の動画1本が必須。本文の1行目がタイトルになり「#Shorts」を自動で付けます。公開設定と子ども向けかどうかは投稿ごとに選択',
+  facebook: 'Facebook：連携のときに選んだ1つのページに投稿（投稿できるページが2つ以上あると連携できないため、Facebookの画面でページを1つだけ選んでください）。テキスト・画像10枚まで・動画1本',
+  youtube: 'YouTube：3分以内の動画1本が必須。本文の1行目がタイトル（100文字まで）になり、収まる場合は「#Shorts」を付けます。説明は5,000バイト（日本語でおよそ1,600文字）まで。公開設定と子ども向けかどうかは投稿ごとに選択',
 };
 const snsRulesText = () => liveSns().map((p) => SNS_RULES[p.id]).filter(Boolean).join('。');
 function aiLimitsText() {
@@ -501,7 +501,7 @@ const PLATFORM_LIMITS = {
   instagram: { text: 2200, media: '画像（JPEG・10件まで）またはリール動画が必須' },
   tiktok: { text: 2200, media: '動画1本、または写真（JPEG・35枚まで）が必須' },
   facebook: { text: 63206, media: '画像10枚まで、または動画1本は任意' },
-  youtube: { text: 5000, media: '動画1本が必須（本文の1行目がタイトル）' },
+  youtube: { text: 5000, media: '動画1本が必須（本文の1行目がタイトル。説明はバイト数で数え、日本語は1文字3バイト）' },
 };
 
 function composePage({ user, accounts, csrf, aiAvail = {} }) {
@@ -558,7 +558,7 @@ function composePage({ user, accounts, csrf, aiAvail = {} }) {
         <select id="ytPrivacy"><option value="">選択してください</option><option value="public">公開</option><option value="unlisted">限定公開</option><option value="private">非公開</option></select>
         <label class="lbl" for="ytKids">子ども向けの動画ですか（YouTubeで申告が必要です）</label>
         <select id="ytKids"><option value="">選択してください</option><option value="no">いいえ、子ども向けではない</option><option value="yes">はい、子ども向け</option></select>
-        <p class="small">本文の1行目（92文字まで）に「 #Shorts」を付けたものがタイトルになります（ショートとして扱われるよう、説明にも「#Shorts」を付けます）。動画は3分以内にしてください。YouTubeの監査が終わるまでは、公開を選んでも「非公開」に制限される場合があります。</p></div>
+        <p class="small">本文の1行目（100文字まで）がタイトルになり、収まる場合は「 #Shorts」を付けます。説明（本文全体）は5,000バイト（日本語でおよそ1,600文字）までです。半角の「&lt;」「&gt;」は、全角の「＜」「＞」に置き換えて送ります。動画は3分以内にしてください。YouTubeの監査が終わるまでは、公開を選んでも「非公開」に制限される場合があります。</p></div>
       <div class="field"><span class="lbl">いつ投稿するか</span>
         <label class="check"><input type="radio" name="when" value="schedule" checked><span>日時を指定して予約</span></label>
         <input id="at" type="datetime-local" value="${defaultAt}" style="max-width:260px">
@@ -575,7 +575,7 @@ function composePage({ user, accounts, csrf, aiAvail = {} }) {
       function cat(){return document.querySelector('input[name=cat]:checked').value;}
       function sel(){return ACC.filter(function(a){var c=document.querySelector('input[data-acc="'+a.id+'"]');return c&&c.checked;});}
       var accs=$('accs');ACC.forEach(function(a){var l=el('label',{'class':'check'});var c=el('input',{type:'checkbox','data-acc':a.id});if(ACC.length===1)c.checked=true;l.appendChild(c);var sp=el('span');sp.appendChild(document.createTextNode(a.label));sp.appendChild(el('br'));sp.appendChild(el('span',{'class':'small'},a.rule));l.appendChild(sp);accs.appendChild(l);c.addEventListener('change',refresh);});
-      function len(t,p){if(p!=='x')return Array.from(t).length;var n=0;t=t.replace(/https?:\\/\\/\\S+/g,function(){n+=23;return '';});Array.from(t).forEach(function(ch){var c=ch.codePointAt(0);n+=((c>=0x1100&&c<=0x11ff)||(c>=0x2e80&&c<=0xa4cf)||(c>=0xac00&&c<=0xd7a3)||(c>=0xf900&&c<=0xfaff)||(c>=0xff00&&c<=0xff60)||(c>=0x1f300&&c<=0x1faff))?2:1;});return n;}
+      function len(t,p){if(p==='youtube')return new TextEncoder().encode(t.replace(/[<>]/g,'＜')).length;if(p!=='x')return Array.from(t).length;var n=0;t=t.replace(/https?:\\/\\/\\S+/g,function(){n+=23;return '';});Array.from(t).forEach(function(ch){var c=ch.codePointAt(0);n+=((c>=0x1100&&c<=0x11ff)||(c>=0x2e80&&c<=0xa4cf)||(c>=0xac00&&c<=0xd7a3)||(c>=0xf900&&c<=0xfaff)||(c>=0xff00&&c<=0xff60)||(c>=0x1f300&&c<=0x1faff))?2:1;});return n;}
       function counts(){var t=$('mainText').value;var s=sel();$('mainCount').textContent=s.length?s.map(function(a){var n=len(t,a.platform);return a.label.split(' ')[0]+' '+n+'/'+a.limit+(n>a.limit?'（超過）':'');}).join('　'):Array.from(t).length+'文字';}
       $('mainText').addEventListener('input',counts);
       function refresh(){var c=cat();$('mediaField').style.display=(c==='image'||c==='video'||c==='tree')?'block':'none';$('treeField').style.display=c==='tree'?'block':'none';
@@ -603,7 +603,7 @@ function composePage({ user, accounts, csrf, aiAvail = {} }) {
       function aiCall(kind,payload){$('aiMsg').textContent='生成中…';return fetch('/service/app/ai/'+kind,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF':csrf},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'生成に失敗しました。');return j;});}).catch(function(e){$('aiMsg').textContent=e.message;throw e;});}
       if($('aiTextBtn'))$('aiTextBtn').addEventListener('click',function(){var s=sel();aiCall('text',{theme:$('aiTheme').value,platform:s.length?s[0].platform:''}).then(function(j){$('mainText').value=j.text;counts();perBox();$('aiMsg').textContent='文章を入れました。内容をご確認ください。';}).catch(function(){});});
       // ご自身のAIで作る：投稿先の条件を入れた指示文を作り、コピーしてから、そのAIを開く
-      var LIMIT_NOTE={threads:'Threadsは500文字まで',x:'Xは日本語で140文字程度まで（全角は2文字として数えるため短く）',instagram:'Instagramはキャプション2,200文字まで（改行とハッシュタグを使う）',tiktok:'TikTokは短いタイトル向け',facebook:'Facebookページ向け',youtube:'YouTubeショートは1行目がタイトル（92文字まで）'};
+      var LIMIT_NOTE={threads:'Threadsは500文字まで',x:'Xは日本語で140文字程度まで（全角は2文字として数えるため短く）',instagram:'Instagramはキャプション2,200文字まで（改行とハッシュタグを使う）',tiktok:'TikTokは短いタイトル向け',facebook:'Facebookページ向け',youtube:'YouTubeショートは1行目がタイトル（100文字まで）。説明は5,000バイト（日本語でおよそ1,600文字）まで'};
       function ownPrompt(kind){var th=$('aiTheme').value.trim();var s=sel();var plats=s.map(function(a){return LIMIT_NOTE[a.platform]||a.label;});
         if(kind==='image')return 'SNSに投稿する画像を1枚作ってください。\\nテーマ：'+th+'\\n条件：正方形。文字やロゴは入れない。実在の人物・他社の商標・著作物に似せない。';
         return 'SNSにそのまま投稿できる日本語の投稿文を1本書いてください。前置きや説明は書かず、投稿文だけを出力してください。\\nテーマ：'+th+(plats.length?'\\n投稿先の条件：'+plats.join('／'):'')+'\\n守ること：事実として確認できない数字・実績・お客様の声・効果の断定は書かない。誇大な表現や、他者を傷つける表現を使わない。';}
@@ -782,7 +782,7 @@ function apiDocsPage(user, baseUrl) {
   "scheduled_at": "2026-12-01T09:00:00+09:00"
 }'`)}
     <h3>SNSごとの設定（<code>options</code>）</h3>
-    <p>アカウントIDごとに指定します。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なり、アプリの審査前は「SELF_ONLY（自分のみ）」だけの場合があります）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（省略すると、非公開・子ども向けではない、として扱います）。</p>
+    <p>アカウントIDごとに指定します。<b>TikTokへは、APIからは下書き（<code>draft:true</code>）にだけできます</b>（TikTokの決まりにより、投稿は、サービスの画面で利用者ご本人が内容と設定を確かめてから行います）。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なり、アプリの審査前は「SELF_ONLY（自分のみ）」だけの場合があります）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否（<code>disable_comment</code>・<code>disable_duet</code>・<code>disable_stitch</code>。true で禁止）、写真の投稿に音楽を自動で付けるか（<code>auto_add_music</code>。初期値は付けない）を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private）と、子ども向けかどうか（<code>made_for_kids</code>：true／false）を、必ず利用者に確認して指定してください（下書き以外は必須です。指定がないと予約できません）。YouTubeへのアップロードには、サービス全体で1日（太平洋時間）の上限があり、上限に達した日時には予約できません。</p>
     ${code(`"options": {
   "<TikTokのアカウントID>": { "privacy_level": "<利用者が選んだ公開範囲>", "disable_comment": false, "disable_duet": true, "disable_stitch": true, "commercial_own": false, "commercial_paid": false, "auto_add_music": false },
   "<YouTubeのアカウントID>": { "privacy": "unlisted", "made_for_kids": false }

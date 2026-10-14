@@ -29,6 +29,12 @@ db.exec(`
     n INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day, kind)
   );
+  CREATE TABLE IF NOT EXISTS api_usage (
+    platform TEXT NOT NULL,
+    day TEXT NOT NULL,
+    n INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (platform, day)
+  );
   CREATE TABLE IF NOT EXISTS ai_jobs (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -387,6 +393,17 @@ const ScheduledPosts = {
     db.prepare(`UPDATE scheduled_posts SET status='pending', scheduled_at=?, last_error=?, updated_at=? WHERE id=?`)
       .run(scheduledAt, String(message || '').slice(0, 500), now(), id);
   },
+  // SNSへ送らずに後ろへずらす（サービス全体の上限に達したときなど）。試行回数は数えない
+  defer(id, scheduledAt, message) {
+    db.prepare(`UPDATE scheduled_posts SET status='pending', scheduled_at=?, last_error=?, attempts=MAX(attempts-1, 0), updated_at=? WHERE id=?`)
+      .run(scheduledAt, String(message || '').slice(0, 500), now(), id);
+  },
+  // サービス全体で、そのSNSへの予約・投稿の件数（YouTubeの1日の割り当ての確認用）
+  countPlatformBetween(platform, fromIso, toIso) {
+    return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
+      WHERE (p.platform=? OR a.platform=?) AND p.scheduled_at >= ? AND p.scheduled_at < ? AND p.status IN ('pending','publishing','posted')`)
+      .get(platform, platform, fromIso, toIso).n;
+  },
   // 起動時：処理中のまま残った行は、二重投稿を避けるため失敗扱いにする（投稿されたかどうかが不明なため）
   failStuck(olderThanIso) {
     return db.prepare(`UPDATE scheduled_posts SET status='failed', last_error=?, updated_at=? WHERE status='publishing' AND updated_at < ?`)
@@ -506,6 +523,23 @@ const UploadTickets = {
   },
 };
 
+// SNSのAPIの、サービス全体での1日の使用回数（YouTubeのアップロードの割り当てなど）
+const ApiUsage = {
+  // 上限未満なら1回分を確保して true。上限に達していれば false
+  take(platform, day, limit) {
+    return db.prepare(`INSERT INTO api_usage (platform, day, n) VALUES (?, ?, 1)
+      ON CONFLICT(platform, day) DO UPDATE SET n = n + 1 WHERE n < ?`).run(platform, day, limit).changes === 1;
+  },
+  // SNS側で割り当てを使い切ったと言われたとき、その日の残りを使わないようにする
+  fill(platform, day, limit) {
+    db.prepare(`INSERT INTO api_usage (platform, day, n) VALUES (?, ?, ?) ON CONFLICT(platform, day) DO UPDATE SET n = MAX(n, excluded.n)`).run(platform, day, limit);
+  },
+  get(platform, day) {
+    const r = db.prepare('SELECT n FROM api_usage WHERE platform=? AND day=?').get(platform, day);
+    return r ? r.n : 0;
+  },
+};
+
 const MAX_API_KEYS = 5;
 const ApiKeys = {
   hash(key) { return require('crypto').createHash('sha256').update(String(key)).digest('hex'); },
@@ -535,4 +569,4 @@ const ApiKeys = {
   },
 };
 
-module.exports = { OPEN_STRIPE_STATUSES, UploadTickets, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+module.exports = { OPEN_STRIPE_STATUSES, UploadTickets, ApiUsage, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

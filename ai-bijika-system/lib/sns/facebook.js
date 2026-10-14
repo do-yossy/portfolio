@@ -1,5 +1,5 @@
 'use strict';
-// Facebookページへの投稿（Facebookログイン＋Graph API）。連携時に、管理しているページのうち先頭の1つを対象にする。
+// Facebookページへの投稿（Facebookログイン＋Graph API）。連携時に許可されたページのうち、投稿できるページが1つだけのときに、そのページを対象にする。
 // 仕様・必要な権限・アプリレビューは、運用前にMeta公式ドキュメントで必ず確認すること。
 const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
@@ -8,7 +8,10 @@ const { normalize } = require('./post');
 const API_VERSION = 'v22.0';
 const HOST = 'graph.facebook.com';
 const AUTH_URL = `https://www.facebook.com/${API_VERSION}/dialog/oauth`;
-const SCOPES = 'pages_show_list,pages_manage_posts,pages_read_engagement';
+// business_management：ビジネスポートフォリオにひも付いたページは、これが無いと一覧に出てこない（v17.0以降の公式の変更）
+const SCOPES = 'pages_show_list,pages_manage_posts,pages_read_engagement,business_management';
+// 投稿に欠かせない権限。利用者は権限ごとに拒否できるため、連携のときに許可されたかを確かめる
+const REQUIRED_PERMISSIONS = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement'];
 
 const id = 'facebook';
 const label = 'Facebookページ';
@@ -34,7 +37,8 @@ function validatePost(args) {
 
 function authUrl({ state, redirectUri }) {
   const c = creds();
-  return `${AUTH_URL}?${new URLSearchParams({ client_id: c.appId, redirect_uri: redirectUri, scope: SCOPES, response_type: 'code', state }).toString()}`;
+  // auth_type=rerequest：一度拒否された権限は、これを付けないと二度と求められない（公式）
+  return `${AUTH_URL}?${new URLSearchParams({ client_id: c.appId, redirect_uri: redirectUri, scope: SCOPES, response_type: 'code', state, auth_type: 'rerequest' }).toString()}`;
 }
 
 async function call({ method = 'GET', path, query, form }) {
@@ -48,7 +52,16 @@ async function call({ method = 'GET', path, query, form }) {
   if (r.status >= 200 && r.status < 300 && r.json) return r.json;
   const em = r.json && r.json.error;
   const err = classify(r.status, em && em.message ? `Facebook: ${em.message}` : '');
-  if (em && em.code === 190) { err.authError = true; err.retriable = false; }
+  // HTTPステータスではなく、Graph API のエラーコードで分ける（公式のエラー処理のガイド）
+  const code = em && Number(em.code); const sub = em && Number(em.error_subcode);
+  // 呼び出しの上限・一時的な障害は、投稿されていないと確定しているので、最終段階でも再試行してよい（status を 429 として扱う）
+  if ([1, 2, 4, 17, 32, 341, 613].includes(code)) { err.retriable = true; err.authError = false; err.status = 429; }
+  if (code === 190 || (code === 102 && !sub) || (sub >= 458 && sub <= 467) || sub === 492) { err.authError = true; err.retriable = false; }
+  else if (code === 10 || (code >= 200 && code <= 299)) {
+    err.authError = true; err.retriable = false;
+    err.message = `${err.message}（ページへの投稿の許可がありません。連携をやり直し、すべての項目を許可してください）`;
+  }
+  if (code) err.code = code;
   throw err;
 }
 
@@ -57,9 +70,17 @@ async function exchangeCode({ code, redirectUri }) {
   const c = creds();
   const short = await call({ path: `/${API_VERSION}/oauth/access_token`, query: { client_id: c.appId, client_secret: c.appSecret, redirect_uri: redirectUri, code } });
   const long = await call({ path: `/${API_VERSION}/oauth/access_token`, query: { grant_type: 'fb_exchange_token', client_id: c.appId, client_secret: c.appSecret, fb_exchange_token: short.access_token } });
-  const pages = await call({ path: `/${API_VERSION}/me/accounts`, query: { fields: 'id,name,access_token', access_token: long.access_token } });
-  const page = pages.data && pages.data[0];
-  if (!page) throw new SnsError('管理しているFacebookページが見つかりませんでした。ページの管理権限をご確認ください。');
+  const perms = await call({ path: `/${API_VERSION}/me/permissions`, query: { access_token: long.access_token } });
+  const granted = new Set((perms.data || []).filter((x) => x.status === 'granted').map((x) => x.permission));
+  const missing = REQUIRED_PERMISSIONS.filter((x) => !granted.has(x));
+  if (missing.length) throw new SnsError('Facebookページへの投稿に必要な許可が得られませんでした。もう一度連携し、表示されるすべての項目を許可してください。');
+  const pages = await call({ path: `/${API_VERSION}/me/accounts`, query: { fields: 'id,name,access_token,tasks', access_token: long.access_token } });
+  // 投稿できる（CREATE_CONTENT の作業ができる）ページだけを候補にする
+  const list = (pages.data || []).filter((pg) => pg && pg.access_token && (!Array.isArray(pg.tasks) || pg.tasks.includes('CREATE_CONTENT')));
+  if (!list.length) throw new SnsError('投稿できるFacebookページが見つかりませんでした。ページで投稿できる役割があるかをご確認ください。ページがビジネスポートフォリオにひも付いている場合は、ビジネス側での役割も必要です。');
+  // 意図しないページに投稿しないよう、候補が2つ以上のときは連携を止める（ページを選ぶ画面は、Facebookの連携画面で行う）
+  if (list.length > 1) throw new SnsError(`投稿できるFacebookページが${list.length}つあります。もう一度連携し、Facebookの画面でページを選ぶところで、投稿に使うページを1つだけ選んでください。`);
+  const page = list[0];
   return { accessToken: page.access_token, refreshToken: '', expiresAt: '', externalUserId: String(page.id), handle: page.name || '' };
 }
 

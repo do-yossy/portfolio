@@ -17,15 +17,15 @@ const badLimiter = createLimiter({ max: 20, windowMs: 15 * 60 * 1000 });
 const TOOLS = [
   { name: 'list_accounts', description: '連携済みのSNSアカウントの一覧（IDを投稿に使う）', inputSchema: { type: 'object', properties: {} } },
   { name: 'get_account_info', description: 'ご契約の状態・上限・今月や今日の利用状況を確認する', inputSchema: { type: 'object', properties: {} } },
-  { name: 'create_post', description: '投稿を作る。category は text／image／video／tree。now=true で即時、scheduled_at（ISO 8601）で予約、draft=true で下書き。画像・動画は先にAPIでアップロードしたmedia_idsを指定する。',
+  { name: 'create_post', description: '投稿を作る。category は text／image／video／tree。now=true で即時、scheduled_at（ISO 8601）で予約、draft=true で下書き。TikTokへは下書き（draft=true）にだけでき、投稿は利用者がサービスの画面で行う。画像・動画は先にAPIでアップロードしたmedia_idsを指定する。',
     inputSchema: { type: 'object', required: ['category', 'account_ids'], properties: {
       category: { type: 'string', enum: ['text', 'image', 'video', 'tree'] }, text: { type: 'string' },
       account_ids: { type: 'array', items: { type: 'string' } }, captions: { type: 'object', description: 'アカウントIDごとの本文（任意）' },
       media_ids: { type: 'array', items: { type: 'string' } }, tree: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, media_ids: { type: 'array', items: { type: 'string' } } } } },
-      options: { type: 'object', description: 'アカウントIDごとの設定。TikTokは {"privacy_level": 利用者が選んだ公開範囲, "disable_comment", "disable_duet", "disable_stitch"（true で禁止）, "commercial_own", "commercial_paid", "auto_add_music"（写真の投稿に音楽を自動で付けるか。初期値は付けない）}（公開範囲は必ず利用者に選んでもらう）。YouTubeは {"privacy": "public"|"unlisted"|"private", "made_for_kids": true|false}（必ず利用者に確認して指定する。省略すると非公開・子ども向けではない）' },
+      options: { type: 'object', description: 'アカウントIDごとの設定。TikTokは {"privacy_level": 利用者が選んだ公開範囲, "disable_comment", "disable_duet", "disable_stitch"（true で禁止）, "commercial_own", "commercial_paid", "auto_add_music"（写真の投稿に音楽を自動で付けるか。初期値は付けない）}（公開範囲は必ず利用者に選んでもらう）。YouTubeは {"privacy": "public"|"unlisted"|"private", "made_for_kids": true|false}（必須。必ず利用者に確認して指定する）' },
       scheduled_at: { type: 'string' }, now: { type: 'boolean' }, draft: { type: 'boolean' } } } },
   { name: 'list_posts', description: '投稿の一覧（status で絞り込み：draft／pending／posted／failed／cancelled）', inputSchema: { type: 'object', properties: { status: { type: 'string' } } } },
-  { name: 'publish_draft', description: '下書きを予約または即時投稿にする', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, now: { type: 'boolean' }, scheduled_at: { type: 'string' } } } },
+  { name: 'publish_draft', description: '下書きを予約または即時投稿にする（TikTokの下書きは不可。サービスの画面から投稿する）', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, now: { type: 'boolean' }, scheduled_at: { type: 'string' } } } },
   { name: 'delete_post', description: '予約・下書きを取り消す', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } } },
   { name: 'create_upload_url', description: '画像・動画をアップロードするための一時URLを発行する（15分・1回だけ）。ファイルをPUTすると id が返り、create_post の media_ids に使える', inputSchema: { type: 'object', properties: {} } },
   { name: 'import_media_from_url', description: 'URLから画像・動画を取り込む（チャットの添付ファイルのURL、Googleドライブの共有リンクなど）。戻り値のidを media_ids に使う', inputSchema: { type: 'object', required: ['url'], properties: { url: { type: 'string' } } } },

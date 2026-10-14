@@ -12,6 +12,9 @@ const LIMITS = {
   get maxPerDay() { return envInt('SERVICE_MAX_PER_DAY', 50); },
   // XのAPIは投稿数に応じて費用がかかるため、Xへの投稿は1人あたり月の上限を設ける（ツリーは1件ずつ数える）
   get xPerMonth() { return envInt('X_MONTHLY_LIMIT', 30); },
+  // YouTubeのアップロードは、サービス全体で1日100回まで（Google Cloud のプロジェクトごとの割り当て。太平洋時間の0時にリセット）。
+  // 連携の確認などの余裕を残して、初期値は90件
+  get youtubePerDay() { return envInt('YOUTUBE_DAILY_LIMIT', 90); },
 };
 const MAX_DAYS_AHEAD = 90;
 const JST_OFFSET_MS = 9 * 3600 * 1000;
@@ -113,6 +116,22 @@ function xQuotaError(userId, iso, adding) {
   return null;
 }
 
+// YouTubeの予約が、その日（太平洋時間）のサービス全体の上限を超えないか
+function youtubeQuotaError(iso, adding) {
+  if (!adding) return null;
+  const { from, to } = require('./pt-time').dayBounds(iso);
+  if (ScheduledPosts.countPlatformBetween('youtube', from, to) + adding > LIMITS.youtubePerDay) {
+    return 'この日時のYouTubeへの予約は、サービス全体の1日の上限に達しています。別の日時を選んでください（YouTubeの1日は、日本時間の16時または17時に切り替わります）。';
+  }
+  return null;
+}
+// YouTubeの公開設定と「子ども向けかどうか」は、利用者が選ぶ決まり（YouTubeの必須の機能の要件）
+function youtubeOptionsError(o) {
+  const ad = registry.get('youtube');
+  if (!o || !((ad && ad.PRIVACY) || []).includes(o.privacy) || typeof o.made_for_kids !== 'boolean') return 'YouTubeへは、公開設定（privacy）と「子ども向けかどうか」（made_for_kids）を指定してください。';
+  return null;
+}
+
 function formatJst(iso) {
   if (!iso) return '';
   const d = new Date(Date.parse(iso) + JST_OFFSET_MS);
@@ -197,6 +216,10 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
     const xUnits = resolved.filter((r) => r.a.platform === 'x').length * (1 + (category === 'tree' ? cards.length : 0));
     const qe = xQuotaError(userId, scheduledAtIso, xUnits);
     if (qe) return { ok: false, error: qe };
+    const yts = resolved.filter((r) => r.a.platform === 'youtube');
+    for (const r of yts) { const oe = youtubeOptionsError(r.options); if (oe) return { ok: false, error: oe }; }
+    const ye = youtubeQuotaError(scheduledAtIso, yts.length);
+    if (ye) return { ok: false, error: ye };
   }
   const groupId = require('crypto').randomBytes(10).toString('hex');
   const created = resolved.map(({ a, caption, options }) => ScheduledPosts.create({
@@ -213,6 +236,7 @@ function capacityError({ userId, platform, atIso, draft }) {
   const [from, to] = jstDayBounds(atIso);
   if (ScheduledPosts.countScheduledBetween(userId, from, to) + 1 > LIMITS.maxPerDay) return `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。`;
   if (platform === 'x') return xQuotaError(userId, atIso, 1);
+  if (platform === 'youtube') return youtubeQuotaError(atIso, 1);
   return null;
 }
 
@@ -241,6 +265,13 @@ function promoteDraft({ userId, postId, scheduledAtIso, via = 'api', nowMs = Dat
     let n = 1; try { n += JSON.parse(p.tree || '[]').length; } catch { /* */ }
     const qe = xQuotaError(userId, iso, n);
     if (qe) return { ok: false, error: qe };
+  }
+  if (a.platform === 'youtube') {
+    let o = {}; try { o = JSON.parse(p.options || '{}'); } catch { o = {}; }
+    const oe = youtubeOptionsError(o);
+    if (oe) return { ok: false, error: `${oe}「投稿を作る」画面で作り直して投稿してください。` };
+    const ye = youtubeQuotaError(iso, 1);
+    if (ye) return { ok: false, error: ye };
   }
   if (!ScheduledPosts.promote(postId, userId, iso)) return { ok: false, error: '下書きが見つかりません。' };
   return { ok: true };

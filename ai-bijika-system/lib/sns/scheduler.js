@@ -1,7 +1,8 @@
 'use strict';
 // 予約投稿の実行（同じプロセス内で一定間隔に確認する。Fly.ioは1台構成のため、これで足りる）
 // 方針：投稿するのは利用者本人が作成・予約した内容だけ。いいね・フォロー・コメント等の自動操作は行わない。
-const { SnsAccounts, ScheduledPosts, Subscriptions, MediaAssets } = require('../service-store');
+const { SnsAccounts, ScheduledPosts, Subscriptions, MediaAssets, ApiUsage } = require('../service-store');
+const ptTime = require('../pt-time');
 const mediaLib = require('../media');
 const box = require('../crypto-box');
 const registry = require('./index');
@@ -11,6 +12,9 @@ const RETRY_BASE_MS = 5 * 60 * 1000; // 5分、10分…
 // 期限の前に更新する余裕。有効期間の長い Threads・Instagram は3日前、短い X・TikTok は直前に更新する
 const REFRESH_MARGIN_MS = { x: 10 * 60 * 1000, tiktok: 60 * 60 * 1000, youtube: 5 * 60 * 1000 };
 const DEFAULT_REFRESH_MARGIN_MS = 3 * 24 * 3600 * 1000;
+// YouTubeのアップロードの、サービス全体の1日（太平洋時間）の上限。割り当てを超えないよう、送る前に1回分を確保する
+const youtubePerDay = () => { const v = parseInt(process.env.YOUTUBE_DAILY_LIMIT || '', 10); return Number.isFinite(v) && v > 0 ? v : 90; };
+const YT_DEFER_MSG = 'YouTubeへのアップロードが、サービス全体の1日の上限に達したため、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します';
 
 function key() {
   return box.keyFromEnv();
@@ -62,12 +66,23 @@ async function processOne(post) {
     try { options = JSON.parse(post.options || '{}'); } catch { options = {}; }
     const category = post.category || (!medias.length ? 'text' : (medias[0].kind === 'video' ? 'video' : 'image'));
     const full = { category, text: post.text, medias, tree: treeCards.map((c, i) => ({ text: c.text, medias: cardMedias[i] })), options };
+    if (account.platform === 'youtube') {
+      const d = ptTime.dayBounds(new Date().toISOString());
+      if (!ApiUsage.take('youtube', d.day, youtubePerDay())) return ScheduledPosts.defer(post.id, new Date(Date.parse(d.to) + 5 * 60 * 1000).toISOString(), YT_DEFER_MSG);
+    }
     const r = await adapter.publish({ accessToken, externalUserId: account.external_user_id, post: full });
     ScheduledPosts.markPosted(post.id, r.externalId);
   } catch (e) {
     if (e && e.authError) {
       SnsAccounts.setStatus(account.id, 'reauth_required');
       return ScheduledPosts.markFailed(post.id, `${e.message}（SNSの連携をやり直してください）`);
+    }
+    // SNS側の1日の割り当てを使い切った（YouTubeの quotaExceeded）。その日の残りは送らず、日付が変わった後に回す
+    if (e && e.quotaExhausted && account.platform === 'youtube') {
+      const d = ptTime.dayBounds(new Date().toISOString());
+      ApiUsage.fill('youtube', d.day, youtubePerDay());
+      if (post.attempts < MAX_ATTEMPTS) return ScheduledPosts.reschedule(post.id, new Date(Date.parse(d.to) + 5 * 60 * 1000).toISOString(), `${e.message}（YouTubeの日付が変わった後に自動で再試行します）`);
+      return ScheduledPosts.markFailed(post.id, e.message);
     }
     if (e && e.retriable && post.attempts < MAX_ATTEMPTS) {
       const at = new Date(Date.now() + RETRY_BASE_MS * 2 ** (post.attempts - 1)).toISOString();
