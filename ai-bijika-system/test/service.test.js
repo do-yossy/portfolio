@@ -272,7 +272,7 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
 
   mockSns.restore();
   console.log('対応SNS');
-  ok(registry.list().map((p) => p.id).join() === 'threads,x', 'Threads と X に対応している');
+  ok(registry.list().map((p) => p.id).join() === 'threads,x,instagram,tiktok', 'Threads・X・Instagram・TikTok に対応している');
 
   process.exit(summary() ? 0 : 1);
 })().catch((e) => { console.error(e); process.exit(1); });

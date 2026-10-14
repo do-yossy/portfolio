@@ -57,7 +57,7 @@ function landingPage({ user, billingReady }) {
   return wrap('SNS自動投稿サービス', `
     ${topNav(user)}
     <header class="page-head"><div class="eyebrow">SNS Scheduler</div><h1>${nameOf()}</h1>
-      <p class="lead">Threads・Xへの投稿を、あらかじめ予約しておけるサービスです。書いた投稿を、決めた日時に自動で公開します。</p></header>
+      <p class="lead">Threads・X・Instagram・TikTokへの投稿を、あらかじめ予約しておけるサービスです。書いた投稿や、用意した画像・動画を、決めた日時に自動で公開します。</p></header>
     <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます（解約後も、契約期間の終わりまでご利用いただけます）</small></div>
     ${cta}
     <h2 style="margin-top:26px">できること</h2>
@@ -65,7 +65,7 @@ function landingPage({ user, billingReady }) {
       <div class="card"><div class="card-title">投稿の予約</div>
         <p class="small">本文と日時を決めて予約します。日本時間で、最大90日先まで指定できます。</p></div>
       <div class="card"><div class="card-title">複数のSNSへ</div>
-        <p class="small">ThreadsとXに対応しています。同じ内容を、選んだSNSへまとめて予約できます。</p></div>
+        <p class="small">Threads・X・Instagram・TikTokに対応しています。同じ内容を、選んだSNSへまとめて予約できます（SNSごとに、必要な画像・動画の条件があります）。</p></div>
       <div class="card"><div class="card-title">自分のアカウントで投稿</div>
         <p class="small">各SNSの公式の連携（OAuth）を使います。SNSのパスワードをお預かりすることはありません。連携は、いつでも解除できます。</p></div>
       <div class="card"><div class="card-title">失敗しても安心</div>
@@ -73,10 +73,13 @@ function landingPage({ user, billingReady }) {
     </div>
     <h2 style="margin-top:26px">ご利用の前にご確認ください</h2>
     <div class="card"><ul class="plain small">
-      <li>対応SNSは、ThreadsとXです。InstagramとTikTokには対応していません（画像・動画が必要なため）。</li>
+      <li>対応SNSは、Threads・X・Instagram・TikTokです。Xはテキストのみ、Instagramは画像（JPEG）またはリール動画が必須、TikTokは動画（MP4）が必須です。Threadsは画像・動画を付けられます。</li>
+      <li>Instagramは、プロアカウント（ビジネス／クリエイター）が対象です。</li>
+      <li>TikTokへの投稿は、TikTok側の仕様・審査状況により、公開範囲が制限される場合があります。</li>
+      <li>アップロードできるファイルは、画像（JPEG・PNG）が8MBまで、動画（MP4）が100MBまでです。投稿が終わったファイルは、自動で削除します。</li>
       <li>投稿できるのは、ご自身で作成・予約した内容だけです。いいね・フォロー・コメントなどの自動操作は行いません。</li>
       <li>Xへの投稿は、X側のAPIの利用条件（投稿数の制限など）の影響を受ける場合があります。</li>
-      <li>文字数の上限は、Threadsが500文字、Xが重み付きで280（日本語は1文字を2として計算）です。</li>
+      <li>文字数の上限は、Threadsが500文字、Xが重み付きで280（日本語は1文字を2として計算）、Instagram・TikTokが2,200文字です。</li>
       <li>未投稿の予約は100件まで、1日の予約は30件まで、連携できるアカウントは5件までです。</li>
       <li>SNS側の仕様変更や障害、各SNSの規約による制限で、投稿できない場合があります。</li>
       <li>投稿の内容と、その結果（SNS側での表示・凍結等）の責任は、ご利用者にあります。</li>
@@ -126,7 +129,7 @@ function checkoutPage({ user, csrf, error }) {
         <tr><th>契約期間と更新</th><td>1か月ごとの自動更新です。解約しない限り、毎月、同じ日に ${price} が、お支払い方法に請求されます。</td></tr>
         <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。</td></tr>
         <tr><th>返金</th><td>お支払い済みの料金は、法令上必要な場合を除き、返金いたしません（日割りでの返金もありません）。</td></tr>
-        <tr><th>対応SNSと制限</th><td>ThreadsとX。未投稿の予約は100件まで、1日の予約は30件まで、連携は5アカウントまでです。</td></tr>
+        <tr><th>対応SNSと制限</th><td>Threads・X・Instagram・TikTok。未投稿の予約は100件まで、1日の予約は30件まで、連携は5アカウントまでです。画像は8MB、動画は100MBまでです。</td></tr>
         <tr><th>お支払い方法</th><td>クレジットカード等（決済代行：Stripe）。カード情報は当サービスには保存されません。</td></tr>
       </table>
     </div>
@@ -183,25 +186,58 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
     : `<span class="small">${escapeHtml(p.label)}：準備中</span>`).join(' ');
   const activeAccounts = accounts.filter((a) => a.status === 'active');
   const defaultAt = toLocalInput(Date.now() + 60 * 60 * 1000);
+  const hasTikTok = activeAccounts.some((a) => a.platform === 'tiktok');
+  const tiktokAcc = activeAccounts.find((a) => a.platform === 'tiktok');
   const compose = active && activeAccounts.length ? `
-    <form method="POST" action="/service/app/post" class="card">
+    <form method="POST" action="/service/app/post" class="card" id="postForm">
       <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
+      <input type="hidden" name="media_id" id="media_id" value="">
       <div class="card-title">投稿を予約する</div>
-      <div class="field"><label class="lbl" for="text">本文</label><textarea id="text" name="text" required maxlength="1000" oninput="cnt()"></textarea>
+      <div class="field"><label class="lbl" for="text">本文（キャプション）</label><textarea id="text" name="text" maxlength="2200" oninput="cnt()"></textarea>
         <div class="small" id="count">0文字</div></div>
+      <div class="field"><label class="lbl" for="file">画像・動画（Instagram・TikTokでは必須）</label>
+        <input id="file" type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime">
+        <div class="small" id="fileStatus">JPEG・PNG（8MBまで）／MP4（100MBまで）</div></div>
       <div class="field"><span class="lbl">投稿先</span>
-        ${activeAccounts.map((a) => `<label class="check"><input type="checkbox" name="account" value="${escapeHtml(a.id)}" ${activeAccounts.length === 1 ? 'checked' : ''}><span>${escapeHtml((registry.get(a.platform) || {}).label || a.platform)} ${escapeHtml(a.handle || '')}</span></label>`).join('')}</div>
+        ${activeAccounts.map((a) => `<label class="check"><input type="checkbox" name="account" value="${escapeHtml(a.id)}" data-platform="${escapeHtml(a.platform)}" ${activeAccounts.length === 1 ? 'checked' : ''}><span>${escapeHtml((registry.get(a.platform) || {}).label || a.platform)} ${escapeHtml(a.handle || '')}</span></label>`).join('')}</div>
+      ${hasTikTok ? `<div class="field" id="tiktokBox" style="display:none;border:1px solid #d9d0bb;border-radius:12px;padding:10px">
+        <span class="lbl">TikTokの設定（${escapeHtml(tiktokAcc.handle || 'TikTok')}へ投稿）</span>
+        <label class="lbl" for="tiktok_privacy">公開範囲（必ず選んでください）</label>
+        <select id="tiktok_privacy" name="tiktok_privacy"><option value="">選択してください</option>
+          <option value="PUBLIC_TO_EVERYONE">全員に公開</option><option value="MUTUAL_FOLLOW_FRIENDS">相互フォローの友達</option>
+          <option value="FOLLOWER_OF_CREATOR">フォロワー</option><option value="SELF_ONLY">自分のみ</option></select>
+        <label class="check"><input type="checkbox" name="tiktok_comment" value="1"><span>コメントを許可する</span></label>
+        <label class="check"><input type="checkbox" name="tiktok_duet" value="1"><span>デュエットを許可する</span></label>
+        <label class="check"><input type="checkbox" name="tiktok_stitch" value="1"><span>ステッチを許可する</span></label>
+        <p class="small">投稿することで、<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">TikTokの音楽使用の確認</a>に同意したものとみなされます。アプリの審査が終わるまでは、公開範囲が「自分のみ」に限られる場合があります。</p></div>` : ''}
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
         <button class="btn btn-ghost" type="submit" name="mode" value="now" onclick="return confirm('今すぐ投稿します。よろしいですか？')">今すぐ投稿</button></div>
-      <p class="small">Threads：500文字まで／X：日本語は140文字まで（重み280）。</p>
+      <p class="small">文字数の上限：Threads 500／X 日本語140文字（重み280）／Instagram・TikTok 2,200。</p>
     </form>
-    <script>function cnt(){var t=document.getElementById('text').value;document.getElementById('count').textContent=Array.from(t).length+'文字';}</script>` : '';
+    <script>
+    function cnt(){var t=document.getElementById('text').value;document.getElementById('count').textContent=Array.from(t).length+'文字';}
+    (function(){
+      var f=document.getElementById('file'),st=document.getElementById('fileStatus'),mid=document.getElementById('media_id');
+      var csrf=${JSON.stringify(csrf)};
+      f.addEventListener('change',function(){
+        mid.value='';var file=f.files[0];if(!file){st.textContent='';return;}
+        st.textContent='アップロード中…（'+Math.round(file.size/1048576*10)/10+'MB）';
+        fetch('/service/app/media',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/octet-stream','X-CSRF':csrf},body:file})
+          .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+          .then(function(x){if(x.ok){mid.value=x.j.id;st.textContent='添付しました：'+(x.j.kind==='video'?'動画':'画像')+'（'+Math.round(x.j.size/1048576*10)/10+'MB）';}else{st.textContent=x.j.error||'アップロードに失敗しました。';f.value='';}})
+          .catch(function(){st.textContent='アップロードに失敗しました。';f.value='';});
+      });
+      var box=document.getElementById('tiktokBox');
+      function tt(){if(!box)return;var on=document.querySelector('input[name=account][data-platform=tiktok]:checked');box.style.display=on?'block':'none';}
+      document.querySelectorAll('input[name=account]').forEach(function(c){c.addEventListener('change',tt)});tt();
+    })();
+    </script>` : '';
   const postRows = posts.length ? posts.map((p) => {
     const [l, c] = POST_STATUS[p.status] || [p.status, 'badge-off'];
     const ad = registry.get(p.platform);
     return `<tr><td style="white-space:nowrap">${escapeHtml(core.formatJstShort(p.scheduled_at))}</td><td style="white-space:nowrap">${escapeHtml(ad ? ad.label : '')}<br><span class="small">${escapeHtml(p.handle || '')}</span></td>
-      <td>${escapeHtml(p.text.length > 60 ? `${p.text.slice(0, 60)}…` : p.text)}${p.last_error ? `<br><span class="small">${escapeHtml(p.last_error)}</span>` : ''}</td>
+      <td>${p.media_id ? '<span class="badge-off">添付あり</span> ' : ''}${escapeHtml(p.text.length > 60 ? `${p.text.slice(0, 60)}…` : p.text)}${p.last_error ? `<br><span class="small">${escapeHtml(p.last_error)}</span>` : ''}</td>
       <td><span class="${c}">${l}</span>${p.status === 'pending' ? `<br><form class="inline" method="POST" action="/service/app/post/${escapeHtml(p.id)}/cancel"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">取り消し</button></form>` : ''}</td></tr>`;
   }).join('') : '<tr><td colspan="4" class="small">予約はまだありません。</td></tr>';
   const renewal = sub && sub.current_period_end ? core.formatJst(sub.current_period_end) : '';

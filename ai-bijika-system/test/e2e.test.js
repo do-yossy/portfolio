@@ -170,6 +170,35 @@ function webhook(event, secret = 'whsec_e2e') {
   await scheduler.tick();
   const posted = store.ScheduledPosts.listForUser(userIdForSub).find((p) => p.text === '今すぐテスト');
   ok(posted && posted.status === 'posted' && posted.external_id === 'post_e2e', '実行時刻が来た投稿がThreadsへ投稿される');
+  // 画像の添付（アップロード → 予約 → 投稿）
+  const rawUpload = (buf, headers) => new Promise((resolve, reject) => {
+    const q = http.request(`${base}/service/app/media`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/octet-stream', 'Content-Length': buf.length, ...headers } }, (res) => {
+      const ch = []; res.on('data', (c) => ch.push(c)); res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(ch).toString('utf8') }));
+    });
+    q.on('error', reject); q.write(buf); q.end();
+  });
+  const jpegBuf = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(1500, 5)]);
+  r = await rawUpload(jpegBuf, { 'X-CSRF': 'bad' });
+  ok(r.status === 403, 'アップロードもCSRFトークンが必要');
+  r = await rawUpload(Buffer.from('not an image at all, just text'), { 'X-CSRF': appCsrf });
+  ok(r.status === 400 && JSON.parse(r.text).error.includes('対応していない'), '画像・動画以外はアップロードできない');
+  r = await rawUpload(jpegBuf, { 'X-CSRF': appCsrf });
+  const up = JSON.parse(r.text);
+  ok(r.status === 200 && up.kind === 'image' && up.id, '画像をアップロードできる');
+  const mediaRow = store.MediaAssets.get(up.id);
+  const savedCookie2 = cookie;
+  cookie = '';
+  r = await req('GET', `/media/${mediaRow.token}.${mediaRow.ext}`);
+  ok(r.status === 200 && r.headers['content-type'] === 'image/jpeg', '公開URLは、ログインなしでも（SNS側が）取得できる');
+  r = await req('GET', `/media/${'0'.repeat(48)}.jpg`);
+  ok(r.status === 404, '推測したURLでは取得できない');
+  cookie = savedCookie2;
+  r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: '画像つき', account: accId, at: FUTURE, mode: 'schedule', media_id: up.id } });
+  ok(r.status === 302 && r.headers.location === '/service/app?f=scheduled', '画像つきで予約できる');
+  r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: '他人の画像', account: accId, at: FUTURE, mode: 'schedule', media_id: 'deadbeefdeadbeefdead' } });
+  ok(r.status === 400, '存在しない（または他人の）画像は使えない');
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('添付あり') && !r.text.includes('id="tiktokBox"'), '履歴に添付ありと表示する（未連携のTikTokの設定欄は出ない）');
   r = await req('POST', `/service/app/post/${postId}/cancel`, { body: { csrf: appCsrf } });
   ok(r.status === 302 && r.headers.location === '/service/app?f=cancelled', '未投稿の予約を取り消せる');
 

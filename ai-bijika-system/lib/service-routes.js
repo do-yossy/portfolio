@@ -12,6 +12,8 @@ const ui = require('./service-ui');
 const scheduler = require('./sns/scheduler');
 const { Subscriptions, SnsAccounts, ScheduledPosts } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
+const mediaLib = require('./media');
+const registry = require('./sns');
 
 const loginLimiter = createLimiter({ max: 8, windowMs: 15 * 60 * 1000 });
 const signupLimiter = createLimiter({ max: 10, windowMs: 60 * 60 * 1000 });
@@ -93,6 +95,10 @@ async function handle(ctx) {
     }
     return true;
   }
+
+  // ── 投稿に添付するメディアの公開URL（Instagram等が取得する。推測できないトークン付き）──
+  const mediaMatch = pathname.match(/^\/media\/([a-f0-9]{48})\.(jpg|png|mp4|mov)$/);
+  if (mediaMatch && (method === 'GET' || method === 'HEAD')) { mediaLib.serve(req, res, mediaMatch[1], mediaMatch[2]); return true; }
 
   if (!pathname.startsWith('/service')) return false;
   // 販売を開始してよい状態か（Stripeの設定、連絡先メール、SNS連携の設定、そして運営者が明示した販売開始の合図）
@@ -216,11 +222,23 @@ async function handle(ctx) {
   // マイページ
   if (pathname === '/service/app' && method === 'GET') { dashboard(200, flashOf(url.searchParams.get('f'))); return true; }
 
+  // 画像・動画のアップロード（本文はファイルそのもの。CSRFトークンはヘッダーで受け取る）
+  if (pathname === '/service/app/media' && method === 'POST') {
+    if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }
+    if (!Subscriptions.isActive(user.id)) { sendJson(res, 403, { error: 'ご契約が有効ではありません。' }); return true; }
+    const r = await mediaLib.saveUpload({ userId: user.id, req, contentLength: parseInt(req.headers['content-length'] || '0', 10) });
+    if (!r.ok) { sendJson(res, 400, { error: r.error }); return true; }
+    sendJson(res, 200, { id: r.media.id, kind: r.media.kind, size: r.media.size, mime: r.media.mime });
+    return true;
+  }
+
   if (pathname === '/service/app/post' && method === 'POST') {
     const body = await needCsrf(); if (!body) return true;
     const now = body.mode === 'now';
     const at = now ? new Date(Date.now() + 1000).toISOString() : core.jstLocalToIso(body.at);
-    const r = core.createPosts({ userId: user.id, accountIds: body.account, text: body.text, scheduledAtIso: at });
+    // TikTokの設定：公開範囲は必ず本人に選ばせる。コメント・デュエット・ステッチは、チェックを入れたときだけ許可
+    const options = { tiktok: { privacy_level: body.tiktok_privacy || '', disable_comment: body.tiktok_comment !== '1', disable_duet: body.tiktok_duet !== '1', disable_stitch: body.tiktok_stitch !== '1' } };
+    const r = core.createPosts({ userId: user.id, accountIds: body.account, text: body.text, scheduledAtIso: at, mediaId: body.media_id || '', options });
     if (!r.ok) { dashboard(400, { type: 'error', text: r.error }); return true; }
     if (now) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
     redirect(res, `/service/app?f=${now ? 'now' : 'scheduled'}`);
@@ -242,16 +260,16 @@ async function handle(ctx) {
   }
 
   // SNS連携（OAuth）
-  const connectMatch = pathname.match(/^\/service\/connect\/(threads|x)$/);
-  if (connectMatch && method === 'GET') {
+  const connectMatch = pathname.match(/^\/service\/connect\/([a-z]+)$/);
+  if (connectMatch && registry.get(connectMatch[1]) && method === 'GET') {
     if (!Subscriptions.isActive(user.id)) { dashboard(403, { type: 'error', text: 'ご契約が有効でないため、連携できません。' }); return true; }
     const r = core.startConnect({ userId: user.id, platform: connectMatch[1] });
     if (!r.ok) { dashboard(400, { type: 'error', text: r.error }); return true; }
     redirect(res, r.url);
     return true;
   }
-  const cbMatch = pathname.match(/^\/service\/oauth\/callback\/(threads|x)$/);
-  if (cbMatch && method === 'GET') {
+  const cbMatch = pathname.match(/^\/service\/oauth\/callback\/([a-z]+)$/);
+  if (cbMatch && registry.get(cbMatch[1]) && method === 'GET') {
     if (url.searchParams.get('error')) { dashboard(400, { type: 'error', text: 'SNS側で連携が許可されませんでした。' }); return true; }
     const r = await core.finishConnect({ userId: user.id, platform: cbMatch[1], code: url.searchParams.get('code'), state: url.searchParams.get('state') });
     if (!r.ok) { dashboard(400, { type: 'error', text: r.error }); return true; }

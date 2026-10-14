@@ -34,6 +34,13 @@ function textLength(text) {
   return n;
 }
 
+function validatePost({ text, media }) {
+  if (media) return 'Xは、現時点ではテキストのみに対応しています（画像・動画は添付できません）。';
+  if (!String(text || '').trim()) return 'Xは、本文が必要です。';
+  if (textLength(text) > maxLength) return `Xの文字数の上限（${maxLength}。日本語は1文字を2として計算）を超えています。`;
+  return null;
+}
+
 function newPkce() {
   const verifier = crypto.randomBytes(48).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -105,4 +112,4 @@ async function publish({ accessToken, text }) {
   return { externalId: String(r.data.id) };
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, authUrl, exchangeCode, refresh, publish, newPkce, usesPkce: true };
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, newPkce, usesPkce: true, mediaRule: 'テキストのみ' };
