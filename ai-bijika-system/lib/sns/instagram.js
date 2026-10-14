@@ -2,7 +2,7 @@
 // Instagram（「Instagram APIとInstagram ログイン」）の公開投稿。プロアカウント（ビジネス／クリエイター）が対象。
 // 画像（JPEG）またはリール動画を、メディアの公開URL経由で投稿する。仕様は公式ドキュメントで運用前に必ず確認すること。
 const { request, encodeForm } = require('../http-client');
-const { SnsError, classify } = require('./errors');
+const { SnsError, classify, ambiguous } = require('./errors');
 const poll = require('./poll');
 
 const API_VERSION = 'v22.0';
@@ -42,7 +42,8 @@ async function call({ host = GRAPH, method = 'GET', path, query, form }) {
   if (r.status >= 200 && r.status < 300 && r.json) return r.json;
   const em = r.json && r.json.error;
   const err = classify(r.status, em && em.message ? `Instagram: ${em.message}` : '');
-  if (em && (em.code === 190 || em.type === 'OAuthException')) { err.authError = true; err.retriable = false; }
+  // 認証エラーと判断するのは、トークンの失効・無効を示すコード(190)のときだけ（他のOAuthExceptionは連携を無効にしない）
+  if (em && em.code === 190) { err.authError = true; err.retriable = false; }
   throw err;
 }
 
@@ -83,7 +84,10 @@ async function publish({ accessToken, externalUserId, text, media }) {
   else { form.media_type = 'REELS'; form.video_url = media.url; }
   const created = await call({ method: 'POST', path: `/${API_VERSION}/${encodeURIComponent(externalUserId)}/media`, form });
   if (media.kind === 'video') await waitFinished(created.id, accessToken);
-  const published = await call({ method: 'POST', path: `/${API_VERSION}/${encodeURIComponent(externalUserId)}/media_publish`, form: { creation_id: created.id, access_token: accessToken } });
+  let published;
+  try {
+    published = await call({ method: 'POST', path: `/${API_VERSION}/${encodeURIComponent(externalUserId)}/media_publish`, form: { creation_id: created.id, access_token: accessToken } });
+  } catch (e) { throw ambiguous(e); }
   return { externalId: String(published.id) };
 }
 

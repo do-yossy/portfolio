@@ -222,6 +222,21 @@ async function handle(ctx) {
   // マイページ
   if (pathname === '/service/app' && method === 'GET') { dashboard(200, flashOf(url.searchParams.get('f'))); return true; }
 
+  // TikTokの投稿設定（このアカウントで使える公開範囲など）をTikTokに問い合わせる
+  if (pathname === '/service/app/tiktok/creator-info' && method === 'GET') {
+    const acc = SnsAccounts.getForUser(url.searchParams.get('account') || '', user.id);
+    if (!acc || acc.platform !== 'tiktok' || acc.status !== 'active' || !Subscriptions.isActive(user.id)) { sendJson(res, 404, { error: 'アカウントが見つかりません。' }); return true; }
+    try {
+      const adapter = registry.get('tiktok');
+      const token = await scheduler.ensureAccessToken(acc, adapter);
+      sendJson(res, 200, await adapter.creatorInfo({ accessToken: token }));
+    } catch (e) {
+      if (e && e.authError) SnsAccounts.setStatus(acc.id, 'reauth_required');
+      sendJson(res, 502, { error: 'TikTokの投稿設定を取得できませんでした。時間をおいてもう一度お試しください。' });
+    }
+    return true;
+  }
+
   // 画像・動画のアップロード（本文はファイルそのもの。CSRFトークンはヘッダーで受け取る）
   if (pathname === '/service/app/media' && method === 'POST') {
     if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }

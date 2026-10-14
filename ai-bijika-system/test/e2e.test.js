@@ -30,6 +30,7 @@ const mock = installHttpsMock(async (c) => {
     if (c.method === 'POST' && c.path === '/v1/subscriptions/sub_e2e') { cancelFlag = /cancel_at_period_end=true/.test(c.body); return { status: 200, json: subObj() }; }
     if (c.path === '/v1/billing_portal/sessions') return { status: 200, json: { url: 'https://portal.stripe.test/e2e' } };
   }
+  if (c.host === 'open.tiktokapis.com' && c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { creator_nickname: 'e2e_tt', privacy_level_options: ['SELF_ONLY'], comment_disabled: false }, error: { code: 'ok' } } };
   if (c.host === 'graph.threads.net') {
     if (c.path === '/oauth/access_token') return { status: 200, json: { access_token: 'th_short', user_id: 4242 } };
     if (c.path.startsWith('/access_token?')) return { status: 200, json: { access_token: 'th_long', expires_in: 5184000 } };
@@ -199,6 +200,17 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 400, '存在しない（または他人の）画像は使えない');
   r = await req('GET', '/service/app');
   ok(r.text.includes('添付あり') && !r.text.includes('id="tiktokBox"'), '履歴に添付ありと表示する（未連携のTikTokの設定欄は出ない）');
+  // TikTokの投稿設定（公開範囲の選択肢をTikTokから取得して画面に反映する）
+  const box = require('../lib/crypto-box');
+  const ttId = store.SnsAccounts.upsert({ userId: userIdForSub, platform: 'tiktok', externalUserId: 'tt1', handle: 'e2e_tt', accessTokenEnc: box.encrypt('t', box.keyFromEnv()), refreshTokenEnc: box.encrypt('r', box.keyFromEnv()), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  r = await req('GET', `/service/app/tiktok/creator-info?account=${ttId}`);
+  const ci = JSON.parse(r.text);
+  ok(r.status === 200 && ci.privacyLevelOptions.join() === 'SELF_ONLY' && ci.nickname === 'e2e_tt', 'TikTokの投稿設定（公開範囲の選択肢）を、TikTokから取得して返す');
+  r = await req('GET', `/service/app/tiktok/creator-info?account=${accId}`);
+  ok(r.status === 404, 'TikTok以外のアカウントでは取得できない');
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('id="tiktokBox"') && r.text.includes('第三者の商品・ブランドの宣伝'), 'TikTokを連携すると、投稿フォームにTikTokの設定欄（公開範囲・コメント等・商用の開示）が出る');
+  store.SnsAccounts.remove(ttId, userIdForSub);
   r = await req('POST', `/service/app/post/${postId}/cancel`, { body: { csrf: appCsrf } });
   ok(r.status === 302 && r.headers.location === '/service/app?f=cancelled', '未投稿の予約を取り消せる');
 

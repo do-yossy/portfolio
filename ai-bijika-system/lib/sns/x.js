@@ -3,7 +3,7 @@
 // 利用できる投稿数・費用はXのAPIプラン次第。運用前にXの公式ドキュメントで必ず確認すること。
 const crypto = require('crypto');
 const { request, encodeForm } = require('../http-client');
-const { SnsError, classify } = require('./errors');
+const { SnsError, classify, ambiguous } = require('./errors');
 
 const HOST = 'api.x.com';
 const AUTH_URL = 'https://x.com/i/oauth2/authorize';
@@ -104,11 +104,14 @@ async function refresh({ refreshToken }) {
 }
 
 async function publish({ accessToken, text }) {
-  const r = await call({
-    method: 'POST', path: '/2/tweets',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ text }),
-  });
+  let r;
+  try {
+    r = await call({
+      method: 'POST', path: '/2/tweets',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ text }),
+    });
+  } catch (e) { throw ambiguous(e); }
   return { externalId: String(r.data.id) };
 }
 

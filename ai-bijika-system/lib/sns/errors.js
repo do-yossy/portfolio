@@ -18,4 +18,14 @@ function classify(status, message) {
   return new SnsError(message || `SNS側でエラーになりました (${status})`, { status });
 }
 
-module.exports = { SnsError, classify };
+// 公開の最終段階で起きたエラーは、投稿されたかどうかが分からない（応答だけが失われた可能性がある）。
+// 自動で再試行すると二重投稿になりうるため、再試行せずに失敗として、利用者に確認を促す。
+function ambiguous(err) {
+  if (err && !err.authError) {
+    err.retriable = false;
+    if (!/投稿されたか/.test(err.message)) err.message = `${err.message}（投稿されたかどうか、SNSでご確認ください）`;
+  }
+  return err;
+}
+
+module.exports = { SnsError, classify, ambiguous };

@@ -188,6 +188,75 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   ok(core.startConnect({ userId: uid, platform: 'instagram' }).url.startsWith('https://www.instagram.com/oauth/authorize?') && core.startConnect({ userId: uid, platform: 'instagram' }).url.includes('instagram_business_content_publish'), 'Instagramの認可URLを作れる');
   ok(core.startConnect({ userId: uid, platform: 'tiktok' }).url.startsWith('https://www.tiktok.com/v2/auth/authorize/?') && core.startConnect({ userId: uid, platform: 'tiktok' }).url.includes('video.publish'), 'TikTokの認可URLを作れる');
 
+  console.log('審査指摘への対応（種類判定・容量・削除条件・エラー分類）');
+  const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypheic'), Buffer.alloc(100)]);
+  const avif = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypavif'), Buffer.alloc(100)]);
+  const qt = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypqt  '), Buffer.alloc(100)]);
+  ok(media.sniff(heic) === null && media.sniff(avif) === null, 'HEIC・AVIFの画像を、動画として受け付けない');
+  ok(media.sniff(qt).ext === 'mov' && media.sniff(MP4).ext === 'mp4', 'QuickTime(MOV)とMP4は受け付ける');
+  const lim = media.LIMITS.userTotalBytes;
+  media.LIMITS.userTotalBytes = store.MediaAssets.totalSize(uid) + 5000;
+  const big = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3496, 2)]);
+  const [c1, c2] = await Promise.all([upload(uid, big), upload(uid, big)]);
+  ok([c1.ok, c2.ok].filter(Boolean).length === 1, '同時に2つアップロードしても、合計容量の上限を超えて保存しない');
+  media.LIMITS.userTotalBytes = lim;
+  const usedMedia = (await upload(uid, JPEG)).media;
+  const usedPost = store.ScheduledPosts.create({ userId: uid, accountId: 'x', text: 't', scheduledAt: new Date(Date.now() + 86400000).toISOString(), mediaId: usedMedia.id });
+  const later = Date.now() + 3 * 24 * 3600 * 1000;
+  ok(!store.MediaAssets.deletable(later).some((m) => m.id === usedMedia.id), '予約に使用中のメディアは、削除の対象にしない');
+  store.ScheduledPosts.markPosted(usedPost, 'p1');
+  ok(store.MediaAssets.deletable(later).some((m) => m.id === usedMedia.id), '投稿が終わって2日たったメディアは、削除の対象になる');
+
+  // エラーの分類
+  const m5 = installHttpsMock(async (c) => {
+    if (c.host === 'graph.instagram.com' && c.path === '/v22.0/ig1/media') return { status: 400, json: { error: { message: 'Invalid parameter', type: 'OAuthException', code: 100 } } };
+    if (c.host === 'open.tiktokapis.com' && c.path === '/v2/oauth/token/') return { status: 200, json: { error: 'invalid_grant', error_description: 'Authorization code expired' } };
+    if (c.host === 'open.tiktokapis.com' && c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { creator_nickname: 'テスト', privacy_level_options: ['SELF_ONLY', 'PUBLIC_TO_EVERYONE'], comment_disabled: true, max_video_post_duration_sec: 600 }, error: { code: 'ok' } } };
+    return null;
+  });
+  const p100 = core.createPosts({ userId: uid, accountIds: [igAcc], text: 'x', scheduledAtIso: future(), mediaId: jpg.id });
+  await new Promise((rs) => setTimeout(rs, 1200));
+  await scheduler.tick();
+  ok(store.ScheduledPosts.get(p100.ids[0]).status === 'failed' && store.SnsAccounts.get(igAcc).status === 'active', '認証と無関係なOAuthException（コード100）では、連携を無効にしない');
+  let tokenErr = null;
+  try { await tt.exchangeCode({ code: 'c', redirectUri: 'https://example.test/cb' }); } catch (e) { tokenErr = e; }
+  ok(tokenErr && tokenErr.authError, 'TikTokの認可のエラー（文字列形式）を、成功として扱わない');
+  const info = await tt.creatorInfo({ accessToken: 't' });
+  ok(info.nickname === 'テスト' && info.privacyLevelOptions.length === 2 && info.commentDisabled === true && info.maxVideoPostDurationSec === 600, 'TikTokの投稿設定（公開範囲・コメント可否・最大秒数）を取得できる');
+  ok(/自分のみ/.test(tt.validatePost({ text: 'a', media: { kind: 'video' }, options: { privacy_level: 'SELF_ONLY', commercial_paid: true } })), '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできない');
+  m5.restore();
+
+  // 公開の最終段階のエラーは再試行しない（二重投稿の防止）
+  const m6 = installHttpsMock(async (c) => {
+    if (c.host === 'graph.instagram.com') {
+      if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'c9' } };
+      if (c.path === '/v22.0/ig1/media_publish') return { status: 500, json: { error: { message: 'Internal error' } } };
+    }
+    return null;
+  });
+  const pAmb = core.createPosts({ userId: uid, accountIds: [igAcc], text: 'x', scheduledAtIso: future(), mediaId: jpg.id });
+  await new Promise((rs) => setTimeout(rs, 1200));
+  await scheduler.tick();
+  const amb = store.ScheduledPosts.get(pAmb.ids[0]);
+  ok(amb.status === 'failed' && /投稿されたか/.test(amb.last_error) && m6.calls.filter((c) => c.path === '/v22.0/ig1/media').length === 1, '公開の最終段階のエラーは、再試行せず、投稿されたかの確認を促す（二重投稿の防止）');
+  m6.restore();
+
+  // TikTok：商用コンテンツの設定をAPIに渡す
+  const m7 = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY', 'PUBLIC_TO_EVERYONE'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/video/init/') return { status: 200, json: { data: { publish_id: 'p7', upload_url: 'https://upload.tiktok.test/u' }, error: { code: 'ok' } } };
+    if (c.host === 'upload.tiktok.test') return { status: 201, json: {} };
+    if (c.path === '/v2/post/publish/status/fetch/') return { status: 200, json: { data: { status: 'PUBLISH_COMPLETE' }, error: { code: 'ok' } } };
+    return null;
+  });
+  store.SnsAccounts.setStatus(ttAcc, 'active'); // 前のテストで再連携が必要な状態にしたため戻す
+  const pCom = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '宣伝', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE', commercial_own: true, commercial_paid: false } } });
+  await new Promise((rs) => setTimeout(rs, 1200));
+  await scheduler.tick();
+  const initBody = JSON.parse(m7.calls.find((c) => c.path === '/v2/post/publish/video/init/').body);
+  ok(store.ScheduledPosts.get(pCom.ids[0]).status === 'posted' && initBody.post_info.brand_organic_toggle === true && initBody.post_info.brand_content_toggle === false, 'TikTokに、商用コンテンツ（自分の宣伝）の設定を渡す');
+  m7.restore();
+
   console.log('メディアの削除');
   const old = Date.now() + 3 * 24 * 3600 * 1000;
   const unref = await upload(uid, JPEG);

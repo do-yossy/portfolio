@@ -2,7 +2,7 @@
 // Threads（Meta）公式API。テキスト投稿のみ。
 // 仕様は公式ドキュメント（Threads API）で運用前に必ず確認すること。
 const { request, encodeForm } = require('../http-client');
-const { SnsError, classify } = require('./errors');
+const { SnsError, classify, ambiguous } = require('./errors');
 const poll = require('./poll');
 
 const HOST = 'graph.threads.net';
@@ -46,7 +46,7 @@ async function call(method, path, { form, query } = {}) {
   if (r.status >= 200 && r.status < 300 && r.json) return r.json;
   const msg = r.json && r.json.error && r.json.error.message;
   const err = classify(r.status, msg ? `Threads: ${msg}` : '');
-  if (r.json && r.json.error && (r.json.error.code === 190 || r.json.error.type === 'OAuthException')) err.authError = true;
+  if (r.json && r.json.error && r.json.error.code === 190) { err.authError = true; err.retriable = false; }
   throw err;
 }
 
@@ -105,9 +105,12 @@ async function publish({ accessToken, externalUserId, text, media }) {
   else { form.media_type = 'VIDEO'; form.video_url = media.url; }
   const created = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads`, { form });
   if (media && media.kind === 'video') await waitFinished(created.id, accessToken);
-  const published = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads_publish`, {
-    form: { creation_id: created.id, access_token: accessToken },
-  });
+  let published;
+  try {
+    published = await call('POST', `/v1.0/${encodeURIComponent(externalUserId)}/threads_publish`, {
+      form: { creation_id: created.id, access_token: accessToken },
+    });
+  } catch (e) { throw ambiguous(e); }
   return { externalId: String(published.id) };
 }
 

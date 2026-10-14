@@ -50,7 +50,7 @@
 
 ### 2-3-1. Instagram（Metaの開発者アプリ：「Instagram APIとInstagram ログイン」）
 
-1. Meta for Developers のアプリに、「Instagram」製品（Instagram APIとInstagram ログイン）を追加する（Threadsとは別のアプリ、または同じアプリのどちらでも可）。
+1. Meta for Developers のアプリに、「Instagram」製品（Instagram APIとInstagram ログイン）を追加する（Threadsとは別のアプリとして作成する想定です。同じアプリで両方を使えるかは、未確認です）。
 2. 「有効なOAuthリダイレクトURI」に `https://（公開URL）/service/oauth/callback/instagram` を登録する。
 3. 権限（スコープ）は `instagram_business_basic` と `instagram_business_content_publish`。
 4. **自分以外の利用者に公開するには、Metaのアプリレビュー（`instagram_business_content_publish` の承認）と、アプリを「ライブ」にすることが必要**です。ビジネス確認などが求められる場合があります。
@@ -68,7 +68,7 @@
 
 ### 2-3-3. 画像・動画の保存容量
 
-- アップロードされたファイルは、サーバーのディスク（Fly.ioのボリューム）の `media/` に保存し、投稿が終わると自動で削除します。画像は8MB、動画は100MBまで、利用者1人あたり合計300MBまでです。
+- アップロードされたファイルは、サーバーのディスク（Fly.ioのボリューム）の `media/` に保存し、投稿が終わると自動で削除します。画像は8MB、動画は100MBまで、利用者1人あたり合計300MBまでです。投稿が終わってから2日後以降（投稿に使わなかったものは、アップロードから1日後以降）に、自動で削除します。
 - 現在のボリュームは1GBで、データベースと共用です。利用者が増える場合は、容量を増やしてください（`fly volumes extend`）。
 - **`/media/...` のURLは、ログインなしで取得できます**（Instagram・Threadsなどが取得するため）。推測できない長いURLですが、URLを知っている人は見られます。
 
@@ -127,4 +127,4 @@ cd ai-bijika-system
 npm test
 ```
 
-StripeとSNSの外部通信はモックで置き換え、決済・Webhook（再送・順不同を含む）・二重契約の防止・SNS連携・予約実行・解約を通して確認しています（約190件）。**本物のStripeやSNSとの接続は、上の2章の設定を済ませたうえで、テストモードで確認してください。**
+StripeとSNSの外部通信はモックで置き換え、決済・Webhook（再送・順不同を含む）・二重契約の防止・SNS連携・予約実行・解約を通して確認しています（約200件）。**本物のStripeやSNSとの接続は、上の2章の設定を済ませたうえで、テストモードで確認してください。**

@@ -6,6 +6,8 @@ const path = require('path');
 const crypto = require('crypto');
 const { MediaAssets } = require('./service-store');
 
+const VIDEO_BRANDS = new Set(['isom', 'iso2', 'iso4', 'iso5', 'iso6', 'mp41', 'mp42', 'avc1', 'M4V ', 'dash', 'MSNV']);
+const inflight = new Map(); // userId → アップロード中のバイト数（同時アップロードで合計容量の上限を超えないようにする）
 const LIMITS = { imageBytes: 8 * 1024 * 1024, videoBytes: 100 * 1024 * 1024, userTotalBytes: 300 * 1024 * 1024 };
 
 function dir() {
@@ -19,8 +21,10 @@ function sniff(buf) {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { kind: 'image', mime: 'image/jpeg', ext: 'jpg' };
   if (buf.length >= 8 && buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { kind: 'image', mime: 'image/png', ext: 'png' };
   if (buf.length >= 12 && buf.slice(4, 8).toString('latin1') === 'ftyp') {
+    // ftyp は HEIC・AVIF などの画像にもあるため、動画のブランドだけを許可する
     const brand = buf.slice(8, 12).toString('latin1');
-    return { kind: 'video', mime: brand.startsWith('qt') ? 'video/quicktime' : 'video/mp4', ext: brand.startsWith('qt') ? 'mov' : 'mp4' };
+    if (brand === 'qt  ') return { kind: 'video', mime: 'video/quicktime', ext: 'mov' };
+    if (VIDEO_BRANDS.has(brand)) return { kind: 'video', mime: 'video/mp4', ext: 'mp4' };
   }
   return null;
 }
@@ -28,20 +32,24 @@ function sniff(buf) {
 // リクエストの本文（バイナリ）をそのままファイルに保存する。上限を超えたら中断して削除する
 function saveUpload({ userId, req, contentLength }) {
   return new Promise((resolve) => {
-    const used = MediaAssets.totalSize(userId);
+    const used = MediaAssets.totalSize(userId) + (inflight.get(userId) || 0);
     const maxBytes = Math.max(LIMITS.videoBytes, LIMITS.imageBytes);
     if (!Number.isFinite(contentLength) || contentLength <= 0) return resolve({ ok: false, error: 'ファイルが空か、サイズを確認できません。' });
     if (contentLength > maxBytes) return resolve({ ok: false, error: `ファイルが大きすぎます（画像は${LIMITS.imageBytes / 1048576}MB、動画は${LIMITS.videoBytes / 1048576}MBまで）。` });
     if (used + contentLength > LIMITS.userTotalBytes) return resolve({ ok: false, error: '保存できるファイルの合計の上限に達しています。予約済みの投稿が終わると、自動で削除されます。' });
     const token = crypto.randomBytes(24).toString('hex');
     const tmp = path.join(dir(), `${token}.part`);
+    inflight.set(userId, (inflight.get(userId) || 0) + contentLength);
+    const release = () => { const left = (inflight.get(userId) || 0) - contentLength; if (left > 0) inflight.set(userId, left); else inflight.delete(userId); };
     const out = fs.createWriteStream(tmp);
+    out.on('error', () => { req.destroy(); fail('ファイルを保存できませんでした。時間をおいてもう一度お試しください。'); });
     let size = 0;
     let head = Buffer.alloc(0);
     let failed = null;
     const fail = (error) => {
       if (failed) return;
       failed = error;
+      release();
       out.destroy();
       fs.rm(tmp, { force: true }, () => resolve({ ok: false, error }));
     };
@@ -56,6 +64,7 @@ function saveUpload({ userId, req, contentLength }) {
     req.on('end', () => {
       if (failed) return;
       out.end(() => {
+        release();
         const kind = sniff(head);
         if (!kind) return fs.rm(tmp, { force: true }, () => resolve({ ok: false, error: '対応していないファイルです。画像はJPEGまたはPNG、動画はMP4（MOV）にしてください。' }));
         const limit = kind.kind === 'image' ? LIMITS.imageBytes : LIMITS.videoBytes;
