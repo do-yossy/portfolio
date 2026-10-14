@@ -1,0 +1,39 @@
+---
+name: sns-scheduler
+description: 連携済みのSNS（Threads・X・Instagram・TikTok・Facebookページ・YouTube）へ、投稿の作成・予約・下書き保存・取り消し・状態確認を行う。「SNSに投稿して」「明日9時に予約して」「下書きにして」などの依頼で使う。
+---
+
+# SNS自動投稿（API）
+
+利用者の月額SNS自動投稿サービスのREST APIを使って、SNSへ投稿・予約する。
+
+## 準備
+
+- APIキーは、サービスのマイページで発行したものを環境変数 `SNS_SCHEDULER_API_KEY` に入れておく。
+- サービスのURLは、環境変数 `SNS_SCHEDULER_URL` に入れておく（例：`https://example.com`）。
+- どちらかが未設定なら、作業を止めて利用者に設定を頼む。
+
+## 基本の流れ
+
+1. 投稿先を確認する：`curl -s "$SNS_SCHEDULER_URL/api/v1/accounts" -H "Authorization: Bearer $SNS_SCHEDULER_API_KEY"`
+2. 画像・動画がある場合はアップロードし、返ってきた `id` を控える：
+   `curl -s -X POST "$SNS_SCHEDULER_URL/api/v1/media" -H "Authorization: Bearer $SNS_SCHEDULER_API_KEY" --data-binary @ファイル`
+3. 投稿を作る（`POST /api/v1/posts`、JSON）。
+   - `category`：`text`／`image`／`video`／`tree`（ツリー＝連投。Threads・Xのみ）
+   - `account_ids`：投稿先のアカウントID（複数可）
+   - `text`：本文。SNSごとに変える場合は `captions`（アカウントID → 本文）
+   - `media_ids`：添付する画像・動画のID
+   - `tree`：ツリーの2件目以降 `[{"text": "...", "media_ids": []}]`
+   - いつ投稿するか：`"now": true`（即時）／`"scheduled_at": "2026-12-01T09:00:00+09:00"`（予約）／`"draft": true`（下書き）
+4. 結果を確認する：`GET /api/v1/posts?status=pending`、`GET /api/v1/posts/{id}`
+
+その他：下書きの予約化 `POST /api/v1/posts/{id}/publish`（`{"now":true}` または `{"scheduled_at":"..."}`）、取り消し `DELETE /api/v1/posts/{id}`。
+
+## 守ること
+
+- **はじめは下書き（`draft: true`）で作り、利用者に内容を見せて了承を得てから予約・投稿する。** 利用者が「そのまま投稿して」と明示した場合だけ、即時・予約にする。
+- 確認できていない数字・実績・お客様の声を本文に書かない。誇大な表現や、他者を傷つける表現を使わない。
+- 画像・動画は、利用者が権利を持っているものだけを使う。
+- 各SNSの条件：Threads 500文字・カルーセル20件／X 日本語140文字程度・画像4枚または動画1本・月の上限あり／Instagram 画像はJPEG・カルーセル10件・本文2,200文字／TikTok 動画、または写真（JPEG）と公開範囲（`options` に `{"<アカウントID>": {"privacy_level": "SELF_ONLY"}}` など）が必要／YouTube 動画1本（本文の1行目がタイトル）。
+- APIがエラーを返したら、`error` の文をそのまま利用者に伝え、勝手に条件を変えて再送しない。
+- 投稿されたか分からない（タイムアウトなど）ときは、再送せず、SNSで確認するよう利用者に伝える（二重投稿を防ぐ）。

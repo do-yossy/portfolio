@@ -358,7 +358,11 @@ function apiDocsPage(user, baseUrl) {
   "account_ids": ["<アカウントID>"],
   "scheduled_at": "2026-12-01T09:00:00+09:00"
 }'`)}
-    <h2>そのほか</h2><ul><li><code>GET /api/v1/posts?status=draft</code>：投稿の一覧</li><li><code>GET /api/v1/posts/{id}</code>：投稿の確認</li><li><code>POST /api/v1/posts/{id}/publish</code>：下書きを予約／投稿にする（<code>{"now":true}</code> または <code>{"scheduled_at":"…"}</code>）</li><li><code>DELETE /api/v1/posts/{id}</code>：予約・下書きの取り消し</li></ul>
+    <h2>AIアシスタントから使う</h2>
+    <p><b>MCP</b>：MCP対応のアプリ（Claude・ChatGPTなど）に、接続先URL <code>${b}/mcp</code> を追加してください。ログインして「許可する」を押すだけで接続できます（APIキー不要）。使えるツール：アカウントの一覧・契約と利用状況・投稿の作成（即時・予約・下書き）・一覧・下書きの予約化・取り消し・アップロード用URLの発行・URLからの取り込み・AIによる文章／画像／動画の生成。</p>
+    <p><b>Agent Skill（Claude Code）</b>：次の1行で導入できます。APIキーを環境変数 <code>SNS_SCHEDULER_API_KEY</code>、URLを <code>SNS_SCHEDULER_URL</code> に設定してください。</p>
+    ${code(`mkdir -p ~/.claude/skills/sns-scheduler && curl -fsSL ${baseUrl || '$URL'}/service/docs/skill.md -o ~/.claude/skills/sns-scheduler/SKILL.md`)}
+    <h2>そのほか</h2><ul><li><code>POST /api/v1/media/upload-url</code>：アップロード用の一時URL（15分・1回）を発行</li><li><code>POST /api/v1/media/import</code>：URLから画像・動画を取り込む（<code>{"url":"https://…"}</code>。Googleドライブの共有リンクにも対応）</li><li><code>POST /api/v1/ai/text</code>・<code>/ai/image</code>・<code>/ai/video</code>：AIで投稿文・画像・動画を作る（動画は <code>GET /api/v1/ai/jobs/{id}</code> で完了を確認）</li><li><code>GET/POST /api/v1/auto-rules</code>：AIの自動運用ルール</li><li><code>GET /api/v1/posts?status=draft</code>：投稿の一覧</li><li><code>GET /api/v1/posts/{id}</code>：投稿の確認</li><li><code>POST /api/v1/posts/{id}/publish</code>：下書きを予約／投稿にする（<code>{"now":true}</code> または <code>{"scheduled_at":"…"}</code>）</li><li><code>DELETE /api/v1/posts/{id}</code>：予約・下書きの取り消し</li></ul>
     <p class="small">${b}</p></div>`);
 }
 

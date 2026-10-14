@@ -134,6 +134,11 @@ async function handle(ctx) {
     return true;
   }
 
+  if (pathname === '/service/docs/skill.md' && method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+    res.end(fs.readFileSync(path.join(__dirname, '..', 'skill', 'SKILL.md')));
+    return true;
+  }
   if (pathname === '/service/docs/api' && method === 'GET') { sendHtml(res, 200, ui.apiDocsPage(user, String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, ''))); return true; }
 
   if (pathname === '/service/signup' && method === 'GET') {

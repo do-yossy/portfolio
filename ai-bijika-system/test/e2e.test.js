@@ -334,6 +334,10 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('POST', `/service/app/connection/${clientId}/revoke`, { body: { csrf: appCsrf } });
   r = await rpc(tok.access_token, { jsonrpc: '2.0', id: 10, method: 'tools/list' });
   ok(r.status === 401, '接続を解除すると、そのトークンは使えない');
+  r = await req('GET', '/service/docs/skill.md');
+  ok(r.status === 200 && r.text.startsWith('---\nname: sns-scheduler') && r.text.includes('draft'), 'Agent Skill（SKILL.md）を配布できる');
+  r = await req('GET', '/service/docs/api');
+  ok(r.status === 200 && r.text.includes('/mcp') && r.text.includes('skill.md'), 'APIの説明にMCPとSkillの使い方を載せる');
   const keyId = store.ApiKeys.listForUser(userIdForSub)[0].id;
   r = await req('POST', `/service/app/apikey/${keyId}/revoke`, { body: { csrf: appCsrf } });
   r = await api('GET', '/api/v1/accounts', apiKey);
