@@ -62,12 +62,16 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
 
   console.log('課金（モックStripe）');
   const userA = mkUser('a@example.com');
+  const userSync = mkUser('sync@example.com');
   const periodEnd = Math.floor(Date.now() / 1000) + 30 * 86400;
   let subStatus = 'active';
   let cancelFlag = false;
   const mockStripe = installHttpsMock(async (c) => {
     if (c.host === 'api.stripe.com') {
       if (c.method === 'POST' && c.path === '/v1/checkout/sessions') return { status: 200, json: { id: 'cs_1', url: 'https://checkout.stripe.test/cs_1' } };
+      if (c.method === 'GET' && c.path === '/v1/checkout/sessions/cs_done') return { status: 200, json: { id: 'cs_done', client_reference_id: userSync, status: 'complete', customer: 'cus_sync', subscription: 'sub_sync' } };
+      if (c.method === 'GET' && c.path === '/v1/checkout/sessions/cs_open') return { status: 200, json: { id: 'cs_open', client_reference_id: userSync, status: 'open', customer: null, subscription: null } };
+      if (c.method === 'GET' && c.path === '/v1/subscriptions/sub_sync') return { status: 200, json: { id: 'sub_sync', customer: 'cus_sync', status: 'active', current_period_end: periodEnd, cancel_at_period_end: false, metadata: { user_id: userSync }, items: { data: [{ price: { id: 'price_test' } }] } } };
       if (c.method === 'GET' && c.path === '/v1/subscriptions/sub_1') {
         return { status: 200, json: { id: 'sub_1', customer: 'cus_1', status: subStatus, current_period_end: periodEnd, cancel_at_period_end: cancelFlag, metadata: { user_id: userA }, items: { data: [{ price: { id: 'price_test' } }] } } };
       }
@@ -109,6 +113,12 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(!store.Subscriptions.isActive(userA), '契約が終了すると利用できなくなる');
   const portal = await billing.createPortalSession('cus_1');
   ok(portal === 'https://portal.stripe.test/p', 'カード変更用のポータルURLを取得できる');
+  // 決済ページから戻った直後の同期（Webhookの到着前でも、2本目の契約を作らせないため）
+  ok(!(await billing.syncCheckoutSession(userSync, 'cs_open')) && !store.Subscriptions.isActive(userSync), '決済が完了していないセッションでは契約中にならない');
+  ok(!(await billing.syncCheckoutSession(userA, 'cs_done')) && !store.Subscriptions.isActive(userA === userSync ? '' : userSync), '他のユーザーのセッションは反映しない');
+  ok(!(await billing.syncCheckoutSession(userSync, '../etc')), '不正なセッションIDは拒否する');
+  ok((await billing.syncCheckoutSession(userSync, 'cs_done')) && store.Subscriptions.isActive(userSync) && store.Subscriptions.get(userSync).stripe_subscription_id === 'sub_sync', '本人の完了したセッションは、Webhookより先に契約中にできる');
+
   // 順不同で届いた古いイベントで、新しい状態を上書きしない
   const T = Math.floor(Date.now() / 1000) + 1000;
   const subEv = (id, status, created) => ({ id, type: 'customer.subscription.updated', created, data: { object: { id: 'sub_1', customer: 'cus_1', status, current_period_end: periodEnd, cancel_at_period_end: false, metadata: {}, items: { data: [] } } } });

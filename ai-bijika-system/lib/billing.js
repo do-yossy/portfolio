@@ -152,6 +152,23 @@ async function handleEvent(event) {
   return { handled: true };
 }
 
+// 決済ページから戻ってきた直後に、Stripeに直接問い合わせて契約を反映する（Webhookの到着を待つ間に、
+// 申込み画面をもう一度開いて2本目の契約を作ってしまうことを防ぐ）。Stripeから取得した情報だけを使い、
+// セッションが本人のものであること、決済が完了していることを確認する。
+async function syncCheckoutSession(userId, sessionId) {
+  if (!/^cs_[A-Za-z0-9_]+$/.test(String(sessionId || ''))) return false;
+  const sess = await stripeRequest('GET', `/v1/checkout/sessions/${encodeURIComponent(sessionId)}`);
+  if (!sess || sess.client_reference_id !== userId) return false;
+  if (sess.status !== 'complete' || typeof sess.subscription !== 'string') return false;
+  Subscriptions.upsert(userId, {
+    stripe_customer_id: typeof sess.customer === 'string' ? sess.customer : '',
+    stripe_subscription_id: sess.subscription,
+  });
+  const sub = await stripeRequest('GET', `/v1/subscriptions/${encodeURIComponent(sess.subscription)}`);
+  applySubscription(sub, userId, Math.floor(Date.now() / 1000));
+  return true;
+}
+
 // 解約（次回更新を止める。契約期間の終わりまでは使える）／解約の取り消し
 async function setCancelAtPeriodEnd(userId, cancel) {
   const s = Subscriptions.get(userId);
@@ -164,5 +181,5 @@ async function setCancelAtPeriodEnd(userId, cancel) {
 
 module.exports = {
   isConfigured, config, createCheckoutSession, createPortalSession, verifyWebhook, handleEvent,
-  setCancelAtPeriodEnd, applySubscription, stripeRequest,
+  setCancelAtPeriodEnd, applySubscription, stripeRequest, syncCheckoutSession,
 };

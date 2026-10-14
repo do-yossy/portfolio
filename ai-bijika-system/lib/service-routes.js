@@ -205,7 +205,12 @@ async function handle(ctx) {
     }
     return true;
   }
-  if (pathname === '/service/checkout/success' && method === 'GET') { sendHtml(res, 200, ui.checkoutResultPage({ user, kind: 'success' })); return true; }
+  if (pathname === '/service/checkout/success' && method === 'GET') {
+    const sid = url.searchParams.get('session_id');
+    if (sid && billingReady) { try { await billing.syncCheckoutSession(user.id, sid); } catch (e) { console.error('[checkout sync]', e.message); } }
+    sendHtml(res, 200, ui.checkoutResultPage({ user, kind: 'success' }));
+    return true;
+  }
   if (pathname === '/service/checkout/cancel' && method === 'GET') { sendHtml(res, 200, ui.checkoutResultPage({ user, kind: 'cancel' })); return true; }
 
   // マイページ
