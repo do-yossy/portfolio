@@ -1,0 +1,35 @@
+# SNS自動投稿サービス専用のアプリ（ミチシルベ本体とは別のアプリ・別のデータベース）。
+# 同じプログラムを SERVICE_ONLY=true で動かし、SNS自動投稿サービスの画面だけを出す。
+# 無料のアドレス：https://michishirube-post.fly.dev
+# アプリとボリュームの作成は .github/workflows/deploy-sns-post.yml が初回に自動で試みる
+# （FLY_API_TOKEN にアプリを作る権限がない場合は、手順書のとおり一度だけ手動で作る）。
+
+app = "michishirube-post"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3300"
+  NODE_OPTIONS = "--experimental-sqlite"
+  NODE_ENV = "production"
+  SERVICE_ONLY = "true"
+
+[http_service]
+  internal_port = 3300
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# データの保存先（SQLite・画像や動画）。ミチシルベ本体（ai_bijika_data）とは別のボリューム
+[[mounts]]
+  source = "sns_post_data"
+  destination = "/app/data"
+  initial_size = "1gb"

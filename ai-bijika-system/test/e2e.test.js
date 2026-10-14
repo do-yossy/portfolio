@@ -521,6 +521,44 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('POST', '/admin/service/test-grant', { body: { email: 'tester@example.com' } });
   ok(r.status === 302 && !store.Subscriptions.isActive(testerId), '運営者でなければ付与できない');
 
+  console.log('専用アプリとして動かす場合（SERVICE_ONLY=true）');
+  process.env.SERVICE_ONLY = 'true';
+  cookie = '';
+  r = await req('GET', '/');
+  ok(r.status === 302 && r.headers.location === '/service', 'トップページはサービスのページへ移動する');
+  r = await req('GET', '/dashboard');
+  ok(r.status === 302 && r.headers.location === '/service', 'ミチシルベ本体の画面は出さない');
+  r = await req('POST', '/signup', { body: { email: 'x@example.com', password: 'password123' } });
+  ok(r.status === 404, 'ミチシルベ本体の登録は受け付けない');
+  r = await req('GET', '/service');
+  ok(r.status === 200 && r.text.includes('月額'), 'サービスのページは出す');
+  r = await req('GET', '/.well-known/oauth-authorization-server');
+  ok(r.status === 200, 'MCP用のOAuthのメタデータは出す');
+  r = await req('GET', '/contact');
+  ok(r.status === 200, 'お問い合わせは出す');
+  r = await api('GET', '/api/v1/accounts', '');
+  ok(r.status === 401, 'APIは使える（認証が必要）');
+  r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
+  ok(r.status === 302 && r.headers.location === '/admin/service', '運営者のログイン後は、サービスの運営者画面へ移動する');
+  const savedPw = process.env.ADMIN_PASSWORD;
+  delete process.env.ADMIN_PASSWORD;
+  cookie = '';
+  r = await req('POST', '/admin/login', { body: { password: 'changeme' } });
+  ok(r.status === 403, 'ADMIN_PASSWORD が未設定なら、既定のパスワードでは運営者画面に入れない');
+  process.env.ADMIN_PASSWORD = savedPw;
+  delete process.env.SERVICE_ONLY;
+
+  console.log('サービスを専用アプリへ移した場合（SERVICE_MOVED_TO）');
+  process.env.SERVICE_MOVED_TO = 'https://michishirube-post.fly.dev/';
+  r = await req('GET', '/service/legal/terms?x=1');
+  ok(r.status === 302 && r.headers.location === 'https://michishirube-post.fly.dev/service/legal/terms?x=1', 'ミチシルベ側の /service は、移転先の同じページへ転送する');
+  r = await req('GET', '/');
+  ok(r.status === 200, 'ミチシルベ本体の画面はそのまま');
+  process.env.SERVICE_MOVED_TO = 'http://insecure.example';
+  r = await req('GET', '/service');
+  ok(r.status === 200, 'https でない転送先は使わない');
+  delete process.env.SERVICE_MOVED_TO;
+
   console.log('既存のアプリへの影響');
   cookie = '';
   r = await req('GET', '/');

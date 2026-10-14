@@ -1,0 +1,45 @@
+name: Deploy SNS自動投稿サービス（専用アプリ）
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ai-bijika-system/**'
+      - '.github/workflows/deploy-sns-post.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build & Deploy michishirube-post to Fly.io
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      APP: michishirube-post
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # 初回だけ：アプリとボリュームが無ければ作る。トークンに作成の権限がない場合は、作らずに案内を出して終える
+      - name: Ensure app and volume
+        id: ensure
+        working-directory: ai-bijika-system
+        run: |
+          if ! flyctl status -a "$APP" >/dev/null 2>&1; then
+            if ! flyctl apps create "$APP"; then
+              echo "::warning::Fly.io のアプリ $APP を作れませんでした（名前が使われている、またはトークンに作成の権限がない）。お試し手順書の「専用アプリを一度だけ作る」を実行してください。"
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          if [ "$(flyctl volumes list -a "$APP" --json | grep -c '"name": *"sns_post_data"')" = "0" ]; then
+            flyctl volumes create sns_post_data -a "$APP" --region nrt --size 1 --yes
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Fly.io
+        if: steps.ensure.outputs.ready == 'true'
+        working-directory: ai-bijika-system
+        run: flyctl deploy --remote-only --config fly.sns.toml -a "$APP"
