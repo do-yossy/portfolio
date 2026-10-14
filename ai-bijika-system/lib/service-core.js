@@ -15,6 +15,8 @@ const LIMITS = {
   // YouTubeのアップロードは、サービス全体で1日100回まで（Google Cloud のプロジェクトごとの割り当て。太平洋時間の0時にリセット）。
   // 連携の確認などの余裕を残して、初期値は90件
   get youtubePerDay() { return envInt('YOUTUBE_DAILY_LIMIT', 90); },
+  // 1人で全体の枠を使い切らないよう、利用者ごとの1日の上限も設ける
+  get youtubePerUserDay() { return envInt('YOUTUBE_PER_USER_DAILY', 5); },
 };
 const MAX_DAYS_AHEAD = 90;
 const JST_OFFSET_MS = 9 * 3600 * 1000;
@@ -116,10 +118,13 @@ function xQuotaError(userId, iso, adding) {
   return null;
 }
 
-// YouTubeの予約が、その日（太平洋時間）のサービス全体の上限を超えないか
-function youtubeQuotaError(iso, adding) {
+// YouTubeの予約が、その日（太平洋時間）の利用者ごとの上限と、サービス全体の上限を超えないか
+function youtubeQuotaError(userId, iso, adding) {
   if (!adding) return null;
   const { from, to } = require('./pt-time').dayBounds(iso);
+  if (ScheduledPosts.countPlatformBetween('youtube', from, to, userId) + adding > LIMITS.youtubePerUserDay) {
+    return `YouTubeへの投稿は、1日に${LIMITS.youtubePerUserDay}件までです（YouTubeの1日は、日本時間の16時または17時に切り替わります）。別の日時を選んでください。`;
+  }
   if (ScheduledPosts.countPlatformBetween('youtube', from, to) + adding > LIMITS.youtubePerDay) {
     return 'この日時のYouTubeへの予約は、サービス全体の1日の上限に達しています。別の日時を選んでください（YouTubeの1日は、日本時間の16時または17時に切り替わります）。';
   }
@@ -218,7 +223,7 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
     if (qe) return { ok: false, error: qe };
     const yts = resolved.filter((r) => r.a.platform === 'youtube');
     for (const r of yts) { const oe = youtubeOptionsError(r.options); if (oe) return { ok: false, error: oe }; }
-    const ye = youtubeQuotaError(scheduledAtIso, yts.length);
+    const ye = youtubeQuotaError(userId, scheduledAtIso, yts.length);
     if (ye) return { ok: false, error: ye };
   }
   const groupId = require('crypto').randomBytes(10).toString('hex');
@@ -236,7 +241,7 @@ function capacityError({ userId, platform, atIso, draft }) {
   const [from, to] = jstDayBounds(atIso);
   if (ScheduledPosts.countScheduledBetween(userId, from, to) + 1 > LIMITS.maxPerDay) return `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。`;
   if (platform === 'x') return xQuotaError(userId, atIso, 1);
-  if (platform === 'youtube') return youtubeQuotaError(atIso, 1);
+  if (platform === 'youtube') return youtubeQuotaError(userId, atIso, 1);
   return null;
 }
 
@@ -244,11 +249,12 @@ function capacityError({ userId, platform, atIso, draft }) {
 function promoteDraft({ userId, postId, scheduledAtIso, via = 'api', nowMs = Date.now() }) {
   const p = ScheduledPosts.get(postId);
   if (!p || p.user_id !== userId || p.status !== 'draft') return { ok: false, error: '下書きが見つかりません。' };
-  // TikTokは、本人が画面で内容と設定を確かめて同意してから送る決まり（公式の共有のガイドライン）
+  // TikTokは、本人が画面で内容と設定（公開範囲・コメント等・商用の開示・音楽使用の確認）を確かめて同意してから送る決まり（公式の共有のガイドライン）。
+  // 下書きのまま予約・投稿にはせず、「投稿を作る」画面で開き、TikTokから取得した選択肢で設定を選び直してから送る
   if (p.platform === 'tiktok') {
-    if (via !== 'screen') return { ok: false, error: 'TikTokの下書きは、API・AIアシスタントからは予約にできません。サービスの画面で内容と設定を確かめてから投稿してください。' };
-    let o = {}; try { o = JSON.parse(p.options || '{}'); } catch { o = {}; }
-    if (!o.privacy_level) return { ok: false, error: 'TikTokの公開範囲などが選ばれていない下書きです。「投稿を作る」画面で作り直して投稿してください。' };
+    return { ok: false, error: via === 'screen'
+      ? 'TikTokの下書きは、「投稿を作る」画面で開き、公開範囲などの設定を選び直してから投稿してください（カレンダーの「内容と設定を確かめて投稿する」から開けます）。'
+      : 'TikTokの下書きは、API・AIアシスタントからは予約にできません。サービスの画面で内容と設定を確かめてから投稿してください。' };
   }
   if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
   const at = scheduledAtIso ? Date.parse(scheduledAtIso) : Date.parse(p.scheduled_at || '');
@@ -270,7 +276,7 @@ function promoteDraft({ userId, postId, scheduledAtIso, via = 'api', nowMs = Dat
     let o = {}; try { o = JSON.parse(p.options || '{}'); } catch { o = {}; }
     const oe = youtubeOptionsError(o);
     if (oe) return { ok: false, error: `${oe}「投稿を作る」画面で作り直して投稿してください。` };
-    const ye = youtubeQuotaError(iso, 1);
+    const ye = youtubeQuotaError(userId, iso, 1);
     if (ye) return { ok: false, error: ye };
   }
   if (!ScheduledPosts.promote(postId, userId, iso)) return { ok: false, error: '下書きが見つかりません。' };

@@ -116,9 +116,13 @@ async function refresh({ refreshToken }) {
 async function creatorInfo({ accessToken }) {
   const info = await call({ path: '/v2/post/publish/creator_info/query/', headers: bearer(accessToken), body: '{}' });
   const d = info.data || {};
+  let opts = d.privacy_level_options || [];
+  // アプリの審査（Audit）が終わるまでは「自分のみ」しか投稿できないため、画面の選択肢もそれだけにする
+  if (process.env.TIKTOK_AUDITED !== 'true') opts = opts.filter((v) => v === 'SELF_ONLY');
   return {
     nickname: d.creator_nickname || d.creator_username || '',
-    privacyLevelOptions: d.privacy_level_options || [],
+    privacyLevelOptions: opts,
+    audited: process.env.TIKTOK_AUDITED === 'true',
     commentDisabled: !!d.comment_disabled, duetDisabled: !!d.duet_disabled, stitchDisabled: !!d.stitch_disabled,
     maxVideoPostDurationSec: Number(d.max_video_post_duration_sec) || 0,
   };

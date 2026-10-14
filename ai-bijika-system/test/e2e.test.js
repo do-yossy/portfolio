@@ -121,7 +121,7 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
   ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
   ok(r.text.includes('使えるSNS') && r.text.includes('無料体験') && !r.text.includes('Xは月30件まで'), '比較表に使えるSNSと無料体験の行があり、Xを提供していなければXの上限を出さない');
-  ok(r.text.includes('SNSへの投稿を、まとめて予約。') && !r.text.includes('複数のSNSへの投稿を') && !r.text.includes('いくつものSNS') && r.text.includes('公式サイト（料金と概要のページ）'), '使えるSNSが1つだけのときは、LPで「複数のSNS」と書かない。比較の確認元は「料金と概要のページ」');
+  ok(r.text.includes('SNSへの投稿を、まとめて予約。') && !r.text.includes('複数のSNSへの投稿を') && !r.text.includes('いくつものSNS') && !r.text.includes('SNSごとに本文') && !r.text.includes('公式の料金ページで確認') && r.text.includes('公式サイト（料金と概要のページ）'), '使えるSNSが1つだけのときは、LPで「複数のSNS」と書かない。比較の確認元は「料金と概要のページ」');
   process.env.FACEBOOK_APP_ID = 'fb'; process.env.FACEBOOK_APP_SECRET = 'fbs';
   r = await req('GET', '/service/lp');
   const lpMulti = r.text;
@@ -338,6 +338,22 @@ function webhook(event, secret = 'whsec_e2e') {
   const ttE2eId = typeof ttE2e === 'object' ? ttE2e.id : ttE2e;
   r = await api('POST', '/api/v1/posts', apiKey, { category: 'video', text: 'x', media_ids: [], account_ids: [ttE2eId], now: true });
   ok(r.status === 400 && /下書き/.test(r.json.error), 'TikTokへは、APIから直接投稿できない（本人が画面で確かめる決まり）');
+  // TikTokの下書きは、APIからもカレンダーからも直接は予約できず、「投稿を作る」画面で設定を選び直してから送る
+  const ttMp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), Buffer.alloc(2000, 5)]);
+  const ttUp = await api('POST', '/api/v1/media', apiKey, undefined, ttMp4);
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'video', text: 'TikTok下書き', media_ids: [ttUp.json.id], account_ids: [ttE2eId], draft: true, options: { [ttE2eId]: { privacy_level: 'SELF_ONLY' } } });
+  const ttDraftId = r.json.posts && r.json.posts[0].id;
+  ok(r.status === 201 && ttDraftId, 'TikTokへは、APIから下書きにはできる');
+  r = await api('POST', `/api/v1/posts/${ttDraftId}/publish`, apiKey, { now: true });
+  ok(r.status === 400 && /画面/.test(r.json.error), 'TikTokの下書きは、APIからは予約・投稿にできない');
+  r = await req('POST', `/service/app/post/${ttDraftId}/publish`, { body: { csrf: appCsrf, mode: 'now' } });
+  ok(r.status === 400 && r.text.includes('選び直して'), 'TikTokの下書きは、カレンダーからも直接は投稿できない（設定を見ないまま送らない）');
+  r = await req('GET', '/service/app/calendar');
+  ok(r.text.includes(`/service/app/compose?draft=${ttDraftId}`) && r.text.includes('内容と設定を確かめて投稿する'), 'カレンダーのTikTokの下書きには、「投稿を作る」画面で開くリンクを出す');
+  r = await req('GET', `/service/app/compose?draft=${ttDraftId}`);
+  ok(r.status === 200 && r.text.includes('下書きを読み込みました') && r.text.includes('TikTok下書き') && r.text.includes(ttUp.json.id) && !r.text.includes('"privacy_level"'), '「投稿を作る」画面で下書きを開ける（TikTokの設定は読み込まず、選び直してもらう）');
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf }, raw: JSON.stringify({ category: 'video', text: 'TikTok下書き', account_ids: [ttE2eId], media_ids: [ttUp.json.id], options: { [ttE2eId]: { privacy_level: 'SELF_ONLY', disable_comment: true, disable_duet: true, disable_stitch: true } }, scheduled_at: `${FUTURE}:00+09:00`, replace_draft: ttDraftId }) });
+  ok(r.status === 201 && store.ScheduledPosts.get(ttDraftId).status === 'cancelled', '画面で設定を選び直して保存すると予約になり、元の下書きは削除される');
   store.SnsAccounts.remove(ttE2eId, userIdForSub);
 
   console.log('MCP');

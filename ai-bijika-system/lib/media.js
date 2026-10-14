@@ -153,6 +153,24 @@ function serve(req, res, token, ext) {
 }
 
 // 画像の幅と高さ（JPEG・PNG）。読めなければ null（検証をしない）
+// Exif（APP1の中身）から、向き（タグ 0x0112）を読む。読めなければ 0
+function exifOrientation(app) {
+  try {
+    if (app.slice(0, 6).toString('latin1') !== 'Exif\0\0') return 0;
+    const t = app.slice(6);
+    const le = t.slice(0, 2).toString('latin1') === 'II';
+    const u16 = (o) => (le ? t.readUInt16LE(o) : t.readUInt16BE(o));
+    const u32 = (o) => (le ? t.readUInt32LE(o) : t.readUInt32BE(o));
+    const ifd = u32(4);
+    const n = u16(ifd);
+    for (let i = 0; i < n; i++) {
+      const e = ifd + 2 + i * 12;
+      if (u16(e) === 0x0112) return u16(e + 8);
+    }
+  } catch { /* 壊れたExif */ }
+  return 0;
+}
+
 function imageSize(file) {
   let fd;
   try {
@@ -163,6 +181,7 @@ function imageSize(file) {
     if (head[0] !== 0xff || head[1] !== 0xd8) return null;
     const size = fs.fstatSync(fd).size;
     let pos = 2;
+    let orientation = 1;
     const b = Buffer.alloc(10);
     while (pos + 4 < size) {
       fs.readSync(fd, b, 0, 10, pos);
@@ -170,8 +189,18 @@ function imageSize(file) {
       const marker = b[1];
       if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { pos += 2; continue; }
       const len = b.readUInt16BE(2);
-      // SOF0〜SOF15（DHT=C4・JPG=C8・DAC=CC を除く）に、高さと幅がある
-      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return { height: b.readUInt16BE(5), width: b.readUInt16BE(7) };
+      // APP1（Exif）の向き（Orientation）。スマホの縦写真は「横長の画素＋90度回転の指定」で保存されることが多い
+      if (marker === 0xe1 && len > 8 && len < 65536) {
+        const app = Buffer.alloc(len - 2);
+        fs.readSync(fd, app, 0, len - 2, pos + 4);
+        const o = exifOrientation(app);
+        if (o) orientation = o;
+      }
+      // SOF0〜SOF15（DHT=C4・JPG=C8・DAC=CC を除く）に、高さと幅がある。向きが5〜8（90度・270度の回転）なら、見た目の幅と高さは入れ替わる
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+        const h = b.readUInt16BE(5); const w = b.readUInt16BE(7);
+        return orientation >= 5 && orientation <= 8 ? { width: h, height: w, orientation } : { width: w, height: h, orientation };
+      }
       pos += 2 + len;
     }
     return null;

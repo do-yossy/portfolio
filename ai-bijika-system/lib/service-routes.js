@@ -10,7 +10,7 @@ const billing = require('./billing');
 const core = require('./service-core');
 const ui = require('./service-ui');
 const scheduler = require('./sns/scheduler');
-const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys, AutoRules, AiJobs } = require('./service-store');
+const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys, AutoRules, AiJobs, MediaAssets } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
 const mediaLib = require('./media');
 const registry = require('./sns');
@@ -376,7 +376,17 @@ async function handle(ctx) {
   // 投稿を作る（ツリー・複数画像・SNSごとの本文・下書き）とカレンダー
   if (pathname === '/service/app/compose' && method === 'GET') {
     if (!Subscriptions.isActive(user.id)) { redirect(res, '/service/app'); return true; }
-    sendHtml(res, 200, ui.composePage({ user, accounts: SnsAccounts.listForUser(user.id), csrf: token, aiAvail: ai.available() }));
+    // 下書きを読み込んで開く（TikTokの下書きは、ここで設定を選び直してから投稿する）。TikTokの設定は読み込まない（選び直してもらう）
+    let draft = null;
+    const did = url.searchParams.get('draft');
+    const dp = did ? ScheduledPosts.get(did) : null;
+    if (dp && dp.user_id === user.id && dp.status === 'draft') {
+      const mv = (mid) => { const m = MediaAssets.getForUser(mid, user.id); return m ? { id: m.id, kind: m.kind, url: mediaLib.publicUrl(m) } : null; };
+      let mids = []; try { mids = JSON.parse(dp.media_ids || '[]'); } catch { mids = []; }
+      let tree = []; try { tree = JSON.parse(dp.tree || '[]'); } catch { tree = []; }
+      draft = { id: dp.id, accountId: dp.account_id, category: dp.category || 'text', text: dp.text || '', media: mids.map(mv).filter(Boolean), tree: tree.map((c) => ({ text: c.text || '', media: (c.mediaIds || []).map(mv).filter(Boolean) })) };
+    }
+    sendHtml(res, 200, ui.composePage({ user, accounts: SnsAccounts.listForUser(user.id), csrf: token, aiAvail: ai.available(), draft }));
     return true;
   }
   if (pathname === '/service/app/posts' && method === 'POST') {
@@ -384,6 +394,11 @@ async function handle(ctx) {
     let b = null;
     try { b = JSON.parse(await readRaw(req, 300_000)); } catch { b = null; }
     const r = apiV1.createFromBody(user.id, b, { via: 'screen' });
+    // 下書きを開いて保存し直した場合は、元の下書きを削除する（同じ内容が二重に残らないように）
+    if (r.status === 201 && b && b.replace_draft) {
+      const old = ScheduledPosts.get(String(b.replace_draft));
+      if (old && old.user_id === user.id && old.status === 'draft') ScheduledPosts.cancel(old.id, user.id);
+    }
     sendJson(res, r.status, r.body);
     return true;
   }

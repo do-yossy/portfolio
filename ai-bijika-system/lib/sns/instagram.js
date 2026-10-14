@@ -78,13 +78,17 @@ async function refresh({ accessToken }) {
   return { accessToken: r.access_token, refreshToken: '', expiresAt: new Date(Date.now() + (Number(r.expires_in) || 60 * 24 * 3600) * 1000).toISOString() };
 }
 
-// コンテナの準備ができるまで待つ（FINISHED）。公式：画像・カルーセルも含め、状態を確かめてから公開する。確認は間隔を広げながら最大5分
-async function waitFinished(containerId, accessToken) {
+// コンテナの準備ができるまで待つ（FINISHED）。公式：画像・カルーセルも含め、状態を確かめてから公開する。確認は間隔を広げながら最大5分。
+// カルーセルの子は、まとめて1つの待ち時間の中で確かめる（1件ずつ待つと、件数に比例して長くなり、ほかの予約の処理も止まるため）
+async function waitFinished(containerIds, accessToken) {
+  const pending = new Set([].concat(containerIds));
   const r = await poll.until(async () => {
-    const st = await call({ path: `/${API_VERSION}/${encodeURIComponent(containerId)}`, query: { fields: 'status_code,status', access_token: accessToken } });
-    if (st.status_code === 'FINISHED' || st.status_code === 'PUBLISHED') return { done: true };
-    if (st.status_code === 'ERROR' || st.status_code === 'EXPIRED') throw new SnsError(`Instagram側で画像・動画の処理に失敗しました${st.status ? `（${st.status}）` : ''}。形式・縦横比・長さをご確認ください。`);
-    return null;
+    for (const cid of [...pending]) {
+      const st = await call({ path: `/${API_VERSION}/${encodeURIComponent(cid)}`, query: { fields: 'status_code,status', access_token: accessToken } });
+      if (st.status_code === 'FINISHED' || st.status_code === 'PUBLISHED') { pending.delete(cid); continue; }
+      if (st.status_code === 'ERROR' || st.status_code === 'EXPIRED') throw new SnsError(`Instagram側で画像・動画の処理に失敗しました${st.status ? `（${st.status}）` : ''}。形式・縦横比・長さをご確認ください。`);
+    }
+    return pending.size ? null : { done: true };
   });
   if (!r) throw new SnsError('Instagram側の処理が時間内に終わりませんでした。', { retriable: true });
 }
@@ -102,9 +106,9 @@ async function publish(args) {
       const f = { is_carousel_item: 'true', access_token: accessToken };
       if (m.kind === 'image') f.image_url = m.url; else { f.media_type = 'VIDEO'; f.video_url = m.url; }
       const c = await call({ method: 'POST', path: `${base}/media`, form: f });
-      await waitFinished(c.id, accessToken);
       kids.push(c.id);
     }
+    await waitFinished(kids, accessToken);
     created = await call({ method: 'POST', path: `${base}/media`, form: { media_type: 'CAROUSEL', children: kids.join(','), caption: text || '', access_token: accessToken } });
   } else {
     const form = { caption: text || '', access_token: accessToken };

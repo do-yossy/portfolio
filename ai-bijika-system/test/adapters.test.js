@@ -1,6 +1,7 @@
 'use strict';
 // SNSアダプタ単体のテスト（カルーセル・ツリー。外部通信はモック）
 process.env.SNS_POLL_INTERVAL_MS = '1';
+process.env.SNS_POLL_MAX_MS = '200';
 const { ok, summary, installHttpsMock } = require('./helpers');
 const th = require('../lib/sns/threads');
 const ig = require('../lib/sns/instagram');
@@ -79,24 +80,65 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   mock.restore();
   ok(r.externalId === 'igok' && pubTry === 2, 'Instagramの「まだ公開の準備ができていない」は、同じ投稿のまま待って再試行する');
   console.log('Threads 公開の応答が失われた場合');
+  const thList = (data) => (c) => (c.method === 'GET' && c.path.startsWith('/v1.0/u1/threads?') ? { status: 200, json: { data } } : null);
   mock = installHttpsMock(async (c) => {
-    if (/\/threads$/.test(c.path)) return { status: 200, json: { id: 'cx' } };
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cx' } };
     if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    const l = thList([{ id: 'post_other', text: 'ちがう', timestamp: new Date().toISOString() }, { id: 'post_x', text: 'x', timestamp: new Date().toISOString() }])(c);
+    if (l) return l;
     return { status: 200, json: { status: 'PUBLISHED' } };
   });
   r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } });
   mock.restore();
-  ok(r.externalId === 'cx', '公開の応答が失われても、コンテナが PUBLISHED なら投稿済みとして記録する（利用者に確認をお願いしない）');
-  let fin = 0;
+  ok(r.externalId === 'post_x', '公開の応答が失われても、コンテナが PUBLISHED なら投稿済みとし、コンテナIDではなく実際の投稿IDを記録する');
   mock = installHttpsMock(async (c) => {
-    if (/\/threads$/.test(c.path)) return { status: 200, json: { id: 'cy' } };
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cx' } };
     if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
-    fin++; return { status: 200, json: { status: 'FINISHED' } };
+    const l = thList([])(c);
+    if (l) return l;
+    return { status: 200, json: { status: 'PUBLISHED' } };
+  });
+  r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } });
+  mock.restore();
+  ok(r.externalId === '', '投稿IDが見つからなければ、IDは空のまま投稿済みとする（コンテナIDを投稿IDとして記録しない）');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: `c${mock.calls.filter((x) => x.method === 'POST' && /\/threads$/.test(x.path)).length}` } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    const l = thList([])(c);
+    if (l) return l;
+    return { status: 200, json: { status: 'PUBLISHED' } };
+  });
+  err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'tree', text: '1', medias: [], tree: [{ text: '2', medias: [] }] } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && !err.retriable && /続きを投稿できませんでした/.test(err.message) && mock.calls.filter((c) => c.method === 'POST' && /\/threads$/.test(c.path)).length === 1, 'ツリーで投稿IDが分からなくなったら、返信先を決められないので続きを止める（再試行もしない）');
+  let pubN2 = 0;
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cy' } };
+    if (/threads_publish$/.test(c.path)) { pubN2++; if (pubN2 === 1) throw new Error('ECONNRESET'); return { status: 200, json: { id: 'post_retry' } }; }
+    return { status: 200, json: { status: 'FINISHED' } };
+  });
+  r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } });
+  const createdN = mock.calls.filter((c) => c.method === 'POST' && /\/threads$/.test(c.path)).length;
+  const publishBodies = mock.calls.filter((c) => /threads_publish$/.test(c.path)).map((c) => c.body);
+  mock.restore();
+  ok(r.externalId === 'post_retry' && createdN === 1 && publishBodies.length === 2 && publishBodies.every((b) => /creation_id=cy/.test(b)), 'コンテナがまだ FINISHED なら、新しいコンテナは作らず、同じコンテナで公開をやり直す（二重投稿にならない）');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cz' } };
+    if (/threads_publish$/.test(c.path)) return { status: 500, json: { error: { message: 'server' } } };
+    return { status: 200, json: { status: 'FINISHED' } };
   });
   err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } }); } catch (e) { err = e; }
+  const pubTries = mock.calls.filter((c) => /threads_publish$/.test(c.path)).length;
   mock.restore();
-  ok(err && err.retriable === true, 'コンテナがまだ FINISHED（未公開）なら、安全に再試行できる');
+  ok(err && err.retriable === false && /投稿されたか/.test(err.message) && pubTries === 3, '同じコンテナでのやり直しが続けて失敗したら、自動の再試行（新しいコンテナ）には回さず、投稿されたかの確認をお願いする');
   ok(th.textLength('あ😀') === 5 && th.textLength('abc') === 3, 'Threadsの文字数は、絵文字をUTF-8のバイト数で数える（公式の数え方）');
+  ok(th.textLength('🇯🇵') === 8 && th.textLength('1️⃣') === 7, '国旗やキーキャップの絵文字も、UTF-8のバイト数で数える');
+  const uiTh = require('../lib/service-ui').composePage({ user: { email: 'a' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], csrf: 'c' });
+  const thSrc = uiTh.match(/var SEG=[\s\S]*?function thLen\(t\)\{[^\n]*\n/);
+  global.window = { Intl };
+  const thLen = thSrc && new Function(`${thSrc[0]}; return thLen;`)();
+  delete global.window;
+  ok(thLen && thLen('🇯🇵') === 8 && thLen('1️⃣') === 7 && thLen('あ😀') === 5, '画面の文字数の表示も、Threadsはサーバーと同じ数え方にする');
   ok(/\b300\b|5分/.test(th.validatePost({ post: { category: 'video', text: '', medias: [{ kind: 'video', durationSec: 301 }] } }) || ''), 'Threadsの動画は5分まで');
 
   console.log('X ツリー');
@@ -236,6 +278,18 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   };
   err = await fbFail({ message: 'limit', code: 4 });
   ok(err && err.retriable && !err.authError && !/投稿されたか/.test(err.message), 'Facebookの呼び出しの上限（コード4）は、投稿されていないので再試行する');
+  const fbFail500 = async (errBody) => {
+    mock = installHttpsMock(async (c) => (/\/feed$/.test(c.path) ? { status: 500, json: { error: errBody } } : null));
+    let e2 = null; try { await fb.publish({ accessToken: 't', externalUserId: 'pg', post: { category: 'text', text: 'a', medias: [] } }); } catch (e) { e2 = e; }
+    mock.restore();
+    return e2;
+  };
+  for (const code of [1, 2]) {
+    err = await fbFail500({ message: 'temporary', code });
+    ok(err && !err.retriable && /投稿されたか/.test(err.message), `Facebookの一時的な障害（コード${code}・HTTP 500）は、公開の最終段階では投稿されたかの確認をお願いし、自動で再投稿しない`);
+  }
+  err = await fbFail500({ message: 'limit', code: 17 });
+  ok(err && err.retriable && !/投稿されたか/.test(err.message), '呼び出しの上限（コード17）は、受け付けられていないので、最終段階でも再試行する');
   err = await fbFail({ message: 'perm', code: 200 });
   ok(err && err.authError && /許可/.test(err.message), 'Facebookの権限エラー（200番台）は、連携のやり直しを促す');
   err = await fbFail({ message: 'role', code: 100, error_subcode: 492 });

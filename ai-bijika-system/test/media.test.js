@@ -13,6 +13,7 @@ process.env.THREADS_APP_ID = 'th'; process.env.THREADS_APP_SECRET = 'ths';
 process.env.INSTAGRAM_APP_ID = 'ig'; process.env.INSTAGRAM_APP_SECRET = 'igs';
 process.env.TIKTOK_CLIENT_KEY = 'tt'; process.env.TIKTOK_CLIENT_SECRET = 'tts';
 process.env.SNS_POLL_INTERVAL_MS = '1';
+process.env.SNS_POLL_MAX_MS = '200';
 
 const { ok, summary, installHttpsMock } = require('./helpers');
 const { Users } = require('../db');
@@ -231,8 +232,12 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   let tokenErr = null;
   try { await tt.exchangeCode({ code: 'c', redirectUri: 'https://example.test/cb' }); } catch (e) { tokenErr = e; }
   ok(tokenErr && tokenErr.authError, 'TikTokの認可のエラー（文字列形式）を、成功として扱わない');
+  process.env.TIKTOK_AUDITED = 'true';
   const info = await tt.creatorInfo({ accessToken: 't' });
-  ok(info.nickname === 'テスト' && info.privacyLevelOptions.length === 2 && info.commentDisabled === true && info.maxVideoPostDurationSec === 600, 'TikTokの投稿設定（公開範囲・コメント可否・最大秒数）を取得できる');
+  ok(info.nickname === 'テスト' && info.privacyLevelOptions.length === 2 && info.commentDisabled === true && info.maxVideoPostDurationSec === 600 && info.audited === true, 'TikTokの投稿設定（公開範囲・コメント可否・最大秒数）を取得できる');
+  delete process.env.TIKTOK_AUDITED;
+  const infoUn = await tt.creatorInfo({ accessToken: 't' });
+  ok(infoUn.privacyLevelOptions.join() === 'SELF_ONLY' && infoUn.audited === false, 'TikTokのアプリの審査前は、公開範囲の選択肢を「自分のみ」だけにする');
   ok(/自分のみ/.test(tt.validatePost({ text: 'a', media: { kind: 'video' }, options: { privacy_level: 'SELF_ONLY', commercial_paid: true } })), '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできない');
   m5.restore();
 
@@ -242,6 +247,25 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   const synth = Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), box32('mdat', Buffer.alloc(300, 1)), box32('moov', box32('mvhd', mvhd))]);
   const synthPath = path.join(process.env.DATA_DIR, 'synth.mp4'); fs.writeFileSync(synthPath, synth);
   ok(media.mp4DurationSec(synthPath) === 12, 'MP4の長さ（秒）を読み取れる（moovがmdatの後ろにあっても）');
+  // 画像の幅・高さ（JPEGはExifの向きも見る）
+  const sof = (w, h) => Buffer.concat([Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08]), Buffer.from([h >> 8, h & 255, w >> 8, w & 255]), Buffer.alloc(10, 0)]);
+  const exif = (orient, le) => {
+    const t = Buffer.alloc(26);
+    if (le) { t.write('II', 0, 'latin1'); t.writeUInt16LE(42, 2); t.writeUInt32LE(8, 4); t.writeUInt16LE(1, 8); t.writeUInt16LE(0x0112, 10); t.writeUInt16LE(3, 12); t.writeUInt32LE(1, 14); t.writeUInt16LE(orient, 18); }
+    else { t.write('MM', 0, 'latin1'); t.writeUInt16BE(42, 2); t.writeUInt32BE(8, 4); t.writeUInt16BE(1, 8); t.writeUInt16BE(0x0112, 10); t.writeUInt16BE(3, 12); t.writeUInt32BE(1, 14); t.writeUInt16BE(orient, 18); }
+    const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), t]);
+    return Buffer.concat([Buffer.from([0xff, 0xe1, (body.length + 2) >> 8, (body.length + 2) & 255]), body]);
+  };
+  const jpgPath = path.join(process.env.DATA_DIR, 'o.jpg');
+  fs.writeFileSync(jpgPath, Buffer.concat([Buffer.from([0xff, 0xd8]), sof(400, 300)]));
+  let sz = media.imageSize(jpgPath);
+  ok(sz && sz.width === 400 && sz.height === 300, 'JPEGの幅と高さを読み取れる');
+  fs.writeFileSync(jpgPath, Buffer.concat([Buffer.from([0xff, 0xd8]), exif(6, true), sof(400, 300)]));
+  sz = media.imageSize(jpgPath);
+  ok(sz && sz.width === 300 && sz.height === 400, 'Exifの向きが90度回転（6）なら、見た目の幅と高さに入れ替える（スマホの縦写真）');
+  fs.writeFileSync(jpgPath, Buffer.concat([Buffer.from([0xff, 0xd8]), exif(1, false), sof(400, 300)]));
+  sz = media.imageSize(jpgPath);
+  ok(sz && sz.width === 400 && sz.height === 300, 'Exifの向きが通常（1）なら、そのまま（ビッグエンディアンのExifも読める）');
   const box64 = (type, payload) => { const b = Buffer.alloc(16 + payload.length); b.writeUInt32BE(1, 0); b.write(type, 4, 'latin1'); b.writeBigUInt64BE(BigInt(16 + payload.length), 8); payload.copy(b, 16); return b; };
   fs.writeFileSync(synthPath, Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), box64('moov', box32('mvhd', mvhd))]));
   ok(media.mp4DurationSec(synthPath) === 12, '64bitのサイズ表記のMP4でも、長さを読み取れる');
@@ -385,6 +409,22 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   ok(store.SnsAccounts.get(ytAcc).status === 'active', '割り当ての使い切りでは、連携のやり直しにしない');
   delete process.env.YOUTUBE_DAILY_LIMIT;
   [y1, y2, y4].forEach((y) => store.ScheduledPosts.cancel(y.ids[0], ytUid));
+  // 利用者ごとの1日の上限（1人でサービス全体の枠を使い切らないように）
+  process.env.YOUTUBE_PER_USER_DAILY = '1';
+  process.env.YOUTUBE_DAILY_LIMIT = '1000'; // 全体の枠には余裕がある状態で、利用者ごとの上限だけを確かめる
+  const yu1 = mkYt(); const yu2 = mkYt();
+  ok(yu1.ok && !yu2.ok && /1日に1件まで/.test(yu2.error), 'YouTubeは、利用者ごとの1日の上限を超える予約を断る');
+  const ytDay2 = require('../lib/pt-time').dayBounds(new Date().toISOString()).day;
+  store.ApiUsage.fill(`youtube:user:${ytUid}`, ytDay2, 1);
+  const globalBefore = store.ApiUsage.get('youtube', ytDay2);
+  mYt = installHttpsMock(async () => null);
+  await new Promise((res) => setTimeout(res, 1200));
+  await scheduler.tick();
+  mYt.restore();
+  const yu1Row = store.ScheduledPosts.get(yu1.ids[0]);
+  ok(yu1Row.status === 'pending' && yu1Row.attempts === 0 && /1日の上限/.test(yu1Row.last_error) && !/サービス全体/.test(yu1Row.last_error) && !mYt.calls.length && store.ApiUsage.get('youtube', ytDay2) === globalBefore, '送る時点で利用者ごとの上限に達していたら、送らずに翌日へ回し、サービス全体の枠は使わない');
+  store.ScheduledPosts.cancel(yu1.ids[0], ytUid);
+  delete process.env.YOUTUBE_PER_USER_DAILY; delete process.env.YOUTUBE_DAILY_LIMIT;
 
   console.log('メディアの削除');
   const old = Date.now() + 3 * 24 * 3600 * 1000;

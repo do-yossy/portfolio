@@ -398,11 +398,12 @@ const ScheduledPosts = {
     db.prepare(`UPDATE scheduled_posts SET status='pending', scheduled_at=?, last_error=?, attempts=MAX(attempts-1, 0), updated_at=? WHERE id=?`)
       .run(scheduledAt, String(message || '').slice(0, 500), now(), id);
   },
-  // サービス全体で、そのSNSへの予約・投稿の件数（YouTubeの1日の割り当ての確認用）
-  countPlatformBetween(platform, fromIso, toIso) {
+  // そのSNSへの予約・投稿の件数（YouTubeの1日の割り当ての確認用）。userId を渡すとその利用者だけ、省略するとサービス全体
+  countPlatformBetween(platform, fromIso, toIso, userId = null) {
     return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
-      WHERE (p.platform=? OR a.platform=?) AND p.scheduled_at >= ? AND p.scheduled_at < ? AND p.status IN ('pending','publishing','posted')`)
-      .get(platform, platform, fromIso, toIso).n;
+      WHERE (p.platform=? OR a.platform=?) AND p.scheduled_at >= ? AND p.scheduled_at < ? AND p.status IN ('pending','publishing','posted')
+        AND (? IS NULL OR p.user_id = ?)`)
+      .get(platform, platform, fromIso, toIso, userId, userId).n;
   },
   // 起動時：処理中のまま残った行は、二重投稿を避けるため失敗扱いにする（投稿されたかどうかが不明なため）
   failStuck(olderThanIso) {
@@ -537,6 +538,10 @@ const ApiUsage = {
   get(platform, day) {
     const r = db.prepare('SELECT n FROM api_usage WHERE platform=? AND day=?').get(platform, day);
     return r ? r.n : 0;
+  },
+  // 確保した1回分を戻す（ほかの上限に当たって、実際には送らなかったとき）
+  release(platform, day) {
+    db.prepare('UPDATE api_usage SET n = n - 1 WHERE platform=? AND day=? AND n > 0').run(platform, day);
   },
 };
 

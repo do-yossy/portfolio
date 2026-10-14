@@ -22,13 +22,17 @@ function isConfigured(env = process.env) {
   const c = creds(env);
   return !!(c.appId && c.appSecret);
 }
-// 文字数。公式：テキストは500文字まで、絵文字はUTF-8のバイト数で数える（例：😀 は4）
+// 文字数。公式：テキストは500文字まで、絵文字はUTF-8のバイト数で数える（例：😀 は4、🇯🇵 は8、1️⃣ は7）
 const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('ja', { granularity: 'grapheme' }) : null;
+// 絵文字の判定。国旗（地域指示記号の組）やキーキャップ（1️⃣）も絵文字として数える。RGI_Emoji が使えない環境では近い判定にする
+let EMOJI;
+try { EMOJI = new RegExp('\\p{RGI_Emoji}', 'v'); } catch { EMOJI = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u; }
+const isEmoji = (g) => EMOJI.test(g) || /\p{Extended_Pictographic}/u.test(g);
 function textLength(text) {
   const t = String(text);
   if (!segmenter) return [...t].length;
   let n = 0;
-  for (const { segment } of segmenter.segment(t)) n += /\p{Extended_Pictographic}/u.test(segment) ? Buffer.byteLength(segment, 'utf8') : 1;
+  for (const { segment } of segmenter.segment(t)) n += isEmoji(segment) ? Buffer.byteLength(segment, 'utf8') : 1;
   return n;
 }
 
@@ -116,16 +120,53 @@ function validatePost(args) {
   return null;
 }
 
-// コンテナの準備ができるまで待つ（FINISHED）。公式：アップロードの処理に時間がかかるため、状態を確かめてから公開する
-async function waitFinished(containerId, accessToken) {
+async function containerStatus(containerId, accessToken) {
+  return call('GET', `/v1.0/${encodeURIComponent(containerId)}`, { query: { fields: 'status,error_message', access_token: accessToken } });
+}
+// コンテナの準備ができるまで待つ（FINISHED）。公式：アップロードの処理に時間がかかるため、状態を確かめてから公開する。
+// カルーセルの子は、まとめて1つの待ち時間（最大5分）の中で確かめる（1件ずつ待つと、件数に比例して長くなるため）。
+// 状態が返ってこない（status が無い）コンテナは、処理待ちが無いものとして先へ進む（テキストのコンテナなど）
+async function waitFinished(containerIds, accessToken) {
+  const pending = new Set([].concat(containerIds));
   const r = await poll.until(async () => {
-    const st = await call('GET', `/v1.0/${encodeURIComponent(containerId)}`, { query: { fields: 'status,error_message', access_token: accessToken } });
-    if (st.status === 'FINISHED' || st.status === 'PUBLISHED') return { done: true, value: st.status };
-    if (st.status === 'ERROR' || st.status === 'EXPIRED') throw new SnsError(`Threads側で画像・動画の処理に失敗しました${st.error_message ? `（${st.error_message}）` : ''}`);
-    return null;
+    for (const cid of [...pending]) {
+      const st = await containerStatus(cid, accessToken);
+      if (!st.status || st.status === 'FINISHED' || st.status === 'PUBLISHED') { pending.delete(cid); continue; }
+      if (st.status === 'ERROR' || st.status === 'EXPIRED') throw new SnsError(`Threads側で画像・動画の処理に失敗しました${st.error_message ? `（${st.error_message}）` : ''}`);
+    }
+    return pending.size ? null : { done: true };
   });
   if (!r) throw new SnsError('Threads側の処理が時間内に終わりませんでした。', { retriable: true });
-  return r.value;
+}
+
+// 公開の応答が失われたとき（通信エラー・5xx）の確かめ方。
+// FINISHED（まだ公開されていない）なら、同じコンテナで公開をやり直す。1つのコンテナは1回しか公開できないので、二重投稿にならない。
+// 新しいコンテナを作り直す再試行（スケジューラの再試行）には回さない（応答が失われた直後の FINISHED は、あとから PUBLISHED になることがあるため）。
+// PUBLISHED なら、公開された投稿のIDを、自分の最近の投稿から探す（コンテナIDと投稿IDは別の値）。
+// 戻り値：{ id }（投稿ID。見つからなければ id は ''）。決められなければ、元のエラーを「投稿されたか不明」として投げる
+async function recoverPublish({ base, containerId, accessToken, text, startedAt, error }) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let st;
+    try { st = await containerStatus(containerId, accessToken); } catch { break; }
+    if (st.status === 'PUBLISHED') return { id: await findPublishedId({ base, accessToken, text, startedAt }) };
+    if (st.status !== 'FINISHED' || attempt === 2) break;
+    await poll.sleep(poll.intervalMs() * 2);
+    try {
+      const published = await call('POST', `${base}/threads_publish`, { form: { creation_id: containerId, access_token: accessToken } });
+      return { id: String(published.id) };
+    } catch {
+      // 失敗の理由が何であっても（「すでに公開済み」での拒否を含む）、次の回でコンテナの状態を確かめ直す
+    }
+  }
+  throw ambiguous(error);
+}
+async function findPublishedId({ base, accessToken, text, startedAt }) {
+  try {
+    const list = await call('GET', `${base}/threads`, { query: { fields: 'id,text,timestamp', limit: '10', access_token: accessToken } });
+    const since = startedAt - 10 * 60 * 1000;
+    const hit = (list.data || []).find((t) => String(t.text || '') === String(text || '') && (!t.timestamp || Date.parse(t.timestamp) >= since));
+    return hit ? String(hit.id) : '';
+  } catch { return ''; }
 }
 function mediaForm(m) {
   return m.kind === 'image' ? { media_type: 'IMAGE', image_url: m.url } : { media_type: 'VIDEO', video_url: m.url };
@@ -141,9 +182,9 @@ async function publishOne({ accessToken, externalUserId, text, medias, replyTo }
     const kids = [];
     for (const m of medias) {
       const c = await call('POST', `${base}/threads`, { form: { ...mediaForm(m), is_carousel_item: 'true', access_token: accessToken } });
-      await waitFinished(c.id, accessToken);
       kids.push(c.id);
     }
+    await waitFinished(kids, accessToken);
     created = await call('POST', `${base}/threads`, { form: { ...form, media_type: 'CAROUSEL', children: kids.join(','), text: text || '' } });
   } else if (medias.length === 1) {
     created = await call('POST', `${base}/threads`, { form: { ...form, ...mediaForm(medias[0]), text: text || '' } });
@@ -152,17 +193,16 @@ async function publishOne({ accessToken, externalUserId, text, medias, replyTo }
   }
   // テキスト・画像・動画・カルーセルのどれも、準備ができてから公開する
   await waitFinished(created.id, accessToken);
+  const startedAt = Date.now();
   let published;
   try {
     published = await call('POST', `${base}/threads_publish`, { form: { creation_id: created.id, access_token: accessToken } });
   } catch (e) {
-    // 応答だけが失われた可能性がある。コンテナの状態で、公開されたかを確かめる（公式の案内）
-    try {
-      const st = await call('GET', `/v1.0/${encodeURIComponent(created.id)}`, { query: { fields: 'status', access_token: accessToken } });
-      if (st.status === 'PUBLISHED') return String(created.id);
-      if (st.status === 'FINISHED') { e.retriable = !e.authError; throw e; } // まだ公開されていない：安全に再試行できる
-    } catch (e2) { if (e2 === e) throw e; }
-    throw ambiguous(e);
+    // 公開されていないと確定しているエラー（400番台の拒否・認証エラー・429）は、そのまま扱う
+    if (e.authError || !e.retriable || e.status === 429) throw e;
+    // 通信エラー・5xx：応答だけが失われた可能性がある。コンテナの状態で確かめる（公式の案内）
+    const r = await recoverPublish({ base, containerId: created.id, accessToken, text, startedAt, error: e });
+    return r.id;
   }
   return String(published.id);
 }
@@ -179,11 +219,15 @@ async function publish(args) {
   for (let i = 0; i < items.length; i++) {
     try {
       prev = await publishOne({ accessToken, externalUserId, text: items[i].text, medias: items[i].medias || [], replyTo: prev });
-      if (!first) first = prev;
+      if (i === 0) first = prev;
     } catch (e) {
       // 1件目が公開済みなら、自動の再試行は二重投稿になるため止める
-      if (first) { e.retriable = false; e.message = `${e.message}（ツリーの${i}件目までは投稿済みです。SNSでご確認ください）`; }
+      if (i > 0) { e.retriable = false; e.message = `${e.message}（ツリーの${i}件目までは投稿済みです。SNSでご確認ください）`; }
       throw e;
+    }
+    // 公開されたが投稿IDが分からない（応答が失われた）場合、続きは返信先が決められないため止める
+    if (!prev && i < items.length - 1) {
+      throw new SnsError(`ツリーの${i + 1}件目までは投稿されましたが、通信の問題で投稿IDを確かめられなかったため、続きを投稿できませんでした。SNSでご確認ください。`);
     }
   }
   return { externalId: first };

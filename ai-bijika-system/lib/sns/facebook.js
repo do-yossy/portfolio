@@ -54,8 +54,11 @@ async function call({ method = 'GET', path, query, form }) {
   const err = classify(r.status, em && em.message ? `Facebook: ${em.message}` : '');
   // HTTPステータスではなく、Graph API のエラーコードで分ける（公式のエラー処理のガイド）
   const code = em && Number(em.code); const sub = em && Number(em.error_subcode);
-  // 呼び出しの上限・一時的な障害は、投稿されていないと確定しているので、最終段階でも再試行してよい（status を 429 として扱う）
-  if ([1, 2, 4, 17, 32, 341, 613].includes(code)) { err.retriable = true; err.authError = false; err.status = 429; }
+  // 呼び出しの上限（4・17・32・341・613）は、受け付けられていない（処理されていない）ので、公開の最終段階でも再試行してよい（status を 429 として扱う）。
+  // 一時的な障害（1・2）は、公式は「待って再試行」とだけ書いていて、処理されなかったとは書いていない。
+  // そのため再試行の対象にはするが、公開の最終段階では「投稿されたか不明」として止める（status は元のまま。ambiguous が扱う）
+  if ([4, 17, 32, 341, 613].includes(code)) { err.retriable = true; err.authError = false; err.status = 429; }
+  else if ([1, 2].includes(code)) { err.retriable = true; err.authError = false; }
   if (code === 190 || (code === 102 && !sub) || (sub >= 458 && sub <= 467) || sub === 492) { err.authError = true; err.retriable = false; }
   else if (code === 10 || (code >= 200 && code <= 299)) {
     err.authError = true; err.retriable = false;

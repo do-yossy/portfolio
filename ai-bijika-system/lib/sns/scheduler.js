@@ -13,8 +13,17 @@ const RETRY_BASE_MS = 5 * 60 * 1000; // 5分、10分…
 const REFRESH_MARGIN_MS = { x: 10 * 60 * 1000, tiktok: 60 * 60 * 1000, youtube: 5 * 60 * 1000 };
 const DEFAULT_REFRESH_MARGIN_MS = 3 * 24 * 3600 * 1000;
 // YouTubeのアップロードの、サービス全体の1日（太平洋時間）の上限。割り当てを超えないよう、送る前に1回分を確保する
-const youtubePerDay = () => { const v = parseInt(process.env.YOUTUBE_DAILY_LIMIT || '', 10); return Number.isFinite(v) && v > 0 ? v : 90; };
+const envInt = (k, d) => { const v = parseInt(process.env[k] || '', 10); return Number.isFinite(v) && v > 0 ? v : d; };
+const youtubePerDay = () => envInt('YOUTUBE_DAILY_LIMIT', 90);
+const youtubePerUserDay = () => envInt('YOUTUBE_PER_USER_DAILY', 5);
 const YT_DEFER_MSG = 'YouTubeへのアップロードが、サービス全体の1日の上限に達したため、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します';
+const YT_DEFER_USER_MSG = 'YouTubeへの投稿が、1日の上限に達したため、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します';
+// サービス全体と利用者ごとの1回分を、両方そろって確保できたときだけ送る。片方しか確保できなければ戻して、理由を返す
+function takeYoutube(userId, day) {
+  if (!ApiUsage.take('youtube', day, youtubePerDay())) return YT_DEFER_MSG;
+  if (!ApiUsage.take(`youtube:user:${userId}`, day, youtubePerUserDay())) { ApiUsage.release('youtube', day); return YT_DEFER_USER_MSG; }
+  return null;
+}
 
 function key() {
   return box.keyFromEnv();
@@ -68,7 +77,8 @@ async function processOne(post) {
     const full = { category, text: post.text, medias, tree: treeCards.map((c, i) => ({ text: c.text, medias: cardMedias[i] })), options };
     if (account.platform === 'youtube') {
       const d = ptTime.dayBounds(new Date().toISOString());
-      if (!ApiUsage.take('youtube', d.day, youtubePerDay())) return ScheduledPosts.defer(post.id, new Date(Date.parse(d.to) + 5 * 60 * 1000).toISOString(), YT_DEFER_MSG);
+      const why = takeYoutube(post.user_id, d.day);
+      if (why) return ScheduledPosts.defer(post.id, new Date(Date.parse(d.to) + 5 * 60 * 1000).toISOString(), why);
     }
     const r = await adapter.publish({ accessToken, externalUserId: account.external_user_id, post: full });
     ScheduledPosts.markPosted(post.id, r.externalId);
@@ -140,6 +150,9 @@ function start(intervalMs = 30000) {
   // 投稿が終わったメディアの削除と、長期トークンの延長を、1時間ごとに行う
   const clean = () => {
     try { mediaLib.cleanup(); } catch (e) { console.error('[media cleanup]', e); }
+    // 処理中のまま長く残った予約（処理の途中でエラーが起きた・止まったもの）を、二重投稿を避けて失敗扱いにする。
+    // 処理の最中（tick の実行中）は、まだ送っている途中かもしれないので触らない
+    if (!running) { try { ScheduledPosts.failStuck(new Date(Date.now() - 30 * 60 * 1000).toISOString()); } catch (e) { console.error('[fail stuck]', e); } }
     refreshExpiring().catch((e) => console.error('[token refresh]', e));
   };
   clean();
