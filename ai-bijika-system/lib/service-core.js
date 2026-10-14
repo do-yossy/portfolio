@@ -4,7 +4,7 @@ const { Subscriptions, SnsAccounts, OAuthStates, ScheduledPosts, MediaAssets } =
 const box = require('./crypto-box');
 const registry = require('./sns');
 
-const LIMITS = { maxAccounts: 5, maxPending: 100, maxPerDay: 30 };
+const LIMITS = { maxAccounts: 10, maxPending: 100, maxPerDay: 30 };
 const MAX_DAYS_AHEAD = 90;
 const JST_OFFSET_MS = 9 * 3600 * 1000;
 
