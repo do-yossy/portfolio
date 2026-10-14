@@ -2004,6 +2004,8 @@ const server = http.createServer(async (req, res) => {
     // テスト利用の付与・取り消し（動作確認用。Stripeを通さない）
     if ((pathname === '/admin/service/test-grant' || pathname === '/admin/service/test-revoke') && method === 'POST') {
       if (!isAdminAuthed(req)) return redirect(res, '/admin/login');
+      // 管理画面のパスワードが既定値のままだと、誰でも無料で全機能を使えるようになってしまうため、付与させない
+      if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme') return adminServicePage(400, { ok: false, text: 'ADMIN_PASSWORD（管理画面のパスワード）が設定されていないため、テスト利用は付与できません。Fly.io のシークレットに設定してください。' });
       const { email } = await parseBody(req);
       const u = Users.findByEmail(String(email || '').trim().toLowerCase());
       if (!u) return adminServicePage(400, { ok: false, text: 'そのメールアドレスのアカウントが見つかりません。先に /service/signup でアカウントを作ってください。' });

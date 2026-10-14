@@ -571,6 +571,7 @@ function settingsChecklist(env = process.env) {
   const has = (...ks) => ks.every((k) => !!env[k]);
   const base = String(env.SERVICE_BASE_URL || '');
   return [
+    ['管理画面のパスワード（ADMIN_PASSWORD）', !!env.ADMIN_PASSWORD && env.ADMIN_PASSWORD !== 'changeme', '必須。未設定だと既定の弱いパスワードになり、テスト利用の付与もできません'],
     ['サービスのURL（SERVICE_BASE_URL）', /^https:\/\//.test(base), base ? `設定値：${base}` : '例：https://sq-ai-bijika.fly.dev。SNS連携・画像の投稿・AIアシスタントとの接続に必要'],
     ['トークンの暗号化の鍵（SNS_TOKEN_KEY）', has('SNS_TOKEN_KEY'), 'SNS連携に必要。一度決めたら変えない'],
     ['画面の操作の確認用の鍵（APP_SECRET）', has('APP_SECRET'), '未設定だと再起動のたびに、開いていた画面の操作が失敗する'],
