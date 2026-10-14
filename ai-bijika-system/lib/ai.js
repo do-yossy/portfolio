@@ -6,21 +6,28 @@
 const { Readable } = require('stream');
 const { request, encodeForm } = require('./http-client');
 const mediaLib = require('./media');
-const { AiUsage } = require('./service-store');
+const { AiUsage, Subscriptions } = require('./service-store');
 
 const env = () => process.env;
 const TEXT_MODEL = () => env().AI_TEXT_MODEL || 'claude-haiku-5-5';
 const IMAGE_MODEL = () => env().AI_IMAGE_MODEL || 'gpt-image-1';
 const VIDEO_MODEL = () => env().AI_VIDEO_MODEL || 'veo-3.0-generate-001';
 
-// 1日あたりの生成回数の上限（利用者ごと）。費用を管理するための上限で、環境変数で変えられる
+// 1日あたりの生成回数の上限（利用者ごと）。費用を管理するための上限で、環境変数で変えられる。
+// 動画は費用が高くなりやすいため、既定では無効（運営者が AI_DAILY_VIDEO を設定したときだけ使える）
 function limits() {
-  const n = (v, d) => (Number.isFinite(Number(v)) && v !== undefined && v !== '' ? Number(v) : d);
-  return { text: n(env().AI_DAILY_TEXT, 30), image: n(env().AI_DAILY_IMAGE, 10), video: n(env().AI_DAILY_VIDEO, 2) };
+  const n = (v, d) => (v !== undefined && v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.floor(Number(v)) : d);
+  return { text: n(env().AI_DAILY_TEXT, 30), image: n(env().AI_DAILY_IMAGE, 5), video: n(env().AI_DAILY_VIDEO, 0) };
 }
-const available = () => ({ text: !!env().ANTHROPIC_API_KEY, image: !!env().OPENAI_API_KEY, video: !!env().GEMINI_API_KEY });
+const available = () => {
+  const l = limits();
+  return { text: !!env().ANTHROPIC_API_KEY && l.text > 0, image: !!env().OPENAI_API_KEY && l.image > 0, video: !!env().GEMINI_API_KEY && l.video > 0 };
+};
 
-class AiError extends Error {}
+// transient：通信エラー・サーバー側の一時的なエラー（時間をおいて確認し直せばよいもの）
+class AiError extends Error {
+  constructor(message, { transient = false } = {}) { super(message); this.transient = transient; }
+}
 
 const PLATFORM_HINT = {
   threads: 'Threads（500文字以内）', x: 'X（日本語140字程度。全角は2文字として数えるので短く）', instagram: 'Instagram（キャプション。改行とハッシュタグを使う）',
@@ -30,8 +37,10 @@ const PLATFORM_HINT = {
 function day(nowMs = Date.now()) { return new Date(nowMs + 9 * 3600 * 1000).toISOString().slice(0, 10); } // 日本時間の日付
 
 // 生成の前に上限を確認して1回分を使う（失敗したときは戻す）
+// どの経路（画面・REST API・MCP・自動運用）から呼ばれても、ここで契約を確認する
 function reserve(userId, kind, nowMs) {
   const lim = limits()[kind];
+  if (!Subscriptions.isActive(userId)) throw new AiError('ご契約が有効でないため、生成できません。');
   if (!available()[kind]) throw new AiError('この生成機能は、現在ご利用いただけません。');
   if (!AiUsage.tryUse(userId, day(nowMs), kind, lim)) throw new AiError(`本日の生成回数の上限（${lim}回）に達しました。明日またお試しください。`);
 }
@@ -59,7 +68,9 @@ async function generateText({ userId, theme, tone, platform, instruction, nowMs 
     const user = `テーマ：${subject}\n口調：${tone || 'やさしく丁寧'}\n投稿先：${PLATFORM_HINT[platform] || 'SNS'}${instruction ? `\n追加の指示：${instruction}` : ''}`;
     const j = await post('api.anthropic.com', '/v1/messages',
       { 'x-api-key': env().ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      JSON.stringify({ model: TEXT_MODEL(), max_tokens: 800, system, messages: [{ role: 'user', content: user }] }));
+      JSON.stringify({ model: TEXT_MODEL(), max_tokens: 4000, system, messages: [{ role: 'user', content: user }] }));
+    // 途中で切れた文章は投稿に使わない（思考の分も max_tokens を使うモデルがあるため、余裕を持たせている）
+    if (j.stop_reason === 'max_tokens') throw new AiError('文章が長くなりすぎました。テーマを短くして、もう一度お試しください。');
     const text = ((j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('') || '').trim();
     if (!text) throw new AiError('文章を生成できませんでした。');
     return text;
@@ -106,15 +117,16 @@ async function startVideo({ userId, prompt, nowMs }) {
 
 async function get(host, path, headers, timeoutMs = 60000) {
   let r;
-  try { r = await request({ host, method: 'GET', path, headers, timeoutMs }); } catch (e) { throw new AiError(`AIサービスに接続できませんでした (${e.message})`); }
+  try { r = await request({ host, method: 'GET', path, headers, timeoutMs }); } catch (e) { throw new AiError(`AIサービスに接続できませんでした (${e.message})`, { transient: true }); }
   return r;
 }
 
 // 動画の生成の確認。{ done:false } / { done:true, media } / throw
 async function pollVideo({ userId, operation }) {
   const key = env().GEMINI_API_KEY;
-  if (!/^[A-Za-z0-9_\-/.]+$/.test(operation)) throw new AiError('処理名が正しくありません。');
+  if (!/^[A-Za-z0-9_\-/.]+$/.test(operation) || operation.includes('..') || operation.startsWith('/')) throw new AiError('処理名が正しくありません。');
   const r = await get('generativelanguage.googleapis.com', `/v1beta/${operation}`, { 'x-goog-api-key': key });
+  if (r.status === 429 || r.status >= 500) throw new AiError(`動画の状態を確認できませんでした (${r.status})`, { transient: true });
   if (r.status < 200 || r.status >= 300 || !r.json) throw new AiError(`動画の状態を確認できませんでした (${r.status})`);
   if (!r.json.done) return { done: false };
   if (r.json.error) throw new AiError(`動画の生成に失敗しました：${String(r.json.error.message || '').slice(0, 200)}`);

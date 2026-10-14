@@ -51,50 +51,77 @@ function topNav(user) {
 }
 
 // ── 販売ページ ──
+// ── 表示する文（販売ページ・最終確認画面・マイページで同じ文を使う。規約・特商法表記もこの内容に合わせる）──
+const aiLib = () => require('./ai');
+// 実際に使えるSNS（キーが設定されているもの）
+const liveSns = () => registry.list().filter((p) => p.isConfigured());
+const snsNames = () => { const l = liveSns(); return l.length ? l.map((p) => p.label).join('・') : ''; };
+const SNS_RULES = {
+  threads: 'Threads：テキスト・画像・動画（カルーセル20件まで）。ツリー可',
+  x: 'X：画像4枚（各5MBまで）または動画1本（140秒まで）を添付可。ツリー可。投稿数は月の上限あり',
+  instagram: 'Instagram：プロアカウント（ビジネス／クリエイター）が対象。JPEG画像（カルーセル10件まで）またはリール動画が必須',
+  tiktok: 'TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択',
+  facebook: 'Facebook：ご自身が管理するページのうち、連携時に先頭に表示される1つのページに投稿（連携後にページ名をご確認ください）。テキスト・画像10枚まで・動画1本',
+  youtube: 'YouTube：3分以内の動画1本が必須。本文の1行目がタイトルになり「#Shorts」を自動で付けます。公開設定と子ども向けかどうかは投稿ごとに選択',
+};
+const snsRulesText = () => liveSns().map((p) => SNS_RULES[p.id]).filter(Boolean).join('。');
+function aiLimitsText() {
+  const av = aiLib().available(); const l = aiLib().limits();
+  const parts = [];
+  if (av.text) parts.push(`文章${l.text}回`);
+  if (av.image) parts.push(`画像${l.image}回`);
+  if (av.video) parts.push(`動画${l.video}回`);
+  return parts.length ? `AIによる生成は、1日（日本時間）あたり${parts.join('・')}までです（毎日の自動運用で作る分も含みます）` : '';
+}
 function limitsText() {
   const L = core.LIMITS;
-  return `連携できるSNSアカウントは${L.maxAccounts}件まで、未投稿の予約は${L.maxPending}件まで、1日の予約は${L.maxPerDay}件まで、Xへの投稿は月${L.xPerMonth}件まで（ツリーは1件ずつ数えます）`;
+  return `連携できるSNSアカウントは${L.maxAccounts}件まで、未投稿の予約は${L.maxPending}件まで、同じ日（日本時間）に投稿する予約は${L.maxPerDay}件まで、Xへの投稿は日本時間の暦月ごとに${L.xPerMonth}件まで（ツリーは1件ずつ数えます。毎日Xへ自動運用すると、月の上限をほぼ使い切ります）です`;
 }
+const END_TEXT = '契約期間が終わると、SNSの連携情報を削除し、未投稿の予約・下書きと自動運用の設定を取り消し、AIアシスタントとの接続とAPIキーを無効にします（再開するときは、連携をやり直してください）';
+const FILE_TEXT = 'アップロード・取り込み・AIで作ったファイルは、画像（JPEG・PNG）が8MBまで、動画（MP4・MOV）が100MBまで、保存できる合計は1人あたり300MBまでです。予約・下書きに使っているファイルは、その投稿が終わるか取り消されるまで保存し、投稿が終わってから2日後以降に自動で削除します。どの投稿にも使わなかったファイルは、作成から1日後以降に自動で削除します。各SNSが取得できるよう、保存している間は、推測できない長いURLで外部から取得できる状態になります';
 function trialText(trialDays, price) {
-  return `初めてお申し込みの方は、最初の${trialDays}日間は無料です。お申込みの際に、お支払い方法（クレジットカード等）の登録が必要です。無料期間が終わると自動で有料の契約に切り替わり、月額${price}の請求が始まります。無料期間中に解約すれば、料金はかかりません。`;
+  return `初めてお申し込みの方は、お申込みの完了から${trialDays}日間は無料です（終了日時は、お申込み後にマイページに表示します）。お申込みの際に、お支払い方法（クレジットカード等）の登録が必要です。終了日時になると自動で有料の契約に切り替わり、その時点で初回の月額${price}を請求します。終了日時より前に解約すれば、料金はかかりません`;
 }
 
 function landingPage({ user, billingReady, trialDays = 0 }) {
   const price = yen(core.priceYen());
+  const av = aiLib().available();
+  const names = snsNames();
   const cta = billingReady
     ? `<a class="btn btn-primary btn-block" href="${user ? '/service/checkout' : '/service/signup'}">${user ? '申込みに進む' : '無料でアカウントを作って申し込む'}</a>
        <p class="small center" style="margin-top:8px">アカウント作成は無料です。お支払いは、次の確認画面で内容をご確認いただいたあとに始まります。</p>`
     : `<div class="notice"><div>ただいま準備中です。もうしばらくお待ちください。</div></div>`;
   const feat = (t, d) => `<div class="card"><div class="card-title">${t}</div><p class="small">${d}</p></div>`;
+  const aiParts = [av.text && '投稿文', av.image && '画像', av.video && '動画'].filter(Boolean);
   return wrap('SNS自動投稿サービス', `
     ${topNav(user)}
     <header class="page-head"><div class="eyebrow">SNS Scheduler</div><h1>${nameOf()}</h1>
-      <p class="lead">Threads・X・Instagram・TikTok・Facebookページ・YouTubeへの投稿を、1つの画面からまとめて予約できるサービスです。AIで投稿文や画像を作ることも、AIアシスタントから投稿を操作することもできます。</p></header>
+      <p class="lead">複数のSNSへの投稿を、1つの画面からまとめて予約できるサービスです。${names ? `現在の対応SNSは、${escapeHtml(names)}です。` : '対応SNSは準備中です。'}</p></header>
     <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます（解約後も、契約期間の終わりまでご利用いただけます）</small>${trialDays ? `<small><b>初めての方は${trialDays}日間無料</b>（お支払い方法の登録が必要です。期間が終わると自動で課金が始まります）</small>` : ''}</div>
     ${cta}
     <h2 style="margin-top:26px">できること</h2>
     <div class="grid2">
-      ${feat('6つのSNSへ同時投稿', 'Threads・X・Instagram・TikTok・Facebookページ・YouTube（ショート）に対応。同じ内容を、選んだSNSへまとめて投稿・予約できます。SNSごとに本文を変えることもできます。')}
-      ${feat('テキスト・画像・動画・ツリー', '画像は複数枚（カルーセル）、動画、ThreadsとXのツリー（連投）に対応。TikTokは動画のほか写真投稿にも対応しています。')}
+      ${feat('複数のSNSへ同時投稿', `${names ? `${escapeHtml(names)}に対応しています。` : '対応SNSは準備中です。'}同じ内容を、選んだSNSへまとめて投稿・予約できます。SNSごとに本文を変えることもできます。`)}
+      ${feat('テキスト・画像・動画・ツリー', '複数の画像（カルーセル）、動画、ThreadsとXのツリー（連投）に対応しています（SNSごとの条件は下記）。')}
       ${feat('予約・下書き・カレンダー', '日本時間で最大90日先まで予約できます。下書きに保存して、あとから予約することも。予約はカレンダーで一覧できます。')}
-      ${feat('AIで投稿づくり', 'テーマを入れるだけで、AIが投稿文や画像を作ります（動画の生成にも対応）。毎日決めた時刻に、AIが作った投稿を下書きに入れる「自動運用」も使えます。')}
-      ${feat('AIアシスタントから操作', 'ClaudeやChatGPTなどのMCP対応アプリから、ログインと許可だけで接続できます。REST APIとAPIキー、Claude Code用のスキルもご用意しています。')}
+      ${aiParts.length ? feat('AIで投稿づくり', `テーマを入れると、AIが${aiParts.join('・')}を作ります。毎日決めた時刻に、AIが作った投稿を下書きに入れる「自動運用」も使えます。`) : ''}
+      ${feat('AIアシスタントや他のツールから操作', 'MCP（AIアシスタントとつなぐための共通の仕組み）に対応したアプリから、ログインと許可の操作で接続できます（使えるかどうかは、アプリ側の対応状況によります）。REST APIとAPIキーもご用意しています。')}
       ${feat('自分のアカウントで、安全に', '各SNSの公式の連携（OAuth）を使います。SNSのパスワードをお預かりすることはありません。一時的なエラーは自動で再試行し、結果はマイページで確認できます。')}
     </div>
     <h2 style="margin-top:26px">ご利用の前にご確認ください</h2>
     <div class="card"><ul class="plain small">
-      ${trialDays ? `<li>${trialText(trialDays, price)}</li>` : ''}
-      <li>SNSごとの条件：Threadsは画像・動画が任意（カルーセル20件まで）、Xは画像4枚または動画1本が任意、Instagramはプロアカウント（ビジネス／クリエイター）が対象でJPEG画像（10件まで）またはリール動画が必須、TikTokは動画または写真（JPEG）が必須、Facebookはご自身が管理するページへの投稿、YouTubeは動画1本が必須です。ツリーはThreadsとXだけです。</li>
-      <li>TikTok・Instagram・Facebook・YouTubeへの投稿は、各SNS側の審査・仕様により、使える機能や公開範囲が制限される場合があります。</li>
-      <li>アップロードできるファイルは、画像（JPEG・PNG）が8MBまで、動画（MP4・MOV）が100MBまで、保存できる合計は1人あたり300MBまでです。投稿に使ったファイルは、投稿が終わってから2日後以降（投稿に使わなかったファイルは、アップロードから1日後以降）に、自動で削除します。投稿用のファイルは、保存している間、推測できない長いURLで外部から取得できる状態になります。</li>
-      <li>${limitsText()}です。AIによる生成は、1日の回数に上限があります。</li>
-      <li>AIが作った文章・画像・動画は、誤りや不適切な表現を含む場合があります。投稿の前に、必ずご自身で内容をご確認ください。AIで作ったことの表示が、SNSの規約で求められる場合があります。</li>
+      ${trialDays ? `<li>${trialText(trialDays, price)}。</li>` : ''}
+      ${names ? `<li>SNSごとの条件：${escapeHtml(snsRulesText())}。</li>` : ''}
+      <li>各SNS側の審査・仕様により、使える機能や公開範囲が制限される場合があります。</li>
+      <li>${FILE_TEXT}。</li>
+      <li>${limitsText()}。${aiLimitsText() ? `${aiLimitsText()}。` : ''}</li>
+      ${aiParts.length ? '<li>AIが作った内容は、誤りや不適切な表現を含む場合があります。投稿の前に、必ずご自身で内容をご確認ください。AIで作ったことの表示が、SNSの規約で求められる場合があります。</li>' : ''}
       <li>投稿できるのは、ご自身で作成・予約・設定した内容だけです。いいね・フォロー・コメント・DMなどの自動操作や、投稿の分析機能はありません。</li>
       <li>SNS側の仕様変更や障害、各SNSの規約による制限で、投稿できない場合があります。投稿の内容と、その結果（SNS側での表示・凍結等）の責任は、ご利用者にあります。</li>
-      <li>お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。契約期間が終わると、SNSの連携情報とAIアシスタントとの接続は削除され、未投稿の予約は取り消されます（再開するときは、連携をやり直してください）。</li>
+      <li>お支払いが確認できない間は、予約した投稿を実行しません。お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。${END_TEXT}。</li>
     </ul></div>
     <h2 style="margin-top:26px">よくある質問</h2>
-    <div class="card"><div class="card-title">解約するには？</div><p class="small">マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。${trialDays ? '無料期間中に解約した場合、料金はかかりません。' : ''}</p></div>
+    <div class="card"><div class="card-title">解約するには？</div><p class="small">マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。${trialDays ? '無料期間の終了日時より前に解約した場合、料金はかかりません。' : ''}</p></div>
     <div class="card"><div class="card-title">XのAPIを自分で契約する必要はありますか？</div><p class="small">ありません。当サービスが用意した連携を使います（そのため、Xへの投稿には月の上限があります）。</p></div>
     <div class="card"><div class="card-title">お支払い方法は？</div><p class="small">クレジットカード等です。決済は、決済代行会社（Stripe）の画面で行い、当サービスにはカード番号を保存しません。</p></div>
     <div class="card"><div class="card-title">パスワードを忘れたら？</div><p class="small"><a href="/contact">お問い合わせ</a>からご連絡ください。</p></div>
@@ -125,6 +152,7 @@ function authPage(kind, error, next = '') {
 // ── 申込みの最終確認 ──
 function checkoutPage({ user, csrf, error, trialDays = 0 }) {
   const price = yen(core.priceYen());
+  const names = snsNames();
   return wrap('お申込みの最終確認', `
     ${topNav(user)}
     <header class="page-head"><div class="eyebrow">Confirm</div><h1>お申込みの最終確認</h1>
@@ -134,13 +162,15 @@ function checkoutPage({ user, csrf, error, trialDays = 0 }) {
       <table class="t kv">
         <tr><th>サービス</th><td>${nameOf()}</td></tr>
         <tr><th>料金</th><td><b>月額 ${price}（税込）</b></td></tr>
-        ${trialDays ? `<tr><th>無料期間</th><td><b>最初の${trialDays}日間は無料</b>です。決済ページで、お支払い方法の登録が必要です。<b>無料期間が終わると自動で有料の契約に切り替わり、月額 ${price} の請求が始まります。</b>料金をかけずにやめる場合は、無料期間が終わる前に、マイページの「解約する」から手続きしてください。</td></tr>` : ''}
-        <tr><th>お支払い開始</th><td>${trialDays ? `無料期間の終わりに、最初の ${price} を請求します。` : '「同意して支払いへ進む」を押したあとの決済ページで、お支払いが完了した時点で、契約が始まります。'}</td></tr>
+        ${trialDays ? `<tr><th>無料期間</th><td><b>お申込みの完了から${trialDays}日間は無料</b>です（終了日時は、お申込み後にマイページに表示します）。決済ページで、お支払い方法の登録が必要です。<b>終了日時になると自動で有料の契約に切り替わり、その時点で初回の月額 ${price} を請求します。</b>料金をかけずにやめる場合は、終了日時より前に、マイページの「解約する」から手続きしてください。</td></tr>` : ''}
+        <tr><th>お支払いの時期</th><td>${trialDays ? `無料期間の終了日時に、初回の ${price} を請求します。` : '決済ページでお支払いが完了した時点で、初回の料金をお支払いいただきます。'}2回目以降は、毎月、契約の更新日に自動で請求します。</td></tr>
+        <tr><th>提供の時期</th><td>決済ページでの手続きが完了した直後から、ご利用いただけます。</td></tr>
         <tr><th>契約期間と更新</th><td>1か月ごとの自動更新です。解約しない限り、毎月、同じ日に ${price} が、お支払い方法に請求されます。</td></tr>
-        <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、${trialDays ? '無料期間または' : ''}すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。契約期間が終わると、SNSの連携情報とAIアシスタントとの接続は削除され、未投稿の予約は取り消されます（再開するときは、連携をやり直してください）。</td></tr>
-        <tr><th>返金</th><td>お支払い済みの料金は、法令上必要な場合を除き、返金いたしません（日割りでの返金もありません）。</td></tr>
-        <tr><th>対応SNSと上限</th><td>Threads・X・Instagram・TikTok・Facebookページ・YouTube。${limitsText()}です。画像は8MB、動画は100MBまで、保存できるファイルの合計は1人300MBまでです。AIによる生成は1日の回数に上限があります。</td></tr>
-        <tr><th>SNSごとの条件</th><td>Instagramはプロアカウントが対象で、JPEG画像またはリール動画が必須。TikTokは動画または写真（JPEG）が必須。YouTubeは動画が必須。Facebookはご自身が管理するページが対象。各SNS側の審査・仕様により、使える機能や公開範囲が制限される場合があります。</td></tr>
+        <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、${trialDays ? '無料期間または' : ''}すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。${END_TEXT}。</td></tr>
+        <tr><th>返金</th><td>お支払い済みの料金は、法令上必要な場合を除き、返金いたしません（日割りでの返金もありません）。お支払いが確認できない間は、予約した投稿を実行しません。</td></tr>
+        <tr><th>対応SNSと上限</th><td>${names ? `${escapeHtml(names)}。` : '対応SNSは準備中です。'}${limitsText()}。${aiLimitsText() ? `${aiLimitsText()}。` : ''}</td></tr>
+        <tr><th>SNSごとの条件</th><td>${names ? `${escapeHtml(snsRulesText())}。` : ''}各SNS側の審査・仕様により、使える機能や公開範囲が制限される場合があります。</td></tr>
+        <tr><th>ファイル</th><td>${FILE_TEXT}。</td></tr>
         <tr><th>お支払い方法</th><td>クレジットカード等（決済代行：Stripe）。カード情報は当サービスには保存されません。</td></tr>
       </table>
     </div>
@@ -172,16 +202,34 @@ function checkoutResultPage({ user, kind }) {
     </script>`);
 }
 
-const STATUS_LABEL = { active: ['契約中', 'badge-ok'], trialing: ['契約中（お試し）', 'badge-ok'], past_due: ['お支払いの確認が必要', 'badge-ng'], unpaid: ['お支払いの確認が必要', 'badge-ng'], canceled: ['解約済み', 'badge-off'], incomplete: ['お支払い手続き中', 'badge-warn'], incomplete_expired: ['未完了', 'badge-off'], none: ['未契約', 'badge-off'] };
+const STATUS_LABEL = { test: ['テスト利用中（運営者が付与・料金なし）', 'badge-ok'], active: ['契約中', 'badge-ok'], trialing: ['契約中（お試し）', 'badge-ok'], past_due: ['お支払いの確認が必要', 'badge-ng'], unpaid: ['お支払いの確認が必要', 'badge-ng'], canceled: ['解約済み', 'badge-off'], incomplete: ['お支払い手続き中', 'badge-warn'], incomplete_expired: ['未完了', 'badge-off'], none: ['未契約', 'badge-off'] };
 const POST_STATUS = { draft: ['下書き', 'badge-off'], pending: ['予約中', 'badge-warn'], publishing: ['投稿中', 'badge-warn'], posted: ['投稿済み', 'badge-ok'], failed: ['失敗', 'badge-ng'], cancelled: ['取り消し', 'badge-off'] };
 const toLocalInput = (ms) => {
   const d = new Date(ms + 9 * 3600 * 1000);
   return d.toISOString().slice(0, 16);
 };
 
+// マイページ：上限と、今の利用状況
+function usageCard(userId) {
+  const st = require('./service-store');
+  const nowIso = new Date().toISOString();
+  const [mf, mt] = core.jstMonthBounds(nowIso);
+  const L = core.LIMITS; const day = aiLib().day(); const av = aiLib().available(); const al = aiLib().limits();
+  const rows = [
+    ['連携しているSNSアカウント', `${st.SnsAccounts.countForUser(userId)} / ${L.maxAccounts}件`],
+    ['未投稿の予約', `${st.ScheduledPosts.countPending(userId)} / ${L.maxPending}件`],
+    ['今月のXへの投稿（日本時間の暦月・ツリーは1件ずつ）', `${st.ScheduledPosts.countXUnits(userId, mf, mt)} / ${L.xPerMonth}件`],
+    ['同じ日（日本時間）に投稿する予約', `1日${L.maxPerDay}件まで`],
+  ];
+  if (av.text) rows.push(['今日のAIの文章（自動運用を含む）', `${st.AiUsage.used(userId, day, 'text')} / ${al.text}回`]);
+  if (av.image) rows.push(['今日のAIの画像（自動運用を含む）', `${st.AiUsage.used(userId, day, 'image')} / ${al.image}回`]);
+  if (av.video) rows.push(['今日のAIの動画', `${st.AiUsage.used(userId, day, 'video')} / ${al.video}回`]);
+  return `<div class="card"><div class="card-title">ご利用の上限と状況</div><table class="t kv">${rows.map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('')}</table></div>`;
+}
+
 // ── マイページ ──
 function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], mcpConnections = [], newKey = '', aiAvail = {}, autoRules = [] }) {
-  const active = !!sub && ['active', 'trialing'].includes(sub.status);
+  const active = !!sub && ['active', 'trialing', 'test'].includes(sub.status);
   const [stLabel, stClass] = STATUS_LABEL[(sub && sub.status) || 'none'] || STATUS_LABEL.none;
   const accHtml = accounts.length ? accounts.map((a) => {
     const ad = registry.get(a.platform);
@@ -282,14 +330,16 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <td><span class="${c}">${l}</span>${p.status === 'pending' ? `<br><form class="inline" method="POST" action="/service/app/post/${escapeHtml(p.id)}/cancel"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">取り消し</button></form>` : ''}</td></tr>`;
   }).join('') : '<tr><td colspan="4" class="small">予約はまだありません。</td></tr>';
   const renewal = sub && sub.current_period_end ? core.formatJst(sub.current_period_end) : '';
-  const billing = sub && sub.stripe_subscription_id ? `
+  const billing = sub && sub.status === 'test' ? `<div class="card"><div class="card-title">ご利用の状態</div><p class="small">状態：<span class="${stClass}">${stLabel}</span><br>運営者が動作確認のために付与したテスト利用です。料金はかかりません。運営者が取り消すと、SNSの連携とAIアシスタントとの接続は解除されます。</p></div>` : sub && sub.stripe_subscription_id ? `
     <div class="card"><div class="card-title">ご契約・お支払い</div>
       <p class="small">状態：<span class="${stClass}">${stLabel}</span>
-      ${renewal ? `<br>${sub.cancel_at_period_end ? `解約手続き済み。<b>${escapeHtml(renewal)}</b> までご利用いただけます（以降は更新されません）。` : `次回の更新日：<b>${escapeHtml(renewal)}</b>（${yen(core.priceYen())}）`}` : ''}</p>
+      ${renewal ? `<br>${sub.status === 'trialing'
+        ? (sub.cancel_at_period_end ? `解約手続き済み。無料期間の終了日時 <b>${escapeHtml(renewal)}</b> まで、ご利用いただけます（料金はかかりません）。` : `無料期間の終了日時：<b>${escapeHtml(renewal)}</b>（この日時に、初回の${yen(core.priceYen())}を請求します。料金をかけずにやめる場合は、この日時より前に解約してください）`)
+        : (sub.cancel_at_period_end ? `解約手続き済み。<b>${escapeHtml(renewal)}</b> までご利用いただけます（以降は更新されません）。` : `次回の更新日：<b>${escapeHtml(renewal)}</b>（${yen(core.priceYen())}）`)}` : ''}</p>
       <div class="btn-row">
         ${sub.status === 'canceled' ? '<a class="btn btn-primary" href="/service/checkout">再度申し込む</a>' : sub.cancel_at_period_end
           ? `<form class="inline" method="POST" action="/service/billing/resume"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-primary" type="submit">解約を取り消す</button></form>`
-          : `<form class="inline" method="POST" action="/service/billing/cancel" onsubmit="return confirm('解約すると、次回の更新が止まります。契約期間の終わりまではご利用いただけます。解約しますか？')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-ghost" type="submit">解約する</button></form>`}
+          : `<form class="inline" method="POST" action="/service/billing/cancel" onsubmit="return confirm('${sub.status === 'trialing' ? '解約すると、無料期間の終了後に有料の契約へ切り替わりません（料金はかかりません）。無料期間の終了日時まではご利用いただけます。解約しますか？' : '解約すると、次回の更新が止まります。契約期間の終わりまではご利用いただけます。解約しますか？'}')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-ghost" type="submit">解約する</button></form>`}
         ${portalReady ? '<a class="btn btn-ghost" href="/service/billing/portal">支払い方法の変更・請求書</a>' : ''}
       </div></div>` : '';
   const notActive = !active ? `<div class="notice"><div>${!sub || sub.status === 'none' || sub.status === 'canceled' ? 'ご契約が有効ではありません。' : 'お支払いの確認が必要です。'}
@@ -300,6 +350,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
     ${flash ? `<div class="notice ${flash.type === 'error' ? 'error' : ''}" style="margin:0 0 14px"><div>${escapeHtml(flash.text)}</div></div>` : ''}
     ${notActive}
     ${billing}
+    ${active ? usageCard(user.id) : ''}
     <div class="card"><div class="card-title">連携しているSNS</div>${accHtml}
       <div class="btn-row" style="margin-top:10px">${active ? connectBtns : '<span class="small">ご契約後に連携できます。</span>'}</div></div>
     ${active ? `<div class="card"><div class="card-title">投稿の作成と管理</div><p class="small">ツリー（連投）・複数の画像・SNSごとの本文・下書きは「投稿を作る」から。予約の一覧はカレンダーで確認できます。</p>
@@ -324,10 +375,11 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       ${newKey ? `<div class="notice"><div>新しいAPIキーです。<b>この画面を閉じると二度と表示されません</b>。安全な場所に保存してください。<br><code style="word-break:break-all">${escapeHtml(newKey)}</code></div></div>` : ''}
       ${apiKeys.length ? apiKeys.map((k) => `<div class="acct-row"><span><b>${escapeHtml(k.label || '(名前なし)')}</b> <code>${escapeHtml(k.prefix)}…</code> <span class="small">${k.last_used_at ? `最終利用 ${escapeHtml(k.last_used_at.slice(0, 10))}` : '未使用'}</span></span>
         <form class="inline" method="POST" action="/service/app/apikey/${escapeHtml(k.id)}/revoke" onsubmit="return confirm('このAPIキーを無効にします。よろしいですか？')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">無効にする</button></form></div>`).join('') : '<p class="small">APIキーはまだありません。</p>'}
+      <p class="small"><b>APIキーを持っている人は、誰でも、あなたのアカウントで投稿できます。</b>他の人に教えたり、公開の場所に貼ったりしないでください。漏れたおそれがあるときは、すぐに「無効にする」を押してください。</p>
       <form method="POST" action="/service/app/apikey" class="btn-row" style="margin-top:10px"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
         <input type="text" name="label" maxlength="40" placeholder="名前（例：AIアシスタント用）" style="max-width:260px"><button class="btn btn-sm btn-primary" type="submit">APIキーを発行</button></form>
       <div class="card-title" style="margin-top:14px">AIアシスタントとの接続（MCP）</div>
-      <p class="small">ClaudeやChatGPTなどのMCP対応アプリに、接続先URL <code>${escapeHtml((process.env.SERVICE_BASE_URL || '').replace(/\/+$/, ''))}/mcp</code> を追加すると、ログインと許可だけで接続できます（APIキーは不要）。</p>
+      <p class="small">MCP（AIアシスタントとつなぐための共通の仕組み）に対応したアプリに、接続先URL <code>${escapeHtml((process.env.SERVICE_BASE_URL || '').replace(/\/+$/, ''))}/mcp</code> を追加すると、ログインと許可だけで接続できます（APIキーは不要）。</p>
       ${mcpConnections.length ? mcpConnections.map((c) => `<div class="acct-row"><span><b>${escapeHtml(c.name)}</b> <span class="small">最終接続 ${escapeHtml(String(c.last_at || '').slice(0, 10))}</span></span>
         <form class="inline" method="POST" action="/service/app/connection/${escapeHtml(c.id)}/revoke" onsubmit="return confirm('このアプリの接続を解除します。')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">解除</button></form></div>`).join('') : '<p class="small">接続中のアプリはありません。</p>'}
       <p class="small">使い方：<code>Authorization: Bearer &lt;APIキー&gt;</code> を付けて <code>/api/v1/…</code> を呼びます（<a href="/service/docs/api">APIの説明</a>）。キーは、あなたのアカウントに連携したSNSにだけ投稿できます。</p></div>` : ''}
@@ -387,7 +439,10 @@ function composePage({ user, accounts, csrf, aiAvail = {} }) {
         <label class="check"><input type="checkbox" id="ttPaid"><span>第三者の商品・ブランドの宣伝（提携・有償）を含む（公開範囲を「自分のみ」にできません）</span></label>
         <p class="small">投稿することで、<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">TikTokの音楽使用の確認</a>${''}に同意したものとみなされます。提携（有償）の宣伝を含む場合は、<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">ブランドコンテンツのポリシー</a>にも同意したものとみなされます。</p></div>
       <div class="field" id="ytField" style="display:none"><label class="lbl" for="ytPrivacy">YouTubeの公開設定</label>
-        <select id="ytPrivacy"><option value="public">公開</option><option value="unlisted">限定公開</option><option value="private">非公開</option></select></div>
+        <select id="ytPrivacy"><option value="public">公開</option><option value="unlisted">限定公開</option><option value="private">非公開</option></select>
+        <label class="lbl" for="ytKids">子ども向けの動画ですか（YouTubeで申告が必要です）</label>
+        <select id="ytKids"><option value="">選択してください</option><option value="no">いいえ、子ども向けではない</option><option value="yes">はい、子ども向け</option></select>
+        <p class="small">本文の1行目がタイトル（100文字まで）になり、ショートとして扱われるよう「#Shorts」を自動で付けます。動画は3分以内にしてください。YouTubeの監査が終わるまでは、公開を選んでも「非公開」に制限される場合があります。</p></div>
       <div class="field"><span class="lbl">いつ投稿するか</span>
         <label class="check"><input type="radio" name="when" value="schedule" checked><span>日時を指定して予約</span></label>
         <input id="at" type="datetime-local" value="${defaultAt}" style="max-width:260px">
@@ -438,7 +493,8 @@ function composePage({ user, accounts, csrf, aiAvail = {} }) {
         if($('perTarget').checked){body.captions={};document.querySelectorAll('#perBox textarea').forEach(function(t){body.captions[t.dataset.acc]=t.value;});}
         if(c==='tree')body.tree=cards.map(function(x){return {text:x.text,media_ids:(x.media||[]).map(function(m){return m.id;})};});
         s.forEach(function(a){if(a.platform==='tiktok')body.options[a.id]={privacy_level:$('ttPrivacy').value,disable_comment:!$('ttComment').checked,disable_duet:!$('ttDuet').checked,disable_stitch:!$('ttStitch').checked,commercial_own:$('ttOwn').checked,commercial_paid:$('ttPaid').checked};
-          if(a.platform==='youtube')body.options[a.id]={privacy:$('ytPrivacy').value};});
+          if(a.platform==='youtube')body.options[a.id]={privacy:$('ytPrivacy').value,made_for_kids:$('ytKids').value==='yes'};});
+        if(s.some(function(a){return a.platform==='youtube';})&&!$('ytKids').value)return show(false,'YouTubeの「子ども向けかどうか」を選んでください。');
         if(when==='now'){if(!confirm('今すぐ投稿します。よろしいですか？'))return;body.now=true;}else if(when==='draft'){body.draft=true;}else{if(!$('at').value)return show(false,'日時を指定してください。');body.scheduled_at=$('at').value+':00+09:00';}
         $('submitBtn').disabled=true;fetch('/service/app/posts',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF':csrf},body:JSON.stringify(body)})
           .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});}).then(function(x){$('submitBtn').disabled=false;if(!x.ok)return show(false,x.j.error||'保存できませんでした。');
@@ -510,15 +566,48 @@ function legalPage(title, html, user) {
   return wrap(title, `${topNav(user)}<div class="legal-doc">${html}</div><p class="small"><a href="/service">サービス紹介に戻る</a></p>`);
 }
 
-function adminServicePage({ subs, stats, postStats }) {
+// 運営用：設定の確認（値は表示せず、設定されているかだけを示す）
+function settingsChecklist(env = process.env) {
+  const has = (...ks) => ks.every((k) => !!env[k]);
+  const base = String(env.SERVICE_BASE_URL || '');
+  return [
+    ['管理画面のパスワード（ADMIN_PASSWORD）', !!env.ADMIN_PASSWORD && env.ADMIN_PASSWORD !== 'changeme', '必須。未設定だと既定の弱いパスワードになり、テスト利用の付与もできません'],
+    ['サービスのURL（SERVICE_BASE_URL）', /^https:\/\//.test(base), base ? `設定値：${base}` : '例：https://aipro.social-quality.com。SNS連携・画像の投稿・AIアシスタントとの接続に必要'],
+    ['トークンの暗号化の鍵（SNS_TOKEN_KEY）', has('SNS_TOKEN_KEY'), 'SNS連携に必要。一度決めたら変えない'],
+    ['画面の操作の確認用の鍵（APP_SECRET）', has('APP_SECRET'), '未設定だと再起動のたびに、開いていた画面の操作が失敗する'],
+    ['Threads（THREADS_APP_ID・THREADS_APP_SECRET）', has('THREADS_APP_ID', 'THREADS_APP_SECRET'), ''],
+    ['X（X_CLIENT_ID・X_CLIENT_SECRET）', has('X_CLIENT_ID', 'X_CLIENT_SECRET'), ''],
+    ['Instagram（INSTAGRAM_APP_ID・INSTAGRAM_APP_SECRET）', has('INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET'), ''],
+    ['TikTok（TIKTOK_CLIENT_KEY・TIKTOK_CLIENT_SECRET）', has('TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'), ''],
+    ['Facebook（FACEBOOK_APP_ID・FACEBOOK_APP_SECRET）', has('FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET'), ''],
+    ['YouTube（GOOGLE_CLIENT_ID・GOOGLE_CLIENT_SECRET）', has('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'), ''],
+    ['AIの文章（ANTHROPIC_API_KEY）', has('ANTHROPIC_API_KEY'), '任意'],
+    ['AIの画像（OPENAI_API_KEY）', has('OPENAI_API_KEY'), '任意'],
+    ['AIの動画（GEMINI_API_KEY）', has('GEMINI_API_KEY'), '任意・費用が高くなりやすい'],
+    ['Stripe（STRIPE_SECRET_KEY・STRIPE_WEBHOOK_SECRET・STRIPE_PRICE_ID）', has('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID'), '販売に必要（テスト利用だけなら不要）'],
+    ['問い合わせ先（SERVICE_CONTACT_EMAIL）', has('SERVICE_CONTACT_EMAIL'), '販売に必要'],
+    ['代表者の氏名（SERVICE_REPRESENTATIVE）', has('SERVICE_REPRESENTATIVE'), 'プライバシーポリシーの事業者情報に表示する（販売前に設定）'],
+    ['販売の開始（SERVICE_OPEN=true）', env.SERVICE_OPEN === 'true', '審査とテストが済んでから設定する'],
+  ];
+}
+
+function adminServicePage({ subs, stats, postStats, message }) {
   const rows = subs.map((s) => `<tr><td>${escapeHtml(s.email || '')}</td><td>${escapeHtml(s.status)}</td><td>${escapeHtml(s.current_period_end || '')}</td><td>${s.cancel_at_period_end ? '解約予定' : ''}</td><td>${escapeHtml(s.created_at)}</td></tr>`).join('');
+  const checks = settingsChecklist().map(([name, ok, note]) => `<tr><td>${ok ? '✅' : '—'}</td><td>${escapeHtml(name)}</td><td>${escapeHtml(note)}</td></tr>`).join('');
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>月額サービス（運営）</title>
-<style>body{font-family:sans-serif;max-width:920px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:14px}</style></head><body>
-<h1>月額SNS自動投稿サービス（運営用）</h1><p><a href="/admin/inquiries">お問い合わせ</a> ／ <a href="/admin/licenses">ライセンス</a></p>
+<style>body{font-family:sans-serif;max-width:920px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:14px}.msg{padding:10px;border:1px solid #9c9;background:#efe;margin:10px 0}.err{border-color:#c99;background:#fee}input[type=email]{padding:6px;width:260px;max-width:100%}</style></head><body>
+<h1>月額SNS自動投稿サービス（運営用）</h1><p><a href="/admin/inquiries">お問い合わせ</a> ／ <a href="/admin/licenses">ライセンス</a> ／ <a href="/service">サービスのページ</a></p>
+${message ? `<div class="msg${message.ok ? '' : ' err'}">${escapeHtml(message.text)}</div>` : ''}
+<h2>設定の確認</h2><p>値は表示しません。設定されているかだけを示します。設定は Fly.io のシークレットで行い、設定すると自動で再起動します。</p>
+<table><tr><th></th><th>項目</th><th>メモ</th></tr>${checks}</table>
+<h2>テスト利用（動作確認用・料金なし）</h2>
+<p>決済をせずに、指定したアカウントで全機能を試せるようにします。先に <a href="/service/signup">/service/signup</a> でアカウントを作ってから、そのメールアドレスを入れてください。取り消すと、そのアカウントのSNSの連携・AIアシスタントとの接続・APIキーは解除されます。</p>
+<form method="POST" action="/admin/service/test-grant" style="margin:6px 0"><input type="email" name="email" required placeholder="メールアドレス"> <button type="submit">テスト利用を付与</button></form>
+<form method="POST" action="/admin/service/test-revoke" style="margin:6px 0" onsubmit="return confirm('テスト利用を取り消します。SNSの連携なども解除されます。')"><input type="email" name="email" required placeholder="メールアドレス"> <button type="submit">テスト利用を取り消す</button></form>
 <h2>契約の状況</h2><p>${stats.map((r) => `${escapeHtml(r.status)}: ${r.n}件`).join(' ／ ') || '契約はまだありません'}</p>
 <h2>予約の状況</h2><p>${postStats.map((r) => `${escapeHtml(r.status)}: ${r.n}件`).join(' ／ ') || '予約はまだありません'}</p>
 <h2>契約者一覧</h2><table><tr><th>メール</th><th>状態</th><th>次回更新日(UTC)</th><th>解約</th><th>登録日</th></tr>${rows}</table>
-<p>※ 請求・返金などの詳しい情報は、Stripeのダッシュボードで確認してください。</p></body></html>`;
+<p>※ 請求・返金などの詳しい情報は、Stripeのダッシュボードで確認してください。状態が test のものは、運営者が付与したテスト利用です。</p></body></html>`;
 }
 
 function apiDocsPage(user, baseUrl) {
@@ -536,12 +625,18 @@ function apiDocsPage(user, baseUrl) {
   "account_ids": ["<アカウントID>"],
   "scheduled_at": "2026-12-01T09:00:00+09:00"
 }'`)}
+    <h3>SNSごとの設定（<code>options</code>）</h3>
+    <p>アカウントIDごとに指定します。<b>TikTokは、公開範囲（<code>privacy_level</code>）を必ず利用者ご本人が選んでください</b>（選べる値はアカウントごとに異なり、アプリの審査前は「SELF_ONLY（自分のみ）」だけの場合があります）。あわせて、商用コンテンツの開示（<code>commercial_own</code>：自分の宣伝を含む、<code>commercial_paid</code>：第三者の宣伝を含む）と、コメント等の可否を指定します。TikTokへの投稿は、TikTokの音楽使用の確認（および、第三者の宣伝を含む場合はブランドコンテンツのポリシー）に同意したものとみなされます。YouTubeは、公開設定（<code>privacy</code>：public／unlisted／private。省略時は非公開）と、子ども向けかどうか（<code>made_for_kids</code>：true／false。省略時は子ども向けではない）を指定します。</p>
+    ${code(`"options": {
+  "<TikTokのアカウントID>": { "privacy_level": "<利用者が選んだ公開範囲>", "disable_comment": false, "disable_duet": true, "disable_stitch": true, "commercial_own": false, "commercial_paid": false },
+  "<YouTubeのアカウントID>": { "privacy": "unlisted", "made_for_kids": false }
+}`)}
     <h2>AIアシスタントから使う</h2>
-    <p><b>MCP</b>：MCP対応のアプリ（Claude・ChatGPTなど）に、接続先URL <code>${b}/mcp</code> を追加してください。ログインして「許可する」を押すだけで接続できます（APIキー不要）。使えるツール：アカウントの一覧・契約と利用状況・投稿の作成（即時・予約・下書き）・一覧・下書きの予約化・取り消し・アップロード用URLの発行・URLからの取り込み・AIによる文章／画像／動画の生成。</p>
+    <p><b>MCP</b>：MCP（AIアシスタントとつなぐための共通の仕組み）に対応したアプリに、接続先URL <code>${b}/mcp</code> を追加してください。ログインして「許可する」を押すと接続できます（APIキー不要。使えるかどうかは、アプリ側の対応状況によります）。使えるツール：アカウントの一覧・契約と利用状況・投稿の作成（即時・予約・下書き）・一覧・下書きの予約化・取り消し・アップロード用URLの発行・URLからの取り込み・AIによる文章／画像／動画の生成。</p>
     <p><b>Agent Skill（Claude Code）</b>：次の1行で導入できます。APIキーを環境変数 <code>SNS_SCHEDULER_API_KEY</code>、URLを <code>SNS_SCHEDULER_URL</code> に設定してください。</p>
     ${code(`mkdir -p ~/.claude/skills/sns-scheduler && curl -fsSL ${baseUrl || '$URL'}/service/docs/skill.md -o ~/.claude/skills/sns-scheduler/SKILL.md`)}
-    <h2>そのほか</h2><ul><li><code>POST /api/v1/media/upload-url</code>：アップロード用の一時URL（15分・1回）を発行</li><li><code>POST /api/v1/media/import</code>：URLから画像・動画を取り込む（<code>{"url":"https://…"}</code>。Googleドライブの共有リンクにも対応）</li><li><code>POST /api/v1/ai/text</code>・<code>/ai/image</code>・<code>/ai/video</code>：AIで投稿文・画像・動画を作る（動画は <code>GET /api/v1/ai/jobs/{id}</code> で完了を確認）</li><li><code>GET/POST /api/v1/auto-rules</code>：AIの自動運用ルール</li><li><code>GET /api/v1/posts?status=draft</code>：投稿の一覧</li><li><code>GET /api/v1/posts/{id}</code>：投稿の確認</li><li><code>POST /api/v1/posts/{id}/publish</code>：下書きを予約／投稿にする（<code>{"now":true}</code> または <code>{"scheduled_at":"…"}</code>）</li><li><code>DELETE /api/v1/posts/{id}</code>：予約・下書きの取り消し</li></ul>
-    <p class="small">${b}</p></div>`);
+    <h2>そのほか</h2><ul><li><code>POST /api/v1/media/upload-url</code>：アップロード用の一時URL（15分・1回）を発行</li><li><code>POST /api/v1/media/import</code>：URLから画像・動画を取り込む（<code>{"url":"https://…"}</code>。https のURLだけ。Googleドライブの共有リンクは「リンクを知っている全員」が閲覧できる設定で、ウイルス確認の画面が出ない大きさのファイルに限ります）</li><li><code>POST /api/v1/ai/text</code>・<code>/ai/image</code>・<code>/ai/video</code>：AIで投稿文・画像・動画を作る（動画は <code>GET /api/v1/ai/jobs/{id}</code> で完了を確認）</li><li><code>GET/POST /api/v1/auto-rules</code>：AIの自動運用ルール</li><li><code>GET /api/v1/posts?status=draft</code>：投稿の一覧</li><li><code>GET /api/v1/posts/{id}</code>：投稿の確認</li><li><code>POST /api/v1/posts/{id}/publish</code>：下書きを予約／投稿にする（<code>{"now":true}</code> または <code>{"scheduled_at":"…"}</code>）</li><li><code>DELETE /api/v1/posts/{id}</code>：予約・下書きの取り消し</li></ul>
+    </div>`);
 }
 
-module.exports = { composePage, calendarPage, apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };
+module.exports = { settingsChecklist, composePage, calendarPage, apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };

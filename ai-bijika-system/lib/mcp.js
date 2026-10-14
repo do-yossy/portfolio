@@ -4,7 +4,7 @@
 const core = require('./service-core');
 const scheduler = require('./sns/scheduler');
 const { ApiKeys, SnsAccounts, ScheduledPosts } = require('./service-store');
-const { postView, uploadUrlView } = require('./api-v1');
+const { postView, uploadUrlView, createFromBody } = require('./api-v1');
 const fetchMedia = require('./fetch-media');
 const ai = require('./ai');
 const { AiJobs, UploadTickets } = require('./service-store');
@@ -22,6 +22,7 @@ const TOOLS = [
       category: { type: 'string', enum: ['text', 'image', 'video', 'tree'] }, text: { type: 'string' },
       account_ids: { type: 'array', items: { type: 'string' } }, captions: { type: 'object', description: 'アカウントIDごとの本文（任意）' },
       media_ids: { type: 'array', items: { type: 'string' } }, tree: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, media_ids: { type: 'array', items: { type: 'string' } } } } },
+      options: { type: 'object', description: 'アカウントIDごとの設定。TikTokは {"privacy_level": 利用者が選んだ公開範囲, "disable_comment", "disable_duet", "disable_stitch", "commercial_own", "commercial_paid"}（公開範囲は必ず利用者に選んでもらう）。YouTubeは {"privacy": "public"|"unlisted"|"private", "made_for_kids": true|false}（省略時は非公開・子ども向けではない）' },
       scheduled_at: { type: 'string' }, now: { type: 'boolean' }, draft: { type: 'boolean' } } } },
   { name: 'list_posts', description: '投稿の一覧（status で絞り込み：draft／pending／posted／failed／cancelled）', inputSchema: { type: 'object', properties: { status: { type: 'string' } } } },
   { name: 'publish_draft', description: '下書きを予約または即時投稿にする', inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, now: { type: 'boolean' }, scheduled_at: { type: 'string' } } } },
@@ -57,17 +58,10 @@ async function callTool(userId, name, a = {}) {
       return { accounts: SnsAccounts.listForUser(userId).map((x) => ({ id: x.id, platform: x.platform, handle: x.handle, status: x.status })) };
     case 'get_account_info': return accountInfo(userId);
     case 'create_post': {
-      const ids = [].concat(a.account_ids || []).map(String);
-      const caps = a.captions && typeof a.captions === 'object' ? a.captions : {};
-      const targets = ids.map((accountId) => ({ accountId, caption: caps[accountId] !== undefined ? caps[accountId] : a.text, options: {} }));
-      const tree = (Array.isArray(a.tree) ? a.tree : []).map((c) => ({ text: c && c.text, mediaIds: (c && c.media_ids) || [] }));
-      let at = null;
-      if (a.now === true) at = new Date(Date.now() + 1000).toISOString();
-      else if (a.scheduled_at) { at = isoOrNull(a.scheduled_at); if (!at) throw new Error('scheduled_at はISO 8601形式で指定してください。'); }
-      const r = core.createPost({ userId, category: String(a.category || 'text'), targets, mediaIds: a.media_ids || [], tree, scheduledAtIso: at, draft: a.draft === true });
-      if (!r.ok) throw new Error(r.error);
-      if (a.now === true && a.draft !== true) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
-      return { posts: r.ids.map((id) => postView(ScheduledPosts.listForUser(userId, 1000).find((p) => p.id === id))) };
+      // REST API と同じ処理（SNSごとの本文・設定、日時の検証）
+      const r = createFromBody(userId, a);
+      if (r.status !== 201) throw new Error(r.body.error);
+      return r.body;
     }
     case 'list_posts': {
       let rows = ScheduledPosts.listForUser(userId, 100);
@@ -75,7 +69,9 @@ async function callTool(userId, name, a = {}) {
       return { posts: rows.map(postView) };
     }
     case 'publish_draft': {
-      const at = a.now === true ? new Date(Date.now() + 1000).toISOString() : (a.scheduled_at ? isoOrNull(a.scheduled_at) : null);
+      let at = null;
+      if (a.now === true) at = new Date(Date.now() + 1000).toISOString();
+      else if (a.scheduled_at !== undefined) { at = isoOrNull(a.scheduled_at); if (!at) throw new Error('scheduled_at はISO 8601形式で指定してください。'); }
       const r = core.promoteDraft({ userId, postId: String(a.id || ''), scheduledAtIso: at });
       if (!r.ok) throw new Error(r.error);
       if (a.now === true) setTimeout(() => scheduler.tick().catch(() => {}), 1500);
@@ -124,17 +120,15 @@ function send(res, status, obj) {
 async function handle({ req, res, method, pathname }) {
   if (pathname !== '/mcp') return false;
   if (method !== 'POST') { send(res, 405, { error: 'POST のみ対応しています。' }); return true; }
-  const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '');
-  const m = String(req.headers.authorization || '').match(/^Bearer\s+(\S+)$/i);
-  if (!badLimiter.allow(ip)) { send(res, 429, { error: 'too many requests' }); return true; }
   // APIキー（sqk_）または OAuth のアクセストークン（sqa_）
-  const userId = m ? (ApiKeys.authenticate(m[1]) || oauth.authenticate(m[1])) : null;
-  if (!userId) {
-    badLimiter.fail(ip);
+  const a = oauth.authenticateRequest(req, badLimiter, ApiKeys);
+  if (a.status === 429) { send(res, 429, { error: a.error }); return true; }
+  if (!a.userId) {
     res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8', ...oauth.challengeHeader() });
     res.end(JSON.stringify({ error: 'invalid_token', error_description: 'ログインして接続を許可するか、APIキーを指定してください。' }));
     return true;
   }
+  const userId = a.userId;
   if (!limiter.allow(userId)) { send(res, 429, { error: 'リクエストが多すぎます。' }); return true; }
   limiter.fail(userId);
   const msg = await readBody(req);

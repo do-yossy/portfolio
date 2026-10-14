@@ -95,11 +95,15 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('税込'), 'LPに月額1,000円（税込）を表示する');
   ok(r.text.includes('返金') && r.text.includes('解約') && r.text.includes('自動更新'), 'LPに返金・解約・自動更新の条件を表示する');
   ok(r.text.includes('/service/legal/terms') && r.text.includes('/service/legal/tokushoho'), 'LPから規約・特商法表記へリンクする');
+  ok(r.text.includes('現在の対応SNSは、Threadsです') && !r.text.includes('YouTube：') && !r.text.includes('TikTok：'), 'LPには、設定済みのSNSだけを対応SNSとして表示する');
+  ok(!r.text.includes('AIで投稿づくり') && !/ClaudeやChatGPT/.test(r.text), 'AIが未設定ならAIの機能を表示せず、動作を確認していないアプリ名を出さない');
   r = await req('GET', '/service/legal/tokushoho');
   ok(r.status === 200 && r.text.includes('月額1,000円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
   ok(r.text.includes('support@example.com') && !r.text.includes('【メールアドレス】') && r.text.includes('電話番号'), '特商法表記の連絡先に設定したメールアドレスを表示し、電話番号の開示請求について記載する');
   r = await req('GET', '/service/legal/terms');
   ok(r.status === 200 && r.text.includes('第5条（解約）') && r.text.includes('第7条（AIによる生成）'), '利用規約を表示できる');
+  ok(!r.text.includes('草案') && !r.text.includes('（案）'), '販売開始後は、草案である旨の表示を外す');
+  ok(/<ol><li>[^]*?<ul><li>投稿の作成/.test(r.text) && !r.text.includes('<p>- 投稿の作成'), '規約の入れ子の箇条書きを、崩さずに表示する');
 
   console.log('未ログイン');
   r = await req('GET', '/service/app');
@@ -119,6 +123,7 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('POST', '/service/signup', { body: { email: 'e2e@example.com', password: 'password123' } });
   ok(r.status === 400 && r.text.includes('既に登録'), '同じメールアドレスでは二重に登録できない');
   r = await req('GET', '/service/checkout');
+  ok(r.text.includes('提供の時期') && r.text.includes('お支払いが確認できない間は'), '最終確認画面に提供の時期と、お支払いが確認できない場合の扱いを表示する');
   ok(r.status === 200 && r.text.includes('月額 1,000円（税込）') && r.text.includes('自動更新') && r.text.includes('解約') && r.text.includes('返金'), '最終確認画面に金額・自動更新・解約・返金を表示する');
   const csrf = csrfOf(r.text);
   ok(!!csrf, '最終確認画面にCSRFトークンがある');
@@ -329,11 +334,40 @@ function webhook(event, secret = 'whsec_e2e') {
   const oldRefresh = tok.refresh_token; tok = r.json;
   r = await tokenReq({ grant_type: 'refresh_token', refresh_token: oldRefresh, client_id: clientId });
   ok(r.status === 400, '使ったリフレッシュトークンは再利用できない');
+  r = await rpc(tok.access_token, { jsonrpc: '2.0', id: 10, method: 'tools/list' });
+  ok(r.status === 401, '使用済みのリフレッシュトークンが再利用されたら、その接続をまとめて無効にする（漏えい対策）');
+  // もう一度接続する（認可 → トークン）
+  const authorizeAgain = async () => {
+    const v2 = crypto.randomBytes(40).toString('base64url');
+    const q2 = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: cbUri, code_challenge: crypto.createHash('sha256').update(v2).digest('base64url'), code_challenge_method: 'S256', state: 's2' }).toString();
+    const pg = await req('GET', `/oauth/authorize?${q2}`);
+    const rr = await req('POST', '/oauth/authorize', { body: { ...Object.fromEntries(new URLSearchParams(q2)), csrf: csrfOf(pg.text), decision: 'allow' } });
+    return { code: new URL(rr.headers.location).searchParams.get('code'), verifier: v2 };
+  };
+  let ag = await authorizeAgain();
+  r = await tokenReq({ grant_type: 'authorization_code', code: ag.code, client_id: clientId, redirect_uri: cbUri, code_verifier: ag.verifier });
+  tok = r.json;
   r = await req('GET', '/service/app');
   ok(r.text.includes('Claude') && r.text.includes(`/service/app/connection/${clientId}/revoke`), 'マイページに接続中のアプリを表示する');
+  ag = await authorizeAgain(); // まだ使っていない認可コードを持った状態で解除する
   r = await req('POST', `/service/app/connection/${clientId}/revoke`, { body: { csrf: appCsrf } });
-  r = await rpc(tok.access_token, { jsonrpc: '2.0', id: 10, method: 'tools/list' });
+  r = await rpc(tok.access_token, { jsonrpc: '2.0', id: 11, method: 'tools/list' });
   ok(r.status === 401, '接続を解除すると、そのトークンは使えない');
+  r = await tokenReq({ grant_type: 'authorization_code', code: ag.code, client_id: clientId, redirect_uri: cbUri, code_verifier: ag.verifier });
+  ok(r.status === 400, '解除すると、まだ使っていない認可コードも使えなくなる');
+  r = await req('GET', `/oauth/authorize?${authQs.replace('response_type=code', 'response_type=token')}`);
+  ok(r.status === 400 && !r.headers.location, '同意の前のエラーでは、登録された戻り先へ移動しない（オープンリダイレクト対策）');
+  r = await req('GET', `/oauth/authorize?${authQs.replace(/code_challenge_method=S256/, 'code_challenge_method=plain')}`);
+  ok(r.status === 400 && !r.headers.location, 'PKCEの不備も、その場で表示する');
+
+  console.log('回数制限と認証の順序');
+  for (let i = 0; i < 25; i++) await rpc(`sqa_${crypto.randomBytes(32).toString('hex')}`, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+  r = await rpc(apiKey, { jsonrpc: '2.0', id: 12, method: 'tools/list' });
+  ok(r.status === 200, '同じIPから不正なトークンが続いても、正しいキーの利用者は締め出されない');
+  r = await rpc(`sqa_${crypto.randomBytes(32).toString('hex')}`, { jsonrpc: '2.0', id: 13, method: 'tools/list' });
+  ok(r.status === 429, '不正なトークンが続くIPは、一時的に制限する');
+  r = await rpc(tok.access_token, { jsonrpc: '2.0', id: 14, method: 'tools/list' });
+  ok(r.status === 401, '発行したことがある（期限切れ・解除済みの）トークンは、制限に数えずに401を返す');
   r = await req('GET', '/service/docs/skill.md');
   ok(r.status === 200 && r.text.startsWith('---\nname: sns-scheduler') && r.text.includes('draft'), 'Agent Skill（SKILL.md）を配布できる');
   r = await req('GET', '/service/docs/api');
@@ -448,6 +482,44 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('POST', '/admin/login', { body: { password: 'adminpw' } });
   r = await req('GET', '/admin/service');
   ok(r.status === 200 && r.text.includes('e2e@example.com') && r.text.includes('契約者一覧'), '運営者は契約状況を確認できる');
+  ok(r.text.includes('設定の確認') && r.text.includes('SNS_TOKEN_KEY') && !r.text.includes(process.env.SNS_TOKEN_KEY) && !r.text.includes('sk_test_x'), '設定の確認は、値を出さずに設定の有無だけを示す');
+
+  console.log('テスト利用（運営者が付与・決済なし）');
+  const adminCookie = cookie;
+  cookie = '';
+  r = await req('POST', '/service/signup', { body: { email: 'tester@example.com', password: 'testerpass1' } });
+  const testerCookie = cookie;
+  r = await req('GET', '/service/app');
+  ok(!r.text.includes('テスト利用中') && r.text.includes('ご契約が有効ではありません'), '付与する前は使えない');
+  cookie = adminCookie;
+  r = await req('POST', '/admin/service/test-grant', { body: { email: 'nobody@example.com' } });
+  ok(r.status === 400 && r.text.includes('見つかりません'), '存在しないアカウントには付与できない');
+  const paidId = require('../db').Users.create({ email: 'paid@example.com', passwordHash: 'h', passwordSalt: 's' });
+  store.Subscriptions.upsert(paidId, { stripe_subscription_id: 'sub_paid', status: 'active' });
+  r = await req('POST', '/admin/service/test-grant', { body: { email: 'paid@example.com' } });
+  ok(r.status === 400 && r.text.includes('Stripeの契約') && store.Subscriptions.get(paidId).status === 'active', 'Stripeで契約中のアカウントには付与しない');
+  r = await req('POST', '/admin/service/test-grant', { body: { email: 'Tester@Example.com' } });
+  ok(r.status === 200 && r.text.includes('テスト利用を付与しました'), 'テスト利用を付与できる（メールアドレスの大文字小文字は区別しない）');
+  const testerId = store.Subscriptions.all().find((x) => x.email === 'tester@example.com').user_id;
+  ok(store.Subscriptions.isActive(testerId), 'テスト利用は、契約中と同じく全機能を使える');
+  cookie = testerCookie;
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('テスト利用中') && r.text.includes('料金はかかりません') && !r.text.includes('解約する'), 'マイページにテスト利用中と表示し、解約ボタンは出さない');
+  r = await req('GET', '/service/app/compose');
+  ok(r.status === 200, 'テスト利用で投稿を作る画面を使える');
+  r = await req('POST', '/service/app/apikey', { body: { csrf: csrfOf((await req('GET', '/service/app')).text), label: 't' } });
+  const testerKey = (r.text.match(/sqk_[0-9a-f]{48}/) || [])[0];
+  ok(!!testerKey, 'テスト利用でAPIキーを発行できる');
+  cookie = adminCookie;
+  r = await req('POST', '/admin/service/test-revoke', { body: { email: 'tester@example.com' } });
+  ok(r.status === 200 && r.text.includes('取り消しました') && !store.Subscriptions.isActive(testerId), 'テスト利用を取り消せる');
+  r = await api('GET', '/api/v1/accounts', testerKey);
+  ok(r.status === 401, '取り消すと、APIキーも無効になる');
+  r = await req('POST', '/admin/service/test-revoke', { body: { email: 'paid@example.com' } });
+  ok(r.status === 400 && store.Subscriptions.get(paidId).status === 'active', 'テスト利用でないアカウントは取り消さない（Stripeの契約に影響しない）');
+  cookie = '';
+  r = await req('POST', '/admin/service/test-grant', { body: { email: 'tester@example.com' } });
+  ok(r.status === 302 && !store.Subscriptions.isActive(testerId), '運営者でなければ付与できない');
 
   console.log('既存のアプリへの影響');
   cookie = '';

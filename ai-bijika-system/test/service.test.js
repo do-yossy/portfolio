@@ -42,7 +42,8 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(enc !== 'secret-token' && !enc.includes('secret-token'), '暗号文に平文が含まれない');
   ok(box.decrypt(enc, k) === 'secret-token', '復号できる');
   let threw = false;
-  try { box.decrypt(enc.replace(/.$/, 'A'), k); } catch { threw = true; }
+  // 最後の1文字を、必ず別の文字に変える（元が 'A' だと改ざんにならないため）
+  try { box.decrypt(enc.slice(0, -1) + (enc.slice(-1) === 'A' ? 'B' : 'A'), k); } catch { threw = true; }
   ok(threw, '改ざんされた暗号文は復号に失敗する');
   ok(box.keyFromEnv({ SNS_TOKEN_KEY: 'short' }) === null, '不正な鍵は無効');
 

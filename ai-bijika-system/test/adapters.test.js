@@ -103,7 +103,17 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   r = await yt.publish({ accessToken: 't', post: { category: 'video', text: 'タイトル\n説明', medias: [{ kind: 'video', mime: 'video/mp4', size: 100, path: tmp, url: 'u' }], options: { privacy: 'unlisted' } } });
   mock.restore();
   const meta = JSON.parse(mock.calls[0].body);
-  ok(r.externalId === 'yt_1' && meta.snippet.title === 'タイトル #Shorts' && meta.status.privacyStatus === 'unlisted', 'YouTubeへショート動画を投稿できる');
+  ok(r.externalId === 'yt_1' && meta.snippet.title === 'タイトル #Shorts' && meta.status.privacyStatus === 'unlisted' && meta.status.selfDeclaredMadeForKids === false, 'YouTubeへショート動画を投稿できる');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && c.path.startsWith('/upload/youtube/v3/videos')) return { status: 200, json: {}, headers: { location: 'https://www.googleapis.com/upload/youtube/v3/videos?upload_id=abc' } };
+    if (c.method === 'PUT') return { status: 200, json: { id: 'yt_2' } };
+    return null;
+  });
+  await yt.publish({ accessToken: 't', post: { category: 'video', text: 'x', medias: [{ kind: 'video', mime: 'video/mp4', size: 100, path: tmp, url: 'u' }], options: { made_for_kids: true } } });
+  mock.restore();
+  const meta2 = JSON.parse(mock.calls[0].body);
+  ok(meta2.status.privacyStatus === 'private' && meta2.status.selfDeclaredMadeForKids === true, 'YouTubeの公開設定を省略したら非公開にし、子ども向けの選択を申告する');
+  ok(yt.validatePost({ post: { category: 'video', text: 'x', medias: [{ kind: 'video' }], options: { made_for_kids: 'yes' } } }), '子ども向けの設定は true/false だけ');
   ok(yt.validatePost({ post: { category: 'text', text: 'x', medias: [] } }), '動画なしは拒否する');
   console.log('X 画像・動画');
   const xdir = fs.mkdtempSync(path.join(os.tmpdir(), 'x-'));

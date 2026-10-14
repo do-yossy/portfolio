@@ -68,7 +68,15 @@ const Clients = {
   },
 };
 
+// 期限が切れた行を消す（トークンを発行するときに、ついでに行う）
+function purgeExpired() {
+  const t = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  db.prepare('DELETE FROM oauth_tokens WHERE expires_at < ?').run(t);
+  db.prepare('DELETE FROM oauth_codes WHERE expires_at < ?').run(new Date().toISOString());
+}
+
 function issueTokens(clientId, userId) {
+  purgeExpired();
   const access = rand('sqa_'); const refresh = rand('sqr_'); const t = Date.now();
   const ins = db.prepare('INSERT INTO oauth_tokens (token_hash, kind, client_id, user_id, expires_at, created_at) VALUES (?,?,?,?,?,?)');
   ins.run(hash(access), 'access', clientId, userId, new Date(t + ACCESS_TTL * 1000).toISOString(), now());
@@ -84,16 +92,44 @@ function authenticate(token) {
   return r.user_id;
 }
 
+// 発行したことがあるトークン・キーか（期限切れ・解除済みを含む）。正しい利用者が、期限切れのトークンで
+// 回数制限に数えられて締め出されないようにするために使う（リモートの接続は、事業者の共通のIPから届くため）
+function knownToken(token) {
+  const t = String(token || '');
+  if (/^sqa_[0-9a-f]{64}$/.test(t)) return !!db.prepare('SELECT 1 FROM oauth_tokens WHERE token_hash=?').get(hash(t));
+  if (/^sqk_[0-9a-f]{48}$/.test(t)) return !!db.prepare('SELECT 1 FROM api_keys WHERE key_hash=?').get(hash(t));
+  return false;
+}
+
+// Bearer 認証の共通処理。認証できた要求は回数制限の対象にしない。
+// 戻り値：{ userId } または { status, error }（status は 401 か 429）
+function authenticateRequest(req, limiter, apiKeys) {
+  const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '');
+  const m = String(req.headers.authorization || '').match(/^Bearer\s+(\S+)$/i);
+  const userId = m ? (apiKeys.authenticate(m[1]) || authenticate(m[1])) : null;
+  if (userId) return { userId };
+  if (!m || !knownToken(m[1])) {
+    if (!limiter.allow(ip)) return { status: 429, error: '試行回数が多すぎます。しばらくしてからお試しください。' };
+    limiter.fail(ip);
+  }
+  return { status: 401, error: '' };
+}
+
 // マイページ用：接続中のアプリ（有効なリフレッシュトークンを持つもの）
 function listConnections(userId) {
   return db.prepare(`SELECT c.id, c.name, MAX(t.created_at) AS last_at FROM oauth_tokens t JOIN oauth_clients c ON c.id = t.client_id
     WHERE t.user_id=? AND t.revoked=0 AND t.expires_at > ? GROUP BY c.id, c.name ORDER BY last_at DESC`).all(userId, new Date().toISOString());
 }
+// 接続の解除：トークンと、まだ使われていない認可コードも無効にする
 function revokeClient(userId, clientId) {
   db.prepare('UPDATE oauth_tokens SET revoked=1 WHERE user_id=? AND client_id=?').run(userId, clientId);
+  db.prepare('DELETE FROM oauth_codes WHERE user_id=? AND client_id=?').run(userId, clientId);
 }
 // 契約終了時など：すべての接続を解除
-function revokeAll(userId) { db.prepare('UPDATE oauth_tokens SET revoked=1 WHERE user_id=?').run(userId); }
+function revokeAll(userId) {
+  db.prepare('UPDATE oauth_tokens SET revoked=1 WHERE user_id=?').run(userId);
+  db.prepare('DELETE FROM oauth_codes WHERE user_id=?').run(userId);
+}
 
 function send(res, status, obj, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
@@ -181,8 +217,10 @@ async function handle({ req, res, method, pathname, url, user }) {
       res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<p>接続の要求が正しくありません（アプリまたは戻り先が登録されていません）。</p>'); return true;
     }
     const back = (p) => redirectTo(res, withParams(params.redirect_uri, { ...p, state: params.state }));
-    if (method === 'GET' && params.response_type !== 'code') { back({ error: 'unsupported_response_type' }); return true; }
-    if (params.code_challenge_method !== 'S256' || !/^[A-Za-z0-9_-]{43,128}$/.test(params.code_challenge || '')) { back({ error: 'invalid_request', error_description: 'PKCE(S256) is required' }); return true; }
+    // 戻り先は誰でも登録できるため、利用者が「許可する／しない」を選ぶ前のエラーでは戻り先へ移動せず、ここで表示する（オープンリダイレクト対策）
+    const localError = (text) => { res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(`<p>${escapeHtml(text)}</p>`); };
+    if (method === 'GET' && params.response_type !== 'code') { localError('接続の要求が正しくありません（response_type は code だけに対応しています）。'); return true; }
+    if (params.code_challenge_method !== 'S256' || !/^[A-Za-z0-9_-]{43,128}$/.test(params.code_challenge || '')) { localError('接続の要求が正しくありません（PKCE の S256 が必要です）。'); return true; }
     if (!user) {
       const next = `/oauth/authorize?${new URLSearchParams(params).toString()}`;
       redirectTo(res, `/service/login?next=${encodeURIComponent(next)}`); return true;
@@ -221,7 +259,9 @@ async function handle({ req, res, method, pathname, url, user }) {
     }
     if (p.grant_type === 'refresh_token') {
       const row = db.prepare(`SELECT * FROM oauth_tokens WHERE token_hash=? AND kind='refresh'`).get(hash(p.refresh_token || ''));
-      if (!row || row.revoked || Date.parse(row.expires_at) < Date.now() || (p.client_id && p.client_id !== row.client_id)) return fail('invalid_grant', 'リフレッシュトークンが無効です。'), true;
+      // 使用済みのリフレッシュトークンが再び使われたら、漏えいのおそれがあるため、そのアプリの接続をまとめて無効にする
+      if (row && row.revoked) { revokeClient(row.user_id, row.client_id); return fail('invalid_grant', 'リフレッシュトークンが無効です。もう一度接続してください。'), true; }
+      if (!row || Date.parse(row.expires_at) < Date.now() || (p.client_id && p.client_id !== row.client_id)) return fail('invalid_grant', 'リフレッシュトークンが無効です。'), true;
       db.prepare('UPDATE oauth_tokens SET revoked=1 WHERE token_hash=?').run(row.token_hash); // 使い回し防止（ローテーション）
       send(res, 200, issueTokens(row.client_id, row.user_id), cors);
       return true;
@@ -232,4 +272,4 @@ async function handle({ req, res, method, pathname, url, user }) {
   return false;
 }
 
-module.exports = { handle, authenticate, challengeHeader, listConnections, revokeClient, revokeAll, validRedirect };
+module.exports = { handle, authenticate, authenticateRequest, knownToken, challengeHeader, listConnections, revokeClient, revokeAll, validRedirect };

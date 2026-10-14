@@ -28,6 +28,7 @@ function validatePost(args) {
   if (m.durationSec && m.durationSec > 180) return 'YouTubeショートは3分以内の動画にしてください。';
   const o = p.options || {};
   if (o.privacy && !PRIVACY.includes(o.privacy)) return 'YouTubeの公開設定が正しくありません。';
+  if (o.made_for_kids !== undefined && typeof o.made_for_kids !== 'boolean') return 'YouTubeの「子ども向け」の設定が正しくありません。';
   if (textLength(p.text) > maxLength) return `YouTubeの説明は${maxLength}文字までです。`;
   return null;
 }
@@ -88,7 +89,9 @@ async function publish(args) {
   if (err) throw new SnsError(err);
   const m = p.medias[0];
   const { title, description } = titleAndDescription(p.text);
-  const meta = { snippet: { title, description, categoryId: '22' }, status: { privacyStatus: (p.options && p.options.privacy) || 'public', selfDeclaredMadeForKids: false } };
+  // 公開設定を指定しなかった場合は、安全のため「非公開」にする。子ども向けかどうかは利用者の選択（省略時は「子ども向けではない」）
+  const status = { privacyStatus: (p.options && p.options.privacy) || 'private', selfDeclaredMadeForKids: !!(p.options && p.options.made_for_kids === true) };
+  const meta = { snippet: { title, description, categoryId: '22' }, status };
   const init = await call({
     host: 'www.googleapis.com', method: 'POST', path: '/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Length': String(m.size), 'X-Upload-Content-Type': m.mime || 'video/mp4' },

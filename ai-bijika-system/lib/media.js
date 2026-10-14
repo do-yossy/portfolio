@@ -152,4 +152,9 @@ function serve(req, res, token, ext) {
   return fs.createReadStream(file).pipe(res);
 }
 
-module.exports = { LIMITS, mp4DurationSec, sniff, saveUpload, pathOf, publicUrl, remove, cleanup, serve };
+// 利用者が、あと保存できる容量（アップロード中の分を含めて差し引く）
+function remainingBytes(userId) {
+  return Math.max(0, LIMITS.userTotalBytes - MediaAssets.totalSize(userId) - (inflight.get(userId) || 0));
+}
+
+module.exports = { remainingBytes, LIMITS, mp4DurationSec, sniff, saveUpload, pathOf, publicUrl, remove, cleanup, serve };

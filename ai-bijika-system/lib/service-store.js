@@ -155,7 +155,8 @@ db.exec(`
 // 従来の1メディアの予約を、新しい対応表にも反映する
 db.exec("INSERT OR IGNORE INTO post_media (post_id, media_id) SELECT id, media_id FROM scheduled_posts WHERE media_id != ''");
 
-const ACTIVE_STATUSES = new Set(['active', 'trialing']);
+// test：運営者が動作確認のために付与した「テスト利用」（Stripeを通さない。料金はかからない）
+const ACTIVE_STATUSES = new Set(['active', 'trialing', 'test']);
 
 const Subscriptions = {
   get(userId) {
@@ -323,7 +324,10 @@ const ScheduledPosts = {
   countXUnits(userId, fromIso, toIso) {
     // 連携を解除・再連携しても数え直しにならないよう、投稿を作ったときのSNS（p.platform）で数える
     const rows = db.prepare(`SELECT p.tree FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
-      WHERE p.user_id=? AND (p.platform='x' OR a.platform='x') AND p.status IN ('pending','publishing','posted') AND p.scheduled_at >= ? AND p.scheduled_at < ?`).all(userId, fromIso, toIso);
+      WHERE p.user_id=? AND (p.platform='x' OR a.platform='x') AND p.scheduled_at >= ? AND p.scheduled_at < ?
+        AND (p.status IN ('pending','publishing','posted')
+          OR (p.status = 'failed' AND (p.last_error LIKE '%投稿されたか%' OR p.last_error LIKE '%投稿済み%' OR p.last_error LIKE '%再起動%')))`).all(userId, fromIso, toIso);
+    // 「失敗」でも、投稿されたかどうか分からないもの・ツリーの途中まで投稿済みのものは、実際に投稿された可能性があるため数える
     return rows.reduce((n, r) => { let t = 0; try { t = JSON.parse(r.tree || '[]').length; } catch { t = 0; } return n + 1 + t; }, 0);
   },
   // 下書きを予約（または即時投稿）にする
