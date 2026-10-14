@@ -48,7 +48,7 @@ async function processOne(post) {
     if (post.media_id) {
       const m = MediaAssets.get(post.media_id);
       if (!m) return ScheduledPosts.markFailed(post.id, '添付したファイルが削除されているため投稿できませんでした');
-      media = { kind: m.kind, mime: m.mime, size: m.size, path: mediaLib.pathOf(m), url: mediaLib.publicUrl(m) };
+      media = { kind: m.kind, mime: m.mime, size: m.size, path: mediaLib.pathOf(m), url: mediaLib.publicUrl(m), durationSec: m.kind === 'video' ? mediaLib.mp4DurationSec(mediaLib.pathOf(m)) : null };
     }
     let options = {};
     try { options = JSON.parse(post.options || '{}'); } catch { options = {}; }

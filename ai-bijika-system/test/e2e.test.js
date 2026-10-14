@@ -210,6 +210,16 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 404, 'TikTok以外のアカウントでは取得できない');
   r = await req('GET', '/service/app');
   ok(r.text.includes('id="tiktokBox"') && r.text.includes('第三者の商品・ブランドの宣伝'), 'TikTokを連携すると、投稿フォームにTikTokの設定欄（公開範囲・コメント等・商用の開示）が出る');
+  // TikTokの設定（商用コンテンツの開示・公開範囲）が、フォームから予約に保存される
+  const mp4Buf = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), Buffer.alloc(2000, 4)]);
+  const upv = JSON.parse((await rawUpload(mp4Buf, { 'X-CSRF': appCsrf })).text);
+  r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: 'TikTok宣伝', account: ttId, at: FUTURE, mode: 'schedule', media_id: upv.id, tiktok_privacy: 'SELF_ONLY', tiktok_comment: '1', tiktok_commercial_own: '1' } });
+  ok(r.status === 302, 'TikTokの設定つきで予約できる');
+  const ttPostRow = store.ScheduledPosts.listForUser(userIdForSub).find((p) => p.text === 'TikTok宣伝');
+  const ttOpt = JSON.parse(ttPostRow.options);
+  ok(ttOpt.privacy_level === 'SELF_ONLY' && ttOpt.commercial_own === true && ttOpt.commercial_paid === false && ttOpt.disable_comment === false && ttOpt.disable_duet === true, 'フォームの公開範囲・商用コンテンツの開示・コメント許可が、予約に保存される');
+  r = await req('POST', '/service/app/post', { body: { csrf: appCsrf, text: '提携で自分のみ', account: ttId, at: FUTURE, mode: 'schedule', media_id: upv.id, tiktok_privacy: 'SELF_ONLY', tiktok_commercial_paid: '1' } });
+  ok(r.status === 400 && r.text.includes('自分のみ'), '提携（有償）の宣伝は、公開範囲を「自分のみ」にできない');
   store.SnsAccounts.remove(ttId, userIdForSub);
   r = await req('POST', `/service/app/post/${postId}/cancel`, { body: { csrf: appCsrf } });
   ok(r.status === 302 && r.headers.location === '/service/app?f=cancelled', '未投稿の予約を取り消せる');

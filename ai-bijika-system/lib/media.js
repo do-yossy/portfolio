@@ -78,6 +78,40 @@ function saveUpload({ userId, req, contentLength }) {
   });
 }
 
+// MP4/MOV の長さ（秒）。moov > mvhd を読む。読めなければ null（検証をしない）
+function mp4DurationSec(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size;
+    const readAt = (pos, len) => { const b = Buffer.alloc(len); const n = fs.readSync(fd, b, 0, len, pos); return b.slice(0, n); };
+    const findBox = (start, end, type) => {
+      let pos = start;
+      while (pos + 8 <= end) {
+        const h = readAt(pos, 16);
+        let boxSize = h.readUInt32BE(0);
+        const t = h.slice(4, 8).toString('latin1');
+        let header = 8;
+        if (boxSize === 1) { boxSize = Number(h.readBigUInt64BE(8)); header = 16; }
+        else if (boxSize === 0) boxSize = end - pos;
+        if (boxSize < header) return null;
+        if (t === type) return { start: pos + header, end: Math.min(pos + boxSize, end) };
+        pos += boxSize;
+      }
+      return null;
+    };
+    const moov = findBox(0, size, 'moov');
+    if (!moov) return null;
+    const mvhd = findBox(moov.start, moov.end, 'mvhd');
+    if (!mvhd) return null;
+    const b = readAt(mvhd.start, 32);
+    const version = b[0];
+    const timescale = version === 1 ? b.readUInt32BE(20) : b.readUInt32BE(12);
+    const duration = version === 1 ? Number(b.readBigUInt64BE(24)) : b.readUInt32BE(16);
+    return timescale ? duration / timescale : null;
+  } catch { return null; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* 閉じられない */ } }
+}
+
 const pathOf = (m) => path.join(dir(), `${m.token}.${m.ext}`);
 function publicUrl(m) {
   const base = String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, '');
@@ -118,4 +152,4 @@ function serve(req, res, token, ext) {
   return fs.createReadStream(file).pipe(res);
 }
 
-module.exports = { LIMITS, sniff, saveUpload, pathOf, publicUrl, remove, cleanup, serve };
+module.exports = { LIMITS, mp4DurationSec, sniff, saveUpload, pathOf, publicUrl, remove, cleanup, serve };

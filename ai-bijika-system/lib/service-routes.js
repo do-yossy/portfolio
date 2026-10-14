@@ -252,7 +252,7 @@ async function handle(ctx) {
     const now = body.mode === 'now';
     const at = now ? new Date(Date.now() + 1000).toISOString() : core.jstLocalToIso(body.at);
     // TikTokの設定：公開範囲は必ず本人に選ばせる。コメント・デュエット・ステッチは、チェックを入れたときだけ許可
-    const options = { tiktok: { privacy_level: body.tiktok_privacy || '', disable_comment: body.tiktok_comment !== '1', disable_duet: body.tiktok_duet !== '1', disable_stitch: body.tiktok_stitch !== '1' } };
+    const options = { tiktok: { privacy_level: body.tiktok_privacy || '', disable_comment: body.tiktok_comment !== '1', disable_duet: body.tiktok_duet !== '1', disable_stitch: body.tiktok_stitch !== '1', commercial_own: body.tiktok_commercial_own === '1', commercial_paid: body.tiktok_commercial_paid === '1' } };
     const r = core.createPosts({ userId: user.id, accountIds: body.account, text: body.text, scheduledAtIso: at, mediaId: body.media_id || '', options });
     if (!r.ok) { dashboard(400, { type: 'error', text: r.error }); return true; }
     if (now) setTimeout(() => scheduler.tick().catch(() => {}), 1500);

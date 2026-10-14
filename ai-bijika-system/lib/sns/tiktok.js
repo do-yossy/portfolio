@@ -22,7 +22,7 @@ function isConfigured(env = process.env) { const c = creds(env); return !!(c.key
 const textLength = (t) => [...String(t)].length;
 
 function validatePost({ text, media, options }) {
-  if (!media || media.kind !== 'video') return 'TikTokは、動画（MP4）が必要です。';
+  if (!media || media.kind !== 'video') return 'TikTokは、動画（MP4・MOV）が必要です。';
   if (textLength(text || '') > maxLength) return `TikTokのタイトルは${maxLength}文字までです。`;
   if (!options || !PRIVACY.includes(options.privacy_level)) return 'TikTokの公開範囲を選んでください。';
   if (options.commercial_paid && options.privacy_level === 'SELF_ONLY') return '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできません。';
@@ -110,6 +110,9 @@ async function publish({ accessToken, text, media, options }) {
   if (allowed.length && !allowed.includes(options.privacy_level)) {
     throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。アプリの審査が終わるまでは「自分のみ（SELF_ONLY）」だけの場合があります。`);
   }
+  if (info.data && Number(info.data.max_video_post_duration_sec) && media.durationSec && media.durationSec > Number(info.data.max_video_post_duration_sec)) {
+    throw new SnsError(`動画が長すぎます（${Math.round(media.durationSec)}秒）。このアカウントで投稿できるのは、最大${info.data.max_video_post_duration_sec}秒です。`);
+  }
   const plan = chunkPlan(media.size);
   const init = await call({ path: '/v2/post/publish/video/init/', headers: bearer(accessToken), body: JSON.stringify({
     post_info: { title: text || '', privacy_level: options.privacy_level, disable_comment: !!options.disable_comment, disable_duet: !!options.disable_duet, disable_stitch: !!options.disable_stitch,
@@ -145,4 +148,4 @@ async function publish({ accessToken, text, media, options }) {
   } catch (e) { throw ambiguous(e); }
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, creatorInfo, authUrl, exchangeCode, refresh, publish, usesPkce: false, PRIVACY, mediaRule: '動画（MP4）が必須', needsOptions: true };
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, creatorInfo, authUrl, exchangeCode, refresh, publish, usesPkce: false, PRIVACY, mediaRule: '動画（MP4・MOV）が必須', needsOptions: true };

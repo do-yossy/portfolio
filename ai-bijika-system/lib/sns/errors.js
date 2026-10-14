@@ -18,10 +18,11 @@ function classify(status, message) {
   return new SnsError(message || `SNS側でエラーになりました (${status})`, { status });
 }
 
-// 公開の最終段階で起きたエラーは、投稿されたかどうかが分からない（応答だけが失われた可能性がある）。
-// 自動で再試行すると二重投稿になりうるため、再試行せずに失敗として、利用者に確認を促す。
+// 公開の最終段階で、通信エラー・タイムアウト・サーバーエラー(5xx)が起きたときは、投稿されたかどうかが分からない
+// （応答だけが失われた可能性がある）。自動で再試行すると二重投稿になりうるため、再試行せずに失敗として、利用者に確認を促す。
+// 投稿されていないと確定しているエラー（400番台の拒否、429、SNS側の「失敗」の通知、入力の不備）は、このまま扱う。
 function ambiguous(err) {
-  if (err && !err.authError) {
+  if (err && err.retriable && !err.authError && err.status !== 429) {
     err.retriable = false;
     if (!/投稿されたか/.test(err.message)) err.message = `${err.message}（投稿されたかどうか、SNSでご確認ください）`;
   }

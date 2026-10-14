@@ -226,6 +226,61 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   ok(/自分のみ/.test(tt.validatePost({ text: 'a', media: { kind: 'video' }, options: { privacy_level: 'SELF_ONLY', commercial_paid: true } })), '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできない');
   m5.restore();
 
+  // MP4の長さの読み取り
+  const box32 = (type, payload) => { const b = Buffer.alloc(8 + payload.length); b.writeUInt32BE(8 + payload.length, 0); b.write(type, 4, 'latin1'); payload.copy(b, 8); return b; };
+  const mvhd = Buffer.alloc(100); mvhd.writeUInt32BE(1000, 12); mvhd.writeUInt32BE(12000, 16); // version 0, timescale 1000, duration 12000 → 12秒
+  const synth = Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), box32('mdat', Buffer.alloc(300, 1)), box32('moov', box32('mvhd', mvhd))]);
+  const synthPath = path.join(process.env.DATA_DIR, 'synth.mp4'); fs.writeFileSync(synthPath, synth);
+  ok(media.mp4DurationSec(synthPath) === 12, 'MP4の長さ（秒）を読み取れる（moovがmdatの後ろにあっても）');
+  fs.writeFileSync(synthPath, Buffer.alloc(200, 3));
+  ok(media.mp4DurationSec(synthPath) === null && media.mp4DurationSec('/nonexistent') === null, '読み取れないときはnull（検証しない）');
+  const mockDur = installHttpsMock(async (c) => (c.path === '/v2/post/publish/creator_info/query/' ? { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'], max_video_post_duration_sec: 600 }, error: { code: 'ok' } } } : null));
+  let durErr = null;
+  try { await tt.publish({ accessToken: 't', text: 'a', media: { kind: 'video', mime: 'video/mp4', size: 10, path: synthPath, durationSec: 700 }, options: { privacy_level: 'SELF_ONLY' } }); } catch (e) { durErr = e; }
+  ok(durErr && /長すぎます/.test(durErr.message), 'TikTokの最大秒数を超える動画は、投稿前に理由を示して失敗にする');
+  mockDur.restore();
+
+  // 公開の最終段階のエラーのうち、投稿されていないと確定するものは、そのまま扱う
+  const mA = installHttpsMock(async (c) => {
+    if (c.host === 'graph.instagram.com') {
+      if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'cA' } };
+      if (c.path === '/v22.0/ig1/media_publish') return { status: 400, json: { error: { message: 'Media ID is not available', code: 9007 } } };
+    }
+    return null;
+  });
+  const pRej = core.createPosts({ userId: uid, accountIds: [igAcc], text: 'x', scheduledAtIso: future(), mediaId: jpg.id });
+  await new Promise((rs) => setTimeout(rs, 1200));
+  await scheduler.tick();
+  ok(store.ScheduledPosts.get(pRej.ids[0]).status === 'failed' && !/投稿されたか/.test(store.ScheduledPosts.get(pRej.ids[0]).last_error), '拒否（400）は、投稿されていないと確定するため、「投稿されたかご確認ください」とは表示しない');
+  mA.restore();
+  const mB = installHttpsMock(async (c) => {
+    if (c.host === 'graph.instagram.com') {
+      if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'cB' } };
+      if (c.path === '/v22.0/ig1/media_publish') return { status: 429, json: { error: { message: 'rate limit' } } };
+    }
+    return null;
+  });
+  const pRate = core.createPosts({ userId: uid, accountIds: [igAcc], text: 'x', scheduledAtIso: future(), mediaId: jpg.id });
+  await new Promise((rs) => setTimeout(rs, 1200));
+  await scheduler.tick();
+  ok(store.ScheduledPosts.get(pRate.ids[0]).status === 'pending', '429（制限）は、投稿されていないと確定するため、自動で再試行する');
+  store.ScheduledPosts.cancel(pRate.ids[0], uid);
+  mB.restore();
+  store.SnsAccounts.setStatus(ttAcc, 'active');
+  const mC = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/video/init/') return { status: 200, json: { data: { publish_id: 'pf', upload_url: 'https://upload.tiktok.test/u' }, error: { code: 'ok' } } };
+    if (c.host === 'upload.tiktok.test') return { status: 201, json: {} };
+    if (c.path === '/v2/post/publish/status/fetch/') return { status: 200, json: { data: { status: 'FAILED', fail_reason: 'file_format_check_failed' }, error: { code: 'ok' } } };
+    return null;
+  });
+  const pFail = core.createPosts({ userId: uid, accountIds: [ttAcc], text: 'x', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'SELF_ONLY' } } });
+  await new Promise((rs) => setTimeout(rs, 1200));
+  await scheduler.tick();
+  const failRow = store.ScheduledPosts.get(pFail.ids[0]);
+  ok(failRow.status === 'failed' && /file_format_check_failed/.test(failRow.last_error) && !/投稿されたか/.test(failRow.last_error), 'TikTok側が「失敗」と通知した場合は、理由を示し、「投稿されたかご確認ください」とは表示しない');
+  mC.restore();
+
   // 公開の最終段階のエラーは再試行しない（二重投稿の防止）
   const m6 = installHttpsMock(async (c) => {
     if (c.host === 'graph.instagram.com') {

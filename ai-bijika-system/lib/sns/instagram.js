@@ -91,4 +91,4 @@ async function publish({ accessToken, externalUserId, text, media }) {
   return { externalId: String(published.id) };
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, usesPkce: false, mediaRule: '画像（JPEG）または動画（MP4）が必須' };
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, usesPkce: false, mediaRule: '画像（JPEG）または動画（MP4・MOV）が必須' };

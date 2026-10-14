@@ -76,10 +76,10 @@ function landingPage({ user, billingReady }) {
     </div>
     <h2 style="margin-top:26px">ご利用の前にご確認ください</h2>
     <div class="card"><ul class="plain small">
-      <li>対応SNSは、Threads・X・Instagram・TikTokです。Xはテキストのみ、Instagramは画像（JPEG）またはリール動画が必須、TikTokは動画（MP4）が必須です。Threadsは画像・動画を付けられます。</li>
+      <li>対応SNSは、Threads・X・Instagram・TikTokです。Xはテキストのみ、Instagramは画像（JPEG）またはリール動画が必須、TikTokは動画（MP4・MOV）が必須です。Threadsは画像・動画を付けられます。</li>
       <li>Instagramは、プロアカウント（ビジネス／クリエイター）が対象です。</li>
       <li>TikTokへの投稿は、TikTok側の仕様・審査状況により、公開範囲が制限される場合があります。</li>
-      <li>アップロードできるファイルは、画像（JPEG・PNG）が8MBまで、動画（MP4）が100MBまで、保存できる合計は1人あたり300MBまでです。予約した投稿に使うファイルは、投稿が終わるまで保存します。投稿が終わってから2日後以降（投稿に使わなかったファイルは、アップロードから1日後以降）に、自動で削除します。投稿用のファイルは、保存している間、推測できない長いURLで外部から取得できる状態になります。</li>
+      <li>アップロードできるファイルは、画像（JPEG・PNG）が8MBまで、動画（MP4・MOV）が100MBまで、保存できる合計は1人あたり300MBまでです。予約した投稿に使うファイルは、投稿が終わるまで保存します。投稿が終わってから2日後以降（投稿に使わなかったファイルは、アップロードから1日後以降）に、自動で削除します。投稿用のファイルは、保存している間、推測できない長いURLで外部から取得できる状態になります。</li>
       <li>投稿できるのは、ご自身で作成・予約した内容だけです。いいね・フォロー・コメントなどの自動操作は行いません。</li>
       <li>Xへの投稿は、X側のAPIの利用条件（投稿数の制限など）の影響を受ける場合があります。</li>
       <li>文字数の上限は、Threadsが500文字、Xが重み付きで280（日本語は1文字を2として計算）、Instagram・TikTokが2,200文字です。</li>
@@ -133,7 +133,7 @@ function checkoutPage({ user, csrf, error }) {
         <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。</td></tr>
         <tr><th>返金</th><td>お支払い済みの料金は、法令上必要な場合を除き、返金いたしません（日割りでの返金もありません）。</td></tr>
         <tr><th>対応SNSと制限</th><td>Threads・X・Instagram・TikTok。未投稿の予約は100件まで、1日の予約は30件まで、連携は5アカウントまでです。画像は8MB、動画は100MBまで、保存できるファイルの合計は1人300MBまでです。</td></tr>
-        <tr><th>SNSごとの条件</th><td>Xはテキストのみ。Instagramはプロアカウントが対象で、JPEG画像またはリール動画が必須。TikTokは動画（MP4）が必須で、TikTok側の審査状況により、公開範囲が制限される場合があります。Threadsは画像・動画を付けられます。</td></tr>
+        <tr><th>SNSごとの条件</th><td>Xはテキストのみ。Instagramはプロアカウントが対象で、JPEG画像またはリール動画が必須。TikTokは動画（MP4・MOV）が必須で、TikTok側の審査状況により、公開範囲が制限される場合があります。Threadsは画像・動画を付けられます。</td></tr>
         <tr><th>お支払い方法</th><td>クレジットカード等（決済代行：Stripe）。カード情報は当サービスには保存されません。</td></tr>
       </table>
     </div>
@@ -201,7 +201,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
         <div class="small" id="count">0文字</div></div>
       <div class="field"><label class="lbl" for="file">画像・動画（Instagram・TikTokでは必須）</label>
         <input id="file" type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime">
-        <div class="small" id="fileStatus">JPEG・PNG（8MBまで）／MP4（100MBまで）</div>
+        <div class="small" id="fileStatus">JPEG・PNG（8MBまで）／MP4・MOV（100MBまで）</div>
         <div id="previewBox" style="margin-top:8px"></div></div>
       <div class="field"><span class="lbl">投稿先</span>
         ${activeAccounts.map((a) => `<label class="check"><input type="checkbox" name="account" value="${escapeHtml(a.id)}" data-platform="${escapeHtml(a.platform)}" ${activeAccounts.length === 1 ? 'checked' : ''}><span>${escapeHtml((registry.get(a.platform) || {}).label || a.platform)} ${escapeHtml(a.handle || '')}</span></label>`).join('')}</div>
@@ -214,7 +214,8 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
         <label class="check"><input type="checkbox" name="tiktok_duet" id="tt_duet" value="1"><span>デュエットを許可する</span></label>
         <label class="check"><input type="checkbox" name="tiktok_stitch" id="tt_stitch" value="1"><span>ステッチを許可する</span></label>
         <label class="check"><input type="checkbox" name="tiktok_commercial_own" value="1"><span>この動画は、自分のブランド・商品・サービスの宣伝を含む</span></label>
-        <label class="check"><input type="checkbox" name="tiktok_commercial_paid" value="1"><span>この動画は、第三者の商品・ブランドの宣伝（提携・有償）を含む</span></label>
+        <label class="check"><input type="checkbox" name="tiktok_commercial_paid" id="tt_paid" value="1"><span>この動画は、第三者の商品・ブランドの宣伝（提携・有償）を含む</span></label>
+        <p class="small" id="ttPaidNote" style="display:none">提携（有償）の宣伝を投稿するには、公開範囲を「自分のみ」にできません。投稿することで、<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">TikTokのブランドコンテンツのポリシー</a>と音楽使用の確認に同意したものとみなされます。</p>
         <p class="small">投稿することで、<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">TikTokの音楽使用の確認</a>に同意したものとみなされます。アプリの審査が終わるまでは、公開範囲が「自分のみ」に限られる場合があります。</p></div>` : ''}
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
@@ -239,12 +240,15 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       var LABELS={PUBLIC_TO_EVERYONE:'全員に公開',MUTUAL_FOLLOW_FRIENDS:'相互フォローの友達',FOLLOWER_OF_CREATOR:'フォロワー',SELF_ONLY:'自分のみ'};var loaded=false;
       function loadTT(){if(loaded||!box)return;loaded=true;var sel=document.getElementById('tiktok_privacy'),msg=document.getElementById('ttMsg');
         fetch('/service/app/tiktok/creator-info?account='+encodeURIComponent(box.dataset.account),{credentials:'same-origin'}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){
-          if(!x.ok){sel.innerHTML='<option value="">取得できませんでした</option>';msg.textContent=x.j.error||'';loaded=false;return;}
-          var o=x.j.privacyLevelOptions||[];sel.innerHTML='<option value="">選択してください</option>'+o.map(function(v){return '<option value="'+v+'">'+(LABELS[v]||v)+'</option>'}).join('');
+          if(!x.ok){sel.textContent='';var e1=document.createElement('option');e1.value='';e1.textContent='取得できませんでした';sel.appendChild(e1);msg.textContent=x.j.error||'';loaded=false;return;}
+          var o=x.j.privacyLevelOptions||[];sel.textContent='';var ph=document.createElement('option');ph.value='';ph.textContent='選択してください';sel.appendChild(ph);
+          o.forEach(function(v){var op=document.createElement('option');op.value=v;op.textContent=LABELS[v]||v;sel.appendChild(op);});
           if(x.j.nickname)document.getElementById('ttNick').textContent=x.j.nickname;
           [['tt_comment',x.j.commentDisabled],['tt_duet',x.j.duetDisabled],['tt_stitch',x.j.stitchDisabled]].forEach(function(p){var c=document.getElementById(p[0]);if(p[1]){c.checked=false;c.disabled=true;c.parentNode.querySelector('span').textContent+='（このアカウントでは許可できません）';}});
           msg.textContent=x.j.maxVideoPostDurationSec?'投稿できる動画の長さは、最大'+x.j.maxVideoPostDurationSec+'秒です。':'';
-        }).catch(function(){sel.innerHTML='<option value="">取得できませんでした</option>';loaded=false;});}
+        }).catch(function(){sel.textContent='';var e2=document.createElement('option');e2.value='';e2.textContent='取得できませんでした';sel.appendChild(e2);loaded=false;});}
+      (function(){var paid=document.getElementById('tt_paid');if(!paid)return;paid.addEventListener('change',function(){var sel=document.getElementById('tiktok_privacy'),note=document.getElementById('ttPaidNote');note.style.display=paid.checked?'block':'none';
+        Array.prototype.forEach.call(sel.options,function(op){if(op.value==='SELF_ONLY'){op.disabled=paid.checked;if(paid.checked&&sel.value==='SELF_ONLY')sel.value='';}});});})();
       function tt(){if(!box)return;var on=document.querySelector('input[name=account][data-platform=tiktok]:checked');box.style.display=on?'block':'none';if(on)loadTT();}
       document.querySelectorAll('input[name=account]').forEach(function(c){c.addEventListener('change',tt)});tt();
     })();

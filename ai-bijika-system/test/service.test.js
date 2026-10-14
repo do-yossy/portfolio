@@ -109,8 +109,11 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(canceled.cancel_at_period_end === 1 && store.Subscriptions.isActive(userA), '解約手続きをしても期間末までは利用できる');
   const resumed = await billing.setCancelAtPeriodEnd(userA, false);
   ok(resumed.cancel_at_period_end === 0, '解約を取り消せる');
+  const endAcc = store.SnsAccounts.upsert({ userId: userA, platform: 'threads', externalUserId: 'end1', handle: '@end', accessTokenEnc: box.encrypt('tok', k), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  const endPost = store.ScheduledPosts.create({ userId: userA, accountId: endAcc, text: 't', scheduledAt: new Date(Date.now() + 86400000).toISOString() });
   await billing.handleEvent({ id: 'evt_d', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1', customer: 'cus_1', status: 'canceled', current_period_end: periodEnd, cancel_at_period_end: false, metadata: {}, items: { data: [] } } } });
   ok(!store.Subscriptions.isActive(userA), '契約が終了すると利用できなくなる');
+  ok(store.SnsAccounts.get(endAcc) === null && store.ScheduledPosts.get(endPost).status === 'cancelled', '契約が終了すると、保存しているSNSの連携情報（トークン）を削除し、未投稿の予約を取り消す');
   const portal = await billing.createPortalSession('cus_1');
   ok(portal === 'https://portal.stripe.test/p', 'カード変更用のポータルURLを取得できる');
   // 決済ページから戻った直後の同期（Webhookの到着前でも、2本目の契約を作らせないため）
