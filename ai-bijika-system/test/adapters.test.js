@@ -68,6 +68,16 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   ok(r.externalId === 'igp' && /is_carousel_item=true/.test(ib[0]) && /media_type=VIDEO/.test(ib[1]) && /media_type=CAROUSEL/.test(ib[2]) && /caption=cap/.test(ib[2]), 'Instagramのカルーセル（画像＋動画）を投稿できる');
   ok(ig.validatePost({ post: { category: 'image', text: '', medias: Array.from({ length: 11 }, (_, i) => img(i)) } }), '11件は拒否する');
   ok(ig.validatePost({ post: { category: 'tree', text: '', medias: [img(1)], tree: [{ text: 'x' }] } }), 'Instagramはツリー不可');
+  ok(/縦横比/.test(ig.validatePost({ post: { category: 'image', text: '', medias: [{ ...img(1), width: 1080, height: 1440 }] } }) || '') && ig.validatePost({ post: { category: 'image', text: '', medias: [{ ...img(1), width: 1080, height: 1350 }] } }) === null, 'Instagramの画像は縦横比 4:5〜1.91:1 だけ（スマホの縦写真3:4は予約の時点で断る）');
+  let pubTry = 0;
+  mock = installHttpsMock(async (c) => {
+    if (/\/media$/.test(c.path)) return { status: 200, json: { id: 'ix' } };
+    if (/media_publish$/.test(c.path)) { pubTry++; return pubTry === 1 ? { status: 400, json: { error: { message: 'not ready', code: 9007, error_subcode: 2207027 } } } : { status: 200, json: { id: 'igok' } }; }
+    return { status: 200, json: { status_code: 'FINISHED' } };
+  });
+  r = await ig.publish({ accessToken: 't', externalUserId: 'g1', post: { category: 'image', text: 'c', medias: [img(1)] } });
+  mock.restore();
+  ok(r.externalId === 'igok' && pubTry === 2, 'Instagramの「まだ公開の準備ができていない」は、同じ投稿のまま待って再試行する');
   console.log('Threads 公開の応答が失われた場合');
   mock = installHttpsMock(async (c) => {
     if (/\/threads$/.test(c.path)) return { status: 200, json: { id: 'cx' } };
@@ -170,6 +180,26 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   const tkb = JSON.parse(mock.calls.find((c) => c.path === '/v2/post/publish/content/init/').body);
   mock.restore();
   ok(r.externalId === 'tp1' && tkb.media_type === 'PHOTO' && tkb.source_info.photo_images.length === 2 && tkb.post_info.title === 'タイトル', 'TikTokへ写真を投稿できる（1行目がタイトル）');
+  console.log('TikTok の拒否の理由とAI生成の表示');
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 403, json: { error: { code: 'unaudited_client_can_only_post_to_private_accounts', message: 'x' } } };
+    return null;
+  });
+  err = null; try { await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [img(1)], options: { privacy_level: 'SELF_ONLY' } } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && !err.authError && /非公開/.test(err.message), 'TikTokの「審査前は非公開アカウントだけ」の拒否は、連携のやり直しにせず、理由を日本語で示す');
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 200, json: { data: { publish_id: 'pa' }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/status/fetch/') return { status: 200, json: { data: { status: 'PUBLISH_COMPLETE' }, error: { code: 'ok' } } };
+    return null;
+  });
+  await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [{ ...img(1), aiGenerated: true }], options: { privacy_level: 'SELF_ONLY' } } });
+  const aigcBody = JSON.parse(mock.calls.find((c) => c.path === '/v2/post/publish/content/init/').body);
+  mock.restore();
+  ok(aigcBody.is_aigc === true, 'AIで作った写真には、TikTokの「AI生成」の印（is_aigc）を付ける');
+
   console.log('URLからの取り込みの安全対策');
   const fm = require('../lib/fetch-media');
   ok(['127.0.0.1', '10.1.2.3', '169.254.169.254', '192.168.0.1', '172.20.0.1', '100.64.0.1', '::1', 'fd00::1', '::ffff:127.0.0.1', '0.0.0.0'].every(fm.isPrivate), '社内・ローカルのアドレスを判定できる');

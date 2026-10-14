@@ -111,6 +111,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   const mock = installHttpsMock(async (c) => {
     calls.push(c);
     if (c.host === 'graph.instagram.com') {
+      if (c.method === 'GET' && /fields=status_code/.test(c.path)) return { status: 200, json: { status_code: 'FINISHED' } };
       if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'ig_container' } };
       if (c.path === '/v22.0/ig1/media_publish') return { status: 200, json: { id: 'ig_media_1' } };
     }
@@ -165,7 +166,11 @@ const future = () => new Date(Date.now() + 1000).toISOString();
     if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
     return null;
   });
+  const unaudited = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '公開', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE' } } });
+  ok(!unaudited.ok && /審査が終わるまで/.test(unaudited.error), 'TikTokの審査前は、公開範囲「自分のみ」以外は予約の時点で断る');
+  process.env.TIKTOK_AUDITED = 'true'; // 審査済みのアプリでも、アカウントによっては許可されない公開範囲がある
   const pub = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '公開', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE' } } });
+  delete process.env.TIKTOK_AUDITED;
   await new Promise((rs) => setTimeout(rs, 1200));
   await scheduler.tick();
   const pubRow = store.ScheduledPosts.get(pub.ids[0]);
@@ -256,6 +261,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   // 公開の最終段階のエラーのうち、投稿されていないと確定するものは、そのまま扱う
   const mA = installHttpsMock(async (c) => {
     if (c.host === 'graph.instagram.com') {
+      if (c.method === 'GET' && /fields=status_code/.test(c.path)) return { status: 200, json: { status_code: 'FINISHED' } };
       if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'cA' } };
       if (c.path === '/v22.0/ig1/media_publish') return { status: 400, json: { error: { message: 'Media ID is not available', code: 9007 } } };
     }
@@ -268,6 +274,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   mA.restore();
   const mB = installHttpsMock(async (c) => {
     if (c.host === 'graph.instagram.com') {
+      if (c.method === 'GET' && /fields=status_code/.test(c.path)) return { status: 200, json: { status_code: 'FINISHED' } };
       if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'cB' } };
       if (c.path === '/v22.0/ig1/media_publish') return { status: 429, json: { error: { message: 'rate limit' } } };
     }
@@ -297,6 +304,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   // 公開の最終段階のエラーは再試行しない（二重投稿の防止）
   const m6 = installHttpsMock(async (c) => {
     if (c.host === 'graph.instagram.com') {
+      if (c.method === 'GET' && /fields=status_code/.test(c.path)) return { status: 200, json: { status_code: 'FINISHED' } };
       if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'c9' } };
       if (c.path === '/v22.0/ig1/media_publish') return { status: 500, json: { error: { message: 'Internal error' } } };
     }
@@ -334,9 +342,11 @@ const future = () => new Date(Date.now() + 1000).toISOString();
     return null;
   });
   store.SnsAccounts.setStatus(ttAcc, 'active'); // 前のテストで再連携が必要な状態にしたため戻す
+  process.env.TIKTOK_AUDITED = 'true';
   const pCom = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '宣伝', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE', commercial_own: true, commercial_paid: false } } });
   await new Promise((rs) => setTimeout(rs, 1200));
   await scheduler.tick();
+  delete process.env.TIKTOK_AUDITED;
   const initBody = JSON.parse(m7.calls.find((c) => c.path === '/v2/post/publish/video/init/').body);
   ok(store.ScheduledPosts.get(pCom.ids[0]).status === 'posted' && initBody.post_info.brand_organic_toggle === true && initBody.post_info.brand_content_toggle === false, 'TikTokに、商用コンテンツ（自分の宣伝）の設定を渡す');
   m7.restore();

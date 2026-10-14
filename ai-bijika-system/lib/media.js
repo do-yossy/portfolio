@@ -152,9 +152,35 @@ function serve(req, res, token, ext) {
   return fs.createReadStream(file).pipe(res);
 }
 
+// 画像の幅と高さ（JPEG・PNG）。読めなければ null（検証をしない）
+function imageSize(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const head = Buffer.alloc(32);
+    fs.readSync(fd, head, 0, 32, 0);
+    if (head.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { width: head.readUInt32BE(16), height: head.readUInt32BE(20) };
+    if (head[0] !== 0xff || head[1] !== 0xd8) return null;
+    const size = fs.fstatSync(fd).size;
+    let pos = 2;
+    const b = Buffer.alloc(10);
+    while (pos + 4 < size) {
+      fs.readSync(fd, b, 0, 10, pos);
+      if (b[0] !== 0xff) return null;
+      const marker = b[1];
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { pos += 2; continue; }
+      const len = b.readUInt16BE(2);
+      // SOF0〜SOF15（DHT=C4・JPG=C8・DAC=CC を除く）に、高さと幅がある
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return { height: b.readUInt16BE(5), width: b.readUInt16BE(7) };
+      pos += 2 + len;
+    }
+    return null;
+  } catch { return null; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* */ } }
+}
+
 // 利用者が、あと保存できる容量（アップロード中の分を含めて差し引く）
 function remainingBytes(userId) {
   return Math.max(0, LIMITS.userTotalBytes - MediaAssets.totalSize(userId) - (inflight.get(userId) || 0));
 }
 
-module.exports = { remainingBytes, LIMITS, mp4DurationSec, sniff, saveUpload, pathOf, publicUrl, remove, cleanup, serve };
+module.exports = { imageSize, remainingBytes, LIMITS, mp4DurationSec, sniff, saveUpload, pathOf, publicUrl, remove, cleanup, serve };

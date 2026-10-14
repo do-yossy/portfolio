@@ -152,6 +152,8 @@ try { db.exec("ALTER TABLE auto_rules ADD COLUMN options TEXT DEFAULT '{}'"); } 
 try { db.exec("ALTER TABLE ai_jobs ADD COLUMN payload TEXT DEFAULT ''"); } catch { /* 既にある */ }
 // テスト利用を付ける前の状態（取り消すときに戻す）
 try { db.exec("ALTER TABLE subscriptions ADD COLUMN pre_test_status TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// AIで作ったメディアか（TikTokなどで「AI生成」の表示をするため）
+try { db.exec("ALTER TABLE media_assets ADD COLUMN ai_generated INTEGER NOT NULL DEFAULT 0"); } catch { /* 既にある */ }
 db.exec(`
   CREATE TABLE IF NOT EXISTS post_media (
     post_id TEXT NOT NULL,
@@ -396,6 +398,7 @@ const ScheduledPosts = {
 };
 
 const MediaAssets = {
+  markAiGenerated(id) { db.prepare('UPDATE media_assets SET ai_generated=1 WHERE id=?').run(id); },
   create({ userId, token, kind, mime, ext, size }) {
     const id = generateId();
     db.prepare('INSERT INTO media_assets (id, user_id, token, kind, mime, ext, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')

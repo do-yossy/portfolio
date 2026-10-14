@@ -94,7 +94,8 @@ async function generateText({ userId, theme, tone, platform, instruction, avoid 
 async function saveBuffer(userId, buf) {
   const r = await mediaLib.saveUpload({ userId, req: Readable.from([buf]), contentLength: buf.length });
   if (!r.ok) throw new AiError(r.error);
-  return r.media;
+  require('./service-store').MediaAssets.markAiGenerated(r.media.id);
+  return { ...r.media, ai_generated: 1 };
 }
 
 // 画像の生成（JPEG）。戻り値は保存したメディア

@@ -127,7 +127,12 @@ function formatJstShort(iso) {
 
 const CATEGORIES = ['text', 'image', 'video', 'tree'];
 const MAX_DRAFTS = 100;
-const mediaOf = (m) => ({ id: m.id, kind: m.kind, mime: m.mime, size: m.size });
+// 投稿の検証に使うメディアの情報（画像は幅・高さ、動画は長さ）
+const mediaOf = (m) => {
+  const media = require('./media');
+  const p = media.pathOf(m);
+  return { id: m.id, kind: m.kind, mime: m.mime, size: m.size, aiGenerated: !!m.ai_generated, ...(m.kind === 'image' ? (media.imageSize(p) || {}) : { durationSec: media.mp4DurationSec(p) }) };
+};
 
 // 投稿を作る（選んだSNSアカウントごとに1件。まとめて group_id でひも付ける）。
 //   category: text / image / video / tree
@@ -212,9 +217,15 @@ function capacityError({ userId, platform, atIso, draft }) {
 }
 
 // 下書きを予約（または即時投稿）にする。日時を過ぎていないか・上限を超えないかを、予約と同じ基準で確認する
-function promoteDraft({ userId, postId, scheduledAtIso, nowMs = Date.now() }) {
+function promoteDraft({ userId, postId, scheduledAtIso, via = 'api', nowMs = Date.now() }) {
   const p = ScheduledPosts.get(postId);
   if (!p || p.user_id !== userId || p.status !== 'draft') return { ok: false, error: '下書きが見つかりません。' };
+  // TikTokは、本人が画面で内容と設定を確かめて同意してから送る決まり（公式の共有のガイドライン）
+  if (p.platform === 'tiktok') {
+    if (via !== 'screen') return { ok: false, error: 'TikTokの下書きは、API・AIアシスタントからは予約にできません。サービスの画面で内容と設定を確かめてから投稿してください。' };
+    let o = {}; try { o = JSON.parse(p.options || '{}'); } catch { o = {}; }
+    if (!o.privacy_level) return { ok: false, error: 'TikTokの公開範囲などが選ばれていない下書きです。「投稿を作る」画面で作り直して投稿してください。' };
+  }
   if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
   const at = scheduledAtIso ? Date.parse(scheduledAtIso) : Date.parse(p.scheduled_at || '');
   if (Number.isNaN(at)) return { ok: false, error: '投稿日時を指定してください。' };

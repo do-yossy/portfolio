@@ -47,7 +47,8 @@ async function processOne(post) {
     const loadMedia = (id) => {
       const m = MediaAssets.get(id);
       if (!m) return null;
-      return { kind: m.kind, mime: m.mime, size: m.size, path: mediaLib.pathOf(m), url: mediaLib.publicUrl(m), durationSec: m.kind === 'video' ? mediaLib.mp4DurationSec(mediaLib.pathOf(m)) : null };
+      const p = mediaLib.pathOf(m);
+      return { kind: m.kind, mime: m.mime, size: m.size, path: p, url: mediaLib.publicUrl(m), durationSec: m.kind === 'video' ? mediaLib.mp4DurationSec(p) : null, ...(m.kind === 'image' ? (mediaLib.imageSize(p) || {}) : {}), aiGenerated: !!m.ai_generated };
     };
     let mediaIds = [];
     try { mediaIds = JSON.parse(post.media_ids || '[]'); } catch { mediaIds = []; }

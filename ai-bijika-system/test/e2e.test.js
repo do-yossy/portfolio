@@ -324,6 +324,13 @@ function webhook(event, secret = 'whsec_e2e') {
   for (const rr of (await api('GET', '/api/v1/auto-rules', apiKey)).json.rules) await api('DELETE', `/api/v1/auto-rules/${rr.id}`, apiKey);
   delete process.env.ANTHROPIC_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
 
+  // TikTokへは、API・MCPからは下書きにだけできる
+  const ttE2e = store.SnsAccounts.upsert({ userId: userIdForSub, platform: 'tiktok', externalUserId: 'tte2e', handle: 'tt', accessTokenEnc: require('../lib/crypto-box').encrypt('t', require('../lib/crypto-box').keyFromEnv()), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  const ttE2eId = typeof ttE2e === 'object' ? ttE2e.id : ttE2e;
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'video', text: 'x', media_ids: [], account_ids: [ttE2eId], now: true });
+  ok(r.status === 400 && /下書き/.test(r.json.error), 'TikTokへは、APIから直接投稿できない（本人が画面で確かめる決まり）');
+  store.SnsAccounts.remove(ttE2eId, userIdForSub);
+
   console.log('MCP');
   const rpc = (key, body) => api('POST', '/mcp', key, body);
   r = await rpc('', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
