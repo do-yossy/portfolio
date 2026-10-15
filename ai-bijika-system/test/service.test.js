@@ -89,6 +89,7 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   const body = mockStripe.calls[0].body;
   ok(/mode=subscription/.test(body) && /client_reference_id=/.test(body) && /price_test/.test(body), 'Checkoutにサブスクリプション・価格・ユーザーIDを渡す');
   ok(/customer_email=a%40example.com/.test(body), '初回はメールアドレスを事前入力する');
+  ok(/payment_method_types%5B0%5D=card(&|$)/.test(body) && !/payment_method_types%5B1%5D/.test(body), 'お支払い方法はクレジットカードだけを指定する（特商法表記・利用規約・画面の記載と合わせる）');
   ok(mockStripe.calls[0].headers.Authorization === 'Bearer sk_test_x', 'APIキーをBearerで送る');
 
   ok(!store.Subscriptions.isActive(userA), '決済前は契約中ではない');

@@ -115,10 +115,10 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.text.includes('現在の対応SNSは、Threadsです') && !r.text.includes('YouTube：') && !r.text.includes('TikTok：'), 'LPには、設定済みのSNSだけを対応SNSとして表示する');
   ok(!r.text.includes('AIで投稿づくり') && !/ClaudeやChatGPT/.test(r.text), 'AIが未設定ならAIの機能を表示せず、動作を確認していないアプリ名を出さない');
   r = await req('GET', '/service/lp');
-  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
+  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('ちょうど半額です') && r.text.includes('と比べると、半額にはなりません') && r.text.includes('<td>なし（月払いだけ）</td>') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す（月払い同士はちょうど半額で、年払いと比べると半額にならないことも書く）');
   ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
   ok(r.text.includes('<section id="ai">') && r.text.includes('AIと一緒に、投稿をつくる。') && r.text.includes('ご自身のAIで作る') && !r.text.includes('<h3>このサービスのAIで作る</h3>') && r.text.includes('このサービスは、AI生成の表示を付けません'), 'LPに #ai で開けるAIの説明があり、このサービスのAIを使わない設定では、ご自身のAIで作る方法だけを説明する');
-  ok(r.text.includes('body{background:#0B141A}') && r.text.includes('迷わず使える、シンプルな手順。') && r.text.includes('大切なアカウントを、安全に。') && r.text.includes('プランはひとつだけ。') && r.text.includes('<summary>どのSNSに投稿できますか？</summary>'), 'LPは暗い配色の1ページで、手順・安全・料金・よくある質問の段がある');
+  ok(r.text.includes('body{background:#0B141A}') && r.text.includes('使い方は、5つの手順。') && r.text.includes('アカウントを守るための仕組み。') && r.text.includes('文字数は入力しながら、条件は保存のときに確かめる。') && r.text.includes('プランはひとつだけ。') && r.text.includes('<summary>どのSNSに投稿できますか？</summary>'), 'LPは暗い配色の1ページで、手順・安全・料金・よくある質問の段がある');
   ok(r.text.includes('section[id]{scroll-margin-top:') && r.text.includes('.svc nav.svc-nav a{color:#5EDDC0}'), '#ai で開いたときに見出しが固定ヘッダーに隠れず、上部のナビも暗い背景で読める色にする');
   {
     const uiLp = require('../lib/service-ui');
@@ -129,7 +129,14 @@ function webhook(event, secret = 'whsec_e2e') {
     ok(!aiPart(h).includes('表示を自動で付け') && !aiPart(h).includes('TikTok'), 'Threadsだけのときは、このサービスのAIがあっても、AI生成の表示を自動で付けるとは書かない（使えないTikTokの名前も出さない）');
     process.env.TIKTOK_CLIENT_KEY = 'k'; process.env.TIKTOK_CLIENT_SECRET = 's';
     h = uiLp.lpPage({ user: null, billingReady: false });
-    ok(aiPart(h).includes('TikTokに投稿するときは、AI生成の表示を自動で付けます') && h.includes('2つのSNSに、まとめて投稿。') && h.includes('<b>2つ</b>'), 'TikTokが使えてこのサービスのAIがあるときだけ、TikTokで表示を付けると書く。SNSが2つなら「2つのSNS」');
+    ok(aiPart(h).includes('このサービスのAIで作った画像をTikTokに投稿するときは、AI生成の表示を自動で付けます') && h.includes('2つのSNSに、まとめて投稿。') && h.includes('<b>2つ</b>'), 'TikTokが使えてこのサービスのAIがあるときだけ、TikTokで表示を付けると書く（作れるものだけ：画像だけなら「画像」）。SNSが2つなら「2つのSNS」');
+    const ttNote = 'このサービスがTikTokの投稿の監査（Audit）を通るまで、公開範囲は「自分のみ」だけ、投稿するTikTokアカウントは非公開にする必要があり、投稿できるのはこのサービス全体で24時間に5人までです。';
+    const ttCount = h.split(ttNote).length - 1;
+    ok(ttCount === 2, 'TikTokが使えて、まだ投稿の監査（Audit）を通っていないときは、先頭とよくある質問に、TikTokの制限（自分のみ・非公開・24時間に5人まで）を書く');
+    process.env.TIKTOK_AUDITED = 'true';
+    h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(!h.includes(ttNote), 'TikTokの投稿の監査（Audit）を通ったら（TIKTOK_AUDITED=true）、その制限の説明は出さない');
+    delete process.env.TIKTOK_AUDITED;
     delete process.env.OPENAI_API_KEY; delete process.env.TIKTOK_CLIENT_KEY; delete process.env.TIKTOK_CLIENT_SECRET;
     delete process.env.THREADS_APP_ID; delete process.env.THREADS_APP_SECRET;
     h = uiLp.lpPage({ user: null, billingReady: false });
@@ -137,9 +144,20 @@ function webhook(event, secret = 'whsec_e2e') {
     Object.keys(keep).forEach((k) => { if (keep[k] === undefined) delete process.env[k]; else process.env[k] = keep[k]; });
     const cp = uiLp.composePage({ user: { email: 'a' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], csrf: 'c' });
     ok(cp.includes('ツリーの2件目以降（Threadsだけ') && !cp.includes('ThreadsとXだけ'), '「投稿を作る」画面のツリーの説明は、使えるSNSだけを書く（Xが使えないときはXを書かない）');
+    {
+      const th = [process.env.THREADS_APP_ID, process.env.THREADS_APP_SECRET];
+      delete process.env.THREADS_APP_ID; delete process.env.THREADS_APP_SECRET;
+      const cp2 = uiLp.composePage({ user: { email: 'a' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], csrf: 'c' });
+      ok(!cp2.includes('id="treeField"') && !cp2.includes('value="tree"') && !cp2.includes('ツリーの2件目以降'), 'ツリーができるSNS（Threads・X）が使えないときは、「投稿を作る」画面にツリーの欄を出さない');
+      process.env.THREADS_APP_ID = th[0]; process.env.THREADS_APP_SECRET = th[1];
+    }
+    const dash = uiLp.dashboardPage({ user: { id: 'u_test_dash', email: 'a' }, sub: { status: 'active' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], posts: [], csrf: 'c', snsReady: true, aiAvail: { text: true } });
+    ok(dash.includes('<label class="lbl" for="file">画像・動画</label>') && !dash.includes('63,206') && dash.includes('かんたん投稿の本文は、どのSNSでも2,200文字までです'), 'かんたん投稿の添付欄は、選べるアカウントに画像・動画が必須のSNSが無ければ「必須」と書かず、文字数の上限はかんたん投稿の上限（2,200）で書く');
+    const dash2 = uiLp.dashboardPage({ user: { id: 'u_test_dash', email: 'a' }, sub: { status: 'active' }, accounts: [], posts: [], csrf: 'c', snsReady: true, aiAvail: { text: true } });
+    ok(dash2.includes('自動運用に使えるSNS（Threads）を先に連携してください。') && !dash2.includes('Instagram・Facebook'), '自動運用の「先に連携してください」には、使えるSNSだけを書く');
   }
   ok(r.text.includes('<summary>Xには投稿できますか？</summary>') && r.text.includes('現在、Xへの投稿は提供していません。'), 'Xを提供していないときは、よくある質問でそのことを伝える');
-  ok(r.text.includes('<b>1つ</b><span>使えるSNS</span>') && r.text.includes('Threadsに投稿。') && !/[2-6]つのSNSに、まとめて投稿/.test(r.text), '使えるSNSの数・名前は、設定されているSNSだけで数える（Threadsだけなら1つ）');
+  ok(r.text.includes('<b>1つ</b><span>使えるSNS</span>') && r.text.includes('<b>10件</b><span>連携できるアカウント（最大）</span>') && !r.text.includes('監査（Audit）を通るまで') && r.text.includes('Threadsに投稿。') && !/[2-6]つのSNSに、まとめて投稿/.test(r.text), '使えるSNSの数・名前は、設定されているSNSだけで数える（Threadsだけなら1つ）');
   ok(!r.text.includes('ポストメッシュ') && r.text.includes('サービスA'), 'LPでは、他社の名前を出さない（サービスA）');
   ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
   ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
@@ -173,13 +191,13 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(uiMod.compareActive(1000, Date.parse('2026-11-01T00:00:00+09:00')) && !uiMod.compareActive(1000, Date.parse('2026-12-15T00:00:00+09:00')), '価格を確認した日から45日を過ぎたら、比較を自動で出さない');
   process.env.SERVICE_LP_COMPARE = 'off';
   r = await req('GET', '/service/lp');
-  ok(!r.text.includes('半額以下') && !r.text.includes('料金の比べ方'), '運営者は、比較の表示を止められる（SERVICE_LP_COMPARE=off）');
+  ok(!r.text.includes('半額') && !r.text.includes('料金の比べ方'), '運営者は、比較の表示を止められる（SERVICE_LP_COMPARE=off）');
   delete process.env.SERVICE_LP_COMPARE;
   r = await req('GET', '/service/legal/terms');
   ok(r.text.includes('「SNSまとめて予約」') && !r.text.includes('ミチシルベ'), '法務文書のサービス名は、設定（SERVICE_NAME）から入り、ミチシルベの名前を出さない');
   process.env.SERVICE_PRICE_JPY = '1500';
   r = await req('GET', '/service/lp');
-  ok(!r.text.includes('半額以下'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');
+  ok(!r.text.includes('半額'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');
   delete process.env.SERVICE_PRICE_JPY;
   r = await req('GET', '/service/legal/tokushoho');
   ok(r.status === 200 && r.text.includes('月額1,100円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
