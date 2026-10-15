@@ -59,11 +59,13 @@ const aiKinds = () => { const av = aiLib().available(); return [av.image && '画
 // 実際に使えるSNS（キーが設定されているもの）
 const liveSns = () => registry.list().filter((p) => p.isConfigured());
 const snsNames = () => { const l = liveSns(); return l.length ? l.map((p) => p.label).join('・') : ''; };
+// TikTokの投稿の監査（Audit）を通るまでの制限（LP・最終確認画面・サービスの説明のページで同じ文を使う）
+const TT_PRE_AUDIT = '公開範囲は「自分のみ」に限られ、投稿するTikTokアカウントは非公開にする必要があり、投稿できるのはこのサービス全体で24時間に5人まで';
 const SNS_RULES = {
   threads: 'Threads：テキスト・画像・動画（カルーセル20件まで。動画は5分まで）。ツリー可。500文字まで（絵文字は1つで2文字以上に数えます。組み合わせの絵文字は10文字を超えることもあります）',
   x: 'X：画像4枚（各5MBまで）または動画1本（140秒まで）を添付可。ツリー可。投稿数は月の上限あり',
   instagram: 'Instagram：プロアカウント（ビジネス／クリエイター）が対象。JPEG画像（カルーセル10件まで。縦横比は4:5〜1.91:1）またはリール動画が必須',
-  get tiktok() { return `TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択${process.env.TIKTOK_AUDITED === 'true' ? '' : '（このサービスがTikTokの投稿の監査（Audit）を通るまでは「自分のみ」。監査を通った後も、それまでに「自分のみ」で出した投稿は自動では公開されません）'}${aiKinds() ? `。このサービスのAIで作った${aiKinds()}には、TikTokの「AI生成」の表示を自動で付けます（ほかのAIで作ってアップロードしたものには、このサービスは表示を付けません。SNSの決まりで表示が必要な場合は、TikTokのアプリから投稿してください）` : ''}`; },
+  get tiktok() { return `TikTok：動画1本、または写真（JPEG・35枚まで）が必須。公開範囲は投稿ごとに選択${process.env.TIKTOK_AUDITED === 'true' ? '' : `（このサービスがTikTokの投稿の監査（Audit）を通るまでは、${TT_PRE_AUDIT}です。監査を通った後も、それまでに「自分のみ」で出した投稿は自動では公開されません）`}${aiKinds() ? `。このサービスのAIで作った${aiKinds()}には、TikTokの「AI生成」の表示を自動で付けます（ほかのAIで作ってアップロードしたものには、このサービスは表示を付けません。SNSの決まりで表示が必要な場合は、TikTokのアプリから投稿してください）` : ''}`; },
   facebook: 'Facebook：連携のときに選んだ1つのページに投稿（投稿できるページが2つ以上あると連携できないため、Facebookの画面でページを1つだけ選んでください）。テキスト・画像10枚まで・動画1本',
   get youtube() { return `YouTube：3分以内の動画1本が必須。本文の1行目がタイトル（100文字まで）になり、収まる場合は「#Shorts」を付けます。説明は5,000バイト（日本語でおよそ1,600文字）まで。公開設定と子ども向けかどうかは投稿ごとに選択。1日の投稿数に上限があり（太平洋時間で数えます）、送る時点で上限に達していた場合は、YouTubeの日付が変わった後（日本時間の16時または17時）に自動で投稿します${aiLib().available().video ? '。このサービスのAIで作った動画は、合成した内容として申告します（ほかのAIで作ってアップロードした動画は、このサービスは申告しません。必要な場合は、YouTubeのアプリから投稿してください）' : ''}`; },
 };
@@ -153,8 +155,9 @@ function landingPage({ user, billingReady, trialDays = 0 }) {
 // 価格の比較は、公式サイト（価格・条件は料金ページ、使えるSNSは概要のページ）で確認した、条件をそろえて言える範囲だけ（下書き/_調査_予約投稿ツールの価格.md）。
 // 確認日（checked）を更新するときは、料金・年払い・税込・アカウント数・上限・無料体験・使えるSNSをすべて確かめ直す（1つでも確かめられなければ比較をやめる）。
 // 他社の名前は出さない（サービスA）。根拠（確認した相手・日付・ページ）は社内の調査記録に残している。
-// 「国内の同じ種類のサービスの中でいちばん安いプランの、さらに半額以下」と読まれないよう、特定の1社の1プランと比べていることが先に分かる語順にする
-// （「サービスA（…サービスの1つ）の最安の有料プラン（…）と比べて、半額以下」。Threadsの固定投稿（下書き/Threads固定投稿_出品用.md）と同じ書き方）。
+// 「国内の同じ種類のサービスの中でいちばん安いプランの、さらに半額」と読まれないよう、特定の1社の1プランと比べていることが先に分かる語順にする
+// （「サービスA（…サービスの1つ）の最安の有料プラン（…・月払い・税込）と比べて、ちょうど半額です（同じプランの年払い…と比べると、半額にはなりません）」）。
+// 年払いと比べた結果も、すぐ近くに書く。Threadsの固定投稿（下書き/Threads固定投稿_出品用.md）の1件目も同じ意味の書き方にしている。
 // 確認日から COMPARE_VALID_DAYS を過ぎたら、比較を自動で出さない（相手の価格が変わっているおそれがあるため。再確認したら checked を更新する）。
 const COMPARE = {
   name: 'サービスA', desc: '国内の、複数のSNSに予約投稿できるサービスの1つ', price: 2200, note: '月払い・税込', annual: 2000,
@@ -246,7 +249,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
   const diffs = ['予約の上限', '使えるSNS', `${trialDays}日間` === COMPARE.trial ? '' : '無料体験'].filter(Boolean).join('・');
   // TikTokは、このサービスがTikTokの投稿の監査（Audit）を通るまで制限がある（公開範囲は「自分のみ」・投稿するアカウントは非公開・このサービス全体で24時間に5人まで）
   const ttLimited = live.some((p) => p.id === 'tiktok') && process.env.TIKTOK_AUDITED !== 'true';
-  const ttNote = 'TikTokは、このサービスがTikTokの投稿の監査（Audit）を通るまで、公開範囲は「自分のみ」だけ、投稿するTikTokアカウントは非公開にする必要があり、投稿できるのはこのサービス全体で24時間に5人までです。';
+  const ttNote = `TikTokは、このサービスがTikTokの投稿の監査（Audit）を通るまで、${TT_PRE_AUDIT}です。`;
   const ours = `未投稿の予約${L.maxPending}件まで、同じ日（日本時間）に投稿する予約${L.maxPerDay}件まで${xLive() ? `、Xは月${L.xPerMonth}件まで` : ''}`;
   const treeNames = live.filter((p) => p.id === 'threads' || p.id === 'x').map((p) => p.label).join('と');
   const cta = (where) => billingReady
@@ -378,14 +381,14 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
         <li>連携できるSNSアカウントは${L.maxAccounts}件まで</li>
         <li>${ours}</li>
         <li>日本時間で最大90日先まで予約・下書き・カレンダー</li>
-        <li>ご自身のAIで投稿文・画像を作る${av.text || av.image ? '／このサービスのAIで作る（回数の上限あり）' : ''}</li>
+        <li>ご自身のAIで投稿文・画像を作る${av.text || av.image || av.video ? '／このサービスのAIで作る（回数の上限あり）' : ''}</li>
         <li>APIキー・AIアシスタント（MCP）との接続</li>
       </ul>
       ${cmp ? `<h3 style="margin-top:16px">料金の比べ方</h3>
       <div style="overflow-x:auto"><table class="t"><colgroup><col style="width:30%"><col><col></colgroup>
         <tr>${th('')}${th('このサービス')}${th(`${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン`)}</tr>
         <tr>${th('月額')}<td>${price}（月払い・税込）</td><td>${yen(COMPARE.price)}（${COMPARE.note}）</td></tr>
-        <tr>${th('年払い')}<td>なし（月払いだけ）</td><td>1か月あたり${yen(COMPARE.annual)}（税込）</td></tr>
+        <tr>${th('年払い')}<td>なし（月払いだけ）</td><td>1か月あたり${yen(COMPARE.annual)}（税込。年${yen(COMPARE.annual * 12)}を前払い）</td></tr>
         <tr>${th('使えるSNS')}<td>${names ? escapeHtml(names) : '準備中'}（各SNSの審査が終わるまで、使える機能や公開範囲が限られる場合があります）</td><td>${COMPARE.sns}</td></tr>
         <tr>${th('つなげるアカウント')}<td>${L.maxAccounts}アカウントまで</td><td>${COMPARE.accounts}アカウントまで</td></tr>
         <tr>${th('投稿・予約の上限')}<td>${ours}</td><td>${COMPARE.posts}</td></tr>
@@ -412,7 +415,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
       <details><summary>どのSNSに投稿できますか？</summary><p>${names ? `現在は、${escapeHtml(names)}に投稿できます。` : '対応SNSは準備中です。'}${ttLimited ? ttNote : ''}各SNSの審査・仕様により、使える機能や公開範囲が制限される場合があります。</p></details>
       ${xLive() ? '' : '<details><summary>Xには投稿できますか？</summary><p>現在、Xへの投稿は提供していません。</p></details>'}
       <details><summary>SNSのパスワードを預ける必要はありますか？</summary><p>ありません。各SNSの公式の連携（OAuth）を使います。</p></details>
-      <details><summary>AIは使えますか？</summary><p>ChatGPT・Claude・Gemini など、ご自身のAIで投稿文や画像を作れます（各AIのご利用条件・料金は、それぞれのサービスに従います）。${av.text || av.image ? 'このサービスのAIでも作れます（回数の上限があります）。' : ''}</p></details>
+      <details><summary>AIは使えますか？</summary><p>ChatGPT・Claude・Gemini など、ご自身のAIで投稿文や画像を作れます（各AIのご利用条件・料金は、それぞれのサービスに従います）。${av.text || av.image || av.video ? 'このサービスのAIでも作れます（回数の上限があります）。' : ''}</p></details>
       <details><summary>解約するには？</summary><p>マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。お支払い後の返金は、法令上必要な場合を除き、いたしません。</p></details>
       <details><summary>お支払い方法は？</summary><p>クレジットカードです。決済代行会社（Stripe）の画面でお支払いいただき、当サービスにはカード番号を保存しません。</p></details>
       <p class="small"><a href="/service">サービスの詳しい説明</a></p>
@@ -623,7 +626,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
         <button class="btn btn-ghost" type="submit" name="mode" value="now" onclick="return confirm('今すぐ投稿します。よろしいですか？')">今すぐ投稿</button></div>
-      <p class="small">文字数の上限：${quickLimitText()}。かんたん投稿の本文は、どのSNSでも2,200文字までです。上の文字数は目安です（絵文字などの数え方は、SNSごとに異なります）。</p>
+      <p class="small">文字数の上限：${quickLimitText()}。かんたん投稿の入力欄は2,200文字までです（SNSごとの上限のほうが短い場合は、その上限まで）。上の文字数は目安です（絵文字などの数え方は、SNSごとに異なります）。</p>
     </form>
     <script>
     function cnt(){var t=document.getElementById('text').value;document.getElementById('count').textContent=Array.from(t).length+'文字';}
@@ -886,7 +889,8 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
       // 下書きを読み込む（投稿先・種類・本文・添付・ツリー。TikTokの設定は選び直してもらう）
       if(DRAFT){ACC.forEach(function(a){var c=document.querySelector('input[data-acc="'+a.id+'"]');if(c)c.checked=(a.id===DRAFT.accountId);});
         var cr=document.querySelector('input[name=cat][value="'+DRAFT.category+'"]');if(cr)cr.checked=true;
-        $('mainText').value=DRAFT.text;media=DRAFT.media.slice();cards=DRAFT.tree.map(function(c){return {text:c.text,media:c.media};});drawMedia();drawCards();}
+        $('mainText').value=DRAFT.text;media=DRAFT.media.slice();cards=DRAFT.tree.map(function(c){return {text:c.text,media:c.media};});drawMedia();drawCards();
+        if(DRAFT.category==='tree'&&!$('treeField'))show(false,'この下書きはツリー（連投）ですが、今はツリーを使えません。このまま保存すると、2件目以降は保存されません。');}
       refresh();
     })();
     </script>` : '<div class="card"><p class="small">先にマイページでSNSを連携してください。</p></div>'}

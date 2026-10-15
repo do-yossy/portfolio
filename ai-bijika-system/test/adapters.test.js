@@ -1,5 +1,7 @@
 'use strict';
 // SNSアダプタ単体のテスト（カルーセル・ツリー。外部通信はモック）
+// ほかのテストと同じく、一時ディレクトリをデータの置き場にする（リポジトリの data/ を使わない）
+process.env.DATA_DIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'aibj-adapters-'));
 process.env.SNS_POLL_INTERVAL_MS = '1';
 process.env.SNS_POLL_MAX_MS = '200';
 const { ok, summary, installHttpsMock } = require('./helpers');
