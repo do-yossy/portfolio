@@ -117,8 +117,27 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('GET', '/service/lp');
   ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
   ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
-  ok(r.text.includes('<section id="ai">') && r.text.includes('AIと一緒に、投稿をつくる。') && r.text.includes('ご自身のAIで作る') && !r.text.includes('<h3>このサービスのAIで作る</h3>') && r.text.includes('このサービスはAI生成の表示を付けません'), 'LPに #ai で開けるAIの説明があり、このサービスのAIを使わない設定では、ご自身のAIで作る方法だけを説明する');
+  ok(r.text.includes('<section id="ai">') && r.text.includes('AIと一緒に、投稿をつくる。') && r.text.includes('ご自身のAIで作る') && !r.text.includes('<h3>このサービスのAIで作る</h3>') && r.text.includes('このサービスは、AI生成の表示を付けません'), 'LPに #ai で開けるAIの説明があり、このサービスのAIを使わない設定では、ご自身のAIで作る方法だけを説明する');
   ok(r.text.includes('body{background:#0B141A}') && r.text.includes('迷わず使える、シンプルな手順。') && r.text.includes('大切なアカウントを、安全に。') && r.text.includes('プランはひとつだけ。') && r.text.includes('<summary>どのSNSに投稿できますか？</summary>'), 'LPは暗い配色の1ページで、手順・安全・料金・よくある質問の段がある');
+  ok(r.text.includes('section[id]{scroll-margin-top:') && r.text.includes('.svc nav.svc-nav a{color:#5EDDC0}'), '#ai で開いたときに見出しが固定ヘッダーに隠れず、上部のナビも暗い背景で読める色にする');
+  {
+    const uiLp = require('../lib/service-ui');
+    const keep = {}; ['OPENAI_API_KEY', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET', 'THREADS_APP_ID', 'THREADS_APP_SECRET'].forEach((k) => { keep[k] = process.env[k]; });
+    const aiPart = (h) => h.slice(h.indexOf('<section id="ai">'), h.indexOf('</section>', h.indexOf('<section id="ai">')));
+    process.env.OPENAI_API_KEY = 'ok';
+    let h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(!aiPart(h).includes('表示を自動で付け') && !aiPart(h).includes('TikTok'), 'Threadsだけのときは、このサービスのAIがあっても、AI生成の表示を自動で付けるとは書かない（使えないTikTokの名前も出さない）');
+    process.env.TIKTOK_CLIENT_KEY = 'k'; process.env.TIKTOK_CLIENT_SECRET = 's';
+    h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(aiPart(h).includes('TikTokに投稿するときは、AI生成の表示を自動で付けます') && h.includes('2つのSNSに、まとめて投稿。') && h.includes('<b>2つ</b>'), 'TikTokが使えてこのサービスのAIがあるときだけ、TikTokで表示を付けると書く。SNSが2つなら「2つのSNS」');
+    delete process.env.OPENAI_API_KEY; delete process.env.TIKTOK_CLIENT_KEY; delete process.env.TIKTOK_CLIENT_SECRET;
+    delete process.env.THREADS_APP_ID; delete process.env.THREADS_APP_SECRET;
+    h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(h.includes('使えるSNSは、準備中です。') && h.includes('<b>準備中</b>'), '使えるSNSが無いときは、準備中と書く');
+    Object.keys(keep).forEach((k) => { if (keep[k] === undefined) delete process.env[k]; else process.env[k] = keep[k]; });
+    const cp = uiLp.composePage({ user: { email: 'a' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], csrf: 'c' });
+    ok(cp.includes('ツリーの2件目以降（Threadsだけ') && !cp.includes('ThreadsとXだけ'), '「投稿を作る」画面のツリーの説明は、使えるSNSだけを書く（Xが使えないときはXを書かない）');
+  }
   ok(r.text.includes('<summary>Xには投稿できますか？</summary>') && r.text.includes('現在、Xへの投稿は提供していません。'), 'Xを提供していないときは、よくある質問でそのことを伝える');
   ok(r.text.includes('<b>1つ</b><span>使えるSNS</span>') && r.text.includes('Threadsに投稿。') && !/[2-6]つのSNSに、まとめて投稿/.test(r.text), '使えるSNSの数・名前は、設定されているSNSだけで数える（Threadsだけなら1つ）');
   ok(!r.text.includes('ポストメッシュ') && r.text.includes('サービスA'), 'LPでは、他社の名前を出さない（サービスA）');

@@ -77,6 +77,19 @@ function aiLimitsText() {
   return parts.length ? `AIによる生成の上限は、${parts.join('、')}です（日本時間。自動運用で作る分も含みます）` : '';
 }
 const xLive = () => liveSns().some((p) => p.id === 'x');
+// ツリー（連投）ができる、使えるSNSの名前（ThreadsとXのうち設定済みのもの）。無ければ ''
+const treeLive = () => liveSns().filter((p) => p.id === 'threads' || p.id === 'x').map((p) => p.label).join('と');
+// かんたん投稿で選べる、使えるSNSの文字数の上限（設定済みのSNSだけを書く）
+function quickLimitText() {
+  const ids = liveSns().map((p) => p.id);
+  const parts = [];
+  if (ids.includes('threads')) parts.push('Threads 500（絵文字は1つで2文字以上に数えます）');
+  if (ids.includes('x')) parts.push('X 日本語140文字（重み280）');
+  const cap = ['instagram', 'tiktok'].filter((id) => ids.includes(id)).map((id) => (id === 'instagram' ? 'Instagram' : 'TikTok'));
+  if (cap.length) parts.push(`${cap.join('・')} 2,200`);
+  if (ids.includes('facebook')) parts.push('Facebookページ 63,206（目安）');
+  return parts.length ? parts.join('／') : '対応SNSは準備中です';
+}
 function limitsText() {
   const L = core.LIMITS;
   return `連携できるSNSアカウントは${L.maxAccounts}件まで、未投稿の予約は${L.maxPending}件まで、同じ日（日本時間）に投稿する予約は${L.maxPerDay}件まで${xLive() ? `、Xへの投稿は日本時間の暦月ごとに${L.xPerMonth}件まで（ツリーは1件ずつ数えます。毎日Xへ自動運用すると、月の上限をほぼ使い切ります）` : ''}です`;
@@ -170,6 +183,10 @@ body{background:#0B141A}
 .svc .lp h2{display:block}.svc .lp h2::after{content:none;display:none}
 .svc .lp .grid>*{min-width:0}
 .svc .lp pre{max-width:100%;box-sizing:border-box}
+.svc .lp section[id]{scroll-margin-top:calc(72px + env(safe-area-inset-top, 0px))}
+.svc nav.svc-nav a{color:#5EDDC0}
+.svc nav.svc-nav .small{color:#A7B7C0}
+.svc .lp ul.chips{list-style:none;padding:0}
 .svc .lp p{margin:0 0 10px}
 .svc .lp .mute{color:var(--lp-mute)}
 .svc .lp .small{font-size:12.5px;color:var(--lp-mute)}
@@ -228,7 +245,10 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
        <p class="small" style="text-align:center">アカウントは無料で作れます。お支払いは、確認画面で内容をご確認いただいたあとに始まります。${trialDays ? `初めての方は${trialDays}日間無料です（お支払い方法の登録が必要。期間が終わると自動で課金が始まります）。` : ''}</p>`
     : `<div class="soon"${where ? ` data-where="${where}"` : ''}>ただいま準備中です。もうしばらくお待ちください。</div>`;
   const th = (t) => `<th>${t}</th>`;
-  const snsChips = live.length ? `<div class="chips" aria-label="使えるSNS">${live.map((p) => `<span class="chip"><i aria-hidden="true"></i>${escapeHtml(p.label)}</span>`).join('')}</div>` : '<p class="mute">対応SNSは準備中です。</p>';
+  const snsChips = live.length ? `<ul class="chips" aria-label="使えるSNS">${live.map((p) => `<li class="chip"><i aria-hidden="true"></i>${escapeHtml(p.label)}</li>`).join('')}</ul>` : '<p class="mute">対応SNSは準備中です。</p>';
+  // このサービスのAIで作ったものに、AI生成の表示を自動で付けられるSNS（実際に使えるものだけ。TikTokは画像・動画、YouTubeは動画）
+  const labelSns = live.filter((p) => (p.id === 'tiktok' && (av.image || av.video)) || (p.id === 'youtube' && av.video)).map((p) => p.label);
+  const apiBase = String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, '') || 'https://（サービスのURL）';
   return wrap(`SNSの予約投稿を月額${price}で`, `${LP_CSS}
     ${topNav(user)}
     <div class="lp">
@@ -279,25 +299,25 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
     <section>
       <span class="tag">SNSごとの決まり</span>
       <h2>文字数や条件を、入力しながら確かめられる。</h2>
-      <p class="mute">投稿を作る画面では、選んだSNSごとの文字数を数えて表示し、画像・動画の条件に合わないときは、予約する前にお知らせします。</p>
+      <p class="mute">投稿を作る画面では、本文の文字数を、選んだSNSごとの数え方で表示します。SNSごとの条件（文字数・画像や動画の形式など）は保存するときに確かめ、合わないときは予約せずにお知らせします。</p>
     </section>
 
     <section id="ai">
       <span class="tag">AI</span>
       <h2>AIと一緒に、投稿をつくる。</h2>
       <div class="grid">
-        <div class="card"><h3>ご自身のAIで作る</h3><p class="small">「投稿を作る」画面でテーマを入れてボタンを押すと、投稿先のSNSの条件（文字数など）を入れた指示文をコピーしてから、AIを開きます（文章は ChatGPT・Claude・Gemini、画像は ChatGPT・Gemini）。自動で入力されない場合は、貼り付けて送信してください。できた文章は本文に貼り付け、画像は保存して添付します。各AIのご利用条件・料金は、それぞれのサービスに従います。</p></div>
+        <div class="card"><h3>ご自身のAIで作る</h3><p class="small">「投稿を作る」画面でテーマを入れてボタンを押すと、指示文をコピーしてから、AIを開きます。文章は ChatGPT・Claude・Gemini で、指示文に投稿先のSNSの条件（文字数など）を入れます。画像は ChatGPT・Gemini で作れます。自動で入力されない場合は、貼り付けて送信してください。できた文章は本文に貼り付け、画像は保存して添付します。各AIのご利用条件・料金は、それぞれのサービスに従います。</p></div>
         ${av.text || av.image ? `<div class="card"><h3>このサービスのAIで作る</h3><p class="small">テーマを入れると、AIが${[av.text && '文章', av.image && '画像'].filter(Boolean).join('と')}を作ります（1日・1か月の回数に上限があります）。</p></div>` : ''}
         <div class="card"><h3>AIアシスタントから操作</h3><p class="small">MCP（AIアシスタントとつなぐための共通の仕組み）に対応したアプリから、ログインと許可の操作で接続できます（使えるかどうかは、アプリ側の対応状況によります）。</p></div>
         <div class="card"><h3>REST APIで連携</h3><p class="small">マイページで発行するAPIキーで、投稿の作成・予約・下書き・取り消しができます。</p>
-<pre aria-label="APIの例">curl -X POST https://（サービスのURL）/api/v1/posts \\
+<pre>curl -X POST ${escapeHtml(apiBase)}/api/v1/posts \\
   -H "Authorization: Bearer （APIキー）" \\
   -H "Content-Type: application/json" \\
   -d '{"category":"text","account_ids":["…"],"text":"…","draft":true}'</pre></div>
       </div>
       <ul class="dots small">
         <li>AIが作った内容は、誤りや不適切な表現を含む場合があります。投稿の前に、必ずご自身で内容をご確認ください。</li>
-        <li>${aiKinds() ? `このサービスのAIで作った${aiKinds()}には、SNSのAI生成の表示を自動で付けます（TikTokなど、対応しているSNSのみ）。` : ''}ご自身のAIで作った画像・動画には、このサービスはAI生成の表示を付けません。SNSの決まりで表示が必要な場合は、SNSのアプリから表示を付けて投稿してください。</li>
+        <li>${aiKinds() && labelSns.length ? `このサービスのAIで作った${aiKinds()}を${escapeHtml(labelSns.join('・'))}に投稿するときは、AI生成の表示を自動で付けます。それ以外のSNSと、ご自身のAIで作った画像・動画には、このサービスはAI生成の表示を付けません。` : 'このサービスは、AI生成の表示を付けません。'}SNSの決まりで表示が必要な場合は、SNSのアプリから表示を付けて投稿してください。</li>
       </ul>
     </section>
 
@@ -381,7 +401,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
       <details><summary>SNSのパスワードを預ける必要はありますか？</summary><p>ありません。各SNSの公式の連携（OAuth）を使います。</p></details>
       <details><summary>AIは使えますか？</summary><p>ChatGPT・Claude・Gemini など、ご自身のAIで投稿文や画像を作れます（各AIのご利用条件・料金は、それぞれのサービスに従います）。${av.text || av.image ? 'このサービスのAIでも作れます（回数の上限があります）。' : ''}</p></details>
       <details><summary>解約するには？</summary><p>マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。お支払い後の返金は、法令上必要な場合を除き、いたしません。</p></details>
-      <details><summary>お支払い方法は？</summary><p>クレジットカード等です。決済は、決済代行会社（Stripe）の画面で行い、当サービスにはカード番号を保存しません。</p></details>
+      <details><summary>お支払い方法は？</summary><p>決済代行会社（Stripe）の画面でお支払いいただきます。使えるお支払い方法は、その画面に表示されます。当サービスにはカード番号を保存しません。</p></details>
       <p class="small"><a href="/service">サービスの詳しい説明</a></p>
     </section>
 
@@ -585,7 +605,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
         <button class="btn btn-ghost" type="submit" name="mode" value="now" onclick="return confirm('今すぐ投稿します。よろしいですか？')">今すぐ投稿</button></div>
-      <p class="small">文字数の上限：Threads 500（絵文字は1つで2文字以上に数えます）／X 日本語140文字（重み280）／Instagram・TikTok 2,200。上の文字数は目安です（絵文字などの数え方は、SNSごとに異なります）。</p>
+      <p class="small">文字数の上限：${quickLimitText()}。上の文字数は目安です（絵文字などの数え方は、SNSごとに異なります）。</p>
     </form>
     <script>
     function cnt(){var t=document.getElementById('text').value;document.getElementById('count').textContent=Array.from(t).length+'文字';}
@@ -707,7 +727,7 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
         <label class="check"><input type="radio" name="cat" value="text" checked><span>テキスト</span></label>
         <label class="check"><input type="radio" name="cat" value="image"><span>画像</span></label>
         <label class="check"><input type="radio" name="cat" value="video"><span>動画</span></label>
-        <label class="check"><input type="radio" name="cat" value="tree"><span>ツリー（連投）</span></label></div></div>
+        ${treeLive() ? '<label class="check"><input type="radio" name="cat" value="tree"><span>ツリー（連投）</span></label>' : ''}</div></div>
       <div class="field"><span class="lbl">投稿先</span><div id="accs"></div></div>
       <div class="field" style="border:1px dashed #c9bfa6;border-radius:12px;padding:10px"><span class="lbl">AIに作らせる（内容は必ずご自身で確認してください）</span>
         <input type="text" id="aiTheme" maxlength="500" placeholder="テーマ・内容（例：朝活のメリットを3つ）">
@@ -730,7 +750,7 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
         <input type="file" id="mediaFile" multiple accept="image/jpeg,image/png,video/mp4,video/quicktime">
         <div class="small">JPEG・PNG（8MBまで）／MP4・MOV（100MBまで）。選んだ順に並びます。</div>
         <div id="mediaList" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div></div>
-      <div class="field" id="treeField" style="display:none"><span class="lbl">ツリーの2件目以降（ThreadsとXだけ。1件目は上の本文です）</span>
+      <div class="field" id="treeField" style="display:none"><span class="lbl">ツリーの2件目以降（${escapeHtml(treeLive())}だけ。1件目は上の本文です）</span>
         <div id="treeList"></div><button type="button" class="btn btn-sm" id="addCard">＋ 投稿を追加</button></div>
       <div class="field" id="ttField" style="display:none;border:1px solid #d9d0bb;border-radius:12px;padding:10px">
         <span class="lbl">TikTokの設定（<b id="ttNick">TikTok</b>）</span>
