@@ -109,13 +109,13 @@ function webhook(event, secret = 'whsec_e2e') {
 
   console.log('販売ページ');
   r = await req('GET', '/service');
-  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('税込'), 'LPに月額1,000円（税込）を表示する');
+  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('税込'), 'LPに月額1,100円（税込）を表示する');
   ok(r.text.includes('返金') && r.text.includes('解約') && r.text.includes('自動更新'), 'LPに返金・解約・自動更新の条件を表示する');
   ok(r.text.includes('/service/legal/terms') && r.text.includes('/service/legal/tokushoho'), 'LPから規約・特商法表記へリンクする');
   ok(r.text.includes('現在の対応SNSは、Threadsです') && !r.text.includes('YouTube：') && !r.text.includes('TikTok：'), 'LPには、設定済みのSNSだけを対応SNSとして表示する');
   ok(!r.text.includes('AIで投稿づくり') && !/ClaudeやChatGPT/.test(r.text), 'AIが未設定ならAIの機能を表示せず、動作を確認していないアプリ名を出さない');
   r = await req('GET', '/service/lp');
-  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
+  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
   ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
   ok(!r.text.includes('ポストメッシュ') && r.text.includes('サービスA'), 'LPでは、他社の名前を出さない（サービスA）');
   ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
@@ -159,7 +159,7 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(!r.text.includes('半額以下'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');
   delete process.env.SERVICE_PRICE_JPY;
   r = await req('GET', '/service/legal/tokushoho');
-  ok(r.status === 200 && r.text.includes('月額1,000円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
+  ok(r.status === 200 && r.text.includes('月額1,100円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
   ok(r.text.includes('support@example.com') && !r.text.includes('【メールアドレス】') && r.text.includes('電話番号'), '特商法表記の連絡先に設定したメールアドレスを表示し、電話番号の開示請求について記載する');
   r = await req('GET', '/service/legal/terms');
   ok(r.status === 200 && r.text.includes('第5条（解約）') && r.text.includes('第7条（AIによる生成）'), '利用規約を表示できる');
@@ -185,7 +185,7 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 400 && r.text.includes('既に登録'), '同じメールアドレスでは二重に登録できない');
   r = await req('GET', '/service/checkout');
   ok(r.text.includes('提供の時期') && r.text.includes('お支払いが確認できない間は'), '最終確認画面に提供の時期と、お支払いが確認できない場合の扱いを表示する');
-  ok(r.status === 200 && r.text.includes('月額 1,000円（税込）') && r.text.includes('自動更新') && r.text.includes('解約') && r.text.includes('返金'), '最終確認画面に金額・自動更新・解約・返金を表示する');
+  ok(r.status === 200 && r.text.includes('月額 1,100円（税込）') && r.text.includes('自動更新') && r.text.includes('解約') && r.text.includes('返金'), '最終確認画面に金額・自動更新・解約・返金を表示する');
   const csrf = csrfOf(r.text);
   ok(!!csrf, '最終確認画面にCSRFトークンがある');
   r = await req('POST', '/service/checkout', { body: { csrf: 'wrong', agree: '1' } });
@@ -203,7 +203,7 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(cl.length === 1 && cl[0].kind === 'checkout' && cl[0].terms_version && cl[0].ip && Object.keys(cDocs).length === 3, '申込みの同意を、規約の版・3つの文書の控え・IPアドレスつきで記録する');
   const snap = consentLib.getSnapshot(Object.values(cDocs)[0]);
   ok(snap && snap.text.includes('第1条') === Object.keys(cDocs)[0].includes('利用規約') && consentLib.sha256(snap.text) === Object.values(cDocs)[0], '同意した時点の文書の本文を控えとして残し、ハッシュで照合できる');
-  ok(JSON.parse(cl[0].detail).price === 1000, '同意したときの料金も記録する');
+  ok(JSON.parse(cl[0].detail).price === 1100, '同意したときの料金も記録する');
   ok(typeof consentLib.update === 'undefined' && typeof consentLib.remove === 'undefined', '同意の記録は追記だけで、変更・削除の機能を持たない');
   ok(!store.Subscriptions.isActive(userIdForSub), '決済が完了するまでは契約中にならない');
   r = await req('GET', '/service/api/status');

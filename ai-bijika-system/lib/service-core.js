@@ -23,7 +23,7 @@ const JST_OFFSET_MS = 9 * 3600 * 1000;
 
 // サービス名（画面・法務文書の【サービス名】に入る）。ミチシルベ本体とは別の商品として扱う
 const serviceName = () => process.env.SERVICE_NAME || 'SNSまとめて予約';
-const priceYen = () => Number(process.env.SERVICE_PRICE_JPY || 1000);
+const priceYen = () => Number(process.env.SERVICE_PRICE_JPY || 1100);
 // 無料トライアルの日数（0なら無し）。初めて申し込む人だけが対象
 const trialDays = () => { const v = parseInt(process.env.SERVICE_TRIAL_DAYS || '0', 10); return Number.isFinite(v) && v > 0 && v <= 30 ? v : 0; };
 function trialFor(userId) {
@@ -32,7 +32,7 @@ function trialFor(userId) {
   const s = Subscriptions.get(userId);
   return s && s.stripe_subscription_id ? 0 : d; // 一度でも契約したことがあれば対象外
 }
-const TERMS_VERSION = '2026-10-14';
+const TERMS_VERSION = '2026-10-15';
 
 const contactEmail = () => {
   const e = String(process.env.SERVICE_CONTACT_EMAIL || '').trim();
