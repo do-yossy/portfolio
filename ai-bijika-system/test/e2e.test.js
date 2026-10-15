@@ -114,6 +114,8 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.text.includes('/service/legal/terms') && r.text.includes('/service/legal/tokushoho'), 'LPから規約・特商法表記へリンクする');
   ok(r.text.includes('現在の対応SNSは、Threadsです') && !r.text.includes('YouTube：') && !r.text.includes('TikTok：'), 'LPには、設定済みのSNSだけを対応SNSとして表示する');
   ok(!r.text.includes('AIで投稿づくり') && !/ClaudeやChatGPT/.test(r.text), 'AIが未設定ならAIの機能を表示せず、動作を確認していないアプリ名を出さない');
+  // 注意：料金の比較は、確認日（lib/service-ui.js の COMPARE.checked）から45日だけ出す。比較を前提にしたテストは、その期限を過ぎると失敗する。
+  // 固定投稿の0-3の再確認で checked を更新するときに、あわせて確かめる（比較をやめる場合は、これらのテストも直す）。
   r = await req('GET', '/service/lp');
   ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('ちょうど半額です') && r.text.includes('と比べると、半額にはなりません') && r.text.includes('<td>なし（月払いだけ）</td>') && r.text.includes('1か月あたり2,000円（税込。年24,000円を前払い）') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す（月払い同士はちょうど半額で、年払いと比べると半額にならないことも書く）');
   ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
@@ -129,6 +131,7 @@ function webhook(event, secret = 'whsec_e2e') {
     ok(!aiPart(h).includes('表示を自動で付け') && !aiPart(h).includes('TikTok'), 'Threadsだけのときは、このサービスのAIがあっても、AI生成の表示を自動で付けるとは書かない（使えないTikTokの名前も出さない）');
     process.env.TIKTOK_CLIENT_KEY = 'k'; process.env.TIKTOK_CLIENT_SECRET = 's';
     h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(h.includes('このサービスのAIでは、画像を作れます（回数の上限があります）') && h.includes('／このサービスのAIで画像を作る（回数の上限あり）'), 'このサービスのAIが画像だけのときは、料金の段とよくある質問に「画像」とだけ書く');
     ok(aiPart(h).includes('このサービスのAIで作った画像をTikTokに投稿するときは、AI生成の表示を自動で付けます') && h.includes('2つのSNSに、まとめて投稿。') && h.includes('<b>2つ</b>'), 'TikTokが使えてこのサービスのAIがあるときだけ、TikTokで表示を付けると書く（作れるものだけ：画像だけなら「画像」）。SNSが2つなら「2つのSNS」');
     const ttNote = 'このサービスがTikTokの投稿の監査（Audit）を通るまで、公開範囲は「自分のみ」に限られ、投稿するTikTokアカウントは非公開にする必要があり、投稿できるのはこのサービス全体で24時間に5人までです。';
     const ttRule = '公開範囲は「自分のみ」に限られ、投稿するTikTokアカウントは非公開にする必要があり、投稿できるのはこのサービス全体で24時間に5人まで';
@@ -137,7 +140,7 @@ function webhook(event, secret = 'whsec_e2e') {
     ok(uiLp.checkoutPage({ user: { email: 'a' }, csrf: 'c' }).includes(ttRule) && uiLp.landingPage({ user: null, billingReady: false }).includes(ttRule), '最終確認画面とサービスの説明のページにも、LPと同じTikTokの制限を書く');
     process.env.TIKTOK_AUDITED = 'true';
     h = uiLp.lpPage({ user: null, billingReady: false });
-    ok(!h.includes(ttNote) && !h.includes(ttRule) && !uiLp.checkoutPage({ user: { email: 'a' }, csrf: 'c' }).includes(ttRule), 'TikTokの投稿の監査（Audit）を通ったら（TIKTOK_AUDITED=true）、その制限の説明は出さない');
+    ok(!h.includes(ttNote) && !h.includes(ttRule) && !uiLp.checkoutPage({ user: { email: 'a' }, csrf: 'c' }).includes(ttRule) && !uiLp.landingPage({ user: null, billingReady: false }).includes(ttRule), 'TikTokの投稿の監査（Audit）を通ったら（TIKTOK_AUDITED=true）、LP・最終確認画面・サービスの説明のページに、その制限の説明は出さない');
     delete process.env.TIKTOK_AUDITED;
     delete process.env.OPENAI_API_KEY; delete process.env.TIKTOK_CLIENT_KEY; delete process.env.TIKTOK_CLIENT_SECRET;
     delete process.env.THREADS_APP_ID; delete process.env.THREADS_APP_SECRET;
@@ -192,7 +195,7 @@ function webhook(event, secret = 'whsec_e2e') {
     ok(aiSec(h).includes('このサービスのAIで作った画像・動画をTikTokに、動画をYouTubeに投稿するときは、AI生成の表示を自動で付けます'), 'TikTok・YouTubeと、画像・動画のAIがあるときは、TikTokは画像・動画、YouTubeは動画と書く');
     delete process.env.TIKTOK_CLIENT_KEY; delete process.env.TIKTOK_CLIENT_SECRET; delete process.env.OPENAI_API_KEY;
     h = uiC.lpPage({ user: null, billingReady: false });
-    ok(aiSec(h).includes('このサービスのAIで作った動画をYouTubeに投稿するときは、AI生成の表示を自動で付けます') && !aiSec(h).includes('TikTok') && aiSec(h).includes('AIが動画を作ります') && h.includes('このサービスのAIでも作れます（回数の上限があります）') && h.includes('／このサービスのAIで作る（回数の上限あり）'), 'このサービスのAIが動画だけのときも、AIの段・料金の段・よくある質問で同じように書く（YouTubeだけなら、TikTokの名前は出さない）');
+    ok(aiSec(h).includes('このサービスのAIで作った動画をYouTubeに投稿するときは、AI生成の表示を自動で付けます') && !aiSec(h).includes('TikTok') && aiSec(h).includes('AIが動画を作ります') && h.includes('このサービスのAIでは、動画を作れます（回数の上限があります）') && h.includes('／このサービスのAIで動画を作る（回数の上限あり）') && !h.includes('このサービスのAIでは、文章') && !h.includes('このサービスのAIでも作れます'), 'このサービスのAIが動画だけのときは、AIの段・料金の段・よくある質問に「動画」とだけ書く（文章・画像も作れるように読ませない。YouTubeだけなら、TikTokの名前は出さない）');
     delete process.env.GOOGLE_CLIENT_ID; delete process.env.GOOGLE_CLIENT_SECRET; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
     h = uiC.lpPage({ user: null, billingReady: false });
     ok(h.includes('予約の上限・使えるSNS・無料体験などの条件は異なります'), '無料体験が無いときは、無料体験も違う条件として書く');

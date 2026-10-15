@@ -263,6 +263,8 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
   if (live.some((p) => p.id === 'tiktok') && (av.image || av.video)) labelParts.push(`${[av.image && '画像', av.video && '動画'].filter(Boolean).join('・')}をTikTokに`);
   if (live.some((p) => p.id === 'youtube') && av.video) labelParts.push('動画をYouTubeに');
   const apiBase = String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, '') || 'https://（サービスのURL）';
+  // このサービスのAIで作れるもの（設定で使えるものだけ。使えないものを作れるように読ませない）
+  const ownAiKinds = [av.text && '文章', av.image && '画像', av.video && '動画'].filter(Boolean).join('・');
   return wrap(`SNSの予約投稿を月額${price}で`, `${LP_CSS}
     ${topNav(user)}
     <div class="lp">
@@ -322,7 +324,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
       <h2>AIと一緒に、投稿をつくる。</h2>
       <div class="grid">
         <div class="card"><h3>ご自身のAIで作る</h3><p class="small">「投稿を作る」画面でテーマを入れてボタンを押すと、指示文をコピーしてから、AIを開きます。文章は ChatGPT・Claude・Gemini で作れます（指示文には、投稿先のSNSの条件（文字数など）を自動で入れます）。画像は ChatGPT・Gemini で作れます。自動で入力されない場合は、貼り付けて送信してください。できた文章は本文に貼り付け、画像は保存して添付します。各AIのご利用条件・料金は、それぞれのサービスに従います。</p></div>
-        ${av.text || av.image || av.video ? `<div class="card"><h3>このサービスのAIで作る</h3><p class="small">テーマを入れると、AIが${[av.text && '文章', av.image && '画像', av.video && '動画'].filter(Boolean).join('・')}を作ります（1日・1か月の回数に上限があります）。</p></div>` : ''}
+        ${ownAiKinds ? `<div class="card"><h3>このサービスのAIで作る</h3><p class="small">テーマを入れると、AIが${ownAiKinds}を作ります（1日・1か月の回数に上限があります）。</p></div>` : ''}
         <div class="card"><h3>AIアシスタントから操作</h3><p class="small">MCP（AIアシスタントとつなぐための共通の仕組み）に対応したアプリから、ログインと許可の操作で接続できます（使えるかどうかは、アプリ側の対応状況によります）。</p></div>
         <div class="card"><h3>REST APIで連携</h3><p class="small">マイページで発行するAPIキーで、投稿の作成・予約・下書き・取り消しができます。</p>
 <pre>curl -X POST ${escapeHtml(apiBase)}/api/v1/posts \\
@@ -381,7 +383,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
         <li>連携できるSNSアカウントは${L.maxAccounts}件まで</li>
         <li>${ours}</li>
         <li>日本時間で最大90日先まで予約・下書き・カレンダー</li>
-        <li>ご自身のAIで投稿文・画像を作る${av.text || av.image || av.video ? '／このサービスのAIで作る（回数の上限あり）' : ''}</li>
+        <li>ご自身のAIで投稿文・画像を作る${ownAiKinds ? `／このサービスのAIで${ownAiKinds}を作る（回数の上限あり）` : ''}</li>
         <li>APIキー・AIアシスタント（MCP）との接続</li>
       </ul>
       ${cmp ? `<h3 style="margin-top:16px">料金の比べ方</h3>
@@ -415,7 +417,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
       <details><summary>どのSNSに投稿できますか？</summary><p>${names ? `現在は、${escapeHtml(names)}に投稿できます。` : '対応SNSは準備中です。'}${ttLimited ? ttNote : ''}各SNSの審査・仕様により、使える機能や公開範囲が制限される場合があります。</p></details>
       ${xLive() ? '' : '<details><summary>Xには投稿できますか？</summary><p>現在、Xへの投稿は提供していません。</p></details>'}
       <details><summary>SNSのパスワードを預ける必要はありますか？</summary><p>ありません。各SNSの公式の連携（OAuth）を使います。</p></details>
-      <details><summary>AIは使えますか？</summary><p>ChatGPT・Claude・Gemini など、ご自身のAIで投稿文や画像を作れます（各AIのご利用条件・料金は、それぞれのサービスに従います）。${av.text || av.image || av.video ? 'このサービスのAIでも作れます（回数の上限があります）。' : ''}</p></details>
+      <details><summary>AIは使えますか？</summary><p>ChatGPT・Claude・Gemini など、ご自身のAIで投稿文や画像を作れます（各AIのご利用条件・料金は、それぞれのサービスに従います）。${ownAiKinds ? `このサービスのAIでは、${ownAiKinds}を作れます（回数の上限があります）。` : ''}</p></details>
       <details><summary>解約するには？</summary><p>マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。お支払い後の返金は、法令上必要な場合を除き、いたしません。</p></details>
       <details><summary>お支払い方法は？</summary><p>クレジットカードです。決済代行会社（Stripe）の画面でお支払いいただき、当サービスにはカード番号を保存しません。</p></details>
       <p class="small"><a href="/service">サービスの詳しい説明</a></p>
@@ -622,7 +624,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
         <label class="check"><input type="checkbox" name="tiktok_commercial_own" value="1"><span>この動画は、自分のブランド・商品・サービスの宣伝を含む</span></label>
         <label class="check"><input type="checkbox" name="tiktok_commercial_paid" id="tt_paid" value="1"><span>この動画は、第三者の商品・ブランドの宣伝（提携・有償）を含む</span></label>
         <p class="small" id="ttPaidNote" style="display:none">提携（有償）の宣伝を投稿するには、公開範囲を「自分のみ」にできません。投稿することで、<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">TikTokのブランドコンテンツのポリシー</a>と音楽使用の確認に同意したものとみなされます。</p>
-        <p class="small">投稿することで、<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">TikTokの音楽使用の確認</a>に同意したものとみなされます。${process.env.TIKTOK_AUDITED === 'true' ? '' : 'このサービスがTikTokの投稿の監査（Audit）を通るまでは、公開範囲は「自分のみ」だけです。'}</p></div>` : ''}
+        <p class="small">投稿することで、<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">TikTokの音楽使用の確認</a>に同意したものとみなされます。${process.env.TIKTOK_AUDITED === 'true' ? '' : `このサービスがTikTokの投稿の監査（Audit）を通るまでは、${TT_PRE_AUDIT}です。`}</p></div>` : ''}
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
         <button class="btn btn-ghost" type="submit" name="mode" value="now" onclick="return confirm('今すぐ投稿します。よろしいですか？')">今すぐ投稿</button></div>
@@ -890,7 +892,7 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
       if(DRAFT){ACC.forEach(function(a){var c=document.querySelector('input[data-acc="'+a.id+'"]');if(c)c.checked=(a.id===DRAFT.accountId);});
         var cr=document.querySelector('input[name=cat][value="'+DRAFT.category+'"]');if(cr)cr.checked=true;
         $('mainText').value=DRAFT.text;media=DRAFT.media.slice();cards=DRAFT.tree.map(function(c){return {text:c.text,media:c.media};});drawMedia();drawCards();
-        if(DRAFT.category==='tree'&&!$('treeField'))show(false,'この下書きはツリー（連投）ですが、今はツリーを使えません。このまま保存すると、2件目以降は保存されません。');}
+        if(DRAFT.category==='tree'&&!$('treeField'))show(false,'この下書きはツリー（連投）ですが、今はツリーを使えません。このまま保存すると、2件目以降は消えます。'+(DRAFT.media.length?'1件目に画像・動画があるため、保存する前に、投稿の種類（画像・動画）を選び直してください。':''));}
       refresh();
     })();
     </script>` : '<div class="card"><p class="small">先にマイページでSNSを連携してください。</p></div>'}
