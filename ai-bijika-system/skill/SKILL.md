@@ -25,7 +25,7 @@ description: 連携済みのSNS（Threads・X・Instagram・TikTok・Facebookペ
    - `media_ids`：添付する画像・動画のID
    - `tree`：ツリーの2件目以降 `[{"text": "...", "media_ids": []}]`
    - いつ投稿するか：`"now": true`（即時）／`"scheduled_at": "2026-12-01T09:00:00+09:00"`（予約）／`"draft": true`（下書き）
-   - `options`：SNSごとの設定。**アカウントIDごと**に指定する（TikTokは必須。YouTubeは必ず利用者に確認して指定する（省略すると非公開・子ども向けではない）。ほかのSNSは不要）
+   - `options`：SNSごとの設定。**アカウントIDごと**に指定する（TikTokとYouTubeは必須。ほかのSNSは不要）
      ```json
      "options": {
        "<TikTokのアカウントID>": {
@@ -41,7 +41,7 @@ description: 連携済みのSNS（Threads・X・Instagram・TikTok・Facebookペ
      }
      ```
      - TikTok：`privacy_level` は `PUBLIC_TO_EVERYONE`／`MUTUAL_FOLLOW_FRIENDS`／`FOLLOWER_OF_CREATOR`／`SELF_ONLY` のうち、そのアカウントで使えるもの。`disable_comment`・`disable_duet`・`disable_stitch` は **true で「禁止」**、false で「許可」。`commercial_own` は自分の宣伝を含むか、`commercial_paid` は第三者の宣伝（提携・有償）を含むか（true のとき `SELF_ONLY` は使えない）。`auto_add_music` は写真の投稿に音楽を自動で付けるか。
-     - YouTube：`privacy` は `public`／`unlisted`／`private`（省略すると非公開）、`made_for_kids` は子ども向けかどうか（true／false）。
+     - YouTube：`privacy` は `public`／`unlisted`／`private`、`made_for_kids` は子ども向けかどうか（true／false）。どちらも必須（下書き以外）。
 4. 結果を確認する：`GET /api/v1/posts?status=pending`、`GET /api/v1/posts/{id}`
 
 その他：下書きの予約化 `POST /api/v1/posts/{id}/publish`（`{"now":true}` または `{"scheduled_at":"..."}`）、取り消し `DELETE /api/v1/posts/{id}`。
@@ -51,8 +51,8 @@ description: 連携済みのSNS（Threads・X・Instagram・TikTok・Facebookペ
 - **はじめは下書き（`draft: true`）で作り、利用者に内容を見せて了承を得てから予約・投稿する。** 利用者が「そのまま投稿して」と明示した場合だけ、即時・予約にする。
 - 確認できていない数字・実績・お客様の声を本文に書かない。誇大な表現や、他者を傷つける表現を使わない。
 - 画像・動画は、利用者が権利を持っているものだけを使う。
-- 各SNSの条件：Threads 500文字・カルーセル20件・ツリー可／X 日本語140文字程度・画像4枚（各5MB）または動画1本（140秒）・ツリー可・月の上限あり／Instagram プロアカウントのみ・画像はJPEG・カルーセル10件・本文2,200文字／TikTok 動画1本または写真（JPEG・35枚）／Facebook 連携時に先頭に表示されたページへ投稿・画像10枚または動画1本／YouTube 3分以内の動画1本（本文の1行目がタイトル。「#Shorts」が自動で付く）。
-- **TikTokへ投稿するときは、必ず利用者に次を確認してから `options` に入れる**（あなたが勝手に決めない）：公開範囲（`privacy_level`。選べる値はアカウントごとに違う。審査前は `SELF_ONLY` だけの場合がある）、コメント・デュエット・ステッチを許可するか、商用コンテンツの開示（自分の宣伝を含むか＝`commercial_own`、第三者の宣伝を含むか＝`commercial_paid`）。あわせて、TikTokの音楽使用の確認（第三者の宣伝を含む場合はブランドコンテンツのポリシーも）に同意したものとみなされることを利用者に伝える。
-- **YouTubeへ投稿するときは、公開設定（`privacy`：public／unlisted／private）と、子ども向けかどうか（`made_for_kids`）を利用者に確認する**。指定しないと「非公開」「子ども向けではない」になる。
+- 各SNSの条件：Threads 500文字（絵文字はUTF-8のバイト数で数える）・カルーセル20件・動画5分まで・ツリー可／X 日本語140文字程度・画像4枚（各5MB）または動画1本（140秒）・ツリー可・月の上限あり／Instagram プロアカウントのみ・画像はJPEG（縦横比4:5〜1.91:1）・カルーセル10件・本文2,200文字／TikTok 動画1本または写真（JPEG・35枚）／Facebook 連携時に選んだ1つのページへ投稿・画像10枚または動画1本／YouTube 3分以内の動画1本（本文の1行目がタイトル。説明は5,000バイト＝日本語でおよそ1,600文字まで。1日の上限あり。送る時点で上限なら翌日に自動で回る）。このサービスのAI（APIの `/api/v1/ai/…`・MCPの生成のツール）で作った画像・動画にだけ、TikTok・YouTubeのAI生成の表示・申告が自動で付く。**あなたが別の方法で作ってアップロードしたファイルには、このサービスは表示を付けない**ので、本物らしく見えるAI生成の画像・動画を投稿する場合は、そのことを利用者に伝え、必要ならSNSのアプリから表示を付けて投稿してもらう。
+- **TikTokへは、APIからは下書き（`draft: true`）にだけできる。** 投稿は、利用者がサービスのカレンダーから下書きを「投稿を作る」画面で開き、TikTokの設定を選び直してから行う（APIの `publish` では予約にできない）。下書きを作るときも、必ず利用者に次を確認してから `options` に入れる（あなたが勝手に決めない）：公開範囲（`privacy_level`。選べる値はアカウントごとに違う。サービスのアプリの審査が終わるまでは `SELF_ONLY` だけ）、コメント・デュエット・ステッチを許可するか、商用コンテンツの開示（自分の宣伝を含むか＝`commercial_own`、第三者の宣伝を含むか＝`commercial_paid`）。あわせて、TikTokの音楽使用の確認（第三者の宣伝を含む場合はブランドコンテンツのポリシーも）に同意したものとみなされることを利用者に伝える。
+- **YouTubeへ投稿するときは、公開設定（`privacy`：public／unlisted／private）と、子ども向けかどうか（`made_for_kids`）を利用者に確認する**（あなたが勝手に決めない）。指定がないと予約できない。
 - APIがエラーを返したら、`error` の文をそのまま利用者に伝え、勝手に条件を変えて再送しない。
 - 投稿されたか分からない（タイムアウトなど）ときは、再送せず、SNSで確認するよう利用者に伝える（二重投稿を防ぐ）。

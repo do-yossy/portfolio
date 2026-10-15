@@ -94,7 +94,8 @@ async function generateText({ userId, theme, tone, platform, instruction, avoid 
 async function saveBuffer(userId, buf) {
   const r = await mediaLib.saveUpload({ userId, req: Readable.from([buf]), contentLength: buf.length });
   if (!r.ok) throw new AiError(r.error);
-  return r.media;
+  require('./service-store').MediaAssets.markAiGenerated(r.media.id);
+  return { ...r.media, ai_generated: 1 };
 }
 
 // 画像の生成（JPEG）。戻り値は保存したメディア
@@ -149,15 +150,25 @@ async function pollVideo({ userId, operation }) {
   const u = new URL(uri);
   if (u.protocol !== 'https:' || u.hostname !== 'generativelanguage.googleapis.com') throw new AiError('動画の取得先が正しくありません。');
   // 動画のバイナリを取得（http-client はJSON/テキスト向けなので、ここだけ直接受け取る）
+  // 接続が止まったり、途中で切れたりしても待ち続けないよう、締め切りを設け、必ず1回だけ結果を返す
   const buf = await new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn, v) => { if (settled) return; settled = true; clearTimeout(timer); fn(v); };
     const rq = require('https').request({ host: u.host, method: 'GET', path: `${u.pathname}${u.search}`, headers: { 'x-goog-api-key': key } }, (res) => {
-      if (res.statusCode !== 200) { if (res.resume) res.resume(); return reject(new AiError(`動画を取得できませんでした (${res.statusCode})`)); }
+      // 429・5xx は一時的なもの（次の確認で取り直す）。それ以外の4xxは取り直さない
+      if (res.statusCode !== 200) { if (res.resume) res.resume(); return done(reject, new AiError(`動画を取得できませんでした (${res.statusCode})`, { transient: res.statusCode === 429 || res.statusCode >= 500 })); }
       const ch = []; let size = 0;
-      res.on('data', (c) => { size += c.length; if (size > mediaLib.LIMITS.videoBytes) { res.destroy(); reject(new AiError('生成された動画が大きすぎます。')); } else ch.push(c); });
-      res.on('end', () => resolve(Buffer.concat(ch)));
-      res.on('error', reject);
+      res.on('data', (c) => { size += c.length; if (size > mediaLib.LIMITS.videoBytes) { res.destroy(); done(reject, new AiError('生成された動画が大きすぎます。')); } else ch.push(c); });
+      res.on('end', () => done(resolve, Buffer.concat(ch)));
+      // 通信の途中切れ・時間切れは一時的なもの。次の確認で取り直す（完成した動画を保存できたときだけ投稿を作るので、二重にはならない）
+      res.on('aborted', () => done(reject, new AiError('動画を取得できませんでした（通信が途中で切れました）', { transient: true })));
+      res.on('error', (e) => done(reject, new AiError(`動画を取得できませんでした (${e.message})`, { transient: true })));
+      res.on('close', () => { if (!res.complete) done(reject, new AiError('動画を取得できませんでした（通信が途中で切れました）', { transient: true })); });
     });
-    rq.on('error', (e) => reject(new AiError(`動画を取得できませんでした (${e.message})`)));
+    const timer = setTimeout(() => { rq.destroy(new Error('timeout')); done(reject, new AiError('動画を取得できませんでした（時間切れ）', { transient: true })); }, 5 * 60 * 1000);
+    if (timer.unref) timer.unref();
+    rq.setTimeout(60 * 1000, () => rq.destroy(new Error('timeout')));
+    rq.on('error', (e) => done(reject, new AiError(`動画を取得できませんでした (${e.message})`, { transient: true })));
     rq.end();
   });
   return { done: true, media: await saveBuffer(userId, buf) };

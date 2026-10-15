@@ -13,6 +13,7 @@ process.env.THREADS_APP_ID = 'th'; process.env.THREADS_APP_SECRET = 'ths';
 process.env.INSTAGRAM_APP_ID = 'ig'; process.env.INSTAGRAM_APP_SECRET = 'igs';
 process.env.TIKTOK_CLIENT_KEY = 'tt'; process.env.TIKTOK_CLIENT_SECRET = 'tts';
 process.env.SNS_POLL_INTERVAL_MS = '1';
+process.env.SNS_POLL_MAX_MS = '200';
 
 const { ok, summary, installHttpsMock } = require('./helpers');
 const { Users } = require('../db');
@@ -111,12 +112,14 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   const mock = installHttpsMock(async (c) => {
     calls.push(c);
     if (c.host === 'graph.instagram.com') {
+      if (c.method === 'GET' && /fields=status_code/.test(c.path)) return { status: 200, json: { status_code: 'FINISHED' } };
       if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'ig_container' } };
       if (c.path === '/v22.0/ig1/media_publish') return { status: 200, json: { id: 'ig_media_1' } };
     }
     if (c.host === 'graph.threads.net') {
       if (c.path === '/v1.0/th1/threads') return { status: 200, json: { id: 'th_container' } };
       if (c.path === '/v1.0/th1/threads_publish') return { status: 200, json: { id: 'th_post_1' } };
+      if (c.method === 'GET' && /^\/v1\.0\/th_container\?fields=status/.test(c.path)) return { status: 200, json: { status: 'FINISHED' } };
     }
     if (c.host === 'open.tiktokapis.com') {
       if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
@@ -164,7 +167,11 @@ const future = () => new Date(Date.now() + 1000).toISOString();
     if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
     return null;
   });
+  const unaudited = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '公開', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE' } } });
+  ok(!unaudited.ok && /審査が終わるまで/.test(unaudited.error), 'TikTokの審査前は、公開範囲「自分のみ」以外は予約の時点で断る');
+  process.env.TIKTOK_AUDITED = 'true'; // 審査済みのアプリでも、アカウントによっては許可されない公開範囲がある
   const pub = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '公開', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE' } } });
+  delete process.env.TIKTOK_AUDITED;
   await new Promise((rs) => setTimeout(rs, 1200));
   await scheduler.tick();
   const pubRow = store.ScheduledPosts.get(pub.ids[0]);
@@ -225,8 +232,12 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   let tokenErr = null;
   try { await tt.exchangeCode({ code: 'c', redirectUri: 'https://example.test/cb' }); } catch (e) { tokenErr = e; }
   ok(tokenErr && tokenErr.authError, 'TikTokの認可のエラー（文字列形式）を、成功として扱わない');
+  process.env.TIKTOK_AUDITED = 'true';
   const info = await tt.creatorInfo({ accessToken: 't' });
-  ok(info.nickname === 'テスト' && info.privacyLevelOptions.length === 2 && info.commentDisabled === true && info.maxVideoPostDurationSec === 600, 'TikTokの投稿設定（公開範囲・コメント可否・最大秒数）を取得できる');
+  ok(info.nickname === 'テスト' && info.privacyLevelOptions.length === 2 && info.commentDisabled === true && info.maxVideoPostDurationSec === 600 && info.audited === true, 'TikTokの投稿設定（公開範囲・コメント可否・最大秒数）を取得できる');
+  delete process.env.TIKTOK_AUDITED;
+  const infoUn = await tt.creatorInfo({ accessToken: 't' });
+  ok(infoUn.privacyLevelOptions.join() === 'SELF_ONLY' && infoUn.audited === false, 'TikTokのアプリの審査前は、公開範囲の選択肢を「自分のみ」だけにする');
   ok(/自分のみ/.test(tt.validatePost({ text: 'a', media: { kind: 'video' }, options: { privacy_level: 'SELF_ONLY', commercial_paid: true } })), '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできない');
   m5.restore();
 
@@ -236,6 +247,25 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   const synth = Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), box32('mdat', Buffer.alloc(300, 1)), box32('moov', box32('mvhd', mvhd))]);
   const synthPath = path.join(process.env.DATA_DIR, 'synth.mp4'); fs.writeFileSync(synthPath, synth);
   ok(media.mp4DurationSec(synthPath) === 12, 'MP4の長さ（秒）を読み取れる（moovがmdatの後ろにあっても）');
+  // 画像の幅・高さ（JPEGはExifの向きも見る）
+  const sof = (w, h) => Buffer.concat([Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08]), Buffer.from([h >> 8, h & 255, w >> 8, w & 255]), Buffer.alloc(10, 0)]);
+  const exif = (orient, le) => {
+    const t = Buffer.alloc(26);
+    if (le) { t.write('II', 0, 'latin1'); t.writeUInt16LE(42, 2); t.writeUInt32LE(8, 4); t.writeUInt16LE(1, 8); t.writeUInt16LE(0x0112, 10); t.writeUInt16LE(3, 12); t.writeUInt32LE(1, 14); t.writeUInt16LE(orient, 18); }
+    else { t.write('MM', 0, 'latin1'); t.writeUInt16BE(42, 2); t.writeUInt32BE(8, 4); t.writeUInt16BE(1, 8); t.writeUInt16BE(0x0112, 10); t.writeUInt16BE(3, 12); t.writeUInt32BE(1, 14); t.writeUInt16BE(orient, 18); }
+    const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), t]);
+    return Buffer.concat([Buffer.from([0xff, 0xe1, (body.length + 2) >> 8, (body.length + 2) & 255]), body]);
+  };
+  const jpgPath = path.join(process.env.DATA_DIR, 'o.jpg');
+  fs.writeFileSync(jpgPath, Buffer.concat([Buffer.from([0xff, 0xd8]), sof(400, 300)]));
+  let sz = media.imageSize(jpgPath);
+  ok(sz && sz.width === 400 && sz.height === 300, 'JPEGの幅と高さを読み取れる');
+  fs.writeFileSync(jpgPath, Buffer.concat([Buffer.from([0xff, 0xd8]), exif(6, true), sof(400, 300)]));
+  sz = media.imageSize(jpgPath);
+  ok(sz && sz.width === 300 && sz.height === 400, 'Exifの向きが90度回転（6）なら、見た目の幅と高さに入れ替える（スマホの縦写真）');
+  fs.writeFileSync(jpgPath, Buffer.concat([Buffer.from([0xff, 0xd8]), exif(1, false), sof(400, 300)]));
+  sz = media.imageSize(jpgPath);
+  ok(sz && sz.width === 400 && sz.height === 300, 'Exifの向きが通常（1）なら、そのまま（ビッグエンディアンのExifも読める）');
   const box64 = (type, payload) => { const b = Buffer.alloc(16 + payload.length); b.writeUInt32BE(1, 0); b.write(type, 4, 'latin1'); b.writeBigUInt64BE(BigInt(16 + payload.length), 8); payload.copy(b, 16); return b; };
   fs.writeFileSync(synthPath, Buffer.concat([box32('ftyp', Buffer.from('mp42\0\0\0\0mp42')), box64('moov', box32('mvhd', mvhd))]));
   ok(media.mp4DurationSec(synthPath) === 12, '64bitのサイズ表記のMP4でも、長さを読み取れる');
@@ -255,6 +285,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   // 公開の最終段階のエラーのうち、投稿されていないと確定するものは、そのまま扱う
   const mA = installHttpsMock(async (c) => {
     if (c.host === 'graph.instagram.com') {
+      if (c.method === 'GET' && /fields=status_code/.test(c.path)) return { status: 200, json: { status_code: 'FINISHED' } };
       if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'cA' } };
       if (c.path === '/v22.0/ig1/media_publish') return { status: 400, json: { error: { message: 'Media ID is not available', code: 9007 } } };
     }
@@ -267,6 +298,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   mA.restore();
   const mB = installHttpsMock(async (c) => {
     if (c.host === 'graph.instagram.com') {
+      if (c.method === 'GET' && /fields=status_code/.test(c.path)) return { status: 200, json: { status_code: 'FINISHED' } };
       if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'cB' } };
       if (c.path === '/v22.0/ig1/media_publish') return { status: 429, json: { error: { message: 'rate limit' } } };
     }
@@ -296,6 +328,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   // 公開の最終段階のエラーは再試行しない（二重投稿の防止）
   const m6 = installHttpsMock(async (c) => {
     if (c.host === 'graph.instagram.com') {
+      if (c.method === 'GET' && /fields=status_code/.test(c.path)) return { status: 200, json: { status_code: 'FINISHED' } };
       if (c.path === '/v22.0/ig1/media') return { status: 200, json: { id: 'c9' } };
       if (c.path === '/v22.0/ig1/media_publish') return { status: 500, json: { error: { message: 'Internal error' } } };
     }
@@ -320,9 +353,23 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   await new Promise((rs) => setTimeout(rs, 1200));
   await scheduler.tick();
   const putRow = store.ScheduledPosts.get(pPut.ids[0]);
-  ok(putRow.status === 'pending' && !/投稿されたか/.test(putRow.last_error), 'TikTokへの動画のアップロードに失敗しても、まだ投稿されていないため、自動で再試行する');
-  store.ScheduledPosts.cancel(pPut.ids[0], uid);
+  ok(putRow.status === 'failed' && /投稿されたか/.test(putRow.last_error), 'TikTokへの最後のチャンク（1つだけのときも含む）で 5xx が返ったら、受け取られた可能性があるので自動で再試行せず、確認をお願いする');
   mP.restore();
+  // 最後でないチャンクの失敗は、まだ投稿の処理が始まっていないので、通常どおり再試行する
+  const bigPath = path.join(process.env.DATA_DIR, 'big.mp4');
+  fs.writeFileSync(bigPath, Buffer.alloc(70 * 1024 * 1024, 1));
+  const mP2 = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/video/init/') return { status: 200, json: { data: { publish_id: 'pu2', upload_url: 'https://upload.tiktok.test/u2' }, error: { code: 'ok' } } };
+    if (c.host === 'upload.tiktok.test') return { status: 503, json: {} };
+    return null;
+  });
+  let chunkErr = null;
+  try { await tt.publish({ accessToken: 't', post: { category: 'video', text: 'x', medias: [{ kind: 'video', mime: 'video/mp4', size: 70 * 1024 * 1024, path: bigPath }], options: { privacy_level: 'SELF_ONLY' } } }); } catch (e) { chunkErr = e; }
+  mP2.restore();
+  fs.unlinkSync(bigPath);
+  ok(chunkErr && chunkErr.retriable === true && !/投稿されたか/.test(chunkErr.message), 'TikTokへの最後でないチャンクで失敗したときは、まだ投稿されていないため、自動で再試行する');
+  store.ScheduledPosts.cancel(pPut.ids[0], uid);
 
   // TikTok：商用コンテンツの設定をAPIに渡す
   const m7 = installHttpsMock(async (c) => {
@@ -333,12 +380,81 @@ const future = () => new Date(Date.now() + 1000).toISOString();
     return null;
   });
   store.SnsAccounts.setStatus(ttAcc, 'active'); // 前のテストで再連携が必要な状態にしたため戻す
+  process.env.TIKTOK_AUDITED = 'true';
   const pCom = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '宣伝', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE', commercial_own: true, commercial_paid: false } } });
   await new Promise((rs) => setTimeout(rs, 1200));
   await scheduler.tick();
+  delete process.env.TIKTOK_AUDITED;
   const initBody = JSON.parse(m7.calls.find((c) => c.path === '/v2/post/publish/video/init/').body);
   ok(store.ScheduledPosts.get(pCom.ids[0]).status === 'posted' && initBody.post_info.brand_organic_toggle === true && initBody.post_info.brand_content_toggle === false, 'TikTokに、商用コンテンツ（自分の宣伝）の設定を渡す');
   m7.restore();
+
+  console.log('YouTube の設定の必須化と、1日の上限（サービス全体）');
+  process.env.YOUTUBE_DAILY_LIMIT = '2';
+  const ytUid = mkUser('yt@example.com');
+  store.Subscriptions.upsert(ytUid, { status: 'active' });
+  const ytMp4 = (await upload(ytUid, MP4)).media;
+  const ytAcc = store.SnsAccounts.upsert({ userId: ytUid, platform: 'youtube', externalUserId: 'ych', handle: 'YT', accessTokenEnc: enc('yttok'), refreshTokenEnc: enc('ytref'), expiresAt: exp });
+  const ytOpts = { privacy: 'unlisted', made_for_kids: false };
+  const mkYt = (o = ytOpts, draft = false) => core.createPost({ userId: ytUid, category: 'video', targets: [{ accountId: ytAcc, caption: '動画', options: o }], mediaIds: [ytMp4.id], tree: [], scheduledAtIso: future(), draft });
+  const noOpt = mkYt({ privacy: 'public' });
+  ok(!noOpt.ok && /子ども向け/.test(noOpt.error), 'YouTubeは、公開設定と子ども向けかどうかの両方を選ばないと予約できない');
+  const ytDraft = mkYt({}, true);
+  const ytPromote = core.promoteDraft({ userId: ytUid, postId: ytDraft.ids[0], scheduledAtIso: future(), via: 'screen' });
+  ok(ytDraft.ok && !ytPromote.ok && /公開設定/.test(ytPromote.error), '設定の無いYouTubeの下書きは、予約にできない');
+  const y1 = mkYt(); const y2 = mkYt(); const y3 = mkYt();
+  ok(y1.ok && y2.ok && !y3.ok && /1日の上限/.test(y3.error), 'その日（太平洋時間）のYouTubeの予約が、サービス全体の上限を超えるときは断る');
+  const ptDay = require('../lib/pt-time').dayBounds(new Date().toISOString());
+  store.ApiUsage.fill('youtube', ptDay.day, 2);
+  let mYt = installHttpsMock(async () => null);
+  await new Promise((res) => setTimeout(res, 1200));
+  await scheduler.tick();
+  mYt.restore();
+  const y1Row = store.ScheduledPosts.get(y1.ids[0]);
+  ok(y1Row.status === 'pending' && y1Row.attempts === 0 && y1Row.scheduled_at === new Date(Date.parse(ptDay.to) + 5 * 60 * 1000).toISOString() && /上限/.test(y1Row.last_error) && !mYt.calls.length, '送る時点で上限に達していたら、YouTubeへ送らずに翌日（太平洋時間）へ回す（試行回数は数えない）');
+  process.env.YOUTUBE_DAILY_LIMIT = '100';
+  const y4 = mkYt();
+  mYt = installHttpsMock(async (c) => (c.method === 'POST' && c.path.startsWith('/upload/youtube/') ? { status: 403, json: { error: { message: 'quota', errors: [{ reason: 'quotaExceeded' }] } } } : null));
+  await new Promise((res) => setTimeout(res, 1200));
+  await scheduler.tick();
+  mYt.restore();
+  const y4Row = store.ScheduledPosts.get(y4.ids[0]);
+  ok(y4Row.status === 'pending' && Date.parse(y4Row.scheduled_at) >= Date.parse(ptDay.to) && /割り当て/.test(y4Row.last_error) && store.ApiUsage.get('youtube', ptDay.day) === 100, 'YouTubeが割り当ての使い切りを返したら、その日の残りは送らず、日付が変わった後に再試行する');
+  ok(store.SnsAccounts.get(ytAcc).status === 'active', '割り当ての使い切りでは、連携のやり直しにしない');
+  delete process.env.YOUTUBE_DAILY_LIMIT;
+  [y1, y2, y4].forEach((y) => store.ScheduledPosts.cancel(y.ids[0], ytUid));
+  // 利用者ごとの1日の上限（1人でサービス全体の枠を使い切らないように）
+  process.env.YOUTUBE_PER_USER_DAILY = '1';
+  process.env.YOUTUBE_DAILY_LIMIT = '1000'; // 全体の枠には余裕がある状態で、利用者ごとの上限だけを確かめる
+  const yu1 = mkYt(); const yu2 = mkYt();
+  ok(yu1.ok && !yu2.ok && /1日に1件まで/.test(yu2.error), 'YouTubeは、利用者ごとの1日の上限を超える予約を断る');
+  const ytDay2 = require('../lib/pt-time').dayBounds(new Date().toISOString()).day;
+  store.ApiUsage.fill(`youtube:user:${ytUid}`, ytDay2, 1);
+  const globalBefore = store.ApiUsage.get('youtube', ytDay2);
+  mYt = installHttpsMock(async () => null);
+  await new Promise((res) => setTimeout(res, 1200));
+  await scheduler.tick();
+  mYt.restore();
+  const yu1Row = store.ScheduledPosts.get(yu1.ids[0]);
+  ok(yu1Row.status === 'pending' && yu1Row.attempts === 0 && /1日の上限/.test(yu1Row.last_error) && !/サービス全体/.test(yu1Row.last_error) && !mYt.calls.length && store.ApiUsage.get('youtube', ytDay2) === globalBefore, '送る時点で利用者ごとの上限に達していたら、送らずに翌日へ回し、サービス全体の枠は使わない');
+  store.ScheduledPosts.cancel(yu1.ids[0], ytUid);
+  // 再試行では、利用者ごとの枠を使わない（予約1件をその日1件と数える）。サービス全体の枠は、送るたびに数える
+  const ytUid2 = mkUser('yt2@example.com');
+  store.Subscriptions.upsert(ytUid2, { status: 'active' });
+  const ytMp4b = (await upload(ytUid2, MP4)).media;
+  const ytAcc2 = store.SnsAccounts.upsert({ userId: ytUid2, platform: 'youtube', externalUserId: 'ych2', handle: 'YT2', accessTokenEnc: enc('yttok'), refreshTokenEnc: enc('ytref'), expiresAt: exp });
+  process.env.YOUTUBE_PER_USER_DAILY = '2';
+  const yr = core.createPost({ userId: ytUid2, category: 'video', targets: [{ accountId: ytAcc2, caption: '再試行', options: ytOpts }], mediaIds: [ytMp4b.id], tree: [], scheduledAtIso: future(), draft: false });
+  const g0 = store.ApiUsage.get('youtube', ytDay2);
+  mYt = installHttpsMock(async (c) => (c.method === 'POST' && c.path.startsWith('/upload/youtube/') ? { status: 503, json: { error: { message: 'backend' } } } : null));
+  await new Promise((res) => setTimeout(res, 1200));
+  await scheduler.tick();
+  store.ScheduledPosts.reschedule(yr.ids[0], new Date(Date.now() - 1000).toISOString(), 'x');
+  await scheduler.tick();
+  mYt.restore();
+  ok(store.ScheduledPosts.get(yr.ids[0]).attempts === 2 && store.ApiUsage.get(`youtube:user:${ytUid2}`, ytDay2) === 1 && store.ApiUsage.get('youtube', ytDay2) === g0 + 2, '同じ予約の再試行では、利用者ごとの枠は1回分だけ使い、サービス全体の枠は送るたびに数える');
+  store.ScheduledPosts.cancel(yr.ids[0], ytUid2);
+  delete process.env.YOUTUBE_PER_USER_DAILY; delete process.env.YOUTUBE_DAILY_LIMIT;
 
   console.log('メディアの削除');
   const old = Date.now() + 3 * 24 * 3600 * 1000;

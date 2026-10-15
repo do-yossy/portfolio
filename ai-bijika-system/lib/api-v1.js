@@ -46,9 +46,14 @@ function postView(p) {
 }
 
 // 投稿の作成（REST API と画面の投稿作成で共通）。戻り値は { status, body }
-function createFromBody(userId, b) {
+// via：'screen'（サービスの画面）か 'api'（REST API・MCP）。TikTokは、本人が画面で内容と設定を確かめて同意してから送る決まり
+// （公式の共有のガイドライン）のため、API・MCPからは下書きにだけできる
+function createFromBody(userId, b, { via = 'api' } = {}) {
   if (!b || typeof b !== 'object' || Array.isArray(b)) return { status: 400, body: { error: 'JSONの形式が正しくありません。' } };
   const ids = [].concat(b.account_ids || []).map(String);
+  if (via !== 'screen' && b.draft !== true && ids.some((id) => { const a = SnsAccounts.getForUser(id, userId); return a && a.platform === 'tiktok'; })) {
+    return { status: 400, body: { error: 'TikTokへは、API・AIアシスタントからは下書き（draft:true）にだけできます。投稿は、サービスの画面で内容と設定を確かめてから行ってください。' } };
+  }
   const captions = b.captions && typeof b.captions === 'object' ? b.captions : {};
   const opts = b.options && typeof b.options === 'object' ? b.options : {};
   const targets = ids.map((accountId) => ({ accountId, caption: captions[accountId] !== undefined ? captions[accountId] : b.text, options: (opts[accountId] && typeof opts[accountId] === 'object') ? opts[accountId] : {} }));

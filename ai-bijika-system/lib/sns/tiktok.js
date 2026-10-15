@@ -41,6 +41,8 @@ function validatePost(args) {
     if (textLength(text || '') > PHOTO_DESC_MAX) return `TikTokの写真投稿の説明は${PHOTO_DESC_MAX}文字までです。`;
   }
   if (!options || !PRIVACY.includes(options.privacy_level)) return 'TikTokの公開範囲を選んでください。';
+  // 審査（Audit）が終わるまでは、公開範囲「自分のみ」だけ（公式：審査前のアプリは SELF_ONLY でしか投稿できない）
+  if (process.env.TIKTOK_AUDITED !== 'true' && options.privacy_level !== 'SELF_ONLY') return 'TikTokは、アプリの審査が終わるまで、公開範囲「自分のみ」でしか投稿できません（投稿するアカウントも非公開にしておく必要があります）。';
   if (options.commercial_paid && options.privacy_level === 'SELF_ONLY') return '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできません。';
   return null;
 }
@@ -55,6 +57,16 @@ function errorCodeOf(json) {
   if (!json || !json.error) return '';
   return typeof json.error === 'string' ? json.error : (json.error.code || '');
 }
+// 投稿のときに返る、認証以外の理由の拒否（公式の Direct Post のエラー）。連携のやり直しでは直らない
+const KNOWN_ERRORS = {
+  spam_risk_too_many_posts: 'TikTokの、1日に投稿できる数の上限に達しました。時間をおいてから投稿してください。',
+  spam_risk_user_banned_from_posting: 'このTikTokアカウントは、TikTok側で投稿が制限されています。',
+  reached_active_user_cap: 'このアプリから投稿できる人数の上限に達しています（審査前は24時間で5人まで）。運営者にお問い合わせください。',
+  unaudited_client_can_only_post_to_private_accounts: '審査前のため、非公開のTikTokアカウントから、公開範囲「自分のみ」でしか投稿できません。TikTokアカウントを非公開にしてから、もう一度お試しください。',
+  url_ownership_unverified: '写真のURLの所有確認が済んでいないため、TikTokに写真を投稿できません（運営者の設定が必要です）。',
+  privacy_level_option_mismatch: '選んだ公開範囲は、このアカウントでは使えません。公開範囲を選び直してください。',
+};
+
 async function call({ host = HOST, method = 'POST', path, headers = {}, body, json = true }) {
   let r;
   try { r = await request({ host, method, path, headers, body }); }
@@ -62,11 +74,14 @@ async function call({ host = HOST, method = 'POST', path, headers = {}, body, js
   const code = errorCodeOf(r.json);
   const okStatus = r.status >= 200 && r.status < 300;
   if (okStatus && (!json || (r.json && (!code || code === 'ok')))) return r.json || {};
+  // 2xx なのに本文を読み取れない（途中で切れた応答など）：受け付けられた可能性があるので、公開の段階では「投稿されたか不明」、状態の確認では次の確認でやり直す
+  if (okStatus && json && !r.json) throw classify(r.status, 'TikTokからの応答を読み取れませんでした');
   const msg = (r.json && ((r.json.error && r.json.error.message) || r.json.error_description)) || '';
-  const err = classify(r.status >= 400 ? r.status : 400, msg ? `TikTok: ${msg}` : (code ? `TikTok: ${code}` : ''));
+  const err = classify(r.status >= 400 ? r.status : 400, KNOWN_ERRORS[code] || (msg ? `TikTok: ${msg}` : (code ? `TikTok: ${code}` : '')));
+  err.code = code;
   if (['access_token_invalid', 'scope_not_authorized', 'invalid_grant', 'invalid_client', 'token_expired'].includes(code)) { err.authError = true; err.retriable = false; }
-  else if (code === 'rate_limit_exceeded') { err.retriable = true; }
-  else if (okStatus) { err.retriable = false; }
+  else if (code === 'rate_limit_exceeded') { err.retriable = true; err.authError = false; }
+  else if (KNOWN_ERRORS[code] || okStatus) { err.authError = false; err.retriable = false; } // 上限・審査前の制限・設定の問題（連携し直しても直らない）
   throw err;
 }
 const bearer = (t) => ({ Authorization: `Bearer ${t}`, 'Content-Type': 'application/json; charset=UTF-8' });
@@ -103,9 +118,13 @@ async function refresh({ refreshToken }) {
 async function creatorInfo({ accessToken }) {
   const info = await call({ path: '/v2/post/publish/creator_info/query/', headers: bearer(accessToken), body: '{}' });
   const d = info.data || {};
+  let opts = d.privacy_level_options || [];
+  // アプリの審査（Audit）が終わるまでは「自分のみ」しか投稿できないため、画面の選択肢もそれだけにする
+  if (process.env.TIKTOK_AUDITED !== 'true') opts = opts.filter((v) => v === 'SELF_ONLY');
   return {
     nickname: d.creator_nickname || d.creator_username || '',
-    privacyLevelOptions: d.privacy_level_options || [],
+    privacyLevelOptions: opts,
+    audited: process.env.TIKTOK_AUDITED === 'true',
     commentDisabled: !!d.comment_disabled, duetDisabled: !!d.duet_disabled, stitchDisabled: !!d.stitch_disabled,
     maxVideoPostDurationSec: Number(d.max_video_post_duration_sec) || 0,
   };
@@ -120,14 +139,17 @@ function chunkPlan(size) {
 
 async function publish(args) {
   const { accessToken } = args;
-  const p = normalize(args); const text = p.text; const media = p.medias[0]; const options = p.options;
+  const p = normalize(args); const text = p.text; const media = p.medias[0];
   const err = validatePost(args);
   if (err) throw new SnsError(err);
   const info = await call({ path: '/v2/post/publish/creator_info/query/', headers: bearer(accessToken), body: '{}' });
   const allowed = (info.data && info.data.privacy_level_options) || [];
-  if (allowed.length && !allowed.includes(options.privacy_level)) {
-    throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。アプリの審査が終わるまでは「自分のみ（SELF_ONLY）」だけの場合があります。`);
+  if (allowed.length && !allowed.includes(p.options.privacy_level)) {
+    throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。アプリの審査が終わるまでは「自分のみ（SELF_ONLY）」だけです。`);
   }
+  // アカウント側でコメント・デュエット・ステッチを止めている場合は、送る時点の設定でも必ず「許可しない」にする（予約した後に設定が変わった場合も含む）
+  const d = info.data || {};
+  const options = { ...p.options, disable_comment: !!p.options.disable_comment || !!d.comment_disabled, disable_duet: !!p.options.disable_duet || !!d.duet_disabled, disable_stitch: !!p.options.disable_stitch || !!d.stitch_disabled };
   if (media.kind === 'image') return publishPhotos({ accessToken, p, options });
   if (info.data && Number(info.data.max_video_post_duration_sec) && media.durationSec && media.durationSec > Number(info.data.max_video_post_duration_sec)) {
     throw new SnsError(`動画が長すぎます（${Math.round(media.durationSec)}秒）。このアカウントで投稿できるのは、最大${info.data.max_video_post_duration_sec}秒です。`);
@@ -135,7 +157,7 @@ async function publish(args) {
   const plan = chunkPlan(media.size);
   const init = await call({ path: '/v2/post/publish/video/init/', headers: bearer(accessToken), body: JSON.stringify({
     post_info: { title: text || '', privacy_level: options.privacy_level, disable_comment: !!options.disable_comment, disable_duet: !!options.disable_duet, disable_stitch: !!options.disable_stitch,
-      brand_organic_toggle: !!options.commercial_own, brand_content_toggle: !!options.commercial_paid },
+      brand_organic_toggle: !!options.commercial_own, brand_content_toggle: !!options.commercial_paid, ...(media.aiGenerated ? { is_aigc: true } : {}) },
     source_info: { source: 'FILE_UPLOAD', video_size: media.size, chunk_size: plan.chunkSize, total_chunk_count: plan.total },
   }) });
   const publishId = init.data && init.data.publish_id;
@@ -149,9 +171,22 @@ async function publish(args) {
       const end = i === plan.total - 1 ? media.size - 1 : start + plan.chunkSize - 1;
       const buf = Buffer.alloc(end - start + 1);
       fs.readSync(fd, buf, 0, buf.length, start);
-      const r = await request({ host: u.host, method: 'PUT', path: `${u.pathname}${u.search}`, timeoutMs: 120000,
-        headers: { 'Content-Type': media.mime === 'video/quicktime' ? 'video/quicktime' : 'video/mp4', 'Content-Range': `bytes ${start}-${end}/${media.size}` }, body: buf }).catch((e) => { throw new SnsError(`TikTokへのアップロードに失敗しました (${e.message})`, { retriable: true }); });
-      if (r.status !== 201 && r.status !== 206 && r.status !== 200) throw classify(r.status, `TikTokへのアップロードに失敗しました (${r.status})`);
+      const last = i === plan.total - 1;
+      let r;
+      try {
+        r = await request({ host: u.host, method: 'PUT', path: `${u.pathname}${u.search}`, timeoutMs: 120000,
+          headers: { 'Content-Type': media.mime === 'video/quicktime' ? 'video/quicktime' : 'video/mp4', 'Content-Range': `bytes ${start}-${end}/${media.size}` }, body: buf });
+      } catch (e) {
+        const err = new SnsError(`TikTokへのアップロードに失敗しました (${e.message})`, { retriable: true });
+        // 最後のチャンクを送り終えた時点で、TikTokが投稿の処理を始めることがある（公式：201は全部を受け取って処理を開始した、の意味）。
+        // 応答だけが失われた可能性があるため、最後のチャンクの通信エラーは自動で再試行しない
+        throw last ? ambiguous(err) : err;
+      }
+      if (r.status !== 201 && r.status !== 206 && r.status !== 200) {
+        const err = classify(r.status, `TikTokへのアップロードに失敗しました (${r.status})`);
+        // 最後のチャンクで 5xx が返った場合も、中継の装置だけがエラーを返し、TikTokは受け取って処理を始めている可能性がある。自動で再試行しない
+        throw last ? ambiguous(err) : err;
+      }
     }
   } finally { fs.closeSync(fd); }
   // ここから先は、動画を送ったあとの段階。応答だけが失われた場合に再試行すると、二重投稿になりうるため、再試行しない
@@ -161,14 +196,17 @@ async function publish(args) {
 
 async function waitPublished(accessToken, publishId) {
   try {
-    for (let i = 0; i < poll.maxTries(); i++) {
-      const s = await call({ path: '/v2/post/publish/status/fetch/', headers: bearer(accessToken), body: JSON.stringify({ publish_id: publishId }) });
+    const r = await poll.until(async () => {
+      let s;
+      try { s = await call({ path: '/v2/post/publish/status/fetch/', headers: bearer(accessToken), body: JSON.stringify({ publish_id: publishId }) }); }
+      catch (e) { if (e.retriable && !e.authError) return null; throw e; } // 一時的なエラー（429・5xx）は、次の確認でやり直す
       const st = s.data && s.data.status;
-      if (st === 'PUBLISH_COMPLETE') return { externalId: String((s.data.publicaly_available_post_id && s.data.publicaly_available_post_id[0]) || publishId) };
+      if (st === 'PUBLISH_COMPLETE') return { done: true, value: String((s.data.publicaly_available_post_id && s.data.publicaly_available_post_id[0]) || publishId) };
       if (st === 'FAILED') throw new SnsError(`TikTok側で投稿に失敗しました（${(s.data && s.data.fail_reason) || '理由不明'}）`);
-      await poll.sleep(poll.intervalMs());
-    }
-    throw new SnsError('TikTok側の処理が終わりませんでした。投稿されたかをご確認ください。');
+      return null;
+    }, { maxMs: 10 * 60 * 1000 });
+    if (!r) throw new SnsError('TikTok側の処理が時間内に終わりませんでした。投稿されたかをご確認ください。');
+    return { externalId: r.value };
   } catch (e) { throw ambiguous(e); }
 }
 
@@ -182,7 +220,7 @@ async function publishPhotos({ accessToken, p, options }) {
       post_info: { title, description: t, privacy_level: options.privacy_level, disable_comment: !!options.disable_comment, auto_add_music: options.auto_add_music === true,
         brand_organic_toggle: !!options.commercial_own, brand_content_toggle: !!options.commercial_paid },
       source_info: { source: 'PULL_FROM_URL', photo_cover_index: 0, photo_images: p.medias.map((m) => m.url) },
-      post_mode: 'DIRECT_POST', media_type: 'PHOTO',
+      post_mode: 'DIRECT_POST', media_type: 'PHOTO', ...(p.medias.some((m) => m.aiGenerated) ? { is_aigc: true } : {}),
     }) });
   } catch (e) { throw ambiguous(e); }
   const publishId = init.data && init.data.publish_id;

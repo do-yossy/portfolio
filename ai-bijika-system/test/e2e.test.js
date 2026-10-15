@@ -43,6 +43,7 @@ const mock = installHttpsMock(async (c) => {
     if (c.path.startsWith('/v1.0/me?')) return { status: 200, json: { id: '4242', username: 'e2e_user' } };
     if (c.path === '/v1.0/4242/threads') return { status: 200, json: { id: 'cont_1' } };
     if (c.path === '/v1.0/4242/threads_publish') return { status: 200, json: { id: 'post_e2e' } };
+    if (c.method === 'GET' && /^\/v1\.0\/cont_1\?fields=status/.test(c.path)) return { status: 200, json: { status: 'FINISHED' } };
   }
   return null;
 });
@@ -120,6 +121,31 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
   ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
   ok(r.text.includes('使えるSNS') && r.text.includes('無料体験') && !r.text.includes('Xは月30件まで'), '比較表に使えるSNSと無料体験の行があり、Xを提供していなければXの上限を出さない');
+  ok(!r.text.includes('AI生成') && !r.text.includes('合成した内容'), 'このサービスのAIを使わない設定のときは、AI生成の表示についての説明を出さない');
+  {
+    // TikTok・YouTube を設定した状態で、AIの設定ごとに、SNSの条件の説明（AI生成の表示）を確かめる
+    const saveEnv = {}; ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'AI_DAILY_VIDEO'].forEach((k) => { saveEnv[k] = process.env[k]; });
+    Object.assign(process.env, { TIKTOK_CLIENT_KEY: 'k', TIKTOK_CLIENT_SECRET: 's', GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 'gs' });
+    delete process.env.OPENAI_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
+    let lp = (await req('GET', '/service/lp')).text;
+    ok(lp.includes('TikTok：') && lp.includes('YouTube：') && !lp.includes('AI生成') && !lp.includes('合成した内容'), 'TikTok・YouTubeを提供していても、このサービスのAIが無ければ、AI生成の表示の説明は出さない');
+    process.env.OPENAI_API_KEY = 'ok';
+    lp = (await req('GET', '/service/lp')).text;
+    ok(lp.includes('このサービスのAIで作った画像には、TikTokの「AI生成」の表示') && lp.includes('ほかのAIで作ってアップロードしたものには、このサービスは表示を付けません') && !lp.includes('合成した内容'), '画像だけを作れる設定では、TikTokの説明は「画像には」とし、YouTubeの申告の説明は出さない');
+    process.env.GEMINI_API_KEY = 'gk'; process.env.AI_DAILY_VIDEO = '1';
+    lp = (await req('GET', '/service/lp')).text;
+    ok(lp.includes('このサービスのAIで作った画像・動画には') && lp.includes('このサービスのAIで作った動画は、合成した内容として申告します'), '動画も作れる設定では、TikTokは「画像・動画」、YouTubeの申告の説明も出す');
+    Object.keys(saveEnv).forEach((k) => { if (saveEnv[k] === undefined) delete process.env[k]; else process.env[k] = saveEnv[k]; });
+  }
+  ok(r.text.includes('SNSへの投稿を、まとめて予約。') && !r.text.includes('複数のSNSへの投稿を') && !r.text.includes('いくつものSNS') && !r.text.includes('SNSごとに本文') && !r.text.includes('公式の料金ページで確認') && r.text.includes('公式サイト（料金と概要のページ）'), '使えるSNSが1つだけのときは、LPで「複数のSNS」と書かない。比較の確認元は「料金と概要のページ」');
+  process.env.FACEBOOK_APP_ID = 'fb'; process.env.FACEBOOK_APP_SECRET = 'fbs';
+  r = await req('GET', '/service/lp');
+  const lpMulti = r.text;
+  r = await req('GET', '/service');
+  ok(lpMulti.includes('複数のSNSへの投稿を、まとめて予約。') && r.text.includes('複数のSNSへの投稿を、1つの画面から') && r.text.includes('複数のSNSへ同時投稿'), '使えるSNSが2つ以上になったら、「複数のSNS」と書く');
+  delete process.env.FACEBOOK_APP_ID; delete process.env.FACEBOOK_APP_SECRET;
+  r = await req('GET', '/service');
+  ok(r.text.includes('SNSへの投稿を、日時を決めて予約できるサービスです') && !r.text.includes('複数のSNSへ同時投稿'), 'サービスの説明のページも、使えるSNSが1つだけなら「複数のSNS」と書かない');
   const uiMod = require('../lib/service-ui');
   ok(uiMod.compareActive(1000, Date.parse('2026-11-01T00:00:00+09:00')) && !uiMod.compareActive(1000, Date.parse('2026-12-15T00:00:00+09:00')), '価格を確認した日から45日を過ぎたら、比較を自動で出さない');
   process.env.SERVICE_LP_COMPARE = 'off';
@@ -196,7 +222,7 @@ function webhook(event, secret = 'whsec_e2e') {
 
   console.log('SNS連携と予約');
   r = await req('GET', '/service/connect/threads');
-  ok(r.status === 302 && r.headers.location.startsWith('https://threads.net/oauth/authorize'), 'Threadsの認可画面へ移動する');
+  ok(r.status === 302 && r.headers.location.startsWith('https://threads.com/oauth/authorize'), 'Threadsの認可画面へ移動する');
   const st = new URL(r.headers.location).searchParams.get('state');
   r = await req('GET', `/service/oauth/callback/threads?code=abc&state=${st}`);
   ok(r.status === 302 && r.headers.location === '/service/app?f=connected', '連携を完了する');
@@ -322,6 +348,45 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 201 && r.json.media === 'video', 'APIから動画の自動運用ルールを作れる（Threads）');
   for (const rr of (await api('GET', '/api/v1/auto-rules', apiKey)).json.rules) await api('DELETE', `/api/v1/auto-rules/${rr.id}`, apiKey);
   delete process.env.ANTHROPIC_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
+
+  // TikTokへは、API・MCPからは下書きにだけできる
+  const ttE2e = store.SnsAccounts.upsert({ userId: userIdForSub, platform: 'tiktok', externalUserId: 'tte2e', handle: 'tt', accessTokenEnc: require('../lib/crypto-box').encrypt('t', require('../lib/crypto-box').keyFromEnv()), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  const ttE2eId = typeof ttE2e === 'object' ? ttE2e.id : ttE2e;
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'video', text: 'x', media_ids: [], account_ids: [ttE2eId], now: true });
+  ok(r.status === 400 && /下書き/.test(r.json.error), 'TikTokへは、APIから直接投稿できない（本人が画面で確かめる決まり）');
+  // TikTokの下書きは、APIからもカレンダーからも直接は予約できず、「投稿を作る」画面で設定を選び直してから送る
+  const ttMp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), Buffer.alloc(2000, 5)]);
+  const ttUp = await api('POST', '/api/v1/media', apiKey, undefined, ttMp4);
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'video', text: 'TikTok下書き', media_ids: [ttUp.json.id], account_ids: [ttE2eId], draft: true, options: { [ttE2eId]: { privacy_level: 'SELF_ONLY' } } });
+  const ttDraftId = r.json.posts && r.json.posts[0].id;
+  ok(r.status === 201 && ttDraftId, 'TikTokへは、APIから下書きにはできる');
+  r = await api('POST', `/api/v1/posts/${ttDraftId}/publish`, apiKey, { now: true });
+  ok(r.status === 400 && /画面/.test(r.json.error), 'TikTokの下書きは、APIからは予約・投稿にできない');
+  r = await req('POST', `/service/app/post/${ttDraftId}/publish`, { body: { csrf: appCsrf, mode: 'now' } });
+  ok(r.status === 400 && r.text.includes('選び直して'), 'TikTokの下書きは、カレンダーからも直接は投稿できない（設定を見ないまま送らない）');
+  r = await req('GET', '/service/app/calendar');
+  ok(r.text.includes(`/service/app/compose?draft=${ttDraftId}`) && r.text.includes('内容と設定を確かめて投稿する'), 'カレンダーのTikTokの下書きには、「投稿を作る」画面で開くリンクを出す');
+  r = await req('GET', `/service/app/compose?draft=${ttDraftId}`);
+  ok(r.status === 200 && r.text.includes('下書きを読み込みました') && r.text.includes('TikTok下書き') && r.text.includes(ttUp.json.id) && !r.text.includes('"privacy_level"'), '「投稿を作る」画面で下書きを開ける（TikTokの設定は読み込まず、選び直してもらう）');
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf }, raw: JSON.stringify({ category: 'video', text: 'TikTok下書き', account_ids: [ttE2eId], media_ids: [ttUp.json.id], options: { [ttE2eId]: { privacy_level: 'SELF_ONLY', disable_comment: true, disable_duet: true, disable_stitch: true } }, scheduled_at: `${FUTURE}:00+09:00`, replace_draft: ttDraftId }) });
+  ok(r.status === 201 && store.ScheduledPosts.get(ttDraftId).status === 'cancelled', '画面で設定を選び直して保存すると予約になり、元の下書きは削除される');
+  const ttPendingCount = () => store.ScheduledPosts.listForUser(userIdForSub).filter((p) => p.account_id === ttE2eId && p.status === 'pending').length;
+  const pendingBefore = ttPendingCount();
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf }, raw: JSON.stringify({ category: 'video', text: 'TikTok下書き', account_ids: [ttE2eId], media_ids: [ttUp.json.id], options: { [ttE2eId]: { privacy_level: 'SELF_ONLY' } }, scheduled_at: `${FUTURE}:00+09:00`, replace_draft: ttDraftId }) });
+  ok(r.status === 409 && ttPendingCount() === pendingBefore, '同じ下書きをもう一度保存しても（2つのタブ・通信エラーの後の押し直し）、予約は増えない');
+  r = await api('POST', '/api/v1/posts', apiKey, { category: 'video', text: 'TikTok下書き2', media_ids: [ttUp.json.id], account_ids: [ttE2eId], draft: true, options: { [ttE2eId]: { privacy_level: 'SELF_ONLY' } } });
+  const ttDraft2 = r.json.posts[0].id;
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf }, raw: JSON.stringify({ category: 'video', text: 'TikTok下書き2', account_ids: [ttE2eId], media_ids: [ttUp.json.id], options: { [ttE2eId]: {} }, scheduled_at: `${FUTURE}:00+09:00`, replace_draft: ttDraft2 }) });
+  ok(r.status === 400 && store.ScheduledPosts.get(ttDraft2).status === 'draft', '保存できなかったとき（公開範囲を選んでいない）は、元の下書きを残す');
+  // TikTokは1回に1つのアカウントだけ。2つ以上あるときは、かんたん投稿ではTikTokを選べず、「投稿を作る」へ案内する
+  const ttE2e2 = store.SnsAccounts.upsert({ userId: userIdForSub, platform: 'tiktok', externalUserId: 'tte2e2', handle: 'tt2', accessTokenEnc: require('../lib/crypto-box').encrypt('t', require('../lib/crypto-box').keyFromEnv()), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+  const ttE2e2Id = typeof ttE2e2 === 'object' ? ttE2e2.id : ttE2e2;
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': appCsrf }, raw: JSON.stringify({ category: 'video', text: '2つ', account_ids: [ttE2eId, ttE2e2Id], media_ids: [ttUp.json.id], options: { [ttE2eId]: { privacy_level: 'SELF_ONLY' }, [ttE2e2Id]: { privacy_level: 'SELF_ONLY' } }, scheduled_at: `${FUTURE}:00+09:00` }) });
+  ok(r.status === 400 && /1つのアカウント/.test(JSON.parse(r.text).error), 'TikTokのアカウントを2つ同時には選べない（サーバーでも断る）');
+  r = await req('GET', '/service/app');
+  ok(!r.text.includes(`value="${ttE2eId}" data-platform="tiktok"`) && !r.text.includes('id="tiktokBox"') && r.text.includes('TikTokのアカウントが2つ以上あるため'), 'TikTokのアカウントが2つ以上あるときは、かんたん投稿ではTikTokを選べず、「投稿を作る」へ案内する');
+  store.SnsAccounts.remove(ttE2e2Id, userIdForSub);
+  store.SnsAccounts.remove(ttE2eId, userIdForSub);
 
   console.log('MCP');
   const rpc = (key, body) => api('POST', '/mcp', key, body);
@@ -509,6 +574,10 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 400, '契約していない他のユーザーは、他人のSNSアカウントに予約できない');
   r = await req('POST', `/service/app/account/${accId}/disconnect`, { body: { csrf: otherCsrf } });
   ok(store.SnsAccounts.get(accId) !== null, '他のユーザーは他人の連携を解除できない');
+  const othersDraft = store.ScheduledPosts.create({ userId: userIdForSub, accountId: accId, text: '他人の下書き', scheduledAt: new Date(Date.now() + 86400000).toISOString(), status: 'draft' });
+  r = await req('POST', '/service/app/posts', { headers: { 'Content-Type': 'application/json', 'X-CSRF': otherCsrf }, raw: JSON.stringify({ category: 'text', text: 'x', account_ids: [], replace_draft: othersDraft }) });
+  ok(r.status === 409 && store.ScheduledPosts.get(othersDraft).status === 'draft', '他人の下書きは、置き換え（replace_draft）で消せない');
+  store.ScheduledPosts.cancel(othersDraft, userIdForSub);
   r = await req('GET', '/service/connect/threads');
   ok(r.status === 403, '契約していないと連携できない');
   cookie = savedCookie;

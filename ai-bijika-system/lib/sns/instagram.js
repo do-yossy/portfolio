@@ -26,6 +26,8 @@ function validatePost(args) {
   if (!media) return 'Instagramは、画像または動画が必要です。';
   if (p.medias.length > 10) return 'Instagramのカルーセルは10件までです。';
   if (p.medias.some((m) => m.kind === 'image' && m.mime !== 'image/jpeg')) return 'Instagramに投稿できる画像はJPEGです（PNGは使えません）。';
+  // 公式：画像の縦横比は 4:5（縦長）〜 1.91:1（横長）の範囲。スマホの縦写真（3:4）や縦長のスクリーンショットは範囲外
+  if (p.medias.some((m) => m.kind === 'image' && m.width && m.height && (m.width / m.height < 0.8 - 1e-6 || m.width / m.height > 1.91 + 1e-6))) return 'Instagramの画像の縦横比は、4:5（縦長）〜1.91:1（横長）の範囲にしてください（スマホの縦写真3:4は範囲外です。正方形などに切り抜いてください）。';
   if (textLength(text || '') > maxLength) return `Instagramのキャプションは${maxLength}文字までです。`;
   return null;
 }
@@ -34,6 +36,9 @@ function authUrl({ state, redirectUri }) {
   const c = creds();
   return `${AUTH_URL}?${new URLSearchParams({ client_id: c.appId, redirect_uri: redirectUri, scope: SCOPES, response_type: 'code', state }).toString()}`;
 }
+
+// 2207001：サーバーのエラー／2207003：メディアの取得のタイムアウト／2207032：作成の失敗／2207053：新しいコンテナで再試行／2207008：公開の一時的なエラー／2207027：まだ公開の準備ができていない
+const TRANSIENT_SUBCODES = [2207001, 2207003, 2207032, 2207053, 2207008, 2207027];
 
 async function call({ host = GRAPH, method = 'GET', path, query, form }) {
   const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
@@ -48,6 +53,9 @@ async function call({ host = GRAPH, method = 'GET', path, query, form }) {
   const err = classify(r.status, em && em.message ? `Instagram: ${em.message}` : '');
   // 認証エラーと判断するのは、トークンの失効・無効を示すコード(190)のときだけ（他のOAuthExceptionは連携を無効にしない）
   if (em && em.code === 190) { err.authError = true; err.retriable = false; }
+  // 公式で「時間をおいて再試行」とされているもの（HTTP 400 でも一時的なエラー）
+  else if (em && (em.is_transient === true || TRANSIENT_SUBCODES.includes(em.error_subcode))) err.retriable = true;
+  if (em) err.subcode = em.error_subcode;
   throw err;
 }
 
@@ -70,14 +78,19 @@ async function refresh({ accessToken }) {
   return { accessToken: r.access_token, refreshToken: '', expiresAt: new Date(Date.now() + (Number(r.expires_in) || 60 * 24 * 3600) * 1000).toISOString() };
 }
 
-async function waitFinished(containerId, accessToken) {
-  for (let i = 0; i < poll.maxTries(); i++) {
-    const s = await call({ path: `/${API_VERSION}/${encodeURIComponent(containerId)}`, query: { fields: 'status_code', access_token: accessToken } });
-    if (s.status_code === 'FINISHED') return;
-    if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') throw new SnsError('Instagram側で動画の処理に失敗しました。動画の形式・長さをご確認ください。');
-    await poll.sleep(poll.intervalMs());
-  }
-  throw new SnsError('Instagram側の動画の処理が終わりませんでした。', { retriable: true });
+// コンテナの準備ができるまで待つ（FINISHED）。公式：画像・カルーセルも含め、状態を確かめてから公開する。確認は間隔を広げながら最大5分。
+// カルーセルの子は、まとめて1つの待ち時間の中で確かめる（1件ずつ待つと、件数に比例して長くなり、ほかの予約の処理も止まるため）
+async function waitFinished(containerIds, accessToken) {
+  const pending = new Set([].concat(containerIds));
+  const r = await poll.until(async () => {
+    for (const cid of [...pending]) {
+      const st = await call({ path: `/${API_VERSION}/${encodeURIComponent(cid)}`, query: { fields: 'status_code,status', access_token: accessToken } });
+      if (st.status_code === 'FINISHED' || st.status_code === 'PUBLISHED') { pending.delete(cid); continue; }
+      if (st.status_code === 'ERROR' || st.status_code === 'EXPIRED') throw new SnsError(`Instagram側で画像・動画の処理に失敗しました${st.status ? `（${st.status}）` : ''}。形式・縦横比・長さをご確認ください。`);
+    }
+    return pending.size ? null : { done: true };
+  });
+  if (!r) throw new SnsError('Instagram側の処理が時間内に終わりませんでした。', { retriable: true });
 }
 
 async function publish(args) {
@@ -93,22 +106,27 @@ async function publish(args) {
       const f = { is_carousel_item: 'true', access_token: accessToken };
       if (m.kind === 'image') f.image_url = m.url; else { f.media_type = 'VIDEO'; f.video_url = m.url; }
       const c = await call({ method: 'POST', path: `${base}/media`, form: f });
-      if (m.kind === 'video') await waitFinished(c.id, accessToken);
       kids.push(c.id);
     }
+    await waitFinished(kids, accessToken);
     created = await call({ method: 'POST', path: `${base}/media`, form: { media_type: 'CAROUSEL', children: kids.join(','), caption: text || '', access_token: accessToken } });
   } else {
     const form = { caption: text || '', access_token: accessToken };
     if (media.kind === 'image') form.image_url = media.url;
     else { form.media_type = 'REELS'; form.video_url = media.url; }
     created = await call({ method: 'POST', path: `${base}/media`, form });
-    if (media.kind === 'video') await waitFinished(created.id, accessToken);
   }
-  let published;
-  try {
-    published = await call({ method: 'POST', path: `${base}/media_publish`, form: { creation_id: created.id, access_token: accessToken } });
-  } catch (e) { throw ambiguous(e); }
-  return { externalId: String(published.id) };
+  await waitFinished(created.id, accessToken);
+  // 公開。公式で一時的とされるエラー（2207008・2207027）は、同じコンテナのまま少し待って2回まで再試行する（まだ公開されていないため二重投稿にならない）
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const published = await call({ method: 'POST', path: `${base}/media_publish`, form: { creation_id: created.id, access_token: accessToken } });
+      return { externalId: String(published.id) };
+    } catch (e) {
+      if ((e.subcode === 2207008 || e.subcode === 2207027) && attempt < 2) { await poll.sleep(poll.intervalMs() * 10); continue; }
+      throw ambiguous(e);
+    }
+  }
 }
 
 module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, usesPkce: false, mediaRule: '画像（JPEG）または動画（MP4・MOV）が必須' };

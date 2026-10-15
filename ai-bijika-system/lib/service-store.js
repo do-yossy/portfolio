@@ -29,6 +29,12 @@ db.exec(`
     n INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day, kind)
   );
+  CREATE TABLE IF NOT EXISTS api_usage (
+    platform TEXT NOT NULL,
+    day TEXT NOT NULL,
+    n INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (platform, day)
+  );
   CREATE TABLE IF NOT EXISTS ai_jobs (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -144,6 +150,12 @@ try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN tree TEXT DEFAULT '[]'"); 
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN group_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN platform TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN rule_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// SNSへ送り始めた時刻（処理中のまま止まったときに、送り始めていたかどうかを見分ける）
+// 列を新しく足したときだけ、それまで処理中だった行を「送り始めていた」扱いにする（古い版で送信中だった予約を、もう一度送らないように）
+try {
+  db.exec("ALTER TABLE scheduled_posts ADD COLUMN started_at TEXT DEFAULT ''");
+  db.exec("UPDATE scheduled_posts SET started_at=updated_at WHERE status='publishing' AND started_at=''");
+} catch { /* 既にある */ }
 // 自動運用：作るもの（none／image／video）、実行する時刻（カンマ区切り。最大3つ）、SNSごとの設定（YouTubeの公開設定など）
 try { db.exec("ALTER TABLE auto_rules ADD COLUMN media TEXT DEFAULT ''"); } catch { /* 既にある */ }
 try { db.exec("ALTER TABLE auto_rules ADD COLUMN hours TEXT DEFAULT ''"); } catch { /* 既にある */ }
@@ -152,6 +164,8 @@ try { db.exec("ALTER TABLE auto_rules ADD COLUMN options TEXT DEFAULT '{}'"); } 
 try { db.exec("ALTER TABLE ai_jobs ADD COLUMN payload TEXT DEFAULT ''"); } catch { /* 既にある */ }
 // テスト利用を付ける前の状態（取り消すときに戻す）
 try { db.exec("ALTER TABLE subscriptions ADD COLUMN pre_test_status TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// AIで作ったメディアか（TikTokなどで「AI生成」の表示をするため）
+try { db.exec("ALTER TABLE media_assets ADD COLUMN ai_generated INTEGER NOT NULL DEFAULT 0"); } catch { /* 既にある */ }
 db.exec(`
   CREATE TABLE IF NOT EXISTS post_media (
     post_id TEXT NOT NULL,
@@ -250,6 +264,11 @@ const SnsAccounts = {
   },
   countForUser(userId) {
     return db.prepare('SELECT COUNT(*) AS n FROM sns_accounts WHERE user_id = ?').get(userId).n;
+  },
+  // 期限が近い連携（期限の延長が必要なもの）
+  listExpiring(platforms, beforeIso) {
+    const ph = platforms.map(() => '?').join(',');
+    return db.prepare(`SELECT * FROM sns_accounts WHERE status='active' AND expires_at <> '' AND expires_at < ? AND platform IN (${ph})`).all(beforeIso, ...platforms);
   },
   updateTokens(id, { accessTokenEnc, refreshTokenEnc, expiresAt }) {
     db.prepare('UPDATE sns_accounts SET access_token_enc=?, refresh_token_enc=?, expires_at=?, status=\'active\', updated_at=? WHERE id=?')
@@ -351,6 +370,10 @@ const ScheduledPosts = {
       .run(scheduledAt, now(), id, userId);
     return r.changes === 1;
   },
+  // 取り消した下書きを、下書きに戻す（下書きを開いて保存し直すときに、新しい投稿を作れなかった場合）
+  restoreDraft(id, userId) {
+    return db.prepare(`UPDATE scheduled_posts SET status='draft', updated_at=? WHERE id=? AND user_id=? AND status='cancelled'`).run(now(), id, userId).changes === 1;
+  },
   cancel(id, userId) {
     const r = db.prepare(`UPDATE scheduled_posts SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status IN ('pending','draft')`)
       .run(now(), id, userId);
@@ -362,7 +385,7 @@ const ScheduledPosts = {
       .all(nowIso, limit).map((r) => r.id);
     const claimed = [];
     for (const id of ids) {
-      const r = db.prepare(`UPDATE scheduled_posts SET status='publishing', attempts=attempts+1, updated_at=? WHERE id=? AND status='pending'`)
+      const r = db.prepare(`UPDATE scheduled_posts SET status='publishing', attempts=attempts+1, started_at='', updated_at=? WHERE id=? AND status='pending'`)
         .run(now(), id);
       if (r.changes === 1) claimed.push(this.get(id));
     }
@@ -380,10 +403,32 @@ const ScheduledPosts = {
     db.prepare(`UPDATE scheduled_posts SET status='pending', scheduled_at=?, last_error=?, updated_at=? WHERE id=?`)
       .run(scheduledAt, String(message || '').slice(0, 500), now(), id);
   },
-  // 起動時：処理中のまま残った行は、二重投稿を避けるため失敗扱いにする（投稿されたかどうかが不明なため）
-  failStuck(olderThanIso) {
-    return db.prepare(`UPDATE scheduled_posts SET status='failed', last_error=?, updated_at=? WHERE status='publishing' AND updated_at < ?`)
+  // SNSへ送らずに後ろへずらす（サービス全体の上限に達したときなど）。試行回数は数えない
+  defer(id, scheduledAt, message) {
+    db.prepare(`UPDATE scheduled_posts SET status='pending', scheduled_at=?, last_error=?, attempts=MAX(attempts-1, 0), updated_at=? WHERE id=?`)
+      .run(scheduledAt, String(message || '').slice(0, 500), now(), id);
+  },
+  // そのSNSへの予約・投稿の件数（YouTubeの1日の割り当ての確認用）。userId を渡すとその利用者だけ、省略するとサービス全体
+  countPlatformBetween(platform, fromIso, toIso, userId = null) {
+    return db.prepare(`SELECT COUNT(*) AS n FROM scheduled_posts p LEFT JOIN sns_accounts a ON a.id = p.account_id
+      WHERE (p.platform=? OR a.platform=?) AND p.scheduled_at >= ? AND p.scheduled_at < ? AND p.status IN ('pending','publishing','posted')
+        AND (? IS NULL OR p.user_id = ?)`)
+      .get(platform, platform, fromIso, toIso, userId, userId).n;
+  },
+  // SNSへ送り始める直前に印を付ける
+  markStarted(id) {
+    db.prepare(`UPDATE scheduled_posts SET started_at=?, updated_at=? WHERE id=? AND status='publishing'`).run(now(), now(), id);
+  },
+  // 処理中のまま残った行の後始末（起動時と、定期の確認）。
+  // SNSへ送り始めていた行は、投稿されたかどうかが分からないため、二重投稿を避けて失敗にする。
+  // まだ送り始めていなかった行（まとめて確保したうちの後ろのもの）は、送っていないので予約に戻す（試行回数も戻す）
+  // unstartedBefore を省略すると olderThanIso と同じ。起動時は、まだ送り始めていない行をすぐ予約に戻してよい（1台構成のため、ほかに処理中のプロセスは無い）
+  failStuck(olderThanIso, unstartedBefore = olderThanIso) {
+    const back = db.prepare(`UPDATE scheduled_posts SET status='pending', attempts=MAX(attempts-1, 0), updated_at=? WHERE status='publishing' AND started_at='' AND updated_at < ?`)
+      .run(now(), unstartedBefore).changes;
+    const failed = db.prepare(`UPDATE scheduled_posts SET status='failed', last_error=?, updated_at=? WHERE status='publishing' AND started_at!='' AND updated_at < ?`)
       .run('処理中にサーバーが再起動したため中断されました。投稿されたかをご確認のうえ、必要なら予約し直してください。', now(), olderThanIso).changes;
+    return failed + back;
   },
   stats() {
     return db.prepare('SELECT status, COUNT(*) AS n FROM scheduled_posts GROUP BY status').all();
@@ -391,6 +436,7 @@ const ScheduledPosts = {
 };
 
 const MediaAssets = {
+  markAiGenerated(id) { db.prepare('UPDATE media_assets SET ai_generated=1 WHERE id=?').run(id); },
   create({ userId, token, kind, mime, ext, size }) {
     const id = generateId();
     db.prepare('INSERT INTO media_assets (id, user_id, token, kind, mime, ext, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -498,6 +544,29 @@ const UploadTickets = {
   },
 };
 
+// SNSのAPIの、サービス全体での1日の使用回数（YouTubeのアップロードの割り当てなど）
+const ApiUsage = {
+  // 上限未満なら1回分を確保して true。上限に達していれば false
+  take(platform, day, limit) {
+    return db.prepare(`INSERT INTO api_usage (platform, day, n) VALUES (?, ?, 1)
+      ON CONFLICT(platform, day) DO UPDATE SET n = n + 1 WHERE n < ?`).run(platform, day, limit).changes === 1;
+  },
+  // SNS側で割り当てを使い切ったと言われたとき、その日の残りを使わないようにする
+  fill(platform, day, limit) {
+    db.prepare(`INSERT INTO api_usage (platform, day, n) VALUES (?, ?, ?) ON CONFLICT(platform, day) DO UPDATE SET n = MAX(n, excluded.n)`).run(platform, day, limit);
+  },
+  get(platform, day) {
+    const r = db.prepare('SELECT n FROM api_usage WHERE platform=? AND day=?').get(platform, day);
+    return r ? r.n : 0;
+  },
+  // 古い日付の記録を消す（数日分あれば足りる）
+  prune(beforeDay) { db.prepare('DELETE FROM api_usage WHERE day < ?').run(beforeDay); },
+  // 確保した1回分を戻す（ほかの上限に当たって、実際には送らなかったとき）
+  release(platform, day) {
+    db.prepare('UPDATE api_usage SET n = n - 1 WHERE platform=? AND day=? AND n > 0').run(platform, day);
+  },
+};
+
 const MAX_API_KEYS = 5;
 const ApiKeys = {
   hash(key) { return require('crypto').createHash('sha256').update(String(key)).digest('hex'); },
@@ -527,4 +596,10 @@ const ApiKeys = {
   },
 };
 
-module.exports = { OPEN_STRIPE_STATUSES, UploadTickets, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+// 複数の行をまとめて書き込む（全部書くか、何も書かないか）。fn は同期の関数
+function transaction(fn) {
+  db.exec('BEGIN IMMEDIATE');
+  try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { try { db.exec('ROLLBACK'); } catch { /* */ } throw e; }
+}
+
+module.exports = { transaction, OPEN_STRIPE_STATUSES, UploadTickets, ApiUsage, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

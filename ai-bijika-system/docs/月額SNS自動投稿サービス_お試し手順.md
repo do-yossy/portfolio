@@ -113,7 +113,7 @@
 1. Meta for Developers（`https://developers.facebook.com/`）にログインし、新しいアプリを作ります。用途（ユースケース）は「Threads APIにアクセス」を選びます。
 2. Threads APIの設定で、次を登録します。
    - リダイレクト（コールバック）URL：`https://post.social-quality.com/service/oauth/callback/threads`
-   - 権限：`threads_basic` と `threads_content_publish`
+   - 権限：`threads_basic`・`threads_content_publish`・`threads_manage_replies`（3つめはツリー＝連投に必要です）
    - アンインストール・削除のコールバックURLの入力を求められた場合は、仮に `https://post.social-quality.com/service` を入れてください（Metaの審査に出す前に、正式なURLへ差し替える必要があります）。
 3. 「アプリの役割」（テスター）に、ご自身のThreadsアカウントを追加します。
 4. Threads側で招待を承認します。Threadsの「設定」→「アカウント」→「ウェブサイトのアクセス許可」→「招待」から承認します（表記はアプリのバージョンで異なることがあります）。

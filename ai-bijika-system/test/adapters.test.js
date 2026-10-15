@@ -1,6 +1,7 @@
 'use strict';
 // SNSアダプタ単体のテスト（カルーセル・ツリー。外部通信はモック）
 process.env.SNS_POLL_INTERVAL_MS = '1';
+process.env.SNS_POLL_MAX_MS = '200';
 const { ok, summary, installHttpsMock } = require('./helpers');
 const th = require('../lib/sns/threads');
 const ig = require('../lib/sns/instagram');
@@ -35,7 +36,7 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   mock = installHttpsMock(async (c) => {
     if (/\/threads$/.test(c.path)) return { status: 200, json: { id: `c${++n}` } };
     if (/threads_publish$/.test(c.path)) return { status: 200, json: { id: `p${++pubN}` } };
-    return { status: 200, json: {} };
+    return { status: 200, json: { status: 'FINISHED' } };
   });
   r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'tree', text: '1', medias: [], tree: [{ text: '2', medias: [] }, { text: '3', medias: [img(9)] }] } });
   mock.restore();
@@ -48,7 +49,7 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   mock = installHttpsMock(async (c) => {
     if (/\/threads$/.test(c.path)) { n++; return n === 2 ? { status: 503, json: { error: { message: 'down' } } } : { status: 200, json: { id: `c${n}` } }; }
     if (/threads_publish$/.test(c.path)) return { status: 200, json: { id: `p${++pubN}` } };
-    return { status: 200, json: {} };
+    return { status: 200, json: { status: 'FINISHED' } };
   });
   let err = null;
   try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'tree', text: '1', medias: [], tree: [{ text: '2', medias: [] }] } }); } catch (e) { err = e; }
@@ -68,6 +69,87 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   ok(r.externalId === 'igp' && /is_carousel_item=true/.test(ib[0]) && /media_type=VIDEO/.test(ib[1]) && /media_type=CAROUSEL/.test(ib[2]) && /caption=cap/.test(ib[2]), 'Instagramのカルーセル（画像＋動画）を投稿できる');
   ok(ig.validatePost({ post: { category: 'image', text: '', medias: Array.from({ length: 11 }, (_, i) => img(i)) } }), '11件は拒否する');
   ok(ig.validatePost({ post: { category: 'tree', text: '', medias: [img(1)], tree: [{ text: 'x' }] } }), 'Instagramはツリー不可');
+  ok(/縦横比/.test(ig.validatePost({ post: { category: 'image', text: '', medias: [{ ...img(1), width: 1080, height: 1440 }] } }) || '') && ig.validatePost({ post: { category: 'image', text: '', medias: [{ ...img(1), width: 1080, height: 1350 }] } }) === null, 'Instagramの画像は縦横比 4:5〜1.91:1 だけ（スマホの縦写真3:4は予約の時点で断る）');
+  let pubTry = 0;
+  mock = installHttpsMock(async (c) => {
+    if (/\/media$/.test(c.path)) return { status: 200, json: { id: 'ix' } };
+    if (/media_publish$/.test(c.path)) { pubTry++; return pubTry === 1 ? { status: 400, json: { error: { message: 'not ready', code: 9007, error_subcode: 2207027 } } } : { status: 200, json: { id: 'igok' } }; }
+    return { status: 200, json: { status_code: 'FINISHED' } };
+  });
+  r = await ig.publish({ accessToken: 't', externalUserId: 'g1', post: { category: 'image', text: 'c', medias: [img(1)] } });
+  mock.restore();
+  ok(r.externalId === 'igok' && pubTry === 2, 'Instagramの「まだ公開の準備ができていない」は、同じ投稿のまま待って再試行する');
+  console.log('Threads 公開の応答が失われた場合');
+  const thList = (data) => (c) => (c.method === 'GET' && c.path.startsWith('/v1.0/u1/threads?') ? { status: 200, json: { data } } : null);
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cx' } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    const l = thList([{ id: 'post_other', text: 'ちがう', timestamp: new Date().toISOString() }, { id: 'post_x', text: 'x', timestamp: new Date().toISOString() }])(c);
+    if (l) return l;
+    return { status: 200, json: { status: 'PUBLISHED' } };
+  });
+  r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } });
+  mock.restore();
+  ok(r.externalId === 'post_x', '公開の応答が失われても、コンテナが PUBLISHED なら投稿済みとし、コンテナIDではなく実際の投稿IDを記録する');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cx' } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    const l = thList([])(c);
+    if (l) return l;
+    return { status: 200, json: { status: 'PUBLISHED' } };
+  });
+  r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } });
+  mock.restore();
+  ok(r.externalId === '', '投稿IDが見つからなければ、IDは空のまま投稿済みとする（コンテナIDを投稿IDとして記録しない）');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: `c${mock.calls.filter((x) => x.method === 'POST' && /\/threads$/.test(x.path)).length}` } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    const l = thList([])(c);
+    if (l) return l;
+    return { status: 200, json: { status: 'PUBLISHED' } };
+  });
+  err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'tree', text: '1', medias: [], tree: [{ text: '2', medias: [] }] } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && !err.retriable && /続きを投稿できませんでした/.test(err.message) && mock.calls.filter((c) => c.method === 'POST' && /\/threads$/.test(c.path)).length === 1, 'ツリーで投稿IDが分からなくなったら、返信先を決められないので続きを止める（再試行もしない）');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cy' } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    return { status: 200, json: { status: 'FINISHED' } };
+  });
+  err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } }); } catch (e) { err = e; }
+  const createdN = mock.calls.filter((c) => c.method === 'POST' && /\/threads$/.test(c.path)).length;
+  const publishN = mock.calls.filter((c) => /threads_publish$/.test(c.path)).length;
+  const statusChecks = mock.calls.filter((c) => c.method === 'GET' && c.path.startsWith('/v1.0/cy?')).length;
+  mock.restore();
+  ok(err && err.retriable === false && /投稿されたか/.test(err.message) && createdN === 1 && publishN === 1 && statusChecks >= 2, '公開の応答が失われ、状態が FINISHED のままなら、公開をやり直さず（同じコンテナを2回公開できるかは公式に書かれていないため）、投稿されたかの確認をお願いする');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cz' } };
+    if (/threads_publish$/.test(c.path)) return { status: 200, text: '' };
+    return { status: 200, json: { status: 'FINISHED' } };
+  });
+  err = null; try { await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'text', text: 'x', medias: [] } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && err.retriable === false && /投稿されたか/.test(err.message), '公開の応答が 200 なのに本文が無いときも、受け付けられた可能性があるので、再試行せずに確認をお願いする');
+  mock = installHttpsMock(async (c) => {
+    if (c.method === 'POST' && /\/threads$/.test(c.path)) return { status: 200, json: { id: 'cw' } };
+    if (/threads_publish$/.test(c.path)) throw new Error('ECONNRESET');
+    if (c.method === 'GET' && c.path.startsWith('/v1.0/u1/threads?')) return { status: 200, json: { data: [{ id: 'old', text: '', timestamp: new Date().toISOString() }] } };
+    return { status: 200, json: { status: 'PUBLISHED' } };
+  });
+  r = await th.publish({ accessToken: 't', externalUserId: 'u1', post: { category: 'image', text: '', medias: [img(1)] } });
+  mock.restore();
+  ok(r.externalId === '', '本文の無い投稿では、別の投稿のIDを推測で記録しない');
+  ok(th.textLength('あ😀') === 5 && th.textLength('abc') === 3, 'Threadsの文字数は、絵文字をUTF-8のバイト数で数える（公式の数え方）');
+  ok(th.textLength('🇯🇵') === 8 && th.textLength('1️⃣') === 7, '国旗やキーキャップの絵文字も、UTF-8のバイト数で数える');
+  const uiTh = require('../lib/service-ui').composePage({ user: { email: 'a' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], csrf: 'c' });
+  const thSrc = uiTh.match(/var SEG=[\s\S]*?function thLen\(t\)\{[^\n]*\n/);
+  global.window = { Intl };
+  const thLen = thSrc && new Function(`${thSrc[0]}; return thLen;`)();
+  delete global.window;
+  const emojiSamples = ['🇯🇵', '1️⃣', 'あ😀', '❤', '♥', '©', '™', '✔', '▶', '☀', '🧑‍💻', '❤️‍🔥', '👨‍👩‍👧', 'abc', 'テスト'];
+  ok(thLen && emojiSamples.every((t) => thLen(t) === th.textLength(t)), `画面の文字数の表示も、Threadsはサーバーと同じ数え方にする（${emojiSamples.length}種で一致）`);
+  ok(/\b300\b|5分/.test(th.validatePost({ post: { category: 'video', text: '', medias: [{ kind: 'video', durationSec: 301 }] } }) || ''), 'Threadsの動画は5分まで');
+
   console.log('X ツリー');
   let tn = 0;
   mock = installHttpsMock(async () => ({ status: 201, json: { data: { id: `t${++tn}` } } }));
@@ -149,6 +231,150 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   const tkb = JSON.parse(mock.calls.find((c) => c.path === '/v2/post/publish/content/init/').body);
   mock.restore();
   ok(r.externalId === 'tp1' && tkb.media_type === 'PHOTO' && tkb.source_info.photo_images.length === 2 && tkb.post_info.title === 'タイトル', 'TikTokへ写真を投稿できる（1行目がタイトル）');
+  console.log('TikTok の拒否の理由とAI生成の表示');
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 403, json: { error: { code: 'unaudited_client_can_only_post_to_private_accounts', message: 'x' } } };
+    return null;
+  });
+  err = null; try { await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [img(1)], options: { privacy_level: 'SELF_ONLY' } } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && !err.authError && /非公開/.test(err.message), 'TikTokの「審査前は非公開アカウントだけ」の拒否は、連携のやり直しにせず、理由を日本語で示す');
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 200, json: { data: { publish_id: 'pa' }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/status/fetch/') return { status: 200, json: { data: { status: 'PUBLISH_COMPLETE' }, error: { code: 'ok' } } };
+    return null;
+  });
+  await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [{ ...img(1), aiGenerated: true }], options: { privacy_level: 'SELF_ONLY' } } });
+  const aigcBody = JSON.parse(mock.calls.find((c) => c.path === '/v2/post/publish/content/init/').body);
+  mock.restore();
+  ok(aigcBody.is_aigc === true, 'AIで作った写真には、TikTokの「AI生成」の印（is_aigc）を付ける');
+  let fetchN = 0;
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 200, json: { data: { publish_id: 'pb' }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/status/fetch/') { fetchN++; return fetchN === 1 ? { status: 200, text: '' } : { status: 200, json: { data: { status: 'PUBLISH_COMPLETE' }, error: { code: 'ok' } } }; }
+    return null;
+  });
+  r = await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [img(1)], options: { privacy_level: 'SELF_ONLY' } } });
+  mock.restore();
+  ok(r.externalId && fetchN === 2, 'TikTokの状態の確認で本文の無い応答が返っても、確認を打ち切らずに続ける');
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
+    if (c.path === '/v2/post/publish/content/init/') return { status: 200, text: '' };
+    return null;
+  });
+  err = null; try { await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [img(1)], options: { privacy_level: 'SELF_ONLY' } } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && !err.retriable && /投稿されたか/.test(err.message), 'TikTokの写真の投稿の開始で本文の無い応答が返ったら、受け付けられた可能性があるので、確認をお願いする');
+
+  console.log('Facebook の連携（権限・ページの選び方）とエラーの分け方');
+  process.env.FACEBOOK_APP_ID = 'fa'; process.env.FACEBOOK_APP_SECRET = 'fs';
+  const fbAuth = new URL(fb.authUrl({ state: 's', redirectUri: 'https://e.test/cb' }));
+  ok(fbAuth.searchParams.get('auth_type') === 'rerequest' && fbAuth.searchParams.get('scope').split(',').includes('business_management'), 'Facebookの認可画面は、拒否された権限を求め直し、ビジネスのページも一覧に出す');
+  const fbConnect = (perms, pages) => installHttpsMock(async (c) => {
+    if (c.path.includes('/oauth/access_token')) return { status: 200, json: { access_token: 'ut' } };
+    if (c.path.includes('/me/permissions')) return { status: 200, json: { data: perms } };
+    if (c.path.includes('/me/accounts')) return { status: 200, json: { data: pages } };
+    return null;
+  });
+  const allPerms = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement'].map((p) => ({ permission: p, status: 'granted' }));
+  mock = fbConnect([...allPerms.slice(0, 2), { permission: 'pages_read_engagement', status: 'declined' }], [{ id: 'p1', name: 'A', access_token: 'pt', tasks: ['CREATE_CONTENT'] }]);
+  err = null; try { await fb.exchangeCode({ code: 'c', redirectUri: 'https://e.test/cb' }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && /許可/.test(err.message), '投稿に必要な権限が拒否されていたら、連携を止める');
+  mock = fbConnect(allPerms, [{ id: 'p1', name: 'A', access_token: 'pt1', tasks: ['ANALYZE'] }, { id: 'p2', name: 'B', access_token: 'pt2', tasks: ['CREATE_CONTENT', 'MANAGE'] }]);
+  r = await fb.exchangeCode({ code: 'c', redirectUri: 'https://e.test/cb' });
+  const fbAccountsCall = mock.calls.find((c) => c.path.includes('/me/accounts'));
+  mock.restore();
+  ok(r.externalUserId === 'p2' && r.accessToken === 'pt2' && /tasks/.test(decodeURIComponent(fbAccountsCall.path)), '投稿できる（CREATE_CONTENT）ページだけを投稿先の候補にする');
+  mock = fbConnect(allPerms, [{ id: 'p1', name: 'A', access_token: 'pt1', tasks: ['CREATE_CONTENT'] }, { id: 'p2', name: 'B', access_token: 'pt2', tasks: ['CREATE_CONTENT'] }]);
+  err = null; try { await fb.exchangeCode({ code: 'c', redirectUri: 'https://e.test/cb' }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && /1つだけ/.test(err.message), '投稿できるページが2つ以上なら、意図しないページに投稿しないよう連携を止める');
+  mock = fbConnect(allPerms, []);
+  err = null; try { await fb.exchangeCode({ code: 'c', redirectUri: 'https://e.test/cb' }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && /ビジネスポートフォリオ/.test(err.message), 'ページが無いときは、ビジネス側の役割についても案内する');
+  const fbFail = async (errBody) => {
+    mock = installHttpsMock(async (c) => (/\/feed$/.test(c.path) ? { status: 400, json: { error: errBody } } : null));
+    let e2 = null; try { await fb.publish({ accessToken: 't', externalUserId: 'pg', post: { category: 'text', text: 'a', medias: [] } }); } catch (e) { e2 = e; }
+    mock.restore();
+    return e2;
+  };
+  err = await fbFail({ message: 'limit', code: 4 });
+  ok(err && err.retriable && !err.authError && !/投稿されたか/.test(err.message), 'Facebookの呼び出しの上限（コード4）は、投稿されていないので再試行する');
+  const fbFail500 = async (errBody) => {
+    mock = installHttpsMock(async (c) => (/\/feed$/.test(c.path) ? { status: 500, json: { error: errBody } } : null));
+    let e2 = null; try { await fb.publish({ accessToken: 't', externalUserId: 'pg', post: { category: 'text', text: 'a', medias: [] } }); } catch (e) { e2 = e; }
+    mock.restore();
+    return e2;
+  };
+  for (const code of [1, 2]) {
+    err = await fbFail500({ message: 'temporary', code });
+    ok(err && !err.retriable && /投稿されたか/.test(err.message), `Facebookの一時的な障害（コード${code}・HTTP 500）は、公開の最終段階では投稿されたかの確認をお願いし、自動で再投稿しない`);
+  }
+  err = await fbFail500({ message: 'limit', code: 17 });
+  ok(err && err.retriable && !/投稿されたか/.test(err.message), '呼び出しの上限（コード17）は、受け付けられていないので、最終段階でも再試行する');
+  err = await fbFail({ message: 'perm', code: 200 });
+  ok(err && err.authError && /許可/.test(err.message), 'Facebookの権限エラー（200番台）は、連携のやり直しを促す');
+  err = await fbFail({ message: 'role', code: 100, error_subcode: 492 });
+  ok(err && err.authError, 'ページでの役割が無い（サブコード492）は、連携のやり直しを促す');
+  err = await fbFail({ message: 'bad', code: 100 });
+  ok(err && !err.authError && !err.retriable, 'そのほかの400は、通常の失敗にする');
+
+  console.log('YouTube の制限とエラーの分け方');
+  const ytVid = (extra = {}) => ({ kind: 'video', mime: 'video/mp4', size: 100, path: tmp, url: 'u', ...extra });
+  const ytOk = (putJson = { id: 'y1' }) => installHttpsMock(async (c) => {
+    if (c.method === 'POST' && c.path.startsWith('/upload/youtube/v3/videos')) return { status: 200, json: {}, headers: { location: 'https://www.googleapis.com/upload/youtube/v3/videos?upload_id=abc' } };
+    if (c.method === 'PUT') return { status: 200, json: putJson };
+    return null;
+  });
+  mock = ytOk();
+  await yt.publish({ accessToken: 'tok', post: { category: 'video', text: '<お知らせ> A->B\n説明', medias: [ytVid({ aiGenerated: true })], options: { privacy: 'public', made_for_kids: false } } });
+  const ytMeta = JSON.parse(mock.calls[0].body);
+  const ytPut = mock.calls.find((c) => c.method === 'PUT');
+  mock.restore();
+  ok(!/[<>]/.test(ytMeta.snippet.title + ytMeta.snippet.description) && ytMeta.snippet.title.startsWith('＜お知らせ＞ A-＞B'), 'YouTubeのタイトル・説明の半角の < > は全角に置き換える');
+  ok(ytPut.headers.Authorization === 'Bearer tok', '動画本体の送信にも、認可のヘッダーを付ける');
+  ok(ytMeta.status.containsSyntheticMedia === true, 'AIで作った動画は、合成した内容として申告する');
+  const longTitle = 'あ'.repeat(100);
+  const td = yt.titleAndDescription(longTitle);
+  ok([...td.title].length === 100 && !/#Shorts/.test(td.title), 'タイトルは100文字まで使え、収まらないときは #Shorts で削らない');
+  ok(yt.validatePost({ post: { category: 'video', text: 'あ'.repeat(1700), medias: [{ kind: 'video' }] } }) && !yt.validatePost({ post: { category: 'video', text: 'あ'.repeat(1600), medias: [{ kind: 'video' }] } }), 'YouTubeの説明は5,000バイトまで（日本語はおよそ1,600文字）');
+  ok(Buffer.byteLength(yt.titleAndDescription('あ'.repeat(1666)).description, 'utf8') <= 5000, '#Shorts を足しても5,000バイトを超えない');
+  mock = ytOk({ id: 'y2', status: { uploadStatus: 'rejected', rejectionReason: 'duplicate' } });
+  err = null; try { await yt.publish({ accessToken: 't', post: { category: 'video', text: 'x', medias: [ytVid()], options: { privacy: 'private', made_for_kids: false } } }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && /duplicate/.test(err.message) && !err.retriable, 'YouTubeが動画を拒否した（rejected）ときは、理由を示して失敗にする');
+  const ytFail = async (reason) => {
+    mock = installHttpsMock(async (c) => (c.method === 'POST' ? { status: 403, json: { error: { message: 'm', errors: [{ reason }] } } } : null));
+    let e2 = null; try { await yt.publish({ accessToken: 't', post: { category: 'video', text: 'x', medias: [ytVid()], options: { privacy: 'private', made_for_kids: false } } }); } catch (e) { e2 = e; }
+    mock.restore();
+    return e2;
+  };
+  err = await ytFail('quotaExceeded');
+  ok(err && err.quotaExhausted && err.retriable && !err.authError, 'YouTubeの割り当ての使い切り（quotaExceeded）は、再連携にせず翌日に回す');
+  err = await ytFail('insufficientPermissions');
+  ok(err && err.authError, '権限不足（insufficientPermissions）は、連携のやり直しを促す');
+  err = await ytFail('forbidden');
+  ok(err && !err.authError && !err.retriable, 'forbidden は、再連携にしない通常の失敗にする');
+  process.env.GOOGLE_CLIENT_ID = 'gi'; process.env.GOOGLE_CLIENT_SECRET = 'gs';
+  mock = installHttpsMock(async (c) => {
+    if (c.path === '/token') return { status: 200, json: { access_token: 'a', refresh_token: 'r', expires_in: 3600, scope: 'https://www.googleapis.com/auth/youtube.readonly' } };
+    if (c.path.startsWith('/youtube/v3/channels')) return { status: 200, json: { items: [{ id: 'ch', snippet: { title: 'T' } }] } };
+    return null;
+  });
+  err = null; try { await yt.exchangeCode({ code: 'c', redirectUri: 'https://e.test/cb' }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && /アップロード/.test(err.message), '動画のアップロードの権限が許可されていなければ、連携を止める');
+
+  console.log('太平洋時間の1日');
+  const pt = require('../lib/pt-time');
+  ok(pt.dayBounds('2026-10-14T06:59:00Z').day === '2026-10-13' && pt.dayBounds('2026-10-14T07:00:00Z').from === '2026-10-14T07:00:00.000Z', '夏時間：太平洋時間の0時（UTCの7時）で日付が変わる');
+  ok(pt.dayBounds('2026-11-01T12:00:00Z').to === '2026-11-02T08:00:00.000Z' && pt.dayBounds('2026-12-01T12:00:00Z').from === '2026-12-01T08:00:00.000Z', '冬時間への切り替えの日と、冬時間の日の範囲');
+
   console.log('URLからの取り込みの安全対策');
   const fm = require('../lib/fetch-media');
   ok(['127.0.0.1', '10.1.2.3', '169.254.169.254', '192.168.0.1', '172.20.0.1', '100.64.0.1', '::1', 'fd00::1', '::ffff:127.0.0.1', '0.0.0.0'].every(fm.isPrivate), '社内・ローカルのアドレスを判定できる');

@@ -158,6 +158,7 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
         return { status: 200, json: { id: 'container_1' } };
       }
       if (c.path === '/v1.0/777/threads_publish') return { status: 200, json: { id: 'thread_post_1' } };
+      if (c.method === 'GET' && /^\/v1\.0\/container_\d+\?fields=status/.test(c.path)) return { status: 200, json: { status: 'FINISHED' } };
       if (c.path.startsWith('/refresh_access_token?')) return { status: 200, json: { access_token: 'th_long_2', expires_in: 5184000 } };
     }
     if (c.host === 'api.x.com') {
@@ -173,7 +174,7 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   });
 
   const th = core.startConnect({ userId: userB, platform: 'threads' });
-  ok(th.ok && th.url.startsWith('https://threads.net/oauth/authorize?') && th.url.includes('threads_content_publish'), 'Threadsの認可URLを作れる');
+  ok(th.ok && th.url.startsWith('https://threads.com/oauth/authorize?') && th.url.includes('threads_content_publish') && th.url.includes('threads_manage_replies'), 'Threadsの認可URLを作れる');
   const thState = new URL(th.url).searchParams.get('state');
   const bad = await core.finishConnect({ userId: userB, platform: 'threads', code: 'c', state: 'wrong' });
   ok(!bad.ok, '不正なstateでは連携できない');
@@ -278,9 +279,60 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   const c1 = store.ScheduledPosts.claimDue(10, new Date().toISOString());
   const c2 = store.ScheduledPosts.claimDue(10, new Date().toISOString());
   ok(c1.some((p) => p.id === p8) && !c2.some((p) => p.id === p8), '同じ予約を二重に確保しない');
+  const p9 = store.ScheduledPosts.create({ userId: userB, accountId: thAcc.id, text: 'claim2', scheduledAt: new Date(Date.now() - 1000).toISOString() });
+  store.ScheduledPosts.claimDue(10, new Date().toISOString());
+  store.ScheduledPosts.markStarted(p8); // p8 は送り始めていた、p9 はまだ送っていなかった（まとめて確保したうちの後ろ）
   store.ScheduledPosts.failStuck(new Date(Date.now() + 1000).toISOString());
-  ok(store.ScheduledPosts.get(p8).status === 'failed' && /再起動/.test(store.ScheduledPosts.get(p8).last_error), '起動時に処理中のまま残った予約は二重投稿を避けて失敗扱いにする');
+  ok(store.ScheduledPosts.get(p8).status === 'failed' && /再起動/.test(store.ScheduledPosts.get(p8).last_error), '送り始めていたのに処理中のまま残った予約は、二重投稿を避けて失敗扱いにする');
+  ok(store.ScheduledPosts.get(p9).status === 'pending' && store.ScheduledPosts.get(p9).attempts === 0, 'まだ送り始めていなかった予約は、失敗にせず予約に戻す（試行回数も戻す）');
+  store.ScheduledPosts.cancel(p9, userB);
+  // 列（started_at）を足す前の版で処理中だった予約は、新しい版で開いたときに「送り始めていた」扱いになり、もう一度送られない
+  {
+    const { execFileSync } = require('child_process');
+    const migDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-mig-'));
+    const { DatabaseSync } = require('node:sqlite');
+    const old = new DatabaseSync(path.join(migDir, 'ai-bijika.db'));
+    old.exec(`CREATE TABLE scheduled_posts (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, account_id TEXT NOT NULL, text TEXT NOT NULL, scheduled_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT DEFAULT '', external_id TEXT DEFAULT '', posted_at TEXT DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    const t = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    old.prepare("INSERT INTO scheduled_posts (id, user_id, account_id, text, scheduled_at, status, attempts, created_at, updated_at) VALUES ('old1','u','a','x',?, 'publishing', 1, ?, ?)").run(t, t, t);
+    old.close();
+    const out = execFileSync(process.execPath, ['--experimental-sqlite', '-e', `const s=require(${JSON.stringify(path.join(__dirname, '..', 'lib', 'service-store'))});s.ScheduledPosts.failStuck(new Date(Date.now()-5*60*1000).toISOString(), new Date(Date.now()+1000).toISOString());const r=s.ScheduledPosts.get('old1');process.stdout.write(JSON.stringify({status:r.status,started:r.started_at}));`],
+      { env: { ...process.env, DATA_DIR: migDir }, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+    const mig = JSON.parse(out);
+    ok(mig.status === 'failed' && mig.started !== '', '列を足す前の版で処理中だった予約は、送り始めていた扱いにして、もう一度送らない（失敗として確認をお願いする）');
+  }
+  // 起動時は、まだ送り始めていない予約を、経過時間に関係なくすぐ予約に戻す
+  const p10 = store.ScheduledPosts.create({ userId: userB, accountId: thAcc.id, text: 'claim3', scheduledAt: new Date(Date.now() - 1000).toISOString() });
+  store.ScheduledPosts.claimDue(10, new Date().toISOString());
+  store.ScheduledPosts.failStuck(new Date(Date.now() - 5 * 60 * 1000).toISOString(), new Date(Date.now() + 1000).toISOString());
+  ok(store.ScheduledPosts.get(p10).status === 'pending', '起動時は、まだ送り始めていない予約を、確保したばかりでもすぐ予約に戻す（遅れないように）');
+  store.ScheduledPosts.cancel(p10, userB);
+  // 複数の行の書き込みは、途中で失敗したら何も残さない
+  let txErr = null; let txId = null;
+  try { store.transaction(() => { txId = store.ScheduledPosts.create({ userId: userB, accountId: thAcc.id, text: 'tx', scheduledAt: new Date(Date.now() + 3600000).toISOString() }); throw new Error('途中で失敗'); }); } catch (e) { txErr = e; }
+  ok(txErr && txId && store.ScheduledPosts.get(txId) === null, 'transaction は、途中で失敗したら書き込みを1件も残さない');
+  // createPost：2つの投稿先のうち2件目の作成で失敗したら、1件目も残さない（下書きの置き換えで二重にならない）
+  {
+    const mkAcc = (ext) => { const r = store.SnsAccounts.upsert({ userId: userB, platform: 'threads', externalUserId: ext, handle: `@${ext}`, accessTokenEnc: box.encrypt('t', k), expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() }); return typeof r === 'object' ? r.id : r; };
+    const thAcc1Id = mkAcc('tx1'); const thAcc2Id = mkAcc('tx2');
+    const origCreate = store.ScheduledPosts.create;
+    let calls = 0;
+    store.ScheduledPosts.create = function (...a) { calls++; if (calls === 2) throw new Error('2件目で失敗'); return origCreate.apply(this, a); };
+    const before = store.ScheduledPosts.listForUser(userB).length;
+    let cpErr = null;
+    try { core.createPost({ userId: userB, category: 'text', targets: [{ accountId: thAcc1Id, caption: 'tx-a' }, { accountId: thAcc2Id, caption: 'tx-b' }], mediaIds: [], tree: [], scheduledAtIso: new Date(Date.now() + 3600000).toISOString(), draft: false }); } catch (e) { cpErr = e; }
+    store.ScheduledPosts.create = origCreate;
+    ok(cpErr && calls === 2 && store.ScheduledPosts.listForUser(userB).length === before, '予約の作成（createPost）は、2件目の作成で失敗したら1件目も残さない（下書きの置き換えで二重にならない）');
+    store.SnsAccounts.remove(thAcc1Id, userB); store.SnsAccounts.remove(thAcc2Id, userB);
+  }
 
+  // 長期トークンの定期延長：期限まで7日を切った Threads の連携を、投稿が無くても延長する
+  const soonAcc = store.SnsAccounts.upsert({ userId: userA, platform: 'threads', externalUserId: 'soon1', handle: '@soon', accessTokenEnc: box.encrypt('old_long', k), expiresAt: new Date(Date.now() + 3 * 86400000).toISOString() });
+  const refreshedN = await scheduler.refreshExpiring();
+  const soonId = typeof soonAcc === 'object' ? soonAcc.id : soonAcc;
+  const afterRefresh = store.SnsAccounts.get(soonId);
+  ok(refreshedN >= 1 && box.decrypt(afterRefresh.access_token_enc, k) === 'th_long_2' && Date.parse(afterRefresh.expires_at) > Date.now() + 50 * 86400000, '期限が近い Threads の連携を、投稿が無くても定期的に延長する');
   mockSns.restore();
   console.log('対応SNS');
   ok(registry.list().map((p) => p.id).join() === 'threads,x,instagram,tiktok,facebook,youtube', 'Threads・X・Instagram・TikTok・Facebook・YouTube に対応している');

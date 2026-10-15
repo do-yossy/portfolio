@@ -12,6 +12,11 @@ const LIMITS = {
   get maxPerDay() { return envInt('SERVICE_MAX_PER_DAY', 50); },
   // XのAPIは投稿数に応じて費用がかかるため、Xへの投稿は1人あたり月の上限を設ける（ツリーは1件ずつ数える）
   get xPerMonth() { return envInt('X_MONTHLY_LIMIT', 30); },
+  // YouTubeのアップロードは、サービス全体で1日100回まで（Google Cloud のプロジェクトごとの割り当て。太平洋時間の0時にリセット）。
+  // 連携の確認などの余裕を残して、初期値は90件
+  get youtubePerDay() { return envInt('YOUTUBE_DAILY_LIMIT', 90); },
+  // 1人で全体の枠を使い切らないよう、利用者ごとの1日の上限も設ける
+  get youtubePerUserDay() { return envInt('YOUTUBE_PER_USER_DAILY', 5); },
 };
 const MAX_DAYS_AHEAD = 90;
 const JST_OFFSET_MS = 9 * 3600 * 1000;
@@ -113,6 +118,25 @@ function xQuotaError(userId, iso, adding) {
   return null;
 }
 
+// YouTubeの予約が、その日（太平洋時間）の利用者ごとの上限と、サービス全体の上限を超えないか
+function youtubeQuotaError(userId, iso, adding) {
+  if (!adding) return null;
+  const { from, to } = require('./pt-time').dayBounds(iso);
+  if (ScheduledPosts.countPlatformBetween('youtube', from, to, userId) + adding > LIMITS.youtubePerUserDay) {
+    return `YouTubeへの投稿は、1日に${LIMITS.youtubePerUserDay}件までです（YouTubeの1日は、日本時間の16時または17時に切り替わります）。別の日時を選んでください。`;
+  }
+  if (ScheduledPosts.countPlatformBetween('youtube', from, to) + adding > LIMITS.youtubePerDay) {
+    return 'この日時のYouTubeへの予約は、サービス全体の1日の上限に達しています。別の日時を選んでください（YouTubeの1日は、日本時間の16時または17時に切り替わります）。';
+  }
+  return null;
+}
+// YouTubeの公開設定と「子ども向けかどうか」は、利用者が選ぶ決まり（YouTubeの必須の機能の要件）
+function youtubeOptionsError(o) {
+  const ad = registry.get('youtube');
+  if (!o || !((ad && ad.PRIVACY) || []).includes(o.privacy) || typeof o.made_for_kids !== 'boolean') return 'YouTubeへは、公開設定（privacy）と「子ども向けかどうか」（made_for_kids）を指定してください。';
+  return null;
+}
+
 function formatJst(iso) {
   if (!iso) return '';
   const d = new Date(Date.parse(iso) + JST_OFFSET_MS);
@@ -127,7 +151,12 @@ function formatJstShort(iso) {
 
 const CATEGORIES = ['text', 'image', 'video', 'tree'];
 const MAX_DRAFTS = 100;
-const mediaOf = (m) => ({ id: m.id, kind: m.kind, mime: m.mime, size: m.size });
+// 投稿の検証に使うメディアの情報（画像は幅・高さ、動画は長さ）
+const mediaOf = (m) => {
+  const media = require('./media');
+  const p = media.pathOf(m);
+  return { id: m.id, kind: m.kind, mime: m.mime, size: m.size, aiGenerated: !!m.ai_generated, ...(m.kind === 'image' ? (media.imageSize(p) || {}) : { durationSec: media.mp4DurationSec(p) }) };
+};
 
 // 投稿を作る（選んだSNSアカウントごとに1件。まとめて group_id でひも付ける）。
 //   category: text / image / video / tree
@@ -179,6 +208,8 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
     resolved.push({ a, caption, options: t.options || {} });
   }
   if (new Set(resolved.map((r) => r.a.id)).size !== resolved.length) return { ok: false, error: '同じSNSアカウントが、重複して選ばれています。' };
+  // TikTokは、アカウントごとに公開範囲などを確かめる決まりのため、1回の投稿で1つのアカウントだけ
+  if (resolved.filter((r) => r.a.platform === 'tiktok').length > 1) return { ok: false, error: 'TikTokは、1回に1つのアカウントだけ選んでください（アカウントごとに設定を確かめるため）。' };
   if (draft) {
     if (ScheduledPosts.countDrafts(userId) + resolved.length > MAX_DRAFTS) return { ok: false, error: `下書きは${MAX_DRAFTS}件までです。` };
   } else {
@@ -192,12 +223,17 @@ function createPost({ userId, category, targets, mediaIds, tree, scheduledAtIso,
     const xUnits = resolved.filter((r) => r.a.platform === 'x').length * (1 + (category === 'tree' ? cards.length : 0));
     const qe = xQuotaError(userId, scheduledAtIso, xUnits);
     if (qe) return { ok: false, error: qe };
+    const yts = resolved.filter((r) => r.a.platform === 'youtube');
+    for (const r of yts) { const oe = youtubeOptionsError(r.options); if (oe) return { ok: false, error: oe }; }
+    const ye = youtubeQuotaError(userId, scheduledAtIso, yts.length);
+    if (ye) return { ok: false, error: ye };
   }
   const groupId = require('crypto').randomBytes(10).toString('hex');
-  const created = resolved.map(({ a, caption, options }) => ScheduledPosts.create({
+  // 投稿先ごとの行は、全部作るか、何も作らないかにする（途中で失敗して一部だけ残らないように）
+  const created = require('./service-store').transaction(() => resolved.map(({ a, caption, options }) => ScheduledPosts.create({
     userId, accountId: a.id, text: caption, scheduledAt: scheduledAtIso || new Date(nowMs).toISOString(),
     mediaIds: ids, options, category, tree: cards, groupId, status: draft ? 'draft' : 'pending', ruleId,
-  }));
+  })));
   return { ok: true, ids: created, groupId };
 }
 
@@ -208,13 +244,23 @@ function capacityError({ userId, platform, atIso, draft }) {
   const [from, to] = jstDayBounds(atIso);
   if (ScheduledPosts.countScheduledBetween(userId, from, to) + 1 > LIMITS.maxPerDay) return `1日に予約できる投稿は${LIMITS.maxPerDay}件までです（日本時間で、その日の分）。`;
   if (platform === 'x') return xQuotaError(userId, atIso, 1);
+  if (platform === 'youtube') return youtubeQuotaError(userId, atIso, 1);
   return null;
 }
 
 // 下書きを予約（または即時投稿）にする。日時を過ぎていないか・上限を超えないかを、予約と同じ基準で確認する
-function promoteDraft({ userId, postId, scheduledAtIso, nowMs = Date.now() }) {
+function promoteDraft({ userId, postId, scheduledAtIso, via = 'api', nowMs = Date.now() }) {
   const p = ScheduledPosts.get(postId);
   if (!p || p.user_id !== userId || p.status !== 'draft') return { ok: false, error: '下書きが見つかりません。' };
+  // TikTokは、本人が画面で内容と設定（公開範囲・コメント等・商用の開示・音楽使用の確認）を確かめて同意してから送る決まり（公式の共有のガイドライン）。
+  // 下書きのまま予約・投稿にはせず、「投稿を作る」画面で開き、TikTokから取得した選択肢で設定を選び直してから送る
+  // 予約の行の platform（列を足す前の古い行では空）に加えて、連携しているアカウントのSNSでも確かめる
+  const acct = SnsAccounts.getForUser(p.account_id, userId);
+  if (p.platform === 'tiktok' || (acct && acct.platform === 'tiktok')) {
+    return { ok: false, error: via === 'screen'
+      ? 'TikTokの下書きは、「投稿を作る」画面で開き、公開範囲などの設定を選び直してから投稿してください（カレンダーの「内容と設定を確かめて投稿する」から開けます）。'
+      : 'TikTokの下書きは、API・AIアシスタントからは予約にできません。サービスの画面で内容と設定を確かめてから投稿してください。' };
+  }
   if (!Subscriptions.isActive(userId)) return { ok: false, error: 'ご契約が有効でないため、予約できません。' };
   const at = scheduledAtIso ? Date.parse(scheduledAtIso) : Date.parse(p.scheduled_at || '');
   if (Number.isNaN(at)) return { ok: false, error: '投稿日時を指定してください。' };
@@ -230,6 +276,13 @@ function promoteDraft({ userId, postId, scheduledAtIso, nowMs = Date.now() }) {
     let n = 1; try { n += JSON.parse(p.tree || '[]').length; } catch { /* */ }
     const qe = xQuotaError(userId, iso, n);
     if (qe) return { ok: false, error: qe };
+  }
+  if (a.platform === 'youtube') {
+    let o = {}; try { o = JSON.parse(p.options || '{}'); } catch { o = {}; }
+    const oe = youtubeOptionsError(o);
+    if (oe) return { ok: false, error: `${oe}「投稿を作る」画面で作り直して投稿してください。` };
+    const ye = youtubeQuotaError(userId, iso, 1);
+    if (ye) return { ok: false, error: ye };
   }
   if (!ScheduledPosts.promote(postId, userId, iso)) return { ok: false, error: '下書きが見つかりません。' };
   return { ok: true };

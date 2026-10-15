@@ -152,9 +152,64 @@ function serve(req, res, token, ext) {
   return fs.createReadStream(file).pipe(res);
 }
 
+// 画像の幅と高さ（JPEG・PNG）。読めなければ null（検証をしない）
+// Exif（APP1の中身）から、向き（タグ 0x0112）を読む。読めなければ 0
+function exifOrientation(app) {
+  try {
+    if (app.slice(0, 6).toString('latin1') !== 'Exif\0\0') return 0;
+    const t = app.slice(6);
+    const le = t.slice(0, 2).toString('latin1') === 'II';
+    const u16 = (o) => (le ? t.readUInt16LE(o) : t.readUInt16BE(o));
+    const u32 = (o) => (le ? t.readUInt32LE(o) : t.readUInt32BE(o));
+    const ifd = u32(4);
+    const n = u16(ifd);
+    for (let i = 0; i < n; i++) {
+      const e = ifd + 2 + i * 12;
+      if (u16(e) === 0x0112) return u16(e + 8);
+    }
+  } catch { /* 壊れたExif */ }
+  return 0;
+}
+
+function imageSize(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const head = Buffer.alloc(32);
+    fs.readSync(fd, head, 0, 32, 0);
+    if (head.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { width: head.readUInt32BE(16), height: head.readUInt32BE(20) };
+    if (head[0] !== 0xff || head[1] !== 0xd8) return null;
+    const size = fs.fstatSync(fd).size;
+    let pos = 2;
+    let orientation = 1;
+    const b = Buffer.alloc(10);
+    while (pos + 4 < size) {
+      fs.readSync(fd, b, 0, 10, pos);
+      if (b[0] !== 0xff) return null;
+      const marker = b[1];
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { pos += 2; continue; }
+      const len = b.readUInt16BE(2);
+      // APP1（Exif）の向き（Orientation）。スマホの縦写真は「横長の画素＋90度回転の指定」で保存されることが多い
+      if (marker === 0xe1 && len > 8 && len < 65536) {
+        const app = Buffer.alloc(len - 2);
+        fs.readSync(fd, app, 0, len - 2, pos + 4);
+        const o = exifOrientation(app);
+        if (o) orientation = o;
+      }
+      // SOF0〜SOF15（DHT=C4・JPG=C8・DAC=CC を除く）に、高さと幅がある。向きが5〜8（90度・270度の回転）なら、見た目の幅と高さは入れ替わる
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+        const h = b.readUInt16BE(5); const w = b.readUInt16BE(7);
+        return orientation >= 5 && orientation <= 8 ? { width: h, height: w, orientation } : { width: w, height: h, orientation };
+      }
+      pos += 2 + len;
+    }
+    return null;
+  } catch { return null; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* */ } }
+}
+
 // 利用者が、あと保存できる容量（アップロード中の分を含めて差し引く）
 function remainingBytes(userId) {
   return Math.max(0, LIMITS.userTotalBytes - MediaAssets.totalSize(userId) - (inflight.get(userId) || 0));
 }
 
-module.exports = { remainingBytes, LIMITS, mp4DurationSec, sniff, saveUpload, pathOf, publicUrl, remove, cleanup, serve };
+module.exports = { imageSize, remainingBytes, LIMITS, mp4DurationSec, sniff, saveUpload, pathOf, publicUrl, remove, cleanup, serve };

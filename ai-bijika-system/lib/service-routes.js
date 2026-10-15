@@ -10,7 +10,7 @@ const billing = require('./billing');
 const core = require('./service-core');
 const ui = require('./service-ui');
 const scheduler = require('./sns/scheduler');
-const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys, AutoRules, AiJobs } = require('./service-store');
+const { Subscriptions, SnsAccounts, ScheduledPosts, ApiKeys, AutoRules, AiJobs, MediaAssets } = require('./service-store');
 const { createLimiter } = require('./ratelimit');
 const mediaLib = require('./media');
 const registry = require('./sns');
@@ -376,14 +376,37 @@ async function handle(ctx) {
   // 投稿を作る（ツリー・複数画像・SNSごとの本文・下書き）とカレンダー
   if (pathname === '/service/app/compose' && method === 'GET') {
     if (!Subscriptions.isActive(user.id)) { redirect(res, '/service/app'); return true; }
-    sendHtml(res, 200, ui.composePage({ user, accounts: SnsAccounts.listForUser(user.id), csrf: token, aiAvail: ai.available() }));
+    // 下書きを読み込んで開く（TikTokの下書きは、ここで設定を選び直してから投稿する）。TikTokの設定は読み込まない（選び直してもらう）
+    let draft = null;
+    const did = url.searchParams.get('draft');
+    const dp = did ? ScheduledPosts.get(did) : null;
+    if (dp && dp.user_id === user.id && dp.status === 'draft') {
+      const mv = (mid) => { const m = MediaAssets.getForUser(mid, user.id); return m ? { id: m.id, kind: m.kind, url: mediaLib.publicUrl(m) } : null; };
+      let mids = []; try { mids = JSON.parse(dp.media_ids || '[]'); } catch { mids = []; }
+      let tree = []; try { tree = JSON.parse(dp.tree || '[]'); } catch { tree = []; }
+      draft = { id: dp.id, accountId: dp.account_id, category: dp.category || 'text', text: dp.text || '', media: mids.map(mv).filter(Boolean), tree: tree.map((c) => ({ text: c.text || '', media: (c.mediaIds || []).map(mv).filter(Boolean) })) };
+    }
+    sendHtml(res, 200, ui.composePage({ user, accounts: SnsAccounts.listForUser(user.id), csrf: token, aiAvail: ai.available(), draft }));
     return true;
   }
   if (pathname === '/service/app/posts' && method === 'POST') {
     if (!csrf.verify(sessionToken, req.headers['x-csrf'])) { sendJson(res, 403, { error: '操作の有効期限が切れました。ページを再読み込みしてください。' }); return true; }
     let b = null;
     try { b = JSON.parse(await readRaw(req, 300_000)); } catch { b = null; }
-    const r = apiV1.createFromBody(user.id, b);
+    // 下書きを開いて保存し直す場合：元の下書きがまだ本人の下書きのままかを、新しい投稿を作る前に確かめて取り消す。
+    // すでに使われていれば断る（2つのタブで開いた・通信エラーの後にもう一度押した、などで二重に予約・投稿しないように）。
+    // 新しい投稿を作れなかったときは、元の下書きを戻す
+    let replaced = null;
+    if (b && typeof b === 'object' && b.replace_draft) {
+      const old = ScheduledPosts.get(String(b.replace_draft));
+      if (!old || old.user_id !== user.id || old.status !== 'draft' || !ScheduledPosts.cancel(old.id, user.id)) {
+        sendJson(res, 409, { error: 'この下書きは、すでに保存・投稿・削除されているため、保存し直せません。カレンダーでご確認ください。' });
+        return true;
+      }
+      replaced = old.id;
+    }
+    let r = null;
+    try { r = apiV1.createFromBody(user.id, b, { via: 'screen' }); } finally { if (replaced && (!r || r.status !== 201)) ScheduledPosts.restoreDraft(replaced, user.id); }
     sendJson(res, r.status, r.body);
     return true;
   }
@@ -399,7 +422,7 @@ async function handle(ctx) {
     const body = await needCsrf(); if (!body) return true;
     const now = body.mode === 'now';
     const at = now ? new Date(Date.now() + 1000).toISOString() : core.jstLocalToIso(body.at);
-    const r = at ? core.promoteDraft({ userId: user.id, postId: publishMatch[1], scheduledAtIso: at }) : { ok: false, error: '投稿日時の形式が正しくありません。' };
+    const r = at ? core.promoteDraft({ userId: user.id, postId: publishMatch[1], scheduledAtIso: at, via: 'screen' }) : { ok: false, error: '投稿日時の形式が正しくありません。' };
     if (!r.ok) {
       const [from, to] = core.jstMonthBounds(new Date().toISOString());
       sendHtml(res, 400, ui.calendarPage({ user, month: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7), posts: ScheduledPosts.listBetween(user.id, from, to), drafts: ScheduledPosts.listDrafts(user.id), csrf: token, flash: { type: 'error', text: r.error } }));
