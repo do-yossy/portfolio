@@ -154,59 +154,239 @@ function compareActive(priceN, nowMs = Date.now()) {
 }
 const jpDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `${y}年${m}月${d}日`; };
 
+// 固定投稿・Tipsから来た人向けのLP（/service/lp）。暗い配色の1ページで、このページだけのスタイルを持つ（ほかの画面の見た目は変えない）。
+// 書く事実（使えるSNS・上限・料金・比較・AI）は、すべて設定と実装から作る（使えないSNSや機能を、使えるように見せない）。
+const LP_CSS = `<style>
+body{background:#0B141A}
+.svc .lp{--lp-bg:#0B141A;--lp-s1:#122029;--lp-s2:#182A35;--lp-line:rgba(234,241,244,.10);--lp-ink:#EAF1F4;--lp-mute:#A7B7C0;--lp-acc:#5EDDC0;--lp-acc-ink:#04221B;--lp-paper:#F5F1EA;--lp-paper-ink:#0E1A22;
+  color:var(--lp-ink);margin:0 -4px;font-size:15px;line-height:1.85}
+.svc .lp a{color:var(--lp-acc)}
+.svc .lp section{margin:0 0 36px}
+.svc .lp .tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--lp-acc);border:1px solid rgba(94,221,192,.45);border-radius:6px;padding:1px 10px;margin:0 0 10px}
+.svc .lp h1{font-size:30px;line-height:1.35;margin:4px 0 12px;color:#fff;letter-spacing:.02em}
+.svc .lp h2{font-size:23px;line-height:1.45;margin:0 0 12px;color:#fff;letter-spacing:.02em}
+.svc .lp h3{font-size:16px;margin:0 0 6px;color:#fff}
+.svc .lp h1,.svc .lp h2,.svc .lp h3{font-family:var(--f-sans);font-weight:800;letter-spacing:.02em}
+.svc .lp h2{display:block}.svc .lp h2::after{content:none;display:none}
+.svc .lp .grid>*{min-width:0}
+.svc .lp pre{max-width:100%;box-sizing:border-box}
+.svc .lp p{margin:0 0 10px}
+.svc .lp .mute{color:var(--lp-mute)}
+.svc .lp .small{font-size:12.5px;color:var(--lp-mute)}
+.svc .lp .card{background:var(--lp-s1);border:1px solid var(--lp-line);border-radius:16px;padding:16px;margin:0 0 12px;box-shadow:none}
+.svc .lp .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.svc .lp .chip{display:inline-flex;align-items:center;gap:7px;background:var(--lp-s2);border:1px solid var(--lp-line);border-radius:999px;padding:5px 12px;font-size:13.5px;font-weight:700;color:var(--lp-ink)}
+.svc .lp .chip i{width:9px;height:9px;border-radius:50%;background:var(--lp-acc);display:inline-block}
+.svc .lp .price{background:var(--lp-s1);border:1px solid rgba(94,221,192,.35);border-radius:16px;padding:16px;margin:14px 0}
+.svc .lp .price .amount{font-size:40px;font-weight:800;color:#fff;letter-spacing:.01em;line-height:1.2}
+.svc .lp .price .amount small{font-size:14px;font-weight:600;color:var(--lp-mute);margin-left:4px}
+.svc .lp .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.svc .lp .stat{background:var(--lp-s1);border:1px solid var(--lp-line);border-radius:12px;padding:10px 8px;text-align:center}
+.svc .lp .stat b{display:block;font-size:22px;color:#fff;line-height:1.3}
+.svc .lp .stat span{font-size:11.5px;color:var(--lp-mute)}
+.svc .lp .btn-lp{display:block;text-align:center;background:var(--lp-acc);color:var(--lp-acc-ink);font-weight:800;border-radius:12px;padding:14px 16px;text-decoration:none;margin:12px 0 4px;min-height:44px;box-sizing:border-box}
+.svc .lp .soon{background:var(--lp-s2);border:1px dashed rgba(234,241,244,.3);border-radius:12px;padding:12px;text-align:center;color:var(--lp-ink);margin:12px 0}
+.svc .lp ul.dots{margin:6px 0 0;padding-left:20px}.svc .lp ul.dots li{margin:4px 0}
+.svc .lp .mock{background:var(--lp-s2);border:1px solid var(--lp-line);border-radius:14px;padding:12px;font-size:12px;color:var(--lp-mute)}
+.svc .lp .mock .row{display:flex;gap:8px;align-items:center;margin:0 0 8px}
+.svc .lp .mock .bar{height:9px;border-radius:5px;background:rgba(234,241,244,.16);flex:1}
+.svc .lp .mock .pill{border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;background:rgba(94,221,192,.16);color:var(--lp-acc)}
+.svc .lp .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.svc .lp .cal div{min-height:34px;border-radius:6px;background:rgba(234,241,244,.06);font-size:10px;padding:3px;color:var(--lp-mute)}
+.svc .lp .cal .on{background:rgba(94,221,192,.18);color:var(--lp-acc);font-weight:700}
+.svc .lp .grid{display:grid;gap:12px;grid-template-columns:1fr}
+@media(min-width:640px){.svc .lp .grid{grid-template-columns:1fr 1fr}.svc .lp h1{font-size:36px}}
+.svc .lp pre{background:#071015;border:1px solid var(--lp-line);border-radius:12px;padding:12px;overflow-x:auto;font-size:12px;line-height:1.6;color:#CFE3EA;margin:8px 0 0}
+.svc .lp ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+.svc .lp ol.steps li{counter-increment:s;position:relative;padding:12px 12px 12px 52px;background:var(--lp-s1);border:1px solid var(--lp-line);border-radius:14px;margin:0 0 10px}
+.svc .lp ol.steps li::before{content:counter(s);position:absolute;left:12px;top:12px;width:28px;height:28px;border-radius:50%;background:var(--lp-acc);color:var(--lp-acc-ink);font-weight:800;display:grid;place-items:center;font-size:14px}
+.svc .lp .paper{background:var(--lp-paper);color:var(--lp-paper-ink);border-radius:18px;padding:20px}
+.svc .lp .paper h2,.svc .lp .paper h3{color:var(--lp-paper-ink)}
+.svc .lp .paper .small,.svc .lp .paper .mute{color:#4A5862}
+.svc .lp .paper a{color:#0B6B57}
+.svc .lp .paper .btn-lp{background:#0E1A22;color:#fff}
+.svc .lp .paper .soon{background:#fff;color:#0E1A22;border-color:#C9C2B3}
+.svc .lp table.t{width:100%;border-collapse:collapse;font-size:13.5px;table-layout:fixed}
+.svc .lp table.t th,.svc .lp table.t td{border-bottom:1px solid #DDD5C5;padding:8px 6px;text-align:left;vertical-align:top;word-break:break-word;white-space:normal}
+.svc .lp details{background:var(--lp-s1);border:1px solid var(--lp-line);border-radius:12px;padding:12px 14px;margin:0 0 8px}
+.svc .lp summary{cursor:pointer;font-weight:700;color:#fff;min-height:24px}
+.svc .lp details p{margin:8px 0 0;color:var(--lp-ink);font-size:14px}
+.svc .lp .foot{border-top:1px solid var(--lp-line);padding-top:14px;font-size:13px}
+.topbar{background:#0B141A}
+</style>`;
+
 function lpPage({ user, billingReady, trialDays = 0 }) {
   const priceN = core.priceYen(); const price = yen(priceN);
-  const L = core.LIMITS; const names = snsNames(); const av = aiLib().available();
-  const multi = liveSns().length >= 2; // 使えるSNSが1つ以下のときは「複数のSNS」と書かない
+  const L = core.LIMITS; const live = liveSns(); const names = snsNames(); const av = aiLib().available();
+  const multi = live.length >= 2; // 使えるSNSが1つ以下のときは「複数のSNS」と書かない
   const cmp = compareActive(priceN); // 半額以下で、確認日から間もないときだけ比較を出す
   const checked = jpDate(COMPARE.checked);
-  const cta = billingReady
-    ? `<a class="btn btn-primary btn-block" href="${user ? '/service/checkout' : '/service/signup'}">${user ? '申込みに進む' : 'アカウントを作って申し込む'}</a>
-       <p class="small center" style="margin-top:6px">アカウントは無料で作れます。お支払いは、確認画面で内容をご確認いただいたあとに始まります。${trialDays ? `初めての方は${trialDays}日間無料です（お支払い方法の登録が必要。期間が終わると自動で課金が始まります）。` : ''}</p>`
-    : '<div class="notice"><div>ただいま準備中です。もうしばらくお待ちください。</div></div>';
-  const step = (n, t, d) => `<div class="card"><div class="card-title">${n}. ${t}</div><p class="small">${d}</p></div>`;
   const ours = `未投稿の予約${L.maxPending}件まで、同じ日（日本時間）に投稿する予約${L.maxPerDay}件まで${xLive() ? `、Xは月${L.xPerMonth}件まで` : ''}`;
-  const th = (t) => `<th style="white-space:normal">${t}</th>`;
-  return wrap(`SNSの予約投稿を月額${price}で`, `
+  const treeNames = live.filter((p) => p.id === 'threads' || p.id === 'x').map((p) => p.label).join('と');
+  const cta = (where) => billingReady
+    ? `<a class="btn-lp" href="${user ? '/service/checkout' : '/service/signup'}">${user ? '申込みに進む' : 'アカウントを作って申し込む'}</a>
+       <p class="small" style="text-align:center">アカウントは無料で作れます。お支払いは、確認画面で内容をご確認いただいたあとに始まります。${trialDays ? `初めての方は${trialDays}日間無料です（お支払い方法の登録が必要。期間が終わると自動で課金が始まります）。` : ''}</p>`
+    : `<div class="soon"${where ? ` data-where="${where}"` : ''}>ただいま準備中です。もうしばらくお待ちください。</div>`;
+  const th = (t) => `<th>${t}</th>`;
+  const snsChips = live.length ? `<div class="chips" aria-label="使えるSNS">${live.map((p) => `<span class="chip"><i aria-hidden="true"></i>${escapeHtml(p.label)}</span>`).join('')}</div>` : '<p class="mute">対応SNSは準備中です。</p>';
+  return wrap(`SNSの予約投稿を月額${price}で`, `${LP_CSS}
     ${topNav(user)}
-    <header class="page-head"><div class="eyebrow">SNS Scheduler</div>
+    <div class="lp">
+    <section>
+      <span class="tag">SNS予約投稿</span>
       <h1>${multi ? '複数のSNSへの投稿を、まとめて予約。' : 'SNSへの投稿を、まとめて予約。'}</h1>
-      <p class="lead">発信を続けたいけれど、毎日その場で投稿する時間がない。そんな方のための、予約投稿のサービスです。投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p></header>
-    <div class="price-box"><div>月額</div><b>${price}</b>（税込）<small>自動更新／いつでも解約できます</small>${cmp ? `<small>参考：${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン（${yen(COMPARE.price)}・${COMPARE.note}）と比べて、半額以下です。予約の上限・使えるSNS・無料体験などの条件は異なります（${checked}に${COMPARE.name}の公式サイト（料金と概要のページ）で確認。詳しくは下の「料金の比べ方」）。</small>` : ''}</div>
-    ${cta}
-    <h2 style="margin-top:26px">こんな方に</h2>
-    <div class="card"><ul class="plain small">
-      <li>毎日の投稿を、その場で考えて出すのが負担になっている</li>
-      ${multi ? '<li>同じお知らせを、いくつものSNSに出すのが手間</li>' : ''}
-      <li>投稿文の下書きを、AIに手伝ってもらいたい</li>
-    </ul></div>
-    <h2 style="margin-top:26px">使い方は3つの手順</h2>
-    <div class="grid2">
-      ${step(1, 'SNSを連携する', `${names ? `${escapeHtml(names)}に対応しています。` : '対応SNSは準備中です。'}各SNSの公式の連携（OAuth）を使うため、SNSのパスワードをお預かりすることはありません。`)}
-      ${step(2, '投稿を作る', `本文と画像・動画を用意します。投稿文は、お使いのAI（ChatGPT・Claude・Gemini）で作ることもできます。投稿先の条件を入れた指示文をコピーしてからAIを開くので、貼り付けて送信します${av.text || av.image ? `（このツールのAIでも${[av.text && '文章', av.image && '画像'].filter(Boolean).join('と')}を作れます）` : ''}。${multi ? 'SNSごとに本文を変えたり、下書きに保存したりできます。' : '下書きに保存することもできます。'}`)}
-      ${step(3, '日時を決めて予約する', '日本時間で最大90日先まで予約できます。決めた日時に自動で投稿し、結果はカレンダーとマイページで確認できます。一時的なエラーは自動で再試行します。')}
+      <p class="mute">発信を続けたいけれど、毎日その場で投稿する時間がない。そんな方のための、予約投稿のサービスです。投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p>
+      ${snsChips}
+      <div class="price"><div class="small">月額</div><div class="amount">${price}<small>（税込）</small></div><div class="small">自動更新／いつでも解約できます</div>${cmp ? `<p class="small" style="margin:8px 0 0">参考：${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン（${yen(COMPARE.price)}・${COMPARE.note}）と比べて、半額以下です。予約の上限・使えるSNS・無料体験などの条件は異なります（${checked}に${COMPARE.name}の公式サイト（料金と概要のページ）で確認。詳しくは下の「料金の比べ方」）。</p>` : ''}</div>
+      <div class="stats">
+        <div class="stat"><b>${live.length ? `${live.length}つ` : '準備中'}</b><span>使えるSNS</span></div>
+        <div class="stat"><b>90日</b><span>先まで予約できる</span></div>
+        <div class="stat"><b>${L.maxAccounts}</b><span>つなげるアカウント</span></div>
+      </div>
+      ${cta('hero')}
+    </section>
+
+    <section>
+      <span class="tag">こんな方に</span>
+      <div class="card"><ul class="dots">
+        <li>毎日の投稿を、その場で考えて出すのが負担になっている</li>
+        ${multi ? '<li>同じお知らせを、いくつものSNSに出すのが手間</li>' : ''}
+        <li>投稿文の下書きを、AIに手伝ってもらいたい</li>
+      </ul></div>
+    </section>
+
+    <section>
+      <span class="tag">投稿を作る</span>
+      <h2>${multi ? '1回の入力で、複数のSNSへ。' : '投稿をまとめて作って、予約する。'}</h2>
+      <p class="mute">本文と画像・動画を用意して、投稿先と日時を選ぶだけです。${multi ? 'SNSごとに本文を変えることもできます。' : ''}複数の画像（カルーセル）、動画${treeNames ? `、${escapeHtml(treeNames)}のツリー（連投）` : ''}にも対応し、下書きに保存して、あとから予約することもできます。</p>
+      <div class="mock" aria-hidden="true">
+        <div class="row"><span class="pill">投稿先</span><div class="bar"></div></div>
+        <div class="row"><span class="pill">本文</span><div class="bar"></div></div>
+        <div class="row"><div class="bar" style="flex:.7"></div></div>
+        <div class="row"><span class="pill">日時</span><div class="bar" style="flex:.5"></div></div>
+      </div>
+      <p class="small">画面のイメージです。</p>
+    </section>
+
+    <section>
+      <span class="tag">カレンダー</span>
+      <h2>予約も結果も、ひと目でわかる。</h2>
+      <p class="mute">日本時間で最大90日先まで予約できます。予約はカレンダーで一覧でき、投稿の結果（予約中・投稿済み・失敗）はカレンダーとマイページで確認できます。一時的なエラーは自動で再試行し、失敗したときは理由を表示します。</p>
+      <div class="mock" aria-hidden="true"><div class="cal">${Array.from({ length: 14 }, (_, i) => `<div class="${[2, 5, 9, 12].includes(i) ? 'on' : ''}">${i + 1}</div>`).join('')}</div></div>
+      <p class="small">画面のイメージです。</p>
+    </section>
+
+    <section>
+      <span class="tag">SNSごとの決まり</span>
+      <h2>文字数や条件を、入力しながら確かめられる。</h2>
+      <p class="mute">投稿を作る画面では、選んだSNSごとの文字数を数えて表示し、画像・動画の条件に合わないときは、予約する前にお知らせします。</p>
+    </section>
+
+    <section id="ai">
+      <span class="tag">AI</span>
+      <h2>AIと一緒に、投稿をつくる。</h2>
+      <div class="grid">
+        <div class="card"><h3>ご自身のAIで作る</h3><p class="small">「投稿を作る」画面でテーマを入れてボタンを押すと、投稿先のSNSの条件（文字数など）を入れた指示文をコピーしてから、AIを開きます（文章は ChatGPT・Claude・Gemini、画像は ChatGPT・Gemini）。自動で入力されない場合は、貼り付けて送信してください。できた文章は本文に貼り付け、画像は保存して添付します。各AIのご利用条件・料金は、それぞれのサービスに従います。</p></div>
+        ${av.text || av.image ? `<div class="card"><h3>このサービスのAIで作る</h3><p class="small">テーマを入れると、AIが${[av.text && '文章', av.image && '画像'].filter(Boolean).join('と')}を作ります（1日・1か月の回数に上限があります）。</p></div>` : ''}
+        <div class="card"><h3>AIアシスタントから操作</h3><p class="small">MCP（AIアシスタントとつなぐための共通の仕組み）に対応したアプリから、ログインと許可の操作で接続できます（使えるかどうかは、アプリ側の対応状況によります）。</p></div>
+        <div class="card"><h3>REST APIで連携</h3><p class="small">マイページで発行するAPIキーで、投稿の作成・予約・下書き・取り消しができます。</p>
+<pre aria-label="APIの例">curl -X POST https://（サービスのURL）/api/v1/posts \\
+  -H "Authorization: Bearer （APIキー）" \\
+  -H "Content-Type: application/json" \\
+  -d '{"category":"text","account_ids":["…"],"text":"…","draft":true}'</pre></div>
+      </div>
+      <ul class="dots small">
+        <li>AIが作った内容は、誤りや不適切な表現を含む場合があります。投稿の前に、必ずご自身で内容をご確認ください。</li>
+        <li>${aiKinds() ? `このサービスのAIで作った${aiKinds()}には、SNSのAI生成の表示を自動で付けます（TikTokなど、対応しているSNSのみ）。` : ''}ご自身のAIで作った画像・動画には、このサービスはAI生成の表示を付けません。SNSの決まりで表示が必要な場合は、SNSのアプリから表示を付けて投稿してください。</li>
+      </ul>
+    </section>
+
+    <section>
+      <span class="tag">使い方</span>
+      <h2>迷わず使える、シンプルな手順。</h2>
+      <ol class="steps">
+        <li><h3>アカウントを作って申し込む</h3><p class="small">お支払いは、確認画面で内容をご確認いただいたあとに始まります。</p></li>
+        <li><h3>SNSを連携する</h3><p class="small">${names ? `${escapeHtml(names)}に対応しています。` : '対応SNSは準備中です。'}各SNSの公式の連携（OAuth）を使うため、SNSのパスワードをお預かりすることはありません。</p></li>
+        <li><h3>投稿を作る</h3><p class="small">本文と画像・動画を用意します。投稿文は、お使いのAI（ChatGPT・Claude・Gemini）で作ることもできます。${multi ? 'SNSごとに本文を変えたり、下書きに保存したりできます。' : '下書きに保存することもできます。'}</p></li>
+        <li><h3>日時を決めて予約する</h3><p class="small">日本時間で最大90日先まで予約できます。決めた日時に自動で投稿します。</p></li>
+        <li><h3>結果を確かめる</h3><p class="small">結果はカレンダーとマイページで確認できます。一時的なエラーは自動で再試行します。</p></li>
+      </ol>
+    </section>
+
+    <section>
+      <span class="tag">使えるSNS</span>
+      <h2>${live.length ? (multi ? `${live.length}つのSNSに、まとめて投稿。` : `${escapeHtml(live[0].label)}に投稿。`) : '使えるSNSは、準備中です。'}</h2>
+      ${live.length ? live.map((p) => `<div class="card"><h3>${escapeHtml(p.label)}</h3><p class="small">${escapeHtml(String(SNS_RULES[p.id] || '').replace(/^[^：]*：/, ''))}</p></div>`).join('') : '<p class="mute">各SNSの準備ができたものから、ここに表示します。</p>'}
+      <p class="small">各SNSの審査・仕様により、使える機能や公開範囲が制限される場合があります。</p>
+    </section>
+
+    <section>
+      <span class="tag">安全</span>
+      <h2>大切なアカウントを、安全に。</h2>
+      <div class="card"><ul class="dots">
+        <li>各SNSの公式の連携（OAuth）を使います。SNSのパスワードをお預かりすることはありません。</li>
+        <li>連携に使う情報（トークン）は、暗号化して保存します。マイページから、いつでも連携を解除できます。</li>
+        <li>投稿できるのは、ご自身で作成・予約・設定した内容だけです。いいね・フォロー・コメント・DMなどの自動操作はしません。</li>
+        <li>お支払いは決済代行会社（Stripe）の画面で行い、当サービスにはカード番号を保存しません。</li>
+      </ul></div>
+    </section>
+
+    <section class="paper">
+      <h2>発信を、続けられる形に。</h2>
+      <p class="mute">投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p>
+      ${cta('band')}
+    </section>
+
+    <section class="paper">
+      <span class="tag" style="color:#0B6B57;border-color:#0B6B57">料金</span>
+      <h2>プランはひとつだけ。</h2>
+      <div style="font-size:42px;font-weight:800;line-height:1.2">${price}<small style="font-size:14px;font-weight:600;margin-left:4px">／月（税込）</small></div>
+      <p class="small">1か月ごとの自動更新です。いつでも解約でき、解約後も契約期間の終わりまでご利用いただけます。${trialDays ? `初めての方は${trialDays}日間無料です（お支払い方法の登録が必要。期間が終わると自動で課金が始まります）。` : ''}</p>
+      <ul class="dots small">
+        <li>連携できるSNSアカウントは${L.maxAccounts}件まで</li>
+        <li>${ours}</li>
+        <li>日本時間で最大90日先まで予約・下書き・カレンダー</li>
+        <li>ご自身のAIで投稿文・画像を作る${av.text || av.image ? '／このサービスのAIで作る（回数の上限あり）' : ''}</li>
+        <li>APIキー・AIアシスタント（MCP）との接続</li>
+      </ul>
+      ${cmp ? `<h3 style="margin-top:16px">料金の比べ方</h3>
+      <div style="overflow-x:auto"><table class="t"><colgroup><col style="width:30%"><col><col></colgroup>
+        <tr>${th('')}${th('このサービス')}${th(`${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン`)}</tr>
+        <tr>${th('月額')}<td>${price}（月払い・税込）</td><td>${yen(COMPARE.price)}（${COMPARE.note}）</td></tr>
+        <tr>${th('使えるSNS')}<td>${names ? escapeHtml(names) : '準備中'}（各SNSの審査が終わるまで、使える機能や公開範囲が限られる場合があります）</td><td>${COMPARE.sns}</td></tr>
+        <tr>${th('つなげるアカウント')}<td>${L.maxAccounts}アカウントまで</td><td>${COMPARE.accounts}アカウントまで</td></tr>
+        <tr>${th('投稿・予約の上限')}<td>${ours}</td><td>${COMPARE.posts}</td></tr>
+        <tr>${th('無料体験')}<td>${trialDays ? `${trialDays}日間（初めての方）` : 'なし'}</td><td>${COMPARE.trial}</td></tr>
+      </table></div>
+      <p class="small">${COMPARE.name}の価格・条件は、${checked}に同社の公式サイト（料金と概要のページ）で確認したものです（その後、変わっている場合があります）。機能・上限・使えるSNSは、両者で異なります。いちばん安いサービスであることをお約束するものではありません。</p>` : ''}
+      ${cta('pricing')}
+    </section>
+
+    <section>
+      <span class="tag">ご確認ください</span>
+      <h2>ご利用の前にご確認ください</h2>
+      <div class="card"><ul class="dots small">
+        ${names ? `<li>SNSごとの条件：${escapeHtml(snsRulesText())}。</li>` : ''}
+        <li>${limitsText()}。${aiLimitsText() ? `${aiLimitsText()}。` : ''}</li>
+        <li>投稿できるのは、ご自身で作成・予約・設定した内容だけです。いいね・フォロー・コメント・DMなどの自動操作や、投稿の分析機能はありません。投稿の内容と、その結果の責任は、ご利用者にあります。</li>
+        <li>お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。${END_TEXT}。</li>
+      </ul></div>
+    </section>
+
+    <section>
+      <span class="tag">よくある質問</span>
+      <h2>よくある質問</h2>
+      <details><summary>どのSNSに投稿できますか？</summary><p>${names ? `現在は、${escapeHtml(names)}に投稿できます。` : '対応SNSは準備中です。'}各SNSの審査・仕様により、使える機能や公開範囲が制限される場合があります。</p></details>
+      ${xLive() ? '' : '<details><summary>Xには投稿できますか？</summary><p>現在、Xへの投稿は提供していません。</p></details>'}
+      <details><summary>SNSのパスワードを預ける必要はありますか？</summary><p>ありません。各SNSの公式の連携（OAuth）を使います。</p></details>
+      <details><summary>AIは使えますか？</summary><p>ChatGPT・Claude・Gemini など、ご自身のAIで投稿文や画像を作れます（各AIのご利用条件・料金は、それぞれのサービスに従います）。${av.text || av.image ? 'このサービスのAIでも作れます（回数の上限があります）。' : ''}</p></details>
+      <details><summary>解約するには？</summary><p>マイページの「解約する」ボタンから、いつでも手続きできます。解約後も、契約期間の終わりまでご利用いただけます。お支払い後の返金は、法令上必要な場合を除き、いたしません。</p></details>
+      <details><summary>お支払い方法は？</summary><p>クレジットカード等です。決済は、決済代行会社（Stripe）の画面で行い、当サービスにはカード番号を保存しません。</p></details>
+      <p class="small"><a href="/service">サービスの詳しい説明</a></p>
+    </section>
+
+    <div class="foot"><a href="/service/legal/tokushoho">特定商取引法に基づく表記</a></div>
     </div>
-    ${cmp ? `<h2 style="margin-top:26px">料金の比べ方</h2>
-    <div class="card"><table class="t" style="table-layout:fixed"><colgroup><col style="width:30%"><col><col></colgroup>
-      <tr>${th('')}${th('このサービス')}${th(`${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン`)}</tr>
-      <tr>${th('月額')}<td>${price}（月払い・税込）</td><td>${yen(COMPARE.price)}（${COMPARE.note}）</td></tr>
-      <tr>${th('使えるSNS')}<td>${names ? escapeHtml(names) : '準備中'}（各SNSの審査が終わるまで、使える機能や公開範囲が限られる場合があります）</td><td>${COMPARE.sns}</td></tr>
-      <tr>${th('つなげるアカウント')}<td>${L.maxAccounts}アカウントまで</td><td>${COMPARE.accounts}アカウントまで</td></tr>
-      <tr>${th('投稿・予約の上限')}<td>${ours}</td><td>${COMPARE.posts}</td></tr>
-      <tr>${th('無料体験')}<td>${trialDays ? `${trialDays}日間（初めての方）` : 'なし'}</td><td>${COMPARE.trial}</td></tr>
-    </table>
-    <p class="small">${COMPARE.name}の価格・条件は、${checked}に同社の公式サイト（料金と概要のページ）で確認したものです（その後、変わっている場合があります）。機能・上限・使えるSNSは、両者で異なります。いちばん安いサービスであることをお約束するものではありません。</p></div>` : ''}
-    <h2 style="margin-top:26px">ご利用の前にご確認ください</h2>
-    <div class="card"><ul class="plain small">
-      ${names ? `<li>SNSごとの条件：${escapeHtml(snsRulesText())}。</li>` : ''}
-      <li>${limitsText()}。${aiLimitsText() ? `${aiLimitsText()}。` : ''}</li>
-      ${av.text || av.image ? '<li>AIが作った内容は、誤りや不適切な表現を含む場合があります。投稿の前に、必ずご自身で内容をご確認ください。AIで作ったことの表示が、SNSの規約で求められる場合があります。</li>' : ''}
-      <li>投稿できるのは、ご自身で作成・予約・設定した内容だけです。いいね・フォロー・コメント・DMなどの自動操作や、投稿の分析機能はありません。投稿の内容と、その結果の責任は、ご利用者にあります。</li>
-      <li>お支払い後の返金は、法令上必要な場合を除き、いたしません。解約すると、次回の更新が止まります。${END_TEXT}。</li>
-    </ul>
-    <p class="small"><a href="/service">サービスの詳しい説明・よくある質問</a></p></div>
-    ${cta}
-    <div class="legal-links"><a href="/service/legal/tokushoho">特定商取引法に基づく表記</a></div>
   `);
 }
 

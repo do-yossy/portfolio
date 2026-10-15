@@ -117,18 +117,22 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('GET', '/service/lp');
   ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
   ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
+  ok(r.text.includes('<section id="ai">') && r.text.includes('AIと一緒に、投稿をつくる。') && r.text.includes('ご自身のAIで作る') && !r.text.includes('<h3>このサービスのAIで作る</h3>') && r.text.includes('このサービスはAI生成の表示を付けません'), 'LPに #ai で開けるAIの説明があり、このサービスのAIを使わない設定では、ご自身のAIで作る方法だけを説明する');
+  ok(r.text.includes('body{background:#0B141A}') && r.text.includes('迷わず使える、シンプルな手順。') && r.text.includes('大切なアカウントを、安全に。') && r.text.includes('プランはひとつだけ。') && r.text.includes('<summary>どのSNSに投稿できますか？</summary>'), 'LPは暗い配色の1ページで、手順・安全・料金・よくある質問の段がある');
+  ok(r.text.includes('<summary>Xには投稿できますか？</summary>') && r.text.includes('現在、Xへの投稿は提供していません。'), 'Xを提供していないときは、よくある質問でそのことを伝える');
+  ok(r.text.includes('<b>1つ</b><span>使えるSNS</span>') && r.text.includes('Threadsに投稿。') && !/[2-6]つのSNSに、まとめて投稿/.test(r.text), '使えるSNSの数・名前は、設定されているSNSだけで数える（Threadsだけなら1つ）');
   ok(!r.text.includes('ポストメッシュ') && r.text.includes('サービスA'), 'LPでは、他社の名前を出さない（サービスA）');
   ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
   ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
   ok(r.text.includes('使えるSNS') && r.text.includes('無料体験') && !r.text.includes('Xは月30件まで'), '比較表に使えるSNSと無料体験の行があり、Xを提供していなければXの上限を出さない');
-  ok(!r.text.includes('AI生成') && !r.text.includes('合成した内容'), 'このサービスのAIを使わない設定のときは、AI生成の表示についての説明を出さない');
+  ok(!r.text.includes('表示を自動で付け') && !r.text.includes('合成した内容'), 'このサービスのAIを使わない設定のときは、AI生成の表示を自動で付けるという説明を出さない');
   {
     // TikTok・YouTube を設定した状態で、AIの設定ごとに、SNSの条件の説明（AI生成の表示）を確かめる
     const saveEnv = {}; ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'AI_DAILY_VIDEO'].forEach((k) => { saveEnv[k] = process.env[k]; });
     Object.assign(process.env, { TIKTOK_CLIENT_KEY: 'k', TIKTOK_CLIENT_SECRET: 's', GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 'gs' });
     delete process.env.OPENAI_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
     let lp = (await req('GET', '/service/lp')).text;
-    ok(lp.includes('TikTok：') && lp.includes('YouTube：') && !lp.includes('AI生成') && !lp.includes('合成した内容'), 'TikTok・YouTubeを提供していても、このサービスのAIが無ければ、AI生成の表示の説明は出さない');
+    ok(lp.includes('TikTok：') && lp.includes('YouTube：') && !lp.includes('表示を自動で付け') && !lp.includes('合成した内容'), 'TikTok・YouTubeを提供していても、このサービスのAIが無ければ、AI生成の表示を自動で付けるという説明は出さない');
     process.env.OPENAI_API_KEY = 'ok';
     lp = (await req('GET', '/service/lp')).text;
     ok(lp.includes('このサービスのAIで作った画像には、TikTokの「AI生成」の表示') && lp.includes('ほかのAIで作ってアップロードしたものには、このサービスは表示を付けません') && !lp.includes('合成した内容'), '画像だけを作れる設定では、TikTokの説明は「画像には」とし、YouTubeの申告の説明は出さない');
