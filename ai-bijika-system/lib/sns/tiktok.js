@@ -2,7 +2,7 @@
 // TikTok Content Posting API（Direct Post）。動画をファイルアップロード方式で投稿する。
 // 重要：審査は2段階。アプリの審査（Submit for review）の前は、サンドボックスでテスターのアカウントしか使えない。
 // アプリの審査の後も、投稿の監査（Audit）を通るまでは、公開範囲は「自分のみ」だけ・24時間で5人まで・投稿するアカウントは非公開（Content Sharing Guidelines）。
-// 公開範囲の選択・コメント等の可否・利用者への表示など、TikTokのガイドラインに沿った画面が審査で求められる。仕様は公式ドキュメントで確認すること。
+// 公開範囲の選択・コメント等の可否・利用者への表示など、TikTokのガイドラインに沿った画面が投稿の監査（Audit）で求められる。仕様は公式ドキュメントで確認すること。
 const fs = require('fs');
 const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
