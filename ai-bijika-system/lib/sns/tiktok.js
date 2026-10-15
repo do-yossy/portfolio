@@ -42,7 +42,7 @@ function validatePost(args) {
   }
   if (!options || !PRIVACY.includes(options.privacy_level)) return 'TikTokの公開範囲を選んでください。';
   // 審査（Audit）が終わるまでは、公開範囲「自分のみ」だけ（公式：審査前のアプリは SELF_ONLY でしか投稿できない）
-  if (process.env.TIKTOK_AUDITED !== 'true' && options.privacy_level !== 'SELF_ONLY') return 'TikTokは、アプリの審査が終わるまで、公開範囲「自分のみ」でしか投稿できません（投稿するアカウントも非公開にしておく必要があります）。';
+  if (process.env.TIKTOK_AUDITED !== 'true' && options.privacy_level !== 'SELF_ONLY') return 'TikTokは、このサービスのアプリの投稿の監査（Audit）が終わるまで、公開範囲「自分のみ」でしか投稿できません（投稿するアカウントも非公開にしておく必要があります）。';
   if (options.commercial_paid && options.privacy_level === 'SELF_ONLY') return '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできません。';
   return null;
 }
@@ -145,7 +145,7 @@ async function publish(args) {
   const info = await call({ path: '/v2/post/publish/creator_info/query/', headers: bearer(accessToken), body: '{}' });
   const allowed = (info.data && info.data.privacy_level_options) || [];
   if (allowed.length && !allowed.includes(p.options.privacy_level)) {
-    throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。アプリの審査が終わるまでは「自分のみ（SELF_ONLY）」だけです。`);
+    throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。このサービスのアプリの投稿の監査（Audit）が終わるまでは「自分のみ（SELF_ONLY）」だけです。`);
   }
   // アカウント側でコメント・デュエット・ステッチを止めている場合は、送る時点の設定でも必ず「許可しない」にする（予約した後に設定が変わった場合も含む）
   const d = info.data || {};

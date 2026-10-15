@@ -37,7 +37,7 @@ Xは、使わない方針（APIが有料のため。お試し手順の冒頭を�
 | 説明：Facebook Login for Business（2-3-4 で使う） | https://developers.facebook.com/docs/facebook-login/facebook-login-for-business |
 | 説明：ビジネス確認 | https://developers.facebook.com/docs/development/release/business-verification |
 | 審査（アプリレビュー）の申請 | アプリの管理画面の左メニューにある「アプリレビュー」から |
-| ビジネス確認の申請 | アプリの管理画面の「設定」→「ベーシック」の「認証」から（公式の説明による） |
+| ビジネス確認の申請 | アプリの管理画面の「設定」→「ベーシック」の「認証」から始め、続きの手続き（書類の提出など）はビジネスマネージャで行う（公式の説明による） |
 
 **TikTok**
 
@@ -60,7 +60,7 @@ TikTokの「アプリの審査」と「投稿の監査（Audit）」は、別々
 | YouTube Data API v3 を有効にする | https://console.cloud.google.com/apis/library/youtube.googleapis.com |
 | OAuthクライアント（キー）を作る | https://console.cloud.google.com/apis/credentials |
 | YouTube API の監査の申請フォーム | https://support.google.com/youtube/contact/yt_api_form |
-| Googleの審査（OAuth）の申請 | 管理画面の「OAuth同意画面」から（公式のヘルプでは「Google Auth Platform」「確認センター」という名前も使われています） |
+| Googleの審査（OAuth）の申請 | 管理画面の「OAuth同意画面」から（公式のヘルプ（英語）では「Google Auth Platform」「Verification Center」という名前も使われています。日本語の画面での名前は確かめていません） |
 
 各SNSで何を設定するか（リダイレクトURI・権限など）は、下の 2-2、2-3-1〜2-3-5 に書いています（2-3 のXは、使わないため対象外です）。
 
@@ -117,8 +117,11 @@ TikTokの「アプリの審査」と「投稿の監査（Audit）」は、別々
 
 1. アプリを作成し、「Login Kit」と「Content Posting API」の製品を追加する。スコープは `user.info.basic` と `video.publish`（写真の投稿に同じスコープで足りるかは、公式で確認してください）。
 2. 「リダイレクトURI」に `https://（公開URL）/service/oauth/callback/tiktok` を登録する。
-3. TikTokの審査は2つあります。**アプリの審査**（アプリの管理画面の「Submit for review」）と、**投稿の監査（Audit）**（Content Posting API の監査の申請。2-0 のリンク集）です。**投稿の監査を通るまでは、投稿はすべて公開範囲が「自分のみ」となり、テスターに追加したアカウントしか使えません。** 一般の利用者に公開範囲を選ばせるには、投稿の監査が必須です。監査では、デモ動画や、TikTokのガイドラインに沿った画面（公開範囲の選択、コメント・デュエット・ステッチの可否、利用者への表示など）が求められます。投稿フォームのTikTokの設定欄は、TikTokのガイドラインを意識して、公開範囲の選択肢と、コメント等の可否をTikTokから取得して反映し、商用コンテンツの開示、動画のプレビュー、音楽使用の確認の表示を入れています。ただし、**ガイドラインを満たしているかは、審査を通すまで確認できておらず、審査で追加の修正を求められる可能性があります**。
-   - 投稿の監査の前は、テスターのTikTokアカウントを**非公開（プライベート）アカウント**にしておく必要があります（公開アカウントだと、TikTokが投稿を拒否します）。
+3. TikTokの審査は2つあります。**アプリの審査**（アプリの管理画面の「Submit for review」）と、**投稿の監査（Audit）**（Content Posting API の監査の申請。2-0 のリンク集）です。段階ごとの制限は次のとおりです（公式の「Add a Sandbox」と「Content Sharing Guidelines」による）。
+   - **アプリの審査に通るまで**：サンドボックスで、ターゲットユーザー（テスター）に追加したアカウント（自分が持つアカウントを10個まで）しか使えません。
+   - **アプリの審査に通ったあと、投稿の監査に通るまで**：テスター以外の人も使えますが、**投稿は公開範囲「自分のみ」だけ**、投稿できるのは**24時間で5人まで**、**投稿するアカウントはすべて非公開（プライベート）**にしておく必要があります。
+   - 一般の利用者に公開範囲を選ばせるには、投稿の監査が必須です。監査で何を出すか（デモ動画など）の詳しい手順は、公式の公開ページでは確かめられていません（第三者の解説では、デモ動画などが求められるとされています）。TikTokのガイドラインに沿った画面（公開範囲の選択、コメント・デュエット・ステッチの可否、利用者への表示など）が必要です。投稿フォームのTikTokの設定欄は、TikTokのガイドラインを意識して、公開範囲の選択肢と、コメント等の可否をTikTokから取得して反映し、商用コンテンツの開示、動画のプレビュー、音楽使用の確認の表示を入れています。ただし、**ガイドラインを満たしているかは、審査を通すまで確認できておらず、審査で追加の修正を求められる可能性があります**。
+   - 投稿の監査の前は、投稿に使うすべてのTikTokアカウント（テスターも、それ以外の利用者も）を**非公開（プライベート）アカウント**にしておく必要があります（公開アカウントだと、TikTokが投稿を拒否します）。
    - **投稿の監査（Audit）に通ったら**、環境変数 `TIKTOK_AUDITED=true` を設定します（アプリの審査に通っただけでは設定しないでください。設定すると、利用者が「全員に公開」などを選べるようになりますが、TikTokが投稿を拒否します）。設定するまでは、投稿フォームで選べる公開範囲は「自分のみ」だけです（TikTokから取得した選択肢を「自分のみ」に絞って表示し、ほかの値は保存のときにも断ります）。
 4. 動画はファイルアップロード方式で送るため、URLの所有確認は不要です。
 5. **写真の投稿（JPEG・35枚まで）は、TikTokが当サービスの公開URL（`https://（公開URL）/media/...`）から画像を取得する方式（`PULL_FROM_URL`）です。TikTokの開発者ポータルで、公開URLのドメイン（またはURLの先頭部分）の所有確認が必要です。** 確認していないと、写真の投稿は失敗します。
@@ -187,9 +190,9 @@ fly secrets set -a sq-ai-bijika \
   THREADS_APP_ID=... THREADS_APP_SECRET=... \
   INSTAGRAM_APP_ID=... INSTAGRAM_APP_SECRET=... \
   TIKTOK_CLIENT_KEY=... TIKTOK_CLIENT_SECRET=... \
-  X_CLIENT_ID=... X_CLIENT_SECRET=... \
   FACEBOOK_APP_ID=... FACEBOOK_APP_SECRET=... \
   GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
+# Xは使わない方針のため、X_CLIENT_ID・X_CLIENT_SECRET は登録しない（登録しなければ、Xは画面にも規約にも出ない）。将来Xを使う場合だけ足す（2-3）
 # 任意：AI（使うものだけ）・無料トライアル
 fly secrets set -a sq-ai-bijika ANTHROPIC_API_KEY=... OPENAI_API_KEY=... SERVICE_TRIAL_DAYS=7
 ```

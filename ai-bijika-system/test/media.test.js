@@ -168,7 +168,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
     return null;
   });
   const unaudited = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '公開', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE' } } });
-  ok(!unaudited.ok && /審査が終わるまで/.test(unaudited.error), 'TikTokの審査前は、公開範囲「自分のみ」以外は予約の時点で断る');
+  ok(!unaudited.ok && /投稿の監査（Audit）が終わるまで/.test(unaudited.error), 'TikTokの投稿の監査（Audit）の前は、公開範囲「自分のみ」以外は予約の時点で断る');
   process.env.TIKTOK_AUDITED = 'true'; // 審査済みのアプリでも、アカウントによっては許可されない公開範囲がある
   const pub = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '公開', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE' } } });
   delete process.env.TIKTOK_AUDITED;
