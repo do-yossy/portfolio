@@ -110,6 +110,8 @@
 
 ### 6-1. Meta の開発者アプリを作る
 
+各SNSの管理画面と公式の説明へのリンクは、`月額SNS自動投稿サービス_セットアップ手順.md` の「2-0. 各SNSのキーの作成と審査の申請（リンク集）」にまとめています。
+
 1. Meta for Developers（`https://developers.facebook.com/`）にログインし、新しいアプリを作ります。用途（ユースケース）は「Threads APIにアクセス」を選びます。
 2. Threads APIの設定で、次を登録します。
    - リダイレクト（コールバック）URL：`https://post.social-quality.com/service/oauth/callback/threads`

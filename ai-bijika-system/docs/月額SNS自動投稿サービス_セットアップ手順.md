@@ -19,6 +19,42 @@
 
 ## 2. 運営者が行う作業
 
+### 2-0. 各SNSのキーの作成と審査の申請（リンク集）
+
+キー（アプリID・シークレットなど）の作成も、審査の申請も、各社の管理画面で行います。「説明」のリンクは、各社の公式の解説ページです。管理画面はログインが必要です。リンクは2026年10月15日に開けることを確かめました（管理画面はログインの画面に移ります）。**ページの場所は各社が変えることがあります。** 開けないときは、管理画面のトップから同じ名前のメニューを探してください。Xは、このサービスでは扱わないため、載せていません。
+
+**Threads・Instagram・Facebookページ（Meta）**
+
+| 内容 | リンク・場所 |
+|---|---|
+| アプリを作る（3つのSNSとも、この画面から） | https://developers.facebook.com/apps |
+| 説明：Threads API | https://developers.facebook.com/docs/threads |
+| 説明：Instagram API | https://developers.facebook.com/docs/instagram-platform |
+| 説明：アプリレビュー | https://developers.facebook.com/docs/app-review |
+| 説明：ビジネス確認 | https://developers.facebook.com/docs/development/release/business-verification |
+| 審査の申請 | アプリの管理画面の左メニューにある「アプリレビュー」から |
+
+**TikTok**
+
+| 内容 | リンク・場所 |
+|---|---|
+| アプリを作る | https://developers.tiktok.com/apps |
+| 説明：Content Posting API | https://developers.tiktok.com/doc/content-posting-api-get-started |
+| 説明：審査の基準 | https://developers.tiktok.com/doc/content-sharing-guidelines |
+| 審査の申請 | アプリの管理画面の「Submit for review」から |
+
+**YouTube（Google）**
+
+| 内容 | リンク・場所 |
+|---|---|
+| 管理画面 | https://console.cloud.google.com |
+| YouTube Data API v3 を有効にする | https://console.cloud.google.com/apis/library/youtube.googleapis.com |
+| OAuthクライアント（キー）を作る | https://console.cloud.google.com/apis/credentials |
+| YouTube API の監査の申請フォーム | https://support.google.com/youtube/contact/yt_api_form |
+| Googleの審査（OAuth）の申請 | 管理画面の「OAuth同意画面」から |
+
+各SNSで何を設定するか（リダイレクトURI・権限など）は、下の 2-2〜2-3-5 に書いています。
+
 ### 2-1. Stripe（決済）
 
 1. Stripeのアカウントを作成し、事業者情報の確認を済ませる（本番の決済には必要）。
