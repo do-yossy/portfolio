@@ -1,6 +1,7 @@
 'use strict';
 // TikTok Content Posting API（Direct Post）。動画をファイルアップロード方式で投稿する。
-// 重要：アプリの審査（Audit）を通る前は、投稿はすべて「自分だけ」の公開範囲になり、テスターのアカウントしか使えない。
+// 重要：審査は2段階。アプリの審査（Submit for review）の前は、サンドボックスでテスターのアカウントしか使えない。
+// アプリの審査の後も、投稿の監査（Audit）を通るまでは、公開範囲は「自分のみ」だけ・24時間で5人まで・投稿するアカウントは非公開（Content Sharing Guidelines）。
 // 公開範囲の選択・コメント等の可否・利用者への表示など、TikTokのガイドラインに沿った画面が審査で求められる。仕様は公式ドキュメントで確認すること。
 const fs = require('fs');
 const { request, encodeForm } = require('../http-client');
@@ -41,8 +42,8 @@ function validatePost(args) {
     if (textLength(text || '') > PHOTO_DESC_MAX) return `TikTokの写真投稿の説明は${PHOTO_DESC_MAX}文字までです。`;
   }
   if (!options || !PRIVACY.includes(options.privacy_level)) return 'TikTokの公開範囲を選んでください。';
-  // 審査（Audit）が終わるまでは、公開範囲「自分のみ」だけ（公式：審査前のアプリは SELF_ONLY でしか投稿できない）
-  if (process.env.TIKTOK_AUDITED !== 'true' && options.privacy_level !== 'SELF_ONLY') return 'TikTokは、このサービスのアプリの投稿の監査（Audit）が終わるまで、公開範囲「自分のみ」でしか投稿できません（投稿するアカウントも非公開にしておく必要があります）。';
+  // 投稿の監査（Audit）を通るまでは、公開範囲「自分のみ」だけ（公式：監査前のアプリは SELF_ONLY でしか投稿できない）
+  if (process.env.TIKTOK_AUDITED !== 'true' && options.privacy_level !== 'SELF_ONLY') return 'TikTokは、このサービスがTikTokの投稿の監査（Audit）を通るまで、公開範囲「自分のみ」でしか投稿できません（投稿するアカウントも非公開にしておく必要があります）。';
   if (options.commercial_paid && options.privacy_level === 'SELF_ONLY') return '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできません。';
   return null;
 }
@@ -61,8 +62,8 @@ function errorCodeOf(json) {
 const KNOWN_ERRORS = {
   spam_risk_too_many_posts: 'TikTokの、1日に投稿できる数の上限に達しました。時間をおいてから投稿してください。',
   spam_risk_user_banned_from_posting: 'このTikTokアカウントは、TikTok側で投稿が制限されています。',
-  reached_active_user_cap: 'このアプリから投稿できる人数の上限に達しています（審査前は24時間で5人まで）。運営者にお問い合わせください。',
-  unaudited_client_can_only_post_to_private_accounts: '審査前のため、非公開のTikTokアカウントから、公開範囲「自分のみ」でしか投稿できません。TikTokアカウントを非公開にしてから、もう一度お試しください。',
+  reached_active_user_cap: 'このアプリから投稿できる人数の上限に達しています（このサービスがTikTokの投稿の監査（Audit）を通るまでは、24時間で5人まで）。運営者にお問い合わせください。',
+  unaudited_client_can_only_post_to_private_accounts: 'このサービスがTikTokの投稿の監査（Audit）を通るまでは、非公開のTikTokアカウントから、公開範囲「自分のみ」でしか投稿できません。TikTokアカウントを非公開にしてから、もう一度お試しください。',
   url_ownership_unverified: '写真のURLの所有確認が済んでいないため、TikTokに写真を投稿できません（運営者の設定が必要です）。',
   privacy_level_option_mismatch: '選んだ公開範囲は、このアカウントでは使えません。公開範囲を選び直してください。',
 };
@@ -81,7 +82,7 @@ async function call({ host = HOST, method = 'POST', path, headers = {}, body, js
   err.code = code;
   if (['access_token_invalid', 'scope_not_authorized', 'invalid_grant', 'invalid_client', 'token_expired'].includes(code)) { err.authError = true; err.retriable = false; }
   else if (code === 'rate_limit_exceeded') { err.retriable = true; err.authError = false; }
-  else if (KNOWN_ERRORS[code] || okStatus) { err.authError = false; err.retriable = false; } // 上限・審査前の制限・設定の問題（連携し直しても直らない）
+  else if (KNOWN_ERRORS[code] || okStatus) { err.authError = false; err.retriable = false; } // 上限・投稿の監査（Audit）前の制限・設定の問題（連携し直しても直らない）
   throw err;
 }
 const bearer = (t) => ({ Authorization: `Bearer ${t}`, 'Content-Type': 'application/json; charset=UTF-8' });
@@ -119,7 +120,7 @@ async function creatorInfo({ accessToken }) {
   const info = await call({ path: '/v2/post/publish/creator_info/query/', headers: bearer(accessToken), body: '{}' });
   const d = info.data || {};
   let opts = d.privacy_level_options || [];
-  // アプリの審査（Audit）が終わるまでは「自分のみ」しか投稿できないため、画面の選択肢もそれだけにする
+  // 投稿の監査（Audit）を通るまでは「自分のみ」しか投稿できないため、画面の選択肢もそれだけにする
   if (process.env.TIKTOK_AUDITED !== 'true') opts = opts.filter((v) => v === 'SELF_ONLY');
   return {
     nickname: d.creator_nickname || d.creator_username || '',
@@ -145,7 +146,7 @@ async function publish(args) {
   const info = await call({ path: '/v2/post/publish/creator_info/query/', headers: bearer(accessToken), body: '{}' });
   const allowed = (info.data && info.data.privacy_level_options) || [];
   if (allowed.length && !allowed.includes(p.options.privacy_level)) {
-    throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。このサービスのアプリの投稿の監査（Audit）が終わるまでは「自分のみ（SELF_ONLY）」だけです。`);
+    throw new SnsError(`選んだ公開範囲は、このアカウントでは使えません（使えるもの：${allowed.join('、')}）。このサービスがTikTokの投稿の監査（Audit）を通るまでは「自分のみ（SELF_ONLY）」だけです。`);
   }
   // アカウント側でコメント・デュエット・ステッチを止めている場合は、送る時点の設定でも必ず「許可しない」にする（予約した後に設定が変わった場合も含む）
   const d = info.data || {};

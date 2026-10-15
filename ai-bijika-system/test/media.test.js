@@ -162,13 +162,13 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   ok(/media_type=REELS/.test(mock2.calls.find((c) => c.path === '/v22.0/ig1/media').body), '動画はリールとして投稿する');
   mock2.restore();
 
-  // TikTokの公開範囲がアカウントで許可されていない場合（審査前）
+  // TikTokの公開範囲がアカウントで許可されていない場合（投稿の監査（Audit）の前）
   const mock3 = installHttpsMock(async (c) => {
     if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
     return null;
   });
   const unaudited = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '公開', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE' } } });
-  ok(!unaudited.ok && /投稿の監査（Audit）が終わるまで/.test(unaudited.error), 'TikTokの投稿の監査（Audit）の前は、公開範囲「自分のみ」以外は予約の時点で断る');
+  ok(!unaudited.ok && /投稿の監査（Audit）を通るまで/.test(unaudited.error), 'TikTokの投稿の監査（Audit）の前は、公開範囲「自分のみ」以外は予約の時点で断る');
   process.env.TIKTOK_AUDITED = 'true'; // 審査済みのアプリでも、アカウントによっては許可されない公開範囲がある
   const pub = core.createPosts({ userId: uid, accountIds: [ttAcc], text: '公開', scheduledAtIso: future(), mediaId: mp4.id, options: { tiktok: { privacy_level: 'PUBLIC_TO_EVERYONE' } } });
   delete process.env.TIKTOK_AUDITED;
@@ -237,7 +237,7 @@ const future = () => new Date(Date.now() + 1000).toISOString();
   ok(info.nickname === 'テスト' && info.privacyLevelOptions.length === 2 && info.commentDisabled === true && info.maxVideoPostDurationSec === 600 && info.audited === true, 'TikTokの投稿設定（公開範囲・コメント可否・最大秒数）を取得できる');
   delete process.env.TIKTOK_AUDITED;
   const infoUn = await tt.creatorInfo({ accessToken: 't' });
-  ok(infoUn.privacyLevelOptions.join() === 'SELF_ONLY' && infoUn.audited === false, 'TikTokのアプリの審査前は、公開範囲の選択肢を「自分のみ」だけにする');
+  ok(infoUn.privacyLevelOptions.join() === 'SELF_ONLY' && infoUn.audited === false, 'TikTokの投稿の監査（Audit）の前は、公開範囲の選択肢を「自分のみ」だけにする');
   ok(/自分のみ/.test(tt.validatePost({ text: 'a', media: { kind: 'video' }, options: { privacy_level: 'SELF_ONLY', commercial_paid: true } })), '提携（有償）の商用コンテンツは、公開範囲を「自分のみ」にできない');
   m5.restore();
 

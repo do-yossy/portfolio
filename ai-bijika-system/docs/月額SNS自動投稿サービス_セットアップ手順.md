@@ -192,7 +192,8 @@ fly secrets set -a sq-ai-bijika \
   TIKTOK_CLIENT_KEY=... TIKTOK_CLIENT_SECRET=... \
   FACEBOOK_APP_ID=... FACEBOOK_APP_SECRET=... \
   GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
-# Xは使わない方針のため、X_CLIENT_ID・X_CLIENT_SECRET は登録しない（登録しなければ、Xは画面にも規約にも出ない）。将来Xを使う場合だけ足す（2-3）
+# Xは使わない方針のため、X_CLIENT_ID・X_CLIENT_SECRET は登録しない。登録しなければ、Xは画面（販売ページ・申込み・マイページ・投稿フォーム）に出ない。
+# 利用規約・特商法表記・プライバシーポリシーにはXの名前が残る（規約と特商法は「運営者が提供を始めたもの」という書き方なので、そのままでも食い違わない。プライバシーポリシーの X Corp. は、使わない間は消すかどうかを検討する）。将来Xを使う場合だけ足す（2-3）
 # 任意：AI（使うものだけ）・無料トライアル
 fly secrets set -a sq-ai-bijika ANTHROPIC_API_KEY=... OPENAI_API_KEY=... SERVICE_TRIAL_DAYS=7
 ```
