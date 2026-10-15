@@ -109,26 +109,72 @@ function webhook(event, secret = 'whsec_e2e') {
 
   console.log('販売ページ');
   r = await req('GET', '/service');
-  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('税込'), 'LPに月額1,000円（税込）を表示する');
+  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('税込'), 'LPに月額1,100円（税込）を表示する');
   ok(r.text.includes('返金') && r.text.includes('解約') && r.text.includes('自動更新'), 'LPに返金・解約・自動更新の条件を表示する');
   ok(r.text.includes('/service/legal/terms') && r.text.includes('/service/legal/tokushoho'), 'LPから規約・特商法表記へリンクする');
   ok(r.text.includes('現在の対応SNSは、Threadsです') && !r.text.includes('YouTube：') && !r.text.includes('TikTok：'), 'LPには、設定済みのSNSだけを対応SNSとして表示する');
   ok(!r.text.includes('AIで投稿づくり') && !/ClaudeやChatGPT/.test(r.text), 'AIが未設定ならAIの機能を表示せず、動作を確認していないアプリ名を出さない');
+  // 注意：料金の比較は、確認日（lib/service-ui.js の COMPARE.checked）から45日だけ出す。比較を前提にしたテストは、その期限を過ぎると失敗する。
+  // 固定投稿の0-3の再確認で checked を更新するときに、あわせて確かめる（比較をやめる場合は、これらのテストも直す）。
   r = await req('GET', '/service/lp');
-  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,000円') && r.text.includes('半額以下') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す');
+  ok(r.status === 200 && r.text.includes('月額') && r.text.includes('1,100円') && r.text.includes('ちょうど半額です') && r.text.includes('と比べると、半額にはなりません') && r.text.includes('<td>なし（月払いだけ）</td>') && r.text.includes('1か月あたり2,000円（税込。年24,000円を前払い）') && r.text.includes('2026年10月14日') && r.text.includes('条件') && r.text.includes('/service/signup'), '固定投稿用のLPに、価格・根拠（確認日・条件）つきの比較・申込みへの導線を出す（月払い同士はちょうど半額で、年払いと比べると半額にならないことも書く）');
   ok(!r.text.includes('相場'), 'LPでは、根拠を示せない「相場」という言い方をしない');
+  ok(r.text.includes('<section id="ai">') && r.text.includes('AIと一緒に、投稿をつくる。') && r.text.includes('ご自身のAIで作る') && !r.text.includes('<h3>このサービスのAIで作る</h3>') && r.text.includes('このサービスは、AI生成の表示を付けません'), 'LPに #ai で開けるAIの説明があり、このサービスのAIを使わない設定では、ご自身のAIで作る方法だけを説明する');
+  ok(r.text.includes('body{background:#0B141A}') && r.text.includes('使い方は、5つの手順。') && r.text.includes('アカウントを守るための仕組み。') && r.text.includes('文字数は入力しながら、条件は保存のときに確かめる。') && r.text.includes('プランはひとつだけ。') && r.text.includes('<summary>どのSNSに投稿できますか？</summary>'), 'LPは暗い配色の1ページで、手順・安全・料金・よくある質問の段がある');
+  ok(r.text.includes('section[id]{scroll-margin-top:') && r.text.includes('.svc nav.svc-nav a{color:#5EDDC0}'), '#ai で開いたときに見出しが固定ヘッダーに隠れず、上部のナビも暗い背景で読める色にする');
+  {
+    const uiLp = require('../lib/service-ui');
+    const keep = {}; ['OPENAI_API_KEY', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET', 'THREADS_APP_ID', 'THREADS_APP_SECRET'].forEach((k) => { keep[k] = process.env[k]; });
+    const aiPart = (h) => h.slice(h.indexOf('<section id="ai">'), h.indexOf('</section>', h.indexOf('<section id="ai">')));
+    process.env.OPENAI_API_KEY = 'ok';
+    let h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(!aiPart(h).includes('表示を自動で付け') && !aiPart(h).includes('TikTok'), 'Threadsだけのときは、このサービスのAIがあっても、AI生成の表示を自動で付けるとは書かない（使えないTikTokの名前も出さない）');
+    process.env.TIKTOK_CLIENT_KEY = 'k'; process.env.TIKTOK_CLIENT_SECRET = 's';
+    h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(h.includes('このサービスのAIでは、画像を作れます（回数の上限があります）') && h.includes('／このサービスのAIで画像を作る（回数の上限あり）'), 'このサービスのAIが画像だけのときは、料金の段とよくある質問に「画像」とだけ書く');
+    ok(aiPart(h).includes('このサービスのAIで作った画像をTikTokに投稿するときは、AI生成の表示を自動で付けます') && h.includes('2つのSNSに、まとめて投稿。') && h.includes('<b>2つ</b>'), 'TikTokが使えてこのサービスのAIがあるときだけ、TikTokで表示を付けると書く（作れるものだけ：画像だけなら「画像」）。SNSが2つなら「2つのSNS」');
+    const ttNote = 'このサービスがTikTokの投稿の監査（Audit）を通るまで、公開範囲は「自分のみ」に限られ、投稿するTikTokアカウントは非公開にする必要があり、投稿できるのはこのサービス全体で24時間に5人までです。';
+    const ttRule = '公開範囲は「自分のみ」に限られ、投稿するTikTokアカウントは非公開にする必要があり、投稿できるのはこのサービス全体で24時間に5人まで';
+    const ttCount = h.split(ttNote).length - 1;
+    ok(ttCount === 2 && h.split(ttRule).length - 1 === 4, 'TikTokが使えて、まだ投稿の監査（Audit）を通っていないときは、先頭・「使えるSNS」の段・ご利用の前にご確認ください・よくある質問に、TikTokの制限（自分のみ・非公開・24時間に5人まで）を書く');
+    ok(uiLp.checkoutPage({ user: { email: 'a' }, csrf: 'c' }).includes(ttRule) && uiLp.landingPage({ user: null, billingReady: false }).includes(ttRule), '最終確認画面とサービスの説明のページにも、LPと同じTikTokの制限を書く');
+    process.env.TIKTOK_AUDITED = 'true';
+    h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(!h.includes(ttNote) && !h.includes(ttRule) && !uiLp.checkoutPage({ user: { email: 'a' }, csrf: 'c' }).includes(ttRule) && !uiLp.landingPage({ user: null, billingReady: false }).includes(ttRule), 'TikTokの投稿の監査（Audit）を通ったら（TIKTOK_AUDITED=true）、LP・最終確認画面・サービスの説明のページに、その制限の説明は出さない');
+    delete process.env.TIKTOK_AUDITED;
+    delete process.env.OPENAI_API_KEY; delete process.env.TIKTOK_CLIENT_KEY; delete process.env.TIKTOK_CLIENT_SECRET;
+    delete process.env.THREADS_APP_ID; delete process.env.THREADS_APP_SECRET;
+    h = uiLp.lpPage({ user: null, billingReady: false });
+    ok(h.includes('使えるSNSは、準備中です。') && h.includes('<b>準備中</b>'), '使えるSNSが無いときは、準備中と書く');
+    Object.keys(keep).forEach((k) => { if (keep[k] === undefined) delete process.env[k]; else process.env[k] = keep[k]; });
+    const cp = uiLp.composePage({ user: { email: 'a' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], csrf: 'c' });
+    ok(cp.includes('ツリーの2件目以降（Threadsだけ') && !cp.includes('ThreadsとXだけ'), '「投稿を作る」画面のツリーの説明は、使えるSNSだけを書く（Xが使えないときはXを書かない）');
+    {
+      const th = [process.env.THREADS_APP_ID, process.env.THREADS_APP_SECRET];
+      delete process.env.THREADS_APP_ID; delete process.env.THREADS_APP_SECRET;
+      const cp2 = uiLp.composePage({ user: { email: 'a' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], csrf: 'c' });
+      ok(!cp2.includes('id="treeField"') && !cp2.includes('value="tree"') && !cp2.includes('ツリーの2件目以降'), 'ツリーができるSNS（Threads・X）が使えないときは、「投稿を作る」画面にツリーの欄を出さない');
+      process.env.THREADS_APP_ID = th[0]; process.env.THREADS_APP_SECRET = th[1];
+    }
+    const dash = uiLp.dashboardPage({ user: { id: 'u_test_dash', email: 'a' }, sub: { status: 'active' }, accounts: [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }], posts: [], csrf: 'c', snsReady: true, aiAvail: { text: true } });
+    ok(dash.includes('<label class="lbl" for="file">画像・動画</label>') && !dash.includes('63,206') && dash.includes('かんたん投稿の入力欄は2,200文字までです（SNSごとの上限のほうが短い場合は、その上限まで）'), 'かんたん投稿の添付欄は、選べるアカウントに画像・動画が必須のSNSが無ければ「必須」と書かず、文字数の上限はかんたん投稿の上限（2,200）で書く');
+    const dash2 = uiLp.dashboardPage({ user: { id: 'u_test_dash', email: 'a' }, sub: { status: 'active' }, accounts: [], posts: [], csrf: 'c', snsReady: true, aiAvail: { text: true } });
+    ok(dash2.includes('自動運用に使えるSNS（Threads）を先に連携してください。') && !dash2.includes('Instagram・Facebook'), '自動運用の「先に連携してください」には、使えるSNSだけを書く');
+  }
+  ok(r.text.includes('<summary>Xには投稿できますか？</summary>') && r.text.includes('現在、Xへの投稿は提供していません。'), 'Xを提供していないときは、よくある質問でそのことを伝える');
+  ok(r.text.includes('<b>1つ</b><span>使えるSNS</span>') && r.text.includes('<b>10件</b><span>連携できるアカウント（最大）</span>') && !r.text.includes('監査（Audit）を通るまで') && r.text.includes('Threadsに投稿。') && !/[2-6]つのSNSに、まとめて投稿/.test(r.text), '使えるSNSの数・名前は、設定されているSNSだけで数える（Threadsだけなら1つ）');
   ok(!r.text.includes('ポストメッシュ') && r.text.includes('サービスA'), 'LPでは、他社の名前を出さない（サービスA）');
   ok(!r.text.includes('ミチシルベ') && !r.text.includes('Your First Product'), 'LP（サービスの画面）には、ミチシルベの名前を出さない');
   ok(r.text.includes('/service/legal/tokushoho') && !r.text.includes('/service/legal/terms') && !r.text.includes('/service/legal/privacy'), 'LPの足元のリンクは、特定商取引法に基づく表記だけ');
   ok(r.text.includes('使えるSNS') && r.text.includes('無料体験') && !r.text.includes('Xは月30件まで'), '比較表に使えるSNSと無料体験の行があり、Xを提供していなければXの上限を出さない');
-  ok(!r.text.includes('AI生成') && !r.text.includes('合成した内容'), 'このサービスのAIを使わない設定のときは、AI生成の表示についての説明を出さない');
+  ok(!r.text.includes('表示を自動で付け') && !r.text.includes('合成した内容'), 'このサービスのAIを使わない設定のときは、AI生成の表示を自動で付けるという説明を出さない');
   {
     // TikTok・YouTube を設定した状態で、AIの設定ごとに、SNSの条件の説明（AI生成の表示）を確かめる
     const saveEnv = {}; ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'AI_DAILY_VIDEO'].forEach((k) => { saveEnv[k] = process.env[k]; });
     Object.assign(process.env, { TIKTOK_CLIENT_KEY: 'k', TIKTOK_CLIENT_SECRET: 's', GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 'gs' });
     delete process.env.OPENAI_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
     let lp = (await req('GET', '/service/lp')).text;
-    ok(lp.includes('TikTok：') && lp.includes('YouTube：') && !lp.includes('AI生成') && !lp.includes('合成した内容'), 'TikTok・YouTubeを提供していても、このサービスのAIが無ければ、AI生成の表示の説明は出さない');
+    ok(lp.includes('TikTok：') && lp.includes('YouTube：') && !lp.includes('表示を自動で付け') && !lp.includes('合成した内容'), 'TikTok・YouTubeを提供していても、このサービスのAIが無ければ、AI生成の表示を自動で付けるという説明は出さない');
     process.env.OPENAI_API_KEY = 'ok';
     lp = (await req('GET', '/service/lp')).text;
     ok(lp.includes('このサービスのAIで作った画像には、TikTokの「AI生成」の表示') && lp.includes('ほかのAIで作ってアップロードしたものには、このサービスは表示を付けません') && !lp.includes('合成した内容'), '画像だけを作れる設定では、TikTokの説明は「画像には」とし、YouTubeの申告の説明は出さない');
@@ -136,6 +182,29 @@ function webhook(event, secret = 'whsec_e2e') {
     lp = (await req('GET', '/service/lp')).text;
     ok(lp.includes('このサービスのAIで作った画像・動画には') && lp.includes('このサービスのAIで作った動画は、合成した内容として申告します'), '動画も作れる設定では、TikTokは「画像・動画」、YouTubeの申告の説明も出す');
     Object.keys(saveEnv).forEach((k) => { if (saveEnv[k] === undefined) delete process.env[k]; else process.env[k] = saveEnv[k]; });
+  }
+  {
+    // AI生成の表示の文と、比べる条件の言い方を、設定の組み合わせごとに確かめる
+    const uiC = require('../lib/service-ui');
+    const keys = ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'AI_DAILY_VIDEO', 'SERVICE_PRICE_JPY'];
+    const save = {}; keys.forEach((k) => { save[k] = process.env[k]; });
+    const aiSec = (h) => h.slice(h.indexOf('<section id="ai">'), h.indexOf('</section>', h.indexOf('<section id="ai">')));
+    delete process.env.ANTHROPIC_API_KEY; delete process.env.SERVICE_PRICE_JPY;
+    Object.assign(process.env, { TIKTOK_CLIENT_KEY: 'k', TIKTOK_CLIENT_SECRET: 's', GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 'gs', OPENAI_API_KEY: 'ok', GEMINI_API_KEY: 'gk', AI_DAILY_VIDEO: '1' });
+    let h = uiC.lpPage({ user: null, billingReady: false });
+    ok(aiSec(h).includes('このサービスのAIで作った画像・動画をTikTokに、動画をYouTubeに投稿するときは、AI生成の表示を自動で付けます'), 'TikTok・YouTubeと、画像・動画のAIがあるときは、TikTokは画像・動画、YouTubeは動画と書く');
+    delete process.env.TIKTOK_CLIENT_KEY; delete process.env.TIKTOK_CLIENT_SECRET; delete process.env.OPENAI_API_KEY;
+    h = uiC.lpPage({ user: null, billingReady: false });
+    ok(aiSec(h).includes('このサービスのAIで作った動画をYouTubeに投稿するときは、AI生成の表示を自動で付けます') && !aiSec(h).includes('TikTok') && aiSec(h).includes('AIが動画を作ります') && h.includes('このサービスのAIでは、動画を作れます（回数の上限があります）') && h.includes('／このサービスのAIで動画を作る（回数の上限あり）') && !h.includes('このサービスのAIでは、文章') && !h.includes('このサービスのAIでも作れます'), 'このサービスのAIが動画だけのときは、AIの段・料金の段・よくある質問に「動画」とだけ書く（文章・画像も作れるように読ませない。YouTubeだけなら、TikTokの名前は出さない）');
+    delete process.env.GOOGLE_CLIENT_ID; delete process.env.GOOGLE_CLIENT_SECRET; delete process.env.GEMINI_API_KEY; delete process.env.AI_DAILY_VIDEO;
+    h = uiC.lpPage({ user: null, billingReady: false });
+    ok(h.includes('予約の上限・使えるSNS・無料体験などの条件は異なります'), '無料体験が無いときは、無料体験も違う条件として書く');
+    h = uiC.lpPage({ user: null, billingReady: false, trialDays: 7 });
+    ok(h.includes('予約の上限・使えるSNSなどの条件は異なります') && !h.includes('使えるSNS・無料体験などの条件は異なります'), '無料体験の日数が比べた相手と同じ（7日間）なら、無料体験を違う条件として書かない');
+    process.env.SERVICE_PRICE_JPY = '1000';
+    h = uiC.lpPage({ user: null, billingReady: false });
+    ok(h.includes('と比べて、半額より安い金額です（同じプランの年払い（1か月あたり2,000円・税込）と比べても半額以下です）') && !h.includes('ちょうど半額'), '月額が半額より安く、年払いと比べても半額以下なら、そのとおりに書く');
+    keys.forEach((k) => { if (save[k] === undefined) delete process.env[k]; else process.env[k] = save[k]; });
   }
   ok(r.text.includes('SNSへの投稿を、まとめて予約。') && !r.text.includes('複数のSNSへの投稿を') && !r.text.includes('いくつものSNS') && !r.text.includes('SNSごとに本文') && !r.text.includes('公式の料金ページで確認') && r.text.includes('公式サイト（料金と概要のページ）'), '使えるSNSが1つだけのときは、LPで「複数のSNS」と書かない。比較の確認元は「料金と概要のページ」');
   process.env.FACEBOOK_APP_ID = 'fb'; process.env.FACEBOOK_APP_SECRET = 'fbs';
@@ -150,16 +219,16 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(uiMod.compareActive(1000, Date.parse('2026-11-01T00:00:00+09:00')) && !uiMod.compareActive(1000, Date.parse('2026-12-15T00:00:00+09:00')), '価格を確認した日から45日を過ぎたら、比較を自動で出さない');
   process.env.SERVICE_LP_COMPARE = 'off';
   r = await req('GET', '/service/lp');
-  ok(!r.text.includes('半額以下') && !r.text.includes('料金の比べ方'), '運営者は、比較の表示を止められる（SERVICE_LP_COMPARE=off）');
+  ok(!r.text.includes('半額') && !r.text.includes('料金の比べ方'), '運営者は、比較の表示を止められる（SERVICE_LP_COMPARE=off）');
   delete process.env.SERVICE_LP_COMPARE;
   r = await req('GET', '/service/legal/terms');
   ok(r.text.includes('「SNSまとめて予約」') && !r.text.includes('ミチシルベ'), '法務文書のサービス名は、設定（SERVICE_NAME）から入り、ミチシルベの名前を出さない');
   process.env.SERVICE_PRICE_JPY = '1500';
   r = await req('GET', '/service/lp');
-  ok(!r.text.includes('半額以下'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');
+  ok(!r.text.includes('半額'), '月額を変えて半額以下でなくなったら、半額の比較を出さない');
   delete process.env.SERVICE_PRICE_JPY;
   r = await req('GET', '/service/legal/tokushoho');
-  ok(r.status === 200 && r.text.includes('月額1,000円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
+  ok(r.status === 200 && r.text.includes('月額1,100円（税込）') && r.text.includes('<table>'), '特商法表記を表示できる');
   ok(r.text.includes('support@example.com') && !r.text.includes('【メールアドレス】') && r.text.includes('電話番号'), '特商法表記の連絡先に設定したメールアドレスを表示し、電話番号の開示請求について記載する');
   r = await req('GET', '/service/legal/terms');
   ok(r.status === 200 && r.text.includes('第5条（解約）') && r.text.includes('第7条（AIによる生成）'), '利用規約を表示できる');
@@ -185,7 +254,7 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 400 && r.text.includes('既に登録'), '同じメールアドレスでは二重に登録できない');
   r = await req('GET', '/service/checkout');
   ok(r.text.includes('提供の時期') && r.text.includes('お支払いが確認できない間は'), '最終確認画面に提供の時期と、お支払いが確認できない場合の扱いを表示する');
-  ok(r.status === 200 && r.text.includes('月額 1,000円（税込）') && r.text.includes('自動更新') && r.text.includes('解約') && r.text.includes('返金'), '最終確認画面に金額・自動更新・解約・返金を表示する');
+  ok(r.status === 200 && r.text.includes('月額 1,100円（税込）') && r.text.includes('自動更新') && r.text.includes('解約') && r.text.includes('返金'), '最終確認画面に金額・自動更新・解約・返金を表示する');
   const csrf = csrfOf(r.text);
   ok(!!csrf, '最終確認画面にCSRFトークンがある');
   r = await req('POST', '/service/checkout', { body: { csrf: 'wrong', agree: '1' } });
@@ -203,7 +272,7 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(cl.length === 1 && cl[0].kind === 'checkout' && cl[0].terms_version && cl[0].ip && Object.keys(cDocs).length === 3, '申込みの同意を、規約の版・3つの文書の控え・IPアドレスつきで記録する');
   const snap = consentLib.getSnapshot(Object.values(cDocs)[0]);
   ok(snap && snap.text.includes('第1条') === Object.keys(cDocs)[0].includes('利用規約') && consentLib.sha256(snap.text) === Object.values(cDocs)[0], '同意した時点の文書の本文を控えとして残し、ハッシュで照合できる');
-  ok(JSON.parse(cl[0].detail).price === 1000, '同意したときの料金も記録する');
+  ok(JSON.parse(cl[0].detail).price === 1100, '同意したときの料金も記録する');
   ok(typeof consentLib.update === 'undefined' && typeof consentLib.remove === 'undefined', '同意の記録は追記だけで、変更・削除の機能を持たない');
   ok(!store.Subscriptions.isActive(userIdForSub), '決済が完了するまでは契約中にならない');
   r = await req('GET', '/service/api/status');

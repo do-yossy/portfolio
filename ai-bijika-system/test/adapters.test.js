@@ -1,5 +1,7 @@
 'use strict';
 // SNSアダプタ単体のテスト（カルーセル・ツリー。外部通信はモック）
+// ほかのテストと同じく、一時ディレクトリをデータの置き場にする（リポジトリの data/ を使わない）
+process.env.DATA_DIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'aibj-adapters-'));
 process.env.SNS_POLL_INTERVAL_MS = '1';
 process.env.SNS_POLL_MAX_MS = '200';
 const { ok, summary, installHttpsMock } = require('./helpers');
@@ -239,7 +241,7 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   });
   err = null; try { await tk.publish({ accessToken: 't', post: { category: 'image', text: 'a', medias: [img(1)], options: { privacy_level: 'SELF_ONLY' } } }); } catch (e) { err = e; }
   mock.restore();
-  ok(err && !err.authError && /非公開/.test(err.message), 'TikTokの「審査前は非公開アカウントだけ」の拒否は、連携のやり直しにせず、理由を日本語で示す');
+  ok(err && !err.authError && /非公開/.test(err.message), 'TikTokの「投稿の監査（Audit）の前は非公開アカウントだけ」の拒否は、連携のやり直しにせず、理由を日本語で示す');
   mock = installHttpsMock(async (c) => {
     if (c.path === '/v2/post/publish/creator_info/query/') return { status: 200, json: { data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } } };
     if (c.path === '/v2/post/publish/content/init/') return { status: 200, json: { data: { publish_id: 'pa' }, error: { code: 'ok' } } };

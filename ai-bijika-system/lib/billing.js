@@ -51,6 +51,8 @@ async function createCheckoutSession({ userId, email, customerId, trialDays = 0 
     cancel_url: `${c.baseUrl}/service/checkout/cancel`,
     client_reference_id: userId,
     locale: 'ja',
+    // お支払い方法はクレジットカードだけにする（特商法表記・利用規約・画面の「クレジットカード」と合わせる。変えるときは、それらも直す）
+    payment_method_types: ['card'],
     metadata: { user_id: userId },
     subscription_data: { metadata: { user_id: userId }, ...(trialDays > 0 ? { trial_period_days: trialDays } : {}) },
     // トライアルでも支払い方法の登録を必須にする（期間が終わると自動で課金される）
