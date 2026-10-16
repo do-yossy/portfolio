@@ -1,10 +1,29 @@
 import { verifySignature, createCheckoutSession, getCheckoutSession, createPortalSession } from './stripe.js';
-import { upsertMember, insertMemberIfAbsent, setStatus, findByToken, recordEvent, forgetEvent, isActive } from './db.js';
+import {
+  upsertMember, insertMemberIfAbsent, setStatus, recordEvent, forgetEvent, isActive,
+  newToken, claimCheckout, createSession, findBySession,
+} from './db.js';
 import { TEMPLATES, findTemplate } from './content.js';
-import { html, landing, successPage, pendingPage, memberPage, templatePage, inactivePage, notFound } from './pages.js';
+import { html, landing, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound } from './pages.js';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
+
+const COOKIE = 'sakumon_session';
+
+function readCookie(request, name) {
+  for (const part of (request.headers.get('cookie') || '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
+  }
+  return null;
+}
+
+// URL に秘密を載せず、購入したブラウザだけが持つ Cookie で本人を確認する
+const sessionCookie = (token) => `${COOKIE}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000`;
+const currentMember = (request, env) => findBySession(env.DB, readCookie(request, COOKIE));
+
+const redirect = (url) => Response.redirect(url, 303);
 
 // Stripe イベント → 契約状態。到着順が前後しても upsert で収束させる
 export async function handleEvent(db, ev) {
@@ -70,9 +89,10 @@ export default {
 
     if (pathname === '/subscribe' && method === 'GET') {
       const s = await createCheckoutSession(env, url.origin);
-      return Response.redirect(s.url, 303);
+      return redirect(s.url);
     }
 
+    // 申込完了。会員証(Cookie)を渡せるのは、1回の申込につき最初の1回だけ
     if (pathname === '/success' && method === 'GET') {
       const id = url.searchParams.get('session_id');
       if (!id) return notFound();
@@ -84,20 +104,29 @@ export default {
         email: s.customer_details?.email,
         status: s.payment_status === 'paid' ? 'active' : 'incomplete',
       });
-      return html(successPage(`${url.origin}/m/${m.token}`));
+      if (await claimCheckout(env.DB, s.id)) {
+        const token = newToken();
+        await createSession(env.DB, m.customer_id, token);
+        return html(successPage(), 200, { 'Set-Cookie': sessionCookie(token) });
+      }
+      // 2回目以降: すでにこのブラウザが会員証を持っていれば、そのまま案内する。持っていなければ渡さない
+      const me = await currentMember(request, env);
+      return me && me.customer_id === m.customer_id ? html(successPage()) : html(claimedPage(), 403);
     }
 
-    const m = pathname.match(/^\/m\/([0-9a-f]{48})(?:\/(portal|t\/([\w-]+)))?$/);
-    if (m && method === 'GET') {
-      const member = await findByToken(env.DB, m[1]);
+    if (pathname === '/m' || pathname.startsWith('/m/')) {
+      if (method !== 'GET') return notFound();
+      const member = await currentMember(request, env);
+      if (!member) return html(inactivePage(), 403);
       if (!isActive(member)) return html(inactivePage(), 403);
-      if (!m[2]) return html(memberPage(member.token, TEMPLATES));
-      if (m[2] === 'portal') {
-        const p = await createPortalSession(env, member.customer_id, `${url.origin}/m/${member.token}`);
-        return Response.redirect(p.url, 303);
+      if (pathname === '/m') return html(memberPage(TEMPLATES));
+      if (pathname === '/m/portal') {
+        const p = await createPortalSession(env, member.customer_id, `${url.origin}/m`);
+        return redirect(p.url);
       }
-      const t = findTemplate(m[3]);
-      return t ? html(templatePage(member.token, t)) : notFound();
+      const t = pathname.match(/^\/m\/t\/([\w-]+)$/);
+      const tpl = t && findTemplate(t[1]);
+      return tpl ? html(templatePage(tpl)) : notFound();
     }
 
     return notFound();

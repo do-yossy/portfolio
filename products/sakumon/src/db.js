@@ -42,3 +42,34 @@ export async function recordEvent(db, id) {
 export const forgetEvent = (db, id) => db.prepare('DELETE FROM events WHERE id = ?').bind(id).run();
 
 export const isActive = (m) => !!m && (m.status === 'active' || m.status === 'trialing');
+
+// ---- ブラウザ単位の会員証 ----
+export const MAX_DEVICES = 3;
+
+async function sha256Hex(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 1回の申込(Checkout Session)から会員証を受け取れるのは最初の1回だけ。初回なら true
+export async function claimCheckout(db, checkoutId) {
+  const r = await db.prepare('INSERT OR IGNORE INTO claimed_checkouts (id, created_at) VALUES (?, ?)').bind(checkoutId, now()).run();
+  return (r.meta?.changes ?? r.changes) > 0;
+}
+
+// 新しい会員証を発行する。同じ契約の端末が MAX_DEVICES を超えないよう、古いものから失効させる
+export async function createSession(db, customer, token) {
+  await db
+    .prepare('DELETE FROM sessions WHERE customer_id = ? AND id NOT IN (SELECT id FROM sessions WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?)')
+    .bind(customer, customer, MAX_DEVICES - 1)
+    .run();
+  await db.prepare('INSERT INTO sessions (id, customer_id, created_at) VALUES (?, ?, ?)').bind(await sha256Hex(token), customer, now()).run();
+}
+
+export async function findBySession(db, token) {
+  if (!token) return null;
+  return db
+    .prepare('SELECT m.* FROM sessions s JOIN members m ON m.customer_id = s.customer_id WHERE s.id = ?')
+    .bind(await sha256Hex(token))
+    .first();
+}

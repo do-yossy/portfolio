@@ -49,6 +49,8 @@ async function api(env, method, path, params) {
 export function createCheckoutSession(env, origin) {
   return api(env, 'POST', '/checkout/sessions', {
     mode: 'subscription',
+    // 会社が販売者として売る前提(特商法表記)。Managed Payments(Stripeが販売者)は使わない
+    'managed_payments[enabled]': 'false',
     'line_items[0][price]': env.STRIPE_PRICE_ID,
     'line_items[0][quantity]': '1',
     success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,

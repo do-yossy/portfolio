@@ -30,6 +30,16 @@ function makeDb() {
 const SECRET = 'whsec_test';
 const env = { DB: makeDb(), STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_PRICE_ID: 'price_x' };
 
+// Stripe API の擬似応答(申込完了画面が Checkout Session を取りにいく)
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (u) => {
+  const m = String(u).match(/checkout\/sessions\/(cs_\w+)/);
+  if (m) {
+    return new Response(JSON.stringify({ id: m[1], status: 'complete', customer: 'cus_1', subscription: 'sub_1', payment_status: 'paid', customer_details: { email: 'a@example.com' } }), { status: 200 });
+  }
+  return new Response('{}', { status: 404 });
+};
+
 async function sign(body, secret = SECRET, t = Math.floor(Date.now() / 1000)) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = [...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${t}.${body}`)))]
@@ -45,8 +55,9 @@ async function send(ev, header) {
   return res.status;
 }
 
-const get = (path) => worker.fetch(new Request(`https://x.test${path}`), env);
+const get = (path, cookie) => worker.fetch(new Request(`https://x.test${path}`, { headers: cookie ? { cookie } : {} }), env);
 const row = () => env.DB.prepare('SELECT * FROM members WHERE customer_id = ?').bind('cus_1').first();
+const cookieOf = (res) => (res.headers.get('set-cookie') || '').split(';')[0];
 
 // --- 署名 ---
 ok((await send({ id: 'e0', type: 'x' }, 't=1,v1=bad')) === 400, '不正な署名は400');
@@ -56,15 +67,35 @@ ok((await send({ id: 'e1', type: 'x' })) === 200, '正しい署名は200');
 
 // --- 契約の開始 ---
 ok((await send({ id: 'e2', type: 'checkout.session.completed', data: { object: { mode: 'subscription', customer: 'cus_1', subscription: 'sub_1', payment_status: 'paid', customer_details: { email: 'a@example.com' } } } })) === 200, 'checkout完了');
-let m = await row();
+const m = await row();
 ok(m && m.status === 'active' && m.email === 'a@example.com', '契約中として記録');
 
+// --- 会員証は、購入したブラウザにだけ渡る ---
+ok((await get('/m')).status === 403, '会員証のないブラウザは会員ページを開けない');
+ok((await get(`/m/${m.token}`)).status !== 200, '以前のトークンURLは使えない');
+const first = await get('/success?session_id=cs_A');
+const cookie = cookieOf(first);
+ok(first.status === 200 && cookie.startsWith('sakumon_session=') && (first.headers.get('set-cookie') || '').includes('HttpOnly'), '申込完了で会員証(HttpOnly Cookie)が渡る');
+ok(!(await first.text()).includes(cookie.split('=')[1]), '会員証の値が画面に表示されない');
+const second = await get('/success?session_id=cs_A');
+ok(second.status === 403 && !second.headers.get('set-cookie'), '同じ申込完了URLを別のブラウザで開いても会員証は渡らない');
+ok((await get('/success?session_id=cs_A', cookie)).status === 200, '会員証を持つブラウザは申込完了画面をもう一度見られる');
+
 // --- アクセス制御 ---
-const page = await get(`/m/${m.token}`);
-ok(page.status === 200 && (await page.text()).includes('学級通信'), '契約中は会員ページが見える');
-ok((await get(`/m/${m.token}/t/gakkyu-tsushin`)).status === 200, '契約中は教材が見える');
-ok((await get(`/m/${'0'.repeat(48)}`)).status === 403, '存在しないトークンは403');
-ok((await get('/m/short')).status === 404, '形式の違うURLは404');
+const page = await get('/m', cookie);
+ok(page.status === 200 && (await page.text()).includes('学級通信'), '会員証のあるブラウザは会員ページが見える');
+ok((await get('/m/t/gakkyu-tsushin', cookie)).status === 200, '会員証のあるブラウザは教材が見える');
+ok((await get('/m/t/gakkyu-tsushin')).status === 403, '会員証のないブラウザは教材が見えない');
+ok((await get('/m', 'sakumon_session=' + '0'.repeat(48))).status === 403, 'でたらめな会員証は無効');
+
+// --- 端末数の上限(3台)---
+const c2 = cookieOf(await get('/success?session_id=cs_B'));
+const c3 = cookieOf(await get('/success?session_id=cs_C'));
+ok((await get('/m', c2)).status === 200 && (await get('/m', c3)).status === 200 && (await get('/m', cookie)).status === 200, '3台までは同時に使える');
+const c4 = cookieOf(await get('/success?session_id=cs_D'));
+ok((await get('/m', c4)).status === 200, '4台目も使える');
+ok((await get('/m', cookie)).status === 403, '4台目を使い始めると、最も古い端末は使えなくなる');
+ok((await get('/m', c2)).status === 200, '新しい端末は使えたまま');
 
 // --- 再送(冪等) ---
 ok((await send({ id: 'e2', type: 'checkout.session.completed', data: { object: { mode: 'subscription', customer: 'cus_1', payment_status: 'unpaid' } } })) === 200, '同じイベントIDの再送は200');
@@ -73,14 +104,15 @@ ok((await row()).status === 'active', '再送で状態が変わらない');
 // --- 支払い失敗・回復 ---
 await send({ id: 'e3', type: 'invoice.payment_failed', data: { object: { customer: 'cus_1' } } });
 ok((await row()).status === 'past_due', '支払い失敗でpast_due');
-ok((await get(`/m/${m.token}`)).status === 403, 'past_dueは教材が見えない');
+ok((await get('/m', c4)).status === 403, 'past_dueは教材が見えない');
 await send({ id: 'e4', type: 'invoice.paid', data: { object: { customer: 'cus_1' } } });
 ok((await row()).status === 'active', '支払い成功でactiveに戻る');
+ok((await get('/m', c4)).status === 200, '回復すると、同じ端末で再び見える');
 
 // --- 解約 ---
 await send({ id: 'e5', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1', customer: 'cus_1' } } });
 ok((await row()).status === 'canceled', '解約でcanceled');
-ok((await get(`/m/${m.token}`)).status === 403, '解約後は教材が見えない');
+ok((await get('/m', c4)).status === 403, '解約後は会員証があっても教材が見えない');
 await send({ id: 'e6', type: 'invoice.paid', data: { object: { customer: 'cus_1' } } });
 ok((await row()).status === 'canceled', '解約後に遅れて届いたinvoice.paidで復活しない');
 
@@ -92,5 +124,6 @@ ok(m2 && m2.status === 'active', 'subscription.createdが先に届いても契�
 ok((await get('/')).status === 200, 'LPが表示される');
 ok((await get('/nope')).status === 404, '未定義のパスは404');
 
+globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
