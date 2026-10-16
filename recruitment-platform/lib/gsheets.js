@@ -53,6 +53,23 @@ function loadCredentials() {
   return _cachedCreds;
 }
 
+// 通信レベルの失敗（"fetch failed"：DNS・回線の一時切断・VPN/プロキシ・タイムアウトなど）は
+// HTTPエラーと違って例外で返るため、ここで数回だけ待って再試行する（書き込みは同じ内容の再送で冪等）。
+const NET_RETRIES = Number(process.env.SHEETS_NET_RETRIES || 4);
+async function fetchRetry(url, opts) {
+  let lastErr;
+  for (let i = 0; i <= NET_RETRIES; i++) {
+    try {
+      return await fetch(url, { ...opts, signal: AbortSignal.timeout(Number(process.env.SHEETS_FETCH_TIMEOUT_MS || 60000)) });
+    } catch (e) {
+      lastErr = e;
+      if (i === NET_RETRIES) break;
+      await new Promise(r => setTimeout(r, Math.min(15000, 1500 * Math.pow(2, i)) + Math.floor(Math.random() * 500)));
+    }
+  }
+  const cause = lastErr && lastErr.cause ? (lastErr.cause.code || lastErr.cause.message) : '';
+  throw new Error(`Googleへの通信に失敗しました（${lastErr && lastErr.message}${cause ? ' / ' + cause : ''}）。回線・VPN・プロキシ・PCのスリープ復帰直後でないか確認してください`);
+}
 // JWT を生成して access_token を取得（5分マージンでキャッシュ）
 async function getAccessToken() {
   if (_cachedToken && _cachedToken.exp - 300 > Math.floor(Date.now() / 1000)) {
@@ -73,7 +90,7 @@ async function getAccessToken() {
     grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
     assertion: jwt,
   });
-  const res = await fetch(TOKEN_URL, {
+  const res = await fetchRetry(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
@@ -104,7 +121,7 @@ async function api(path, { method = 'GET', body } = {}) {
   let lastErr;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const token = await getAccessToken();
-    const res = await fetch(SHEETS_BASE + path, {
+    const res = await fetchRetry(SHEETS_BASE + path, {
       method,
       headers: {
         Authorization: 'Bearer ' + token,
