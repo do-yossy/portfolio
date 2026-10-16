@@ -5,6 +5,7 @@ const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
 const poll = require('./poll');
 const { normalize } = require('./post');
+const { idString } = require('./ids');
 
 const API_VERSION = 'v22.0';
 const GRAPH = 'graph.instagram.com';
@@ -40,7 +41,8 @@ function authUrl({ state, redirectUri }) {
 // 2207001：サーバーのエラー／2207003：メディアの取得のタイムアウト／2207032：作成の失敗／2207053：新しいコンテナで再試行／2207008：公開の一時的なエラー／2207027：まだ公開の準備ができていない
 const TRANSIENT_SUBCODES = [2207001, 2207003, 2207032, 2207053, 2207008, 2207027];
 
-async function call({ host = GRAPH, method = 'GET', path, query, form }) {
+// raw：true なら、応答の JSON と元の文字列 { json, text } を返す（大きな数値のIDを、丸めずに取り出すため。lib/sns/ids.js）
+async function call({ host = GRAPH, method = 'GET', path, query, form, raw }) {
   const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
   let r;
   try {
@@ -48,7 +50,7 @@ async function call({ host = GRAPH, method = 'GET', path, query, form }) {
   } catch (e) {
     throw new SnsError(`Instagramに接続できませんでした (${e.message})`, { retriable: true });
   }
-  if (r.status >= 200 && r.status < 300 && r.json) return r.json;
+  if (r.status >= 200 && r.status < 300 && r.json) return raw ? { json: r.json, text: r.text } : r.json;
   const em = r.json && r.json.error;
   const err = classify(r.status, em && em.message ? `Instagram: ${em.message}` : '');
   // 認証エラーと判断するのは、トークンの失効・無効を示すコード(190)のときだけ（他のOAuthExceptionは連携を無効にしない）
@@ -61,15 +63,29 @@ async function call({ host = GRAPH, method = 'GET', path, query, form }) {
 
 async function exchangeCode({ code, redirectUri }) {
   const c = creds();
-  const short = await call({ host: 'api.instagram.com', method: 'POST', path: '/oauth/access_token', form: { client_id: c.appId, client_secret: c.appSecret, grant_type: 'authorization_code', redirect_uri: redirectUri, code } });
+  const shortRes = await call({ host: 'api.instagram.com', method: 'POST', path: '/oauth/access_token', form: { client_id: c.appId, client_secret: c.appSecret, grant_type: 'authorization_code', redirect_uri: redirectUri, code }, raw: true });
+  const short = shortRes.json;
   const first = (short.data && short.data[0]) || short;
   const long = await call({ path: '/access_token', query: { grant_type: 'ig_exchange_token', client_secret: c.appSecret, access_token: first.access_token } });
-  const me = await call({ path: `/${API_VERSION}/me`, query: { fields: 'user_id,username', access_token: long.access_token } });
+  // id も取る（Metaから届く削除の求めの照合用）
+  const meRes = await call({ path: `/${API_VERSION}/me`, query: { fields: 'id,user_id,username', access_token: long.access_token }, raw: true });
+  const me = meRes.json;
+  // IDが JSON の数値で届いても、桁を丸めない（範囲外で取り出せなければ ''。丸めた値は保存しない）
+  const tokenUserId = idString(first.user_id, shortRes.text, 'user_id');
+  const meUserId = idString(me.user_id, meRes.text, 'user_id');
+  const meId = idString(me.id, meRes.text, 'id');
+  const externalUserId = meUserId || meId || tokenUserId;
+  // 照合用のIDが1つも無いと、Metaから届く削除の求めに応えられないため、連携を止める
+  if (!externalUserId || (!tokenUserId && !meId)) throw new SnsError('InstagramのユーザーIDを取得できませんでした。時間をおいて、もう一度連携してください。');
   return {
     accessToken: long.access_token, refreshToken: '',
     expiresAt: new Date(Date.now() + (Number(long.expires_in) || 60 * 24 * 3600) * 1000).toISOString(),
-    externalUserId: String(me.user_id || me.id || first.user_id),
+    externalUserId,
     handle: me.username ? `@${me.username}` : '',
+    // Instagram側の利用者IDは2種類ある（トークンの応答の user_id と、/me の user_id。公式の business-login の説明）。
+    // Metaから届く削除の求めの user_id がどれに当たるかは未確認（実物で確かめる）のため、/me の id とあわせて、すべて控える
+    providerUserId: tokenUserId,
+    providerAltId: meId,
   };
 }
 

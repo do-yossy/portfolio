@@ -20,6 +20,9 @@ const oauth = require('./oauth');
 const consent = require('./consent');
 const ai = require('./ai');
 const aiAuto = require('./ai-auto');
+const metaSigned = require('./meta-signed-request');
+const metaDeletion = require('./meta-deletion');
+const snsDisconnect = require('./sns/disconnect');
 
 const loginLimiter = createLimiter({ max: 8, windowMs: 15 * 60 * 1000 });
 const signupLimiter = createLimiter({ max: 10, windowMs: 60 * 60 * 1000 });
@@ -133,6 +136,44 @@ async function handle(ctx) {
     return true;
   }
 
+  // ── データ削除の手順（ログイン不要。各SNSのアプリの「ユーザーデータ削除の手順のURL」に登録できる）──
+  if (pathname === '/service/legal/data-deletion' && method === 'GET') { sendHtml(res, 200, ui.dataDeletionPage({ user })); return true; }
+
+  // ── Meta（Threads・Instagram・Facebook）から届く、データ削除の求めと連携の取り消しの知らせ（ログイン不要。signed_request の署名で確かめる）──
+  // 各アプリの管理画面に登録するURL：/service/meta/<SNS>/data-deletion（データ削除）と /service/meta/<SNS>/deauthorize（取り消し）
+  const metaMatch = pathname.match(/^\/service\/meta\/(threads|instagram|facebook)\/(data-deletion|deauthorize)$/);
+  if (metaMatch) {
+    if (method !== 'POST') { res.writeHead(405, { Allow: 'POST', 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: 'method not allowed' })); return true; }
+    const [, platform, action] = metaMatch;
+    const secret = metaSigned.secretFor(platform);
+    if (!secret) { sendJson(res, 503, { error: 'not configured' }); return true; }
+    let raw;
+    try { raw = await readRaw(req, 64 * 1024); } catch { sendJson(res, 413, { error: 'too large' }); return true; }
+    const v = metaSigned.parse(metaSigned.fromBody(raw, req.headers['content-type']), secret);
+    if (!v.ok) { console.warn('[meta]', platform, action, v.error); sendJson(res, 400, { error: 'invalid signed_request' }); return true; }
+    let r;
+    try {
+      r = metaDeletion.handle({ platform, kind: action === 'data-deletion' ? 'deletion' : 'deauthorize', userId: v.userId });
+    } catch (e) {
+      console.error('[meta]', platform, action, e.message);
+      sendJson(res, 500, { error: 'failed' });
+      return true;
+    }
+    // 取り消しの知らせへの応答の形は、公式に定めが見当たらない（未確認）。受け取ったことだけを返す
+    if (action === 'deauthorize') { sendJson(res, 200, { received: true }); return true; }
+    // データ削除：公式の形 { url, confirmation_code }。url は、人が処理の状況を読めるページ（ログイン不要）
+    const base = String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, '') || `https://${String(req.headers.host || '').replace(/[^A-Za-z0-9.:-]/g, '')}`;
+    sendJson(res, 200, { url: `${base}/service/meta/deletion?code=${r.code}`, confirmation_code: r.code });
+    return true;
+  }
+  // 削除の状況のページ（ログイン不要。確認コードで開く）
+  if (pathname === '/service/meta/deletion' && method === 'GET') {
+    const code = String(url.searchParams.get('code') || '').trim();
+    const request = metaDeletion.getRequest(code);
+    sendHtml(res, request || !code ? 200 : 404, ui.metaDeletionStatusPage({ request, code: code.slice(0, 64), user }));
+    return true;
+  }
+
   if (pathname === '/service/docs/skill.md' && method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
     res.end(fs.readFileSync(path.join(__dirname, '..', 'skill', 'SKILL.md')));
@@ -198,6 +239,7 @@ async function handle(ctx) {
       user, sub: Subscriptions.get(user.id), accounts: SnsAccounts.listForUser(user.id), apiKeys: ApiKeys.listForUser(user.id), mcpConnections: oauth.listConnections(user.id), aiAvail: ai.available(), autoRules: AutoRules.listForUser(user.id), newKey: newKey || '',
       posts: ScheduledPosts.listForUser(user.id), csrf: token, flash,
       snsReady: core.snsEnabled(), portalReady: billingReady,
+      removalNotices: metaDeletion.Notices.listForUser(user.id),
     }));
   };
   const needCsrf = async () => {
@@ -264,6 +306,28 @@ async function handle(ctx) {
     } catch (e) {
       if (e && e.authError) SnsAccounts.setStatus(acc.id, 'reauth_required');
       sendJson(res, 502, { error: 'TikTokの投稿設定を取得できませんでした。時間をおいてもう一度お試しください。' });
+    }
+    return true;
+  }
+
+  // Threadsの最近の投稿（threads_basic の録画の要件）。連携した本人だけが、自分の連携の分だけを見られる。
+  // 開くたびにThreadsから取得して画面に出すだけで、DBには保存しない（Cache-Control: no-store で、ブラウザにも残さない）
+  const recentMatch = pathname.match(/^\/service\/app\/threads\/([a-f0-9]+)\/recent$/);
+  if (recentMatch && method === 'GET') {
+    const acc = SnsAccounts.getForUser(recentMatch[1], user.id);
+    // 他人の連携・存在しない連携・Threads以外の連携は、あるかどうかも分からないよう、同じ 404 にする
+    if (!acc || acc.platform !== 'threads') { sendHtml(res, 404, ui.threadsRecentPage({ user, account: null, error: 'この連携は見つかりませんでした。' })); return true; }
+    if (!Subscriptions.isActive(user.id)) { redirect(res, '/service/app'); return true; }
+    if (acc.status !== 'active') { sendHtml(res, 409, ui.threadsRecentPage({ user, account: acc, error: 'この連携は、再連携が必要です。マイページから連携をやり直してください。' })); return true; }
+    try {
+      const adapter = registry.get('threads');
+      const accessToken = await scheduler.ensureAccessToken(acc, adapter);
+      const items = await adapter.listRecent({ accessToken, externalUserId: acc.external_user_id, limit: 20 });
+      sendHtml(res, 200, ui.threadsRecentPage({ user, account: acc, items }));
+    } catch (e) {
+      if (e && e.authError) SnsAccounts.setStatus(acc.id, 'reauth_required');
+      console.error('[threads recent]', e && e.message);
+      sendHtml(res, 502, ui.threadsRecentPage({ user, account: acc, error: e && e.authError ? 'Threadsの連携が無効になっていました。マイページから連携をやり直してください。' : 'Threadsから投稿を取得できませんでした。時間をおいてもう一度お試しください。' }));
     }
     return true;
   }
@@ -386,7 +450,7 @@ async function handle(ctx) {
       let tree = []; try { tree = JSON.parse(dp.tree || '[]'); } catch { tree = []; }
       draft = { id: dp.id, accountId: dp.account_id, category: dp.category || 'text', text: dp.text || '', media: mids.map(mv).filter(Boolean), tree: tree.map((c) => ({ text: c.text || '', media: (c.mediaIds || []).map(mv).filter(Boolean) })) };
     }
-    sendHtml(res, 200, ui.composePage({ user, accounts: SnsAccounts.listForUser(user.id), csrf: token, aiAvail: ai.available(), draft }));
+    sendHtml(res, 200, ui.composePage({ user, accounts: SnsAccounts.listForUser(user.id), csrf: token, aiAvail: ai.available(), draft, sub: Subscriptions.get(user.id) }));
     return true;
   }
   if (pathname === '/service/app/posts' && method === 'POST') {
@@ -435,15 +499,29 @@ async function handle(ctx) {
   const discMatch = pathname.match(/^\/service\/app\/account\/([a-f0-9]+)\/disconnect$/);
   if (discMatch && method === 'POST') {
     const body = await needCsrf(); if (!body) return true;
-    SnsAccounts.remove(discMatch[1], user.id);
+    // YouTube は、行を消す前に Google へトークンの取り消しを送る（失敗しても消す。結果は待たない：lib/sns/disconnect.js）
+    const acc = SnsAccounts.getForUser(discMatch[1], user.id);
+    if (acc) snsDisconnect.removeAccount(acc);
     redirect(res, '/service/app?f=disconnected');
+    return true;
+  }
+  // SNS側の操作で連携を削除したことの知らせを閉じる
+  const noticeMatch = pathname.match(/^\/service\/app\/notice\/([a-f0-9]+)\/dismiss$/);
+  if (noticeMatch && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    metaDeletion.Notices.dismiss(noticeMatch[1], user.id);
+    redirect(res, '/service/app');
     return true;
   }
 
   // SNS連携（OAuth）
+  // 審査（SNS_APPROVED）の前のSNSは、テスト利用の利用者だけが連携を始められる。画面にボタンが無くても、URLを直接開いて始められないよう、ここでも判定する
   const connectMatch = pathname.match(/^\/service\/connect\/([a-z]+)$/);
   if (connectMatch && registry.get(connectMatch[1]) && method === 'GET') {
     if (!Subscriptions.isActive(user.id)) { dashboard(403, { type: 'error', text: 'ご契約が有効でないため、連携できません。' }); return true; }
+    if (registry.get(connectMatch[1]).isConfigured() && !core.connectMode(connectMatch[1], Subscriptions.get(user.id))) {
+      dashboard(403, { type: 'error', text: core.NOT_APPROVED_ERROR }); return true;
+    }
     const r = core.startConnect({ userId: user.id, platform: connectMatch[1] });
     if (!r.ok) { dashboard(400, { type: 'error', text: r.error }); return true; }
     redirect(res, r.url);

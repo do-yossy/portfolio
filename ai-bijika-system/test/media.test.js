@@ -8,6 +8,8 @@ const { Readable } = require('stream');
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-media-'));
 process.env.SNS_TOKEN_KEY = crypto.randomBytes(32).toString('hex');
+// 各SNSの審査（SNS_APPROVED）を通った状態で試す（審査前の扱いは test/service.test.js・test/e2e.test.js で確かめる）
+process.env.SNS_APPROVED = 'threads,x,instagram,tiktok,facebook,youtube';
 process.env.SERVICE_BASE_URL = 'https://example.test';
 process.env.THREADS_APP_ID = 'th'; process.env.THREADS_APP_SECRET = 'ths';
 process.env.INSTAGRAM_APP_ID = 'ig'; process.env.INSTAGRAM_APP_SECRET = 'igs';

@@ -60,6 +60,20 @@ async function ensureAccessToken(account, adapter) {
   return access;
 }
 
+// 投稿へのリンク（permalink）を取得して保存する。対応しているSNS（adapter.permalink があるもの。今は Threads）だけ。
+// 例外は外へ出さない（投稿はすでに済んでいるため、ここでの失敗で投稿を失敗・再試行にしない）
+async function savePermalink(postId, adapter, accessToken, externalId) {
+  if (!externalId || typeof adapter.permalink !== 'function') return '';
+  try {
+    const url = await adapter.permalink({ accessToken, mediaId: externalId });
+    if (url) ScheduledPosts.setPermalink(postId, url);
+    return url || '';
+  } catch (e) {
+    console.error('[permalink]', adapter.id, e && e.message);
+    return '';
+  }
+}
+
 async function processOne(post) {
   const account = SnsAccounts.get(post.account_id);
   if (!account) return ScheduledPosts.markFailed(post.id, '連携が解除されているため投稿できませんでした');
@@ -95,6 +109,8 @@ async function processOne(post) {
     ScheduledPosts.markStarted(post.id);
     const r = await adapter.publish({ accessToken, externalUserId: account.external_user_id, post: full });
     ScheduledPosts.markPosted(post.id, r.externalId);
+    // 投稿済みにしたあとで、投稿へのリンクを取りに行く（Threads）。取れなくても投稿済みのまま（リンクを出さないだけ）
+    await savePermalink(post.id, adapter, accessToken, r.externalId);
   } catch (e) {
     if (e && e.notSent && account.platform === 'youtube') releaseYoutube(post, ptTime.dayBounds(new Date().toISOString()).day);
     if (e && e.authError) {
@@ -138,6 +154,102 @@ async function refreshExpiring(nowMs = Date.now()) {
   return n;
 }
 
+// ── YouTube：Google の側で取り消された連携の検知と削除 ──
+// 公式（YouTube API Services の Developer Policies III.D.2 の2段落目）：Google のセキュリティの設定のページから取り消された場合も、
+// その利用者のデータを削除する。そのために、トークンがまだ有効かを定期的に確かめ、更新できない利用者のデータを削除する。
+// 削除は、取り消しから30日（暦日）以内に行う。
+// 本サービスの作り：
+//   1) checkYoutubeTokens：有効な YouTube の連携のトークンを、1日1回、更新して確かめる。更新できなければ「再連携が必要」にする（reauth_at を記録）
+//   2) purgeRevokedYoutube：「再連携が必要」になってから YOUTUBE_REAUTH_DELETE_DAYS 日たった連携を消す
+// どちらも1時間ごとの定期処理（start の clean）で呼ぶ。投稿の前のトークンの更新（ensureAccessToken）で気づいた場合も、同じく「再連携が必要」になる。
+
+// 確かめる間隔。最後に確かめた日時（token_checked_at。連携した・トークンを更新できたときに記録する）から、この時間以上たった連携だけを確かめる
+const YOUTUBE_TOKEN_CHECK_HOURS = 24;
+// 削除までの日数（「再連携が必要」になった日時 reauth_at から数える）。28日の根拠：
+//   ・取り消しに気づくまで：最長で約25時間。確かめるのは、最後に確かめてから24時間たった後の、最初の1時間ごとの処理のため
+//     （最後に確かめた直後に取り消された場合が最長）
+//   ・気づいてから消すまで：28日と最長1時間。28日たった後の、最初の1時間ごとの処理で消すため
+//   ・合計で、取り消しから最長で28日と26時間（約29.1日）になり、公式の30日以内に収まる。
+//     残りの約1日は、再起動や Google の一時的なエラーで、確かめ・削除が遅れたときの余裕（一時的なエラーのときは、次の1時間ごとの処理で確かめ直す）。
+//   ・30日にすると、気づくまでの時間の分だけ、取り消しから30日を超えることがある。
+// 日数を変えるときは、マイページの文言（lib/service-ui.js。この定数を使う）と、プライバシーポリシー・セットアップ手順の記載もそろえる
+const YOUTUBE_REAUTH_DELETE_DAYS = 28;
+
+// 1) トークンが有効かを確かめる。戻り値は { checked: 確かめた件数, refreshed: 更新できた件数, reauth: 「再連携が必要」にした件数 }
+//   成功：新しいトークンを保存する（updateTokens。確かめた日時も記録する）
+//   invalid_grant などの認証エラー（取り消された・失効した）、または更新用のトークンが無い：「再連携が必要」にする
+//   そのほかのエラー（通信・5xx・429 などの一時的なエラーや、本サービスの設定の誤り invalid_client：クライアントIDやシークレットの誤り）：
+//     何もしない。確かめた日時を記録しないため、次の1時間ごとの処理で確かめ直す（設定の誤りで、全員を「再連携が必要」にしないため）
+// 待っている間に、解除・再連携・投稿の前の更新などで行が変わっていたら、結果を使わない（新しいトークンを、古いトークンの結果で上書きしない）
+let checkingYoutube = false;
+async function checkYoutubeTokens(nowMs = Date.now()) {
+  const res = { checked: 0, refreshed: 0, reauth: 0 };
+  const adapter = registry.get('youtube');
+  // キーが未設定なら確かめない（送っても、本サービスの設定の誤りでしか失敗しないため）。前の回がまだ動いていれば重ねない
+  if (!adapter || typeof adapter.refresh !== 'function' || !adapter.isConfigured() || checkingYoutube) return res;
+  checkingYoutube = true;
+  try {
+    const k = key();
+    const before = new Date(nowMs - YOUTUBE_TOKEN_CHECK_HOURS * 3600 * 1000).toISOString();
+    for (const listed of SnsAccounts.listTokenCheckDue('youtube', before)) {
+      res.checked++;
+      let r = null;
+      let err = null;
+      let noRefresh = false;
+      try {
+        const refreshTok = listed.refresh_token_enc ? box.decrypt(listed.refresh_token_enc, k) : '';
+        if (refreshTok) r = await adapter.refresh({ accessToken: '', refreshToken: refreshTok });
+        else noRefresh = true;
+      } catch (e) { err = e; }
+      const cur = SnsAccounts.get(listed.id);
+      if (!cur || cur.status !== 'active' || cur.refresh_token_enc !== listed.refresh_token_enc) continue;
+      if (r) {
+        SnsAccounts.updateTokens(cur.id, {
+          accessTokenEnc: box.encrypt(r.accessToken, k),
+          refreshTokenEnc: r.refreshToken ? box.encrypt(r.refreshToken, k) : cur.refresh_token_enc,
+          expiresAt: r.expiresAt,
+        });
+        res.refreshed++;
+      } else if (noRefresh || (err && err.authError && err.oauthError !== 'invalid_client')) {
+        SnsAccounts.setStatus(cur.id, 'reauth_required');
+        res.reauth++;
+        console.warn('[youtube token check] トークンを更新できないため、「再連携が必要」にしました', cur.id, noRefresh ? '（更新用のトークンがありません）' : (err && err.message));
+      } else {
+        console.error('[youtube token check] 確かめられませんでした（次の定期処理で確かめ直します）', cur.id, err && err.message);
+      }
+    }
+  } finally {
+    checkingYoutube = false;
+  }
+  return res;
+}
+
+// 2) 「再連携が必要」になってから YOUTUBE_REAUTH_DELETE_DAYS 日たった連携を消す。
+// 消し方はマイページの解除と同じ（Google へのトークンの取り消しを送ってから、行・予約・投稿IDとリンクを消す。lib/sns/disconnect.js）。
+// その利用者のマイページで知らせる。冪等（消した連携は次から対象にならない）。戻り値は消した件数。
+// 一覧は取った時点の写しのため、1件ずつ、消す直前に行を読み直し、まだ「再連携が必要」で期限を過ぎているときだけ消す
+// （前の件の取り消しを待つ間に、利用者が再連携・解除した場合に、有効な連携を消したり、取り消しや知らせを出したりしないため）。
+// 読み直しから削除までは同期のため、間に割り込まれない
+async function purgeRevokedYoutube(nowMs = Date.now()) {
+  const { removeAccount } = require('./disconnect');
+  const { Notices } = require('../meta-deletion');
+  const before = new Date(nowMs - YOUTUBE_REAUTH_DELETE_DAYS * 24 * 3600 * 1000).toISOString();
+  let n = 0;
+  for (const listed of SnsAccounts.listReauthBefore('youtube', before)) {
+    try {
+      const account = SnsAccounts.get(listed.id);
+      if (!account || account.status !== 'reauth_required' || !account.reauth_at || !(account.reauth_at < before)) continue;
+      const revoking = removeAccount(account);
+      Notices.add(account.user_id, 'youtube', 'expired');
+      n++;
+      await revoking;
+    } catch (e) {
+      console.error('[youtube purge]', e && e.message);
+    }
+  }
+  return n;
+}
+
 let running = false;
 // 実行時刻が来た予約を処理する。戻り値は処理件数
 async function tick(limit = 20) {
@@ -162,7 +274,8 @@ function start(intervalMs = 30000) {
   ScheduledPosts.failStuck(new Date(Date.now() - 5 * 60 * 1000).toISOString(), new Date(Date.now() + 1000).toISOString());
   timer = setInterval(() => { tick().catch((e) => console.error('[scheduler]', e)); }, intervalMs);
   if (timer.unref) timer.unref();
-  // 投稿が終わったメディアの削除と、長期トークンの延長を、1時間ごとに行う
+  // 投稿が終わったメディアの削除と、長期トークンの延長と、YouTubeの連携のトークンの確認（連携ごとに1日1回）と、
+  // 再連携が必要なまま28日たったYouTubeの連携の削除を、1時間ごとに行う
   const clean = () => {
     try { mediaLib.cleanup(); } catch (e) { console.error('[media cleanup]', e); }
     try { ApiUsage.prune(new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)); } catch (e) { console.error('[api usage prune]', e); }
@@ -170,6 +283,8 @@ function start(intervalMs = 30000) {
     // 処理の最中（tick の実行中）は、まだ送っている途中かもしれないので触らない
     if (!running) { try { ScheduledPosts.failStuck(new Date(Date.now() - 30 * 60 * 1000).toISOString()); } catch (e) { console.error('[fail stuck]', e); } }
     refreshExpiring().catch((e) => console.error('[token refresh]', e));
+    checkYoutubeTokens().catch((e) => console.error('[youtube token check]', e));
+    purgeRevokedYoutube().catch((e) => console.error('[youtube purge]', e));
   };
   clean();
   cleanTimer = setInterval(clean, 3600 * 1000);
@@ -182,4 +297,4 @@ function stop() {
   cleanTimer = null;
 }
 
-module.exports = { tick, start, stop, processOne, ensureAccessToken, refreshExpiring, MAX_ATTEMPTS };
+module.exports = { tick, start, stop, processOne, ensureAccessToken, refreshExpiring, checkYoutubeTokens, purgeRevokedYoutube, YOUTUBE_TOKEN_CHECK_HOURS, YOUTUBE_REAUTH_DELETE_DAYS, savePermalink, MAX_ATTEMPTS };

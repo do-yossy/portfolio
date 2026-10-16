@@ -122,11 +122,15 @@ function applySubscription(sub, hintedUserId, createdSec) {
 }
 
 // 利用の終了：保存しているSNSの連携情報（トークン）を削除し、未投稿の予約を取り消し、
-// AIアシスタントとの接続とAPIキーも無効にする
+// AIアシスタントとの接続とAPIキーも無効にする。
+// YouTube は、行を消す前に Google へトークンの取り消しを送る（失敗しても消す：lib/sns/disconnect.js）。
+// 行の削除はこの関数の中で済ませる。戻り値は取り消しの結果の Promise（reject しない。待たなくてよい）
 function endAccess(userId) {
-  for (const a of SnsAccounts.listForUser(userId)) SnsAccounts.remove(a.id, userId);
+  const { removeAccount } = require('./sns/disconnect');
+  const revoking = SnsAccounts.listForUser(userId).map((a) => removeAccount(a));
   require('./oauth').revokeAll(userId);
   require('./service-store').ApiKeys.revokeAll(userId);
+  return Promise.all(revoking);
 }
 
 // 運営者による「テスト利用」の付与・取り消し（動作確認用。Stripeを通さない）

@@ -63,10 +63,17 @@ function legalPlaceholders(nowMs = Date.now()) {
   return legalCache.list;
 }
 
-// 利用者に示す法務文書の本文（Markdown）。サービス名・連絡先・代表者を埋め、販売開始後は草案の表示を外す
+// 法務文書を確定版として公開してよいか。運営者（必要に応じて専門家）が内容を確かめてから LEGAL_FINAL=true を設定する。
+// 販売の開始（SERVICE_OPEN）とは別に設定できる（各SNSの審査の前に、草案ではない文書を見せるため）。
+// 未記入の【】が残っている間は、設定しても確定版にしない
+function legalFinal(env = process.env) {
+  return env.LEGAL_FINAL === 'true' && legalPlaceholders().length === 0;
+}
+
+// 利用者に示す法務文書の本文（Markdown）。サービス名・連絡先・代表者を埋め、確定版（LEGAL_FINAL）または販売開始後は草案の表示を外す
 function legalMarkdown(file) {
   let text = require('fs').readFileSync(require('path').join(legalDir(), file), 'utf8');
-  if (salesOpen()) text = text.replace(/^※ これは運営者による草案です.*$/m, '').replace(/（案）/g, '');
+  if (legalFinal() || salesOpen()) text = text.replace(/^※ これは運営者による草案です.*$/m, '').replace(/（案）/g, '');
   text = text.split('【サービス名】').join(serviceName());
   if (contactEmail()) text = text.split('【メールアドレス】').join(contactEmail());
   const rep = String(process.env.SERVICE_REPRESENTATIVE || '').trim();
@@ -74,11 +81,36 @@ function legalMarkdown(file) {
   return text;
 }
 
-// 販売を開始してよいか：運営者の明示（SERVICE_OPEN）、決済・連絡先・SNSの設定、法務文書の未記入の箇所がないこと
+// ── 各SNSの審査（Meta の App Review など）を通ったかどうか ──
+// 運営者が、審査を通ったSNSの id をカンマ区切りで SNS_APPROVED に設定する（例 "threads,instagram"）。
+// 審査の前は、そのSNSのアプリで役割を持つ人（テスターなど）しか連携できない（Meta のアプリの開発モード）ため、一般の利用者には出さない。
+// TikTokの投稿の監査（Audit）は、これとは別に TIKTOK_AUDITED で示す（公開範囲などの制限の表示）
+function approvedSns(env = process.env) {
+  return new Set(String(env.SNS_APPROVED || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+}
+function snsApproved(platform, env = process.env) {
+  return approvedSns(env).has(platform);
+}
+// テスト利用の利用者（運営者が付与した、契約の状態が 'test' のもの）か
+const isTestSub = (sub) => !!sub && sub.status === 'test';
+// 使えるSNS：キーが設定済み かつ 審査済み（SNS_APPROVED）のもの。販売ページ・申込み・販売開始の判定はこれを使う。
+// sub にテスト利用の契約を渡すと、キーが設定済みなら審査前のSNSも含める（テスト利用の利用者の画面だけで使う）
+function liveSns({ sub = null, env = process.env } = {}) {
+  return registry.list().filter((p) => p.isConfigured(env) && (snsApproved(p.id, env) || isTestSub(sub)));
+}
+// この利用者が、このSNSの連携を始められるか。'live'（審査済み）／'test'（審査前。テスト利用の利用者だけ）／''（できない）
+function connectMode(platform, sub, env = process.env) {
+  const ad = registry.get(platform);
+  if (!ad || !ad.isConfigured(env)) return '';
+  if (snsApproved(platform, env)) return 'live';
+  return isTestSub(sub) ? 'test' : '';
+}
+
+// 販売を開始してよいか：運営者の明示（SERVICE_OPEN）、決済・連絡先・SNSの設定（審査済みのSNSが1つ以上）、法務文書の未記入の箇所がないこと
 function salesOpen() {
   const billing = require('./billing');
   return process.env.SERVICE_OPEN === 'true' && billing.isConfigured() && !!contactEmail()
-    && snsEnabled() && registry.list().some((p) => p.isConfigured()) && legalPlaceholders().length === 0;
+    && snsEnabled() && liveSns().length > 0 && legalPlaceholders().length === 0;
 }
 
 function snsEnabled() {
@@ -310,11 +342,19 @@ function createPosts({ userId, accountIds, text, scheduledAtIso, mediaId, option
 }
 
 // 連携の開始：認可画面のURLを返す
+// 審査（SNS_APPROVED）の前のSNSは、テスト利用の利用者だけが連携できる（画面のボタンと同じ判定を、サーバー側でもかける）
+const NOT_APPROVED_ERROR = 'このSNSの連携は、準備中です（SNS側の審査が終わるまで、ご利用いただけません）。';
+const accountLimitError = () => `連携できるSNSアカウントは${LIMITS.maxAccounts}件までです。`;
 function startConnect({ userId, platform }) {
   const ad = registry.get(platform);
   if (!ad || !ad.isConfigured()) return { ok: false, error: 'このSNSの連携は、現在ご利用いただけません。' };
+  if (!connectMode(platform, Subscriptions.get(userId))) return { ok: false, error: NOT_APPROVED_ERROR };
   if (!snsEnabled()) return { ok: false, error: 'SNS連携は現在ご利用いただけません。' };
-  if (SnsAccounts.countForUser(userId) >= LIMITS.maxAccounts) return { ok: false, error: `連携できるSNSアカウントは${LIMITS.maxAccounts}件までです。` };
+  // 件数の上限。そのSNSに「再連携が必要」の連携があれば、再連携（既存の行の更新で、件数は増えない）かもしれないため、ここでは断らない。
+  // 新しい連携になるかどうかは、SNSのアカウントが分かる連携の完了（finishConnect）で判定する
+  if (SnsAccounts.countForUser(userId) >= LIMITS.maxAccounts && !SnsAccounts.listForUser(userId).some((a) => a.platform === platform && a.status === 'reauth_required')) {
+    return { ok: false, error: accountLimitError() };
+  }
   const pkce = ad.usesPkce ? ad.newPkce() : null;
   const state = OAuthStates.create({ userId, platform, codeVerifier: pkce ? pkce.verifier : '' });
   const url = ad.authUrl({ state, redirectUri: redirectUriFor(platform), codeChallenge: pkce && pkce.challenge });
@@ -328,15 +368,24 @@ async function finishConnect({ userId, platform, code, state }) {
   const st = OAuthStates.consume(state, userId, platform);
   if (!st) return { ok: false, error: '連携の有効期限が切れたか、不正なリクエストです。もう一度やり直してください。' };
   if (!code) return { ok: false, error: 'SNS側で連携が許可されませんでした。' };
-  if (SnsAccounts.countForUser(userId) >= LIMITS.maxAccounts) return { ok: false, error: `連携できるSNSアカウントは${LIMITS.maxAccounts}件までです。` };
+  // 連携を始めた後に、テスト利用が取り消された場合など
+  if (!connectMode(platform, Subscriptions.get(userId))) return { ok: false, error: NOT_APPROVED_ERROR };
   try {
     const k = box.keyFromEnv();
     const t = await ad.exchangeCode({ code, redirectUri: redirectUriFor(platform), codeVerifier: st.code_verifier });
+    // 件数の上限は、どのSNSアカウントかが分かったここで判定する。同じSNSアカウントの行がすでにあれば、再連携（upsert が既存の行の更新）で
+    // 件数は増えないため、上限に数えない（上限まで連携していても、「再連携が必要」の連携を有効に戻せるように）。
+    // 新しい連携になる場合だけ、上限で断る（受け取ったトークンは保存しない）。ここから upsert までは同期のため、間に割り込まれない
+    if (!SnsAccounts.findForUser(userId, platform, t.externalUserId) && SnsAccounts.countForUser(userId) >= LIMITS.maxAccounts) {
+      return { ok: false, error: accountLimitError() };
+    }
     SnsAccounts.upsert({
       userId, platform, externalUserId: t.externalUserId, handle: t.handle,
       accessTokenEnc: box.encrypt(t.accessToken, k),
       refreshTokenEnc: t.refreshToken ? box.encrypt(t.refreshToken, k) : '',
       expiresAt: t.expiresAt,
+      // SNS側の利用者IDの控え（Metaから届く削除の求めの照合用。返さないSNSでは空）
+      providerUserId: t.providerUserId || '', providerAltId: t.providerAltId || '',
     });
     return { ok: true };
   } catch (e) {
@@ -345,6 +394,6 @@ async function finishConnect({ userId, platform, code, state }) {
 }
 
 module.exports = {
-  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, legalMarkdown, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
+  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, legalFinal, legalMarkdown, approvedSns, snsApproved, liveSns, connectMode, NOT_APPROVED_ERROR, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
   jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, capacityError, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

@@ -166,6 +166,39 @@ try { db.exec("ALTER TABLE ai_jobs ADD COLUMN payload TEXT DEFAULT ''"); } catch
 try { db.exec("ALTER TABLE subscriptions ADD COLUMN pre_test_status TEXT DEFAULT ''"); } catch { /* 既にある */ }
 // AIで作ったメディアか（TikTokなどで「AI生成」の表示をするため）
 try { db.exec("ALTER TABLE media_assets ADD COLUMN ai_generated INTEGER NOT NULL DEFAULT 0"); } catch { /* 既にある */ }
+// SNS側の利用者IDの控え（Meta から届く、データ削除の求め・連携の取り消しの知らせの照合に使う。lib/meta-deletion.js）
+//   provider_user_id：Facebook は /me の id（アプリスコープのユーザーID）、Instagram と Threads はトークンの応答の user_id
+//   provider_alt_id ：Instagram の /me の id（external_user_id には /me の user_id が入る）
+// 届く user_id がどのIDかは公式で一部未確認（実物で確かめる）のため、external_user_id を含む、保存したどのIDでも照合する
+try { db.exec("ALTER TABLE sns_accounts ADD COLUMN provider_user_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE sns_accounts ADD COLUMN provider_alt_id TEXT DEFAULT ''"); } catch { /* 既にある */ }
+db.exec('CREATE INDEX IF NOT EXISTS idx_sns_accounts_ext ON sns_accounts(platform, external_user_id)');
+// 投稿へのリンク（Threads の permalink）。連携の解除・契約の終了・削除の求めのときに、投稿IDと一緒に消す
+try { db.exec("ALTER TABLE scheduled_posts ADD COLUMN permalink TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// 「再連携が必要」になった日時（YouTube は、Google の側で取り消されるなどして再連携が必要なまま28日たつと、連携を消す。
+// 日数の根拠は lib/sns/scheduler.js の YOUTUBE_REAUTH_DELETE_DAYS）。有効に戻れば空にする
+try { db.exec("ALTER TABLE sns_accounts ADD COLUMN reauth_at TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// トークンが有効だと最後に確かめた日時（連携した・トークンを更新できた日時。upsert・updateTokens で記録する）。
+// YouTube は、これが24時間より前の有効な連携のトークンを、1時間ごとの定期処理で更新して確かめ直す（lib/sns/scheduler.js の checkYoutubeTokens）。
+// 列を足す前からある連携は空のため、足した後の最初の定期処理で確かめる
+try { db.exec("ALTER TABLE sns_accounts ADD COLUMN token_checked_at TEXT DEFAULT ''"); } catch { /* 既にある */ }
+
+// 前の作りで保存したデータの手当て（起動のたびに実行する。どれも冪等で、2回目以降は何も変わらない）
+function migrateLegacyRows(t = now()) {
+  // 1) この列を足す前から「再連携が必要」だった連携は、最後に更新した日時を、再連携が必要になった日時とみなす
+  db.prepare("UPDATE sns_accounts SET reauth_at = updated_at WHERE status = 'reauth_required' AND COALESCE(reauth_at, '') = ''").run();
+  // 2) 照合用のID（provider_user_id・provider_alt_id）を控える前に連携した Facebook・Instagram は、
+  //    Metaから届く削除の求め・取り消しの知らせと照合できないため、「再連携が必要」にする（再連携すると upsert でIDが埋まり、有効に戻る）。
+  //    Facebook は external_user_id がページIDのため、provider_user_id が無ければ対象。Instagram は控えのIDが2つとも無ければ対象
+  db.prepare(`UPDATE sns_accounts SET status = 'reauth_required', reauth_at = ?, updated_at = ? WHERE status <> 'reauth_required' AND (
+      (platform = 'facebook' AND COALESCE(provider_user_id, '') = '')
+      OR (platform = 'instagram' AND COALESCE(provider_user_id, '') = '' AND COALESCE(provider_alt_id, '') = ''))`).run(t, t);
+  // 3) 前の作りの解除（SnsAccounts.remove）は、投稿済みの予約の投稿IDを消していなかった。
+  //    連携がもう無い予約に残る、SNSでの投稿のIDとリンクを消す（markPosted と同じ考え方：連携が無ければ投稿IDを残さない）
+  db.prepare(`UPDATE scheduled_posts SET external_id = '', permalink = '' WHERE (COALESCE(external_id, '') <> '' OR COALESCE(permalink, '') <> '')
+      AND NOT EXISTS (SELECT 1 FROM sns_accounts a WHERE a.id = scheduled_posts.account_id)`).run();
+}
+migrateLegacyRows();
 db.exec(`
   CREATE TABLE IF NOT EXISTS post_media (
     post_id TEXT NOT NULL,
@@ -238,20 +271,35 @@ const StripeEvents = {
 };
 
 const SnsAccounts = {
-  upsert({ userId, platform, externalUserId, handle, accessTokenEnc, refreshTokenEnc, expiresAt }) {
+  // providerUserId・providerAltId：SNS側の利用者IDの控え（上の ALTER の説明を参照）。渡さなければ、保存済みの値を変えない
+  upsert({ userId, platform, externalUserId, handle, accessTokenEnc, refreshTokenEnc, expiresAt, providerUserId, providerAltId }) {
     const t = now();
-    const ex = db.prepare('SELECT id FROM sns_accounts WHERE user_id=? AND platform=? AND external_user_id=?')
+    const ex = db.prepare('SELECT id, provider_user_id, provider_alt_id FROM sns_accounts WHERE user_id=? AND platform=? AND external_user_id=?')
       .get(userId, platform, externalUserId);
+    const pu = providerUserId !== undefined ? String(providerUserId || '') : ((ex && ex.provider_user_id) || '');
+    const pa = providerAltId !== undefined ? String(providerAltId || '') : ((ex && ex.provider_alt_id) || '');
     if (ex) {
-      db.prepare(`UPDATE sns_accounts SET handle=?, access_token_enc=?, refresh_token_enc=?, expires_at=?, status='active', updated_at=? WHERE id=?`)
-        .run(handle || '', accessTokenEnc, refreshTokenEnc || '', expiresAt || '', t, ex.id);
+      db.prepare(`UPDATE sns_accounts SET handle=?, access_token_enc=?, refresh_token_enc=?, expires_at=?, provider_user_id=?, provider_alt_id=?, status='active', reauth_at='', token_checked_at=?, updated_at=? WHERE id=?`)
+        .run(handle || '', accessTokenEnc, refreshTokenEnc || '', expiresAt || '', pu, pa, t, t, ex.id);
       return ex.id;
     }
     const id = generateId();
-    db.prepare(`INSERT INTO sns_accounts (id, user_id, platform, external_user_id, handle, access_token_enc, refresh_token_enc, expires_at, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`)
-      .run(id, userId, platform, externalUserId, handle || '', accessTokenEnc, refreshTokenEnc || '', expiresAt || '', t, t);
+    db.prepare(`INSERT INTO sns_accounts (id, user_id, platform, external_user_id, handle, access_token_enc, refresh_token_enc, expires_at, provider_user_id, provider_alt_id, status, token_checked_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`)
+      .run(id, userId, platform, externalUserId, handle || '', accessTokenEnc, refreshTokenEnc || '', expiresAt || '', pu, pa, t, t, t);
     return id;
+  },
+  // その利用者が、そのSNSアカウント（external_user_id）をすでに連携しているか（再連携なら upsert が既存の行の更新になる）
+  findForUser(userId, platform, externalUserId) {
+    return db.prepare('SELECT * FROM sns_accounts WHERE user_id=? AND platform=? AND external_user_id=?').get(userId, platform, String(externalUserId || '')) || null;
+  },
+  // SNS側の利用者IDで、連携を探す（同じSNSアカウントを複数の利用者が連携していれば、全員分）。
+  // external_user_id・provider_user_id・provider_alt_id のどれかが一致するもの（空のIDでは探さない）
+  findByProviderId(platform, providerId) {
+    const v = String(providerId || '').trim();
+    if (!v) return [];
+    return db.prepare('SELECT * FROM sns_accounts WHERE platform = ? AND (external_user_id = ? OR provider_user_id = ? OR provider_alt_id = ?) ORDER BY created_at')
+      .all(platform, v, v, v);
   },
   get(id) {
     return db.prepare('SELECT * FROM sns_accounts WHERE id = ?').get(id) || null;
@@ -270,17 +318,38 @@ const SnsAccounts = {
     const ph = platforms.map(() => '?').join(',');
     return db.prepare(`SELECT * FROM sns_accounts WHERE status='active' AND expires_at <> '' AND expires_at < ? AND platform IN (${ph})`).all(beforeIso, ...platforms);
   },
+  // トークンを更新できたときに呼ぶ。トークンが有効だと確かめた日時（token_checked_at）も記録する
   updateTokens(id, { accessTokenEnc, refreshTokenEnc, expiresAt }) {
-    db.prepare('UPDATE sns_accounts SET access_token_enc=?, refresh_token_enc=?, expires_at=?, status=\'active\', updated_at=? WHERE id=?')
-      .run(accessTokenEnc, refreshTokenEnc || '', expiresAt || '', now(), id);
+    const t = now();
+    db.prepare('UPDATE sns_accounts SET access_token_enc=?, refresh_token_enc=?, expires_at=?, status=\'active\', reauth_at=\'\', token_checked_at=?, updated_at=? WHERE id=?')
+      .run(accessTokenEnc, refreshTokenEnc || '', expiresAt || '', t, t, id);
   },
+  // トークンが有効かを確かめる時期が来た、有効な連携（最後に確かめた日時が beforeIso より前。まだ確かめていないものを含む）。古い順
+  listTokenCheckDue(platform, beforeIso) {
+    return db.prepare("SELECT * FROM sns_accounts WHERE platform = ? AND status = 'active' AND COALESCE(token_checked_at, '') < ? ORDER BY COALESCE(token_checked_at, ''), created_at").all(platform, beforeIso);
+  },
+  // reauth_at：「再連携が必要」になった日時。すでに再連携が必要なら、最初の日時を変えない（もう一度失敗しても、削除までの日数の数え始めを延ばさない）
   setStatus(id, status) {
-    db.prepare('UPDATE sns_accounts SET status=?, updated_at=? WHERE id=?').run(status, now(), id);
+    const t = now();
+    if (status === 'reauth_required') {
+      db.prepare("UPDATE sns_accounts SET reauth_at = CASE WHEN status = 'reauth_required' AND COALESCE(reauth_at, '') <> '' THEN reauth_at ELSE ? END, status = 'reauth_required', updated_at = ? WHERE id = ?").run(t, t, id);
+    } else {
+      db.prepare("UPDATE sns_accounts SET status = ?, reauth_at = '', updated_at = ? WHERE id = ?").run(status, t, id);
+    }
+  },
+  // 「再連携が必要」になってから beforeIso より前のまま残っている連携（YouTube の自動削除に使う）
+  listReauthBefore(platform, beforeIso) {
+    return db.prepare("SELECT * FROM sns_accounts WHERE platform = ? AND status = 'reauth_required' AND COALESCE(reauth_at, '') <> '' AND reauth_at < ? ORDER BY reauth_at").all(platform, beforeIso);
   },
   remove(id, userId) {
-    // 連携解除。未投稿の予約は取り消す
-    db.prepare(`UPDATE scheduled_posts SET status='cancelled', last_error='連携を解除したため取り消しました', updated_at=? WHERE account_id=? AND status IN ('pending','draft')`)
-      .run(now(), id);
+    // 連携解除（マイページの解除・契約の終了・テスト利用の取り消し・Metaからの削除の求めと取り消しの知らせで使う）。
+    // 未投稿の予約は取り消す。投稿済みの予約に残る、SNSでの投稿のIDと投稿へのリンクも消す（SNSから受け取った情報を残さない。
+    // 投稿の本文・日時などは、利用者が本サービスで作った情報として残す：プライバシーポリシーの5）
+    const t = now();
+    db.prepare(`UPDATE scheduled_posts SET status='cancelled', last_error='連携を解除したため取り消しました', updated_at=? WHERE account_id=? AND user_id=? AND status IN ('pending','draft')`)
+      .run(t, id, userId);
+    db.prepare(`UPDATE scheduled_posts SET external_id='', permalink='', updated_at=? WHERE account_id=? AND user_id=? AND (external_id <> '' OR permalink <> '')`)
+      .run(t, id, userId);
     db.prepare('DELETE FROM auto_rules WHERE account_id=? AND user_id=?').run(id, userId);
     db.prepare('DELETE FROM sns_accounts WHERE id=? AND user_id=?').run(id, userId);
   },
@@ -394,6 +463,14 @@ const ScheduledPosts = {
   markPosted(id, externalId) {
     db.prepare(`UPDATE scheduled_posts SET status='posted', external_id=?, posted_at=?, last_error='', updated_at=? WHERE id=?`)
       .run(externalId || '', now(), now(), id);
+    // 送っている間に連携が解除・削除された（削除の求めが届いた など）場合は、SNSでの投稿のIDを残さない
+    db.prepare(`UPDATE scheduled_posts SET external_id='', permalink='' WHERE id=? AND NOT EXISTS (SELECT 1 FROM sns_accounts a WHERE a.id = scheduled_posts.account_id)`).run(id);
+  },
+  // 投稿へのリンク（Threads の permalink）を保存する。投稿済みで投稿のIDがあり、連携がまだ残っているときだけ
+  // （リンクを取りに行っている間に、連携の解除や削除の求めがあった場合は残さない）
+  setPermalink(id, permalink) {
+    return db.prepare(`UPDATE scheduled_posts SET permalink=?, updated_at=? WHERE id=? AND status='posted' AND external_id <> ''
+      AND EXISTS (SELECT 1 FROM sns_accounts a WHERE a.id = scheduled_posts.account_id)`).run(String(permalink || '').slice(0, 500), now(), id).changes === 1;
   },
   markFailed(id, message) {
     db.prepare(`UPDATE scheduled_posts SET status='failed', last_error=?, updated_at=? WHERE id=?`)
@@ -602,4 +679,4 @@ function transaction(fn) {
   try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { try { db.exec('ROLLBACK'); } catch { /* */ } throw e; }
 }
 
-module.exports = { transaction, OPEN_STRIPE_STATUSES, UploadTickets, ApiUsage, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+module.exports = { transaction, migrateLegacyRows, OPEN_STRIPE_STATUSES, UploadTickets, ApiUsage, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

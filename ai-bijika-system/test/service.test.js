@@ -8,6 +8,8 @@ const crypto = require('crypto');
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-test-'));
 process.env.SNS_TOKEN_KEY = crypto.randomBytes(32).toString('hex');
+// 各SNSの審査（SNS_APPROVED）を通った状態で試す（審査前の扱いは、後半で SNS_APPROVED を変えて確かめる）
+process.env.SNS_APPROVED = 'threads,x,instagram,tiktok,facebook,youtube';
 process.env.STRIPE_SECRET_KEY = 'sk_test_x';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
 process.env.STRIPE_PRICE_ID = 'price_test';
@@ -148,6 +150,7 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   const userB = mkUser('b@example.com');
   store.Subscriptions.upsert(userB, { status: 'active', stripe_customer_id: 'cus_b', stripe_subscription_id: 'sub_b', current_period_end: new Date(Date.now() + 86400000).toISOString() });
   let threadsPublishFail = null; // null | {status, message}
+  let threadsPermalinkFail = false; // true：投稿へのリンク（permalink）の取得だけを失敗させる
   let xTokenCalls = 0;
   const mockSns = installHttpsMock(async (c) => {
     if (c.host === 'graph.threads.net') {
@@ -160,6 +163,10 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
       }
       if (c.path === '/v1.0/777/threads_publish') return { status: 200, json: { id: 'thread_post_1' } };
       if (c.method === 'GET' && /^\/v1\.0\/container_\d+\?fields=status/.test(c.path)) return { status: 200, json: { status: 'FINISHED' } };
+      if (c.method === 'GET' && c.path.startsWith('/v1.0/thread_post_1?')) {
+        if (threadsPermalinkFail) return { status: 500, json: { error: { message: 'permalink down' } } };
+        return { status: 200, json: { id: 'thread_post_1', permalink: 'https://www.threads.net/@taro/post/P1' } };
+      }
       if (c.path.startsWith('/refresh_access_token?')) return { status: 200, json: { access_token: 'th_long_2', expires_in: 5184000 } };
     }
     if (c.host === 'api.x.com') {
@@ -225,6 +232,39 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   ok(done1.status === 'posted' && done1.external_id === 'thread_post_1', 'Threadsへ投稿して投稿IDを記録する');
   const pubCall = mockSns.calls.find((c) => c.path === '/v1.0/777/threads');
   ok(/media_type=TEXT/.test(pubCall.body) && /text=%E3%83%86%E3%82%B9%E3%83%88/.test(pubCall.body), '本文をThreadsのAPIに渡す');
+  // 投稿へのリンク（permalink）：投稿済みにしたあとで取得して保存する。取れなくても投稿は成功のまま
+  const pubIdx = mockSns.calls.findIndex((c) => c.path === '/v1.0/777/threads_publish');
+  const plIdx = mockSns.calls.findIndex((c) => c.method === 'GET' && c.path.startsWith('/v1.0/thread_post_1?'));
+  ok(done1.permalink === 'https://www.threads.net/@taro/post/P1' && plIdx > pubIdx && new URLSearchParams(mockSns.calls[plIdx].path.split('?')[1]).get('fields') === 'permalink', '投稿したあとで、投稿へのリンク（permalink）を GET /{media-id}?fields=permalink で取得して保存する');
+  threadsPermalinkFail = true;
+  const p1b = mk(thAcc.id, 'リンク取得の失敗');
+  await new Promise((r) => setTimeout(r, 1200));
+  await scheduler.tick();
+  const done1b = store.ScheduledPosts.get(p1b);
+  ok(done1b.status === 'posted' && done1b.external_id === 'thread_post_1' && done1b.permalink === '' && done1b.last_error === '' && done1b.attempts === 1, 'リンクの取得に失敗しても、投稿は成功のまま（リンクを出さないだけ。再試行もしない）');
+  threadsPermalinkFail = false;
+  {
+    const thAdapter = registry.get('threads');
+    const origPl = thAdapter.permalink;
+    thAdapter.permalink = async () => { throw new Error('予期しない失敗'); };
+    const p1c = mk(thAcc.id, 'リンク取得の例外');
+    await new Promise((r) => setTimeout(r, 1200));
+    const origErr = console.error; console.error = () => {};
+    try { await scheduler.tick(); } finally { console.error = origErr; thAdapter.permalink = origPl; }
+    const done1c = store.ScheduledPosts.get(p1c);
+    ok(done1c.status === 'posted' && done1c.external_id === 'thread_post_1' && done1c.permalink === '' && done1c.last_error === '', 'リンクの取得で例外が起きても、投稿は失敗にしない');
+  }
+  {
+    // リンクを保存するのは、投稿済みで、連携が残っているときだけ（取得の間に解除・削除の求めがあったら残さない）
+    const tmp = store.SnsAccounts.upsert({ userId: userB, platform: 'threads', externalUserId: 'pl_tmp', handle: '@pl', accessTokenEnc: box.encrypt('t', k), expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() });
+    const tmpId = typeof tmp === 'object' ? tmp.id : tmp;
+    const pp = store.ScheduledPosts.create({ userId: userB, accountId: tmpId, text: 'リンクの保存', scheduledAt: new Date(Date.now() + 3600000).toISOString() });
+    ok(!store.ScheduledPosts.setPermalink(pp, 'https://www.threads.net/@pl/post/X') && store.ScheduledPosts.get(pp).permalink === '', 'まだ投稿していない予約には、リンクを保存しない');
+    store.ScheduledPosts.markPosted(pp, 'ext_pl');
+    ok(store.ScheduledPosts.setPermalink(pp, 'https://www.threads.net/@pl/post/X') && store.ScheduledPosts.get(pp).permalink === 'https://www.threads.net/@pl/post/X', '投稿済みの予約に、リンクを保存できる');
+    store.SnsAccounts.remove(tmpId, userB);
+    ok(!store.ScheduledPosts.setPermalink(pp, 'https://www.threads.net/@pl/post/X') && store.ScheduledPosts.get(pp).permalink === '' && store.ScheduledPosts.get(pp).external_id === '', '連携を解除したあとは、リンクを保存しない（解除のときに、保存していたリンクも消える）');
+  }
 
   // 失敗→再試行
   threadsPublishFail = { status: 500, message: 'server error' };
@@ -250,13 +290,15 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   // X：期限切れ間近のトークンは更新してから投稿する
   const xRow = store.SnsAccounts.get(xAcc.id);
   store.SnsAccounts.updateTokens(xAcc.id, { accessTokenEnc: xRow.access_token_enc, refreshTokenEnc: xRow.refresh_token_enc, expiresAt: new Date(Date.now() + 60 * 1000).toISOString() });
+  // 期限を近づけた後に送られた投稿だけを見る（前の節で「予約の作成と上限」が作ったXの予約は、時刻によっては、それより前の処理で更新前のトークンのまま送られる）
+  const callsBeforeX = mockSns.calls.length;
   const p4 = mk(xAcc.id, 'Xへの投稿');
   await new Promise((r) => setTimeout(r, 1200));
   await scheduler.tick();
   ok(store.ScheduledPosts.get(p4).status === 'posted' && store.ScheduledPosts.get(p4).external_id === 'tweet_1', 'Xへ投稿して投稿IDを記録する');
   ok(xTokenCalls >= 2, '期限が近いトークンは先に更新する');
-  const tweetCall = mockSns.calls.find((c) => c.path === '/2/tweets');
-  ok(tweetCall.headers.Authorization === 'Bearer x_access_2', '更新後のアクセストークンで投稿する');
+  const tweetCalls = mockSns.calls.slice(callsBeforeX).filter((c) => c.path === '/2/tweets');
+  ok(tweetCalls.length >= 1 && tweetCalls.every((c) => c.headers.Authorization === 'Bearer x_access_2'), '更新後のアクセストークンで投稿する');
   ok(box.decrypt(store.SnsAccounts.get(xAcc.id).refresh_token_enc, k) === 'x_refresh_2', '新しいリフレッシュトークンを暗号化して保存する');
 
   // 契約が切れたら投稿しない
@@ -335,8 +377,158 @@ function sign(raw, secret, t = Math.floor(Date.now() / 1000)) {
   const afterRefresh = store.SnsAccounts.get(soonId);
   ok(refreshedN >= 1 && box.decrypt(afterRefresh.access_token_enc, k) === 'th_long_2' && Date.parse(afterRefresh.expires_at) > Date.now() + 50 * 86400000, '期限が近い Threads の連携を、投稿が無くても定期的に延長する');
   mockSns.restore();
+
+  console.log('審査済みのSNS（SNS_APPROVED）');
+  {
+    const ui = require('../lib/service-ui');
+    const savedApproved = process.env.SNS_APPROVED;
+    ok([...core.approvedSns({ SNS_APPROVED: ' Threads , instagram,, ' })].join() === 'threads,instagram', 'SNS_APPROVED は、カンマ区切りで読む（前後の空白・大文字小文字・空の項目は気にしない）');
+    process.env.SNS_APPROVED = ''; // Threads・X のキーは設定済み。どちらも審査前
+    const general = mkUser('approval-general@example.com');
+    store.Subscriptions.upsert(general, { stripe_subscription_id: 'sub_approval', status: 'active' });
+    const tester = mkUser('approval-tester@example.com');
+    billing.grantTest(tester);
+    const gSub = store.Subscriptions.get(general);
+    const tSub = store.Subscriptions.get(tester);
+    ok(core.liveSns().length === 0 && core.liveSns({ sub: gSub }).length === 0, '審査済みのSNSが無ければ、キーが設定済みでも、一般の利用者には使えるSNSとして出さない');
+    ok(core.liveSns({ sub: tSub }).map((p) => p.id).join() === 'threads,x', 'テスト利用の利用者には、キーが設定済みなら、審査前のSNSも使えるSNSに含める（キーの無いSNSは含めない）');
+    ok(core.connectMode('threads', gSub) === '' && core.connectMode('threads', tSub) === 'test' && core.connectMode('instagram', tSub) === '', '連携できるかの判定：審査前は、テスト利用の利用者だけ（キーの無いSNSは、テスト利用でも不可）');
+    let h = ui.dashboardPage({ user: { id: general, email: 'g' }, sub: gSub, accounts: [], posts: [], csrf: 'c', snsReady: true });
+    ok(!h.includes('href="/service/connect/threads"') && h.includes('Threads：準備中') && !h.includes('審査前（テスト利用のみ）'), '審査前のSNSは、一般の利用者のマイページでは「準備中」と表示し、連携ボタンを出さない');
+    h = ui.dashboardPage({ user: { id: tester, email: 't' }, sub: tSub, accounts: [], posts: [], csrf: 'c', snsReady: true });
+    ok(h.includes('href="/service/connect/threads"') && h.includes('審査前（テスト利用のみ）') && h.includes('Instagram：準備中') && !h.includes('href="/service/connect/instagram"'), 'テスト利用の利用者には、審査前のSNSの連携ボタンを「審査前（テスト利用のみ）」と添えて出す（キーの無いSNSは準備中のまま）');
+    const thAccView = [{ id: 'a1', platform: 'threads', status: 'active', handle: 'x' }];
+    ok(ui.composePage({ user: { email: 't' }, accounts: thAccView, csrf: 'c', sub: tSub }).includes('value="tree"') && !ui.composePage({ user: { email: 'g' }, accounts: thAccView, csrf: 'c', sub: gSub }).includes('value="tree"'), '「投稿を作る」画面のツリーは、テスト利用の利用者には審査前のThreadsでも出し、一般の利用者には出さない');
+    ok(ui.landingPage({ user: null, billingReady: false }).includes('対応SNSは準備中です'), '審査済みのSNSが無ければ、販売ページの対応SNSは「準備中」');
+    const gStart = core.startConnect({ userId: general, platform: 'threads' });
+    ok(!gStart.ok && gStart.error.includes('準備中'), '審査前のSNSは、一般の利用者が連携を始めようとしても、サーバー側で断る');
+    const tStart = core.startConnect({ userId: tester, platform: 'threads' });
+    ok(tStart.ok && tStart.url.startsWith('https://threads.com/oauth/authorize?'), 'テスト利用の利用者は、審査前のSNSでも連携を始められる');
+    const gState = store.OAuthStates.create({ userId: general, platform: 'threads', codeVerifier: '' });
+    const gFinish = await core.finishConnect({ userId: general, platform: 'threads', code: 'c', state: gState });
+    ok(!gFinish.ok && store.SnsAccounts.listForUser(general).length === 0, '連携の完了の時点でも、審査前のSNSを一般の利用者の連携として保存しない');
+    billing.revokeTest(tester);
+    const tFinish = await core.finishConnect({ userId: tester, platform: 'threads', code: 'c', state: new URL(tStart.url).searchParams.get('state') });
+    ok(!tFinish.ok && store.SnsAccounts.listForUser(tester).length === 0, '連携を始めた後にテスト利用が取り消されたら、審査前のSNSの連携を完了しない');
+
+    process.env.SNS_APPROVED = 'threads';
+    const g2 = store.Subscriptions.get(general);
+    h = ui.dashboardPage({ user: { id: general, email: 'g' }, sub: g2, accounts: [], posts: [], csrf: 'c', snsReady: true });
+    ok(h.includes('href="/service/connect/threads"') && !h.includes('審査前（テスト利用のみ）') && h.includes('X：準備中'), '審査済み（SNS_APPROVED）のSNSは、一般の利用者にも連携ボタンを出す（審査前のXは準備中のまま）');
+    ok(core.startConnect({ userId: general, platform: 'threads' }).ok && !core.startConnect({ userId: general, platform: 'x' }).ok, '一般の利用者は、審査済みのSNSだけ連携を始められる');
+    ok(ui.landingPage({ user: null, billingReady: false }).includes('現在の対応SNSは、Threadsです'), '販売ページの対応SNSは、審査済みのSNSだけを書く');
+
+    console.log('販売の開始と審査済みのSNS');
+    const legalTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-legal-'));
+    for (const f of core.LEGAL_FILES) {
+      const t = fs.readFileSync(path.join(__dirname, '..', 'legal', f), 'utf8');
+      fs.writeFileSync(path.join(legalTmp, f), t.replace(/【(?!メールアドレス】|代表者の氏名】|サービス名】)([^】]+)】/g, (m, x) => (x.trim() ? `（記入済み：${x}）` : m)));
+    }
+    Object.assign(process.env, { SERVICE_OPEN: 'true', SERVICE_CONTACT_EMAIL: 'support@example.com', SERVICE_REPRESENTATIVE: '代表 太郎', SERVICE_LEGAL_DIR: legalTmp });
+    ok(core.legalPlaceholders().length === 0 && core.salesOpen(), '設定がそろい、審査済みのSNS（キーあり）があれば、販売を開始する');
+    process.env.SNS_APPROVED = '';
+    ok(!core.salesOpen(), '審査済みのSNSが無ければ、キーが設定済みでも、SERVICE_OPEN=true でも販売を開始しない');
+    process.env.SNS_APPROVED = 'instagram';
+    ok(!core.salesOpen(), '審査済みのSNSのキーが未設定なら、販売を開始しない');
+    const chk = (env, name) => ui.settingsChecklist(env).find((row) => row[0] === name);
+    const rowA = chk({ ...process.env, SNS_APPROVED: 'threads,instagram,thread' }, '審査済みのSNS（SNS_APPROVED）');
+    ok(rowA && rowA[1] === true && rowA[2].includes('一般の利用者に出すSNS：Threads') && rowA[2].includes('キーが未設定のため出していないSNS：Instagram') && rowA[2].includes('知らない id（綴りを確かめる）：thread'), '運営者画面の設定の確認に、審査済みのSNSと、キーの無いもの・綴りの違うidを出す');
+    ok(chk({ ...process.env, SNS_APPROVED: '' }, '審査済みのSNS（SNS_APPROVED）')[1] === false, '審査済みのSNSが無ければ、設定の確認で未設定と示す');
+
+    console.log('法務文書の確定（LEGAL_FINAL）');
+    process.env.SNS_APPROVED = ''; // 販売は開始していない状態（salesOpen() が偽）
+    delete process.env.LEGAL_FINAL;
+    const privacy = 'サービスプライバシーポリシー_案.md';
+    let doc = core.legalMarkdown(privacy);
+    ok(!core.salesOpen() && doc.includes('（案）') && doc.includes('※ これは運営者による草案です'), '販売の開始前で LEGAL_FINAL が無ければ、草案の表示（（案）と注意書き）を残す');
+    process.env.LEGAL_FINAL = 'true';
+    doc = core.legalMarkdown(privacy);
+    ok(core.legalFinal() && !doc.includes('（案）') && !doc.includes('草案') && doc.includes('代表 太郎'), 'LEGAL_FINAL=true で【】が残っていなければ、販売の開始前でも、草案の表示を外す');
+    ok(!core.legalMarkdown('サービス利用規約_案.md').includes('（案）'), 'LEGAL_FINAL=true なら、利用規約の（案）も外す');
+    ok(chk(process.env, '法務文書の確定（LEGAL_FINAL=true）')[1] === true, '設定の確認に、法務文書が確定版になっていることを示す');
+    delete process.env.SERVICE_LEGAL_DIR; // 【】が残っている、元の文書
+    doc = core.legalMarkdown(privacy);
+    ok(core.legalPlaceholders().length > 0 && !core.legalFinal() && doc.includes('（案）') && doc.includes('※ これは運営者による草案です'), 'LEGAL_FINAL=true でも、未記入の【】が残っていれば、草案の表示を外さない');
+    const rowF = chk(process.env, '法務文書の確定（LEGAL_FINAL=true）');
+    ok(rowF[1] === false && rowF[2].includes('草案の表示のままです'), '設定の確認で、LEGAL_FINAL を設定しても【】が残っていて外れていないことを示す');
+    process.env.SERVICE_LEGAL_DIR = legalTmp; process.env.LEGAL_FINAL = 'yes';
+    ok(core.legalMarkdown(privacy).includes('（案）'), 'LEGAL_FINAL は true のときだけ確定版にする');
+
+    for (const key of ['SERVICE_OPEN', 'SERVICE_CONTACT_EMAIL', 'SERVICE_REPRESENTATIVE', 'SERVICE_LEGAL_DIR', 'LEGAL_FINAL']) delete process.env[key];
+    process.env.SNS_APPROVED = savedApproved;
+  }
+
   console.log('対応SNS');
   ok(registry.list().map((p) => p.id).join() === 'threads,x,instagram,tiktok,facebook,youtube', 'Threads・X・Instagram・TikTok・Facebook・YouTube に対応している');
+
+  console.log('画面：Threadsの最近の投稿・Threadsで見る');
+  {
+    const ui = require('../lib/service-ui');
+    const accounts = [{ id: 'aa01', platform: 'threads', status: 'active', handle: '@a' }, { id: 'aa02', platform: 'x', status: 'active', handle: '@b' }, { id: 'aa03', platform: 'threads', status: 'reauth_required', handle: '@c' }];
+    const posts = [
+      { id: 'pp1', status: 'posted', platform: 'threads', handle: '@a', text: '投稿済み', scheduled_at: new Date().toISOString(), permalink: 'https://www.threads.net/@a/post/1' },
+      { id: 'pp2', status: 'posted', platform: 'threads', handle: '@a', text: 'リンクなし', scheduled_at: new Date().toISOString(), permalink: '' },
+      { id: 'pp3', status: 'posted', platform: 'threads', handle: '@a', text: '危ないリンク', scheduled_at: new Date().toISOString(), permalink: 'javascript:alert(1)' },
+      { id: 'pp4', status: 'failed', platform: 'threads', handle: '@a', text: '失敗', scheduled_at: new Date().toISOString(), permalink: 'https://www.threads.net/@a/post/4' },
+    ];
+    const dash = ui.dashboardPage({ user: { id: userB, email: 'b@example.com' }, sub: { status: 'active' }, accounts, posts, csrf: 'c', snsReady: true });
+    ok(dash.includes('href="/service/app/threads/aa01/recent"') && !dash.includes('/service/app/threads/aa02/recent') && !dash.includes('/service/app/threads/aa03/recent'), '「最近の投稿」は、有効なThreadsの連携の行にだけ出す（X・再連携が必要な連携には出さない）');
+    const notActive = ui.dashboardPage({ user: { id: userB, email: 'b@example.com' }, sub: { status: 'canceled' }, accounts, posts: [], csrf: 'c', snsReady: true });
+    ok(!notActive.includes('/recent"'), '契約が有効でなければ「最近の投稿」を出さない');
+    ok((dash.match(/Threadsで見る/g) || []).length === 1 && dash.includes('href="https://www.threads.net/@a/post/1"') && !dash.includes('javascript:alert') && !dash.includes('/post/4'), '「Threadsで見る」は、投稿済みで https のリンクがある予約にだけ出す');
+    const cal = ui.calendarPage({ user: { email: 'b@example.com' }, month: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7), posts, drafts: [], csrf: 'c' });
+    ok((cal.match(/Threadsで見る/g) || []).length === 1 && cal.includes('href="https://www.threads.net/@a/post/1"') && !cal.includes('javascript:alert'), 'カレンダーにも、同じ条件で「Threadsで見る」を出す');
+    const rp = ui.threadsRecentPage({ user: { email: 'b@example.com' }, account: accounts[0], items: [{ id: '1', mediaType: 'IMAGE', mediaUrl: 'https://cdn.example.test/a.jpg', thumbnailUrl: '', permalink: 'https://www.threads.net/@a/post/9', text: '<b>本文</b>', timestamp: '2026-10-15T00:00:00+0000' }] });
+    ok(rp.includes('<h1>Threadsの最近の投稿</h1>') && rp.includes('&lt;b&gt;本文&lt;/b&gt;') && rp.includes('src="https://cdn.example.test/a.jpg"') && rp.includes('2026年10月15日 09:00') && rp.includes('href="https://www.threads.net/@a/post/9"') && rp.includes('保存しません'), '最近の投稿の画面に、本文（エスケープ）・画像・投稿日時（日本時間）・Threadsで見る・保存しないことの説明を出す');
+    const rpEmpty = ui.threadsRecentPage({ user: { email: 'b@example.com' }, account: accounts[0], items: [] });
+    ok(rpEmpty.includes('Threadsの投稿はまだありません'), '投稿が無ければ、その旨を出す');
+    const rp404 = ui.threadsRecentPage({ user: { email: 'b@example.com' }, account: null, error: 'この連携は見つかりませんでした。' });
+    ok(rp404.includes('見つかりませんでした') && !rp404.includes('の最近の投稿</div>'), '連携が見つからないときは、一覧を出さない');
+  }
+
+  console.log('連携の件数の上限と再連携');
+  {
+    const savedMax = process.env.SERVICE_MAX_ACCOUNTS;
+    process.env.SERVICE_MAX_ACCOUNTS = '3';
+    const uL = mkUser('limit@example.com');
+    store.Subscriptions.upsert(uL, { status: 'active' });
+    const mkTh = (ext) => store.SnsAccounts.upsert({ userId: uL, platform: 'threads', externalUserId: ext, handle: `@${ext}`, accessTokenEnc: box.encrypt(`tok_${ext}`, k), expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() });
+    const l1 = mkTh('L1');
+    const l2 = mkTh('L2');
+    mkTh('L3');
+    // Threads の連携の完了のモック。/me の id（どのアカウントか）を meId で変える
+    let meId = 'L2';
+    const mockL = installHttpsMock(async (c) => {
+      if (c.host !== 'graph.threads.net') return null;
+      if (c.path === '/oauth/access_token') return { status: 200, json: { access_token: 'th_short_l', user_id: meId } };
+      if (c.path.startsWith('/access_token?')) return { status: 200, json: { access_token: `th_long_${meId}`, expires_in: 5184000 } };
+      if (c.path.startsWith('/v1.0/me?')) return { status: 200, json: { id: meId, username: `user_${meId}` } };
+      return null;
+    });
+    const stateOf = (r) => new URL(r.url).searchParams.get('state');
+    let st = core.startConnect({ userId: uL, platform: 'threads' });
+    ok(!st.ok && st.error === '連携できるSNSアカウントは3件までです。', '上限まで連携していて、再連携が必要な連携が無ければ、連携を始めさせない（新しい連携は上限で断る）');
+    store.SnsAccounts.setStatus(l2, 'reauth_required');
+    ok(core.startConnect({ userId: uL, platform: 'x' }).error === '連携できるSNSアカウントは3件までです。', '再連携が必要な連携が無いSNSは、上限で断る');
+    st = core.startConnect({ userId: uL, platform: 'threads' });
+    ok(st.ok, '上限まで連携していても、そのSNSに再連携が必要な連携があれば、再連携を始められる');
+    let fin = await core.finishConnect({ userId: uL, platform: 'threads', code: 'c', state: stateOf(st) });
+    const back = store.SnsAccounts.get(l2);
+    ok(fin.ok && back.status === 'active' && back.reauth_at === '' && box.decrypt(back.access_token_enc, k) === 'th_long_L2' && store.SnsAccounts.countForUser(uL) === 3, '同じSNSアカウントの再連携なら、上限まで連携していても、再連携が必要な連携を有効に戻せる（件数は増えない）');
+    store.SnsAccounts.setStatus(l2, 'reauth_required');
+    st = core.startConnect({ userId: uL, platform: 'threads' });
+    meId = 'L9'; // 再連携ではなく、別のアカウントを連携した
+    fin = await core.finishConnect({ userId: uL, platform: 'threads', code: 'c', state: stateOf(st) });
+    ok(st.ok && !fin.ok && fin.error === '連携できるSNSアカウントは3件までです。', '連携の完了で、新しい連携になる場合は、上限で断る');
+    ok(store.SnsAccounts.countForUser(uL) === 3 && !store.SnsAccounts.findForUser(uL, 'threads', 'L9') && store.SnsAccounts.get(l2).status === 'reauth_required' && store.SnsAccounts.get(l1).status === 'active', '上限で断ったときは、新しい連携を保存せず、ほかの連携も変えない');
+    store.SnsAccounts.remove(l1, uL);
+    meId = 'L9';
+    st = core.startConnect({ userId: uL, platform: 'threads' });
+    fin = await core.finishConnect({ userId: uL, platform: 'threads', code: 'c', state: stateOf(st) });
+    ok(fin.ok && store.SnsAccounts.findForUser(uL, 'threads', 'L9') && store.SnsAccounts.countForUser(uL) === 3, '上限より少なければ、新しい連携を保存する');
+    mockL.restore();
+    if (savedMax === undefined) delete process.env.SERVICE_MAX_ACCOUNTS; else process.env.SERVICE_MAX_ACCOUNTS = savedMax;
+  }
 
   process.exit(summary() ? 0 : 1);
 })().catch((e) => { console.error(e); process.exit(1); });

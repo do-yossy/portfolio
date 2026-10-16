@@ -38,6 +38,20 @@ Xは、使わない方針（APIが有料のため。お試し手順の冒頭を�
 | 説明：ビジネス確認 | https://developers.facebook.com/docs/development/release/business-verification |
 | 審査（アプリレビュー）の申請 | アプリの管理画面の左メニューにある「アプリレビュー」から |
 | ビジネス確認の申請 | アプリの管理画面の「設定」→「ベーシック」の「認証」から始め、続きの手続き（書類の提出など）はビジネスマネージャで行う（公式の説明による） |
+| 説明：Threads の始め方（アプリIDが2組できること、Threads Tester、権限の付与の期限） | https://developers.facebook.com/documentation/threads/get-started |
+| 説明：Threads のアプリの作り方（ユースケースの Settings に登録するURL、ライブにするのに要るもの、Publish） | https://developers.facebook.com/documentation/threads/get-started/create-an-app |
+| 説明：Threads の権限（使ってよい範囲と、権限ごとの録画の要件） | https://developers.facebook.com/docs/permissions/threads （権限の一覧のページに移ります） |
+| 説明：審査の申請の手引き（申請の手順、申請前30日以内の呼び出し） | https://developers.facebook.com/documentation/resp-plat-initiatives/individual-processes/app-review/submission-guide |
+| 説明：審査用の画面録画のガイド | https://developers.facebook.com/docs/app-review/submission-guide/screen-recordings |
+| 説明：データの扱いの質問（Data Handling Questions。ライブにした後は毎年の Data Use Checkup で答える） | https://developers.facebook.com/documentation/resp-plat-initiatives/individual-processes/data-handling-questions |
+| 説明：データ削除のコールバック（Data Deletion Request。signed_request と確認コード） | https://developers.facebook.com/documentation/development/create-an-app/app-dashboard/data-deletion-callback |
+| 説明：「設定」→「ベーシック」（アイコン・プライバシーポリシー・利用規約・データ削除のURL） | https://developers.facebook.com/documentation/development/create-an-app/app-dashboard/basic-settings |
+| 説明：アプリのモード（開発モードとライブ） | https://developers.facebook.com/documentation/development/build-and-test/app-modes |
+| 説明：アプリの役割（テスターにしてよい人の条件） | https://developers.facebook.com/documentation/development/build-and-test/app-roles |
+| 規約：Platform Terms（Metaの開発者向けの規約。プライバシーポリシーに書くこと、データの削除） | https://developers.facebook.com/terms/dfc_platform_terms/ |
+| 説明：Access verification（Instagram の審査で使う。2-3-1 の次の段階） | https://developers.facebook.com/documentation/development/release/access-verification |
+| 説明：Data Access Renewal（Facebookページの公開後に続く確認。2-3-4 の次の段階） | https://developers.facebook.com/documentation/resp-plat-initiatives/data-access-renewal |
+| 説明：Facebook の許可の取り消し（`DELETE /{user-id}/permissions`） | https://developers.facebook.com/docs/facebook-login/guides/permissions/request-revoke |
 
 **TikTok**
 
@@ -49,6 +63,11 @@ Xは、使わない方針（APIが有料のため。お試し手順の冒頭を�
 | アプリの審査（App review）の申請 | アプリの管理画面の App review の欄を埋めて「Submit for review」から |
 | 説明：投稿の監査（Audit）の基準 | https://developers.tiktok.com/doc/content-sharing-guidelines |
 | 投稿の監査（Audit）の申請（「自分のみ」の制限を外す） | https://developers.tiktok.com/application/content-posting-api （ログインが必要。公式の「Get Started - Direct Post」のページにある「undergo an audit」のリンク先） |
+| 説明：Login Kit for Web（連携の画面とリダイレクトURI） | https://developers.tiktok.com/doc/login-kit-web |
+| 説明：トークンの管理と取り消し（revoke） | https://developers.tiktok.com/doc/oauth-user-access-token-management |
+| 説明：Webhook（TikTok側で起きたことの知らせ） | https://developers.tiktok.com/doc/webhooks-overview |
+| 説明：Sandbox（アプリの審査の前に試す環境） | https://developers.tiktok.com/doc/add-a-sandbox |
+| 説明：メディアの送り方（Media Transfer。URLの所有確認） | https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide |
 
 TikTokの「アプリの審査」と「投稿の監査（Audit）」は、別々の申請です。アプリの審査に通っても、投稿の監査に通るまでは、投稿は「自分のみ」に限られます（2-3-2 の手順3）。
 
@@ -85,15 +104,87 @@ TikTokの「アプリの審査」と「投稿の監査（Audit）」は、別々
 
 ### 2-2. Threads（Metaの開発者アプリ）
 
-1. Meta for Developers でアプリを作り、「Threads API」のユースケースを追加する。
-2. 「有効なOAuthリダイレクトURI」に `https://（公開URL）/service/oauth/callback/threads` を登録する。
-3. 権限は `threads_basic`・`threads_content_publish`・`threads_manage_replies`（`threads_manage_replies` はツリー＝連投に必要です）。**この権限を追加する前に連携した利用者は、ツリーを使うには連携のやり直しが必要です**（1件目は投稿され、2件目以降が失敗します）。
+最初に審査（Metaのアプリレビュー。App Review）を申請するSNSです。審査に通るまでは、アプリの役割を持つ人（管理者・Threads Tester など）しか連携できません。このサービスでも、`SNS_APPROVED` に `threads` を入れるまでは、一般の利用者には「準備中」と表示し、テスト利用の利用者にだけ連携ボタンを出します（2-4）。
+
+- 手順は、2026年10月15日の調査で読んだ公式の説明ページ（2-0 のリンク集）に合わせています。**管理画面のメニューと欄の名前は、ログインした画面では確かめていません**。公式の説明ページの英語の名前で書いているので、日本語の画面での表記は実物で確かめてください。
+- 申請の画面に貼る英文（権限ごとの使う理由、審査担当者向けの入り方の案内）、画面録画の台本と英語の字幕、日本語の画面の英訳の対応表、データの扱いの質問の回答の材料は、リポジトリの `下書き/Threads審査_申請用一式.md` にまとめています。**reviewer と監査役の審査の前の下書きです**。審査を通してから申請に使ってください。
+- この節のURLの `（公開URL）` は、`SERVICE_BASE_URL` と1文字も違わない値にします（例：`https://post.social-quality.com`）。
+
+**(1) アプリを作る**
+
+1. https://developers.facebook.com/apps でアプリを作り、ユースケース「Access the Threads API」（お試し手順では「Threads APIにアクセス」）を選ぶ。
+2. **同じ日に、ビジネス確認（Business Verification）を始める**。一般の利用者から権限をもらう（Advanced Access）には、ビジネス確認が必要です。アプリの「設定」→「ベーシック」→「認証（Verification）」から会社のビジネスポートフォリオにつなぎ、続きの手続き（書類の提出など）はビジネスマネージャで行います。完了できるのは、ビジネスの管理者だけです。必要な書類と日数は確かめていません（日数が読めないので、最初に始めてください）。
+3. **アプリIDとシークレットは2組できます。`THREADS_APP_ID`・`THREADS_APP_SECRET` には、Threads用のもの（Threads app ID・Threads app secret）を使います**（公式の説明による。メインのアプリIDとシークレットではありません）。
+
+**(2) 権限とURLを登録する**
+
+4. 権限：「Use cases」→ Threads で、`threads_content_publish` と `threads_manage_replies` を「Add」する（`threads_basic` は必須で、外せません）。このサービスが求めるのは、この3つだけです。**ほかの権限（`threads_read_replies`・`threads_manage_insights`・`threads_delete` など）は足さないでください**（足すと、その使い方も審査で見せる必要が出ます）。
+   - `threads_manage_replies` は、ツリー（連投）の2件目以降を、1件目への本人の返信として公開するのに使います。**この権限を追加する前に連携した利用者は、ツリーを使うには連携のやり直しが必要です**（1件目は投稿され、2件目以降が失敗します）。
+   - 自分の投稿への返信に `threads_manage_replies` が必須かは、公式の記述が食い違っています（未確認）。必須でないと分かれば、この権限を申請しないことで、審査の対象を1つ減らせます。
+5. Threads のユースケースの「Settings」に、次の3つのURLを登録する。
+   - Client OAuth Settings（有効なOAuthリダイレクトURI）：`https://（公開URL）/service/oauth/callback/threads`。登録した後の一覧で、末尾に「/」が付いていないか確かめてください（公式の注意）。
+   - Deauthorize callback URL（利用者がアプリを外したときに、Metaが知らせるURL）：`https://（公開URL）/service/meta/threads/deauthorize`
+   - Data Deletion Requests URL（利用者がデータの削除を求めたときに、Metaが知らせるURL）：`https://（公開URL）/service/meta/threads/data-deletion`
+   - 後の2つは、ログインなしで受け付けます。届いた `signed_request` の署名を `THREADS_APP_SECRET`（HMAC-SHA256）で確かめ、そのThreadsアカウントの連携を、このサービスで連携している全員分、マイページの「解除」と同じように消します（連携の情報とトークンの削除、未投稿の予約・下書きと自動運用の取り消し、投稿済みの予約の投稿IDとリンクの削除）。消えたことは、その利用者のマイページに知らせます。データ削除の求めには、確認コードと削除の状況のページ（`https://（公開URL）/service/meta/deletion?code=…`。ログイン不要）のURLを返します（公式の形 `{url, confirmation_code}`）。取り消しの知らせ（Deauthorize）への応答は `{"received": true}` だけで、確認コードは出しません。署名が合わなければ 400（サーバーのログに `[meta] threads deauthorize bad signature` などの行が出ます）、`THREADS_APP_SECRET` が未設定なら 503（ログは出ません）を返し、何も消しません。
+   - 署名は合っていて、該当する連携が無かったとき（すでに解除済み・届いたIDが保存したIDと違う など）は、何も消さず、サーバーのログに `[meta] 該当する連携が見つかりませんでした` と、SNS・種類・確認コードを出します（IDは出しません）。データ削除の求めの場合、状況のページの状態は「受付済み（該当する連携は見つかりませんでした）」となり、「削除しました」とは書きません。
+   - 受け付けた求めの記録（確認コード・SNSの種類・求めの種類・受け付けた日時・状態・消した件数）は残します。届いた `user_id` と、`signed_request` の中身（ハッシュにしたものを含む）は、どこにも残しません。
+   - **未確認・実物で確かめる**：Metaがどちらのシークレット（Threads用か、メインのアプリのものか）で署名するか、`user_id` が連携のときに受け取ったThreadsのユーザーIDと同じか。Threads に限った公式の説明は見つかっていません。8の「受け口の確認」で確かめます。メインのアプリのシークレットで署名されていた場合は、今のコードはそれを入れる環境変数を持たないため、コードの変更が要ります。
+   - これら2つの受け口を含む今回の開発が本番に出てから登録してください（`main` への push で、そのまま本番に出ます）。
+6. Threads Tester を追加する：「App roles」→「Roles」→「Add People」で、役割に「Threads Tester」（ふつうの「Testers」とは別の役割）を選び、自分のThreadsアカウントを招待する。招待されたアカウントで、Threadsのウェブかアプリの「アカウントの設定」→「Website permissions」から承認する（お試し手順の手順6）。**テスターにしてよいのは、従業員か、テスターとしての取り決めがある人だけです**（公式の条件）。お客様をテスターにして、審査の前に使ってもらうことはできません。
+
+**(3) 本番で試す（審査の前）**
+
+7. 今回の開発（審査済みの判定・Metaの受け口・「最近の投稿」・「Threadsで見る」）が本番に出てから、本番にキーを登録する（`fly secrets set -a sq-ai-bijika THREADS_APP_ID=... THREADS_APP_SECRET=...`）。**`SNS_APPROVED` に `threads` は入れず、`SERVICE_OPEN` も設定しません**。この状態では、「Threadsを連携」は、テスト利用の利用者（`/admin/service` で付与したアカウント）にだけ「審査前（テスト利用のみ）」と添えて出ます。
+8. **審査を申請する日から30日以内に、3つの権限をそれぞれ1回以上、実際に使って成功させる**（公式の申請の手引き。成功した呼び出しが記録されるまで、申請のボタンは押せません）。このサービスでは、連携（`/me` の呼び出し）で `threads_basic`、投稿で `threads_content_publish`、ツリーの2件目以降で `threads_manage_replies` を使います。テスターのアカウントで、連携 → テキストの投稿 → 画像の投稿 → ツリー（2件目以降は返信）を1回ずつ成功させ、マイページの「最近の投稿」（見出し「Threadsの最近の投稿」）とカレンダーの「Threadsで見る」も動くことを確かめてください（どちらも録画で使います）。本物のThreadsとつなぐのは、これが初めてです。
    - 本物のThreadsで最初に確かめること（公式に書かれていない、または確かめていない点）：
      - テキストだけの投稿のコンテナで、状態（`status`）が返るか。返らない場合、このサービスは待たずに公開へ進みます。
      - 異体字セレクタの付かない記号（❤ © ™ など）を、Threadsが絵文字としてバイト数で数えるか。このサービスは絵文字として数えています（画面も同じ）。
    - 公開の応答が届かなかった場合（通信エラーなど）、このサービスは公式の案内どおりコンテナの状態を確かめ、公開済みなら投稿済みにします。公開済みと確かめられなければ、**同じコンテナで公開をやり直さず**（同じコンテナを2回公開できるかが公式に書かれていないため）、利用者に投稿されたかの確認をお願いします。
-4. **自分以外の利用者に公開するには、Metaのアプリレビュー（審査）と、アプリを「ライブ」にすることが必要**です。書類（プライバシーポリシーのURLなど）が求められます。審査に通るまでは、アプリの管理者・テスターだけが連携できます。
-5. アプリIDとアプリシークレットを控える。
+   - **受け口の確認（`LEGAL_FINAL=true` と審査の申請より前に、必ず行う）**：プライバシーポリシーの5（2項・3項）は、「Metaから知らせが届いたら、直ちに削除する」と約束しています。実物で確かめるまでは、この約束を守れるか分かりません（5の未確認の2点）。
+     1. テスターのアカウントで Threads を連携した状態にします。**マイページの「解除」は押さないでください**（先に解除すると、消すものが無いため、うまく動いていても下の(c)と同じログになります）。
+     2. flyctl が入ったPCで `fly logs -a sq-ai-bijika` を実行し、表示させたままにします（止めるときは Ctrl+C）。
+     3. Threads の「アカウントの設定」→「Website permissions」から、このアプリを外します。
+     4. しばらく待ってから、マイページを開き直します。あわせて、ログに `[meta]` を含む行が出たかを見ます（行の先頭には、日時などが付きます）。結果は次のどれかです。
+        - **(a) 成功**：マイページから Threads の連携が消え、「Threadsの側で、本サービスへの許可が取り消されたため、（日時）に、その連携の情報を削除しました」で始まる知らせが出ています。成功したときは、ログに `[meta]` の行は出ません。
+        - **(b) 署名が合わない**：ログに `[meta] threads deauthorize bad signature` が出て、連携は残っています。Metaが、`THREADS_APP_SECRET`（Threads用のシークレット）とは別のシークレット（メインのアプリのものなど）で署名している可能性があります。今のコードは `THREADS_APP_SECRET` でしか確かめないため、**コードの変更が要ります**（開発に依頼してください）。連携には Threads用のシークレットを使うため、`THREADS_APP_SECRET` をメインのアプリのシークレットに差し替えないでください。ログの末尾が `bad signature` 以外（`no user_id`・`unsupported algorithm`・`malformed`・`bad json` など）のときも、届いた形が想定と違うため、開発に伝えてください。
+        - **(c) IDが合わない**：ログに `[meta] 該当する連携が見つかりませんでした threads deauthorize （確認コード）` が出て、連携は残っています。署名は合っていますが、届いた `user_id` が、連携のときに保存したID（`/me` の id と、トークンの応答の user_id）のどれとも一致しなかったということです。今のコードは、届いた `user_id` をログにもデータベースにも残さないため、どのIDが届いたかは分かりません。原因を調べるには、届いた中身を一時的に確かめる仕組みを、**開発の作業として**入れる必要があります（今は無い）。
+        - `[meta]` の行が出ず、連携も残っている場合は、知らせが届いていません。5のURLの登録、今回の開発が本番に出ているか、`THREADS_APP_SECRET` が登録されているか（未登録だと 503 を返し、ログは出ません）を確かめてください。Metaが知らせを送るまでの時間は、確かめていません。
+        - この3点（5のURLの登録・本番に出ているか・`THREADS_APP_SECRET`）がすべて合っていても届かない場合は、待った時間と操作の内容（いつ、どのアカウントで、どの画面からアプリを外したか）を添えて、開発に相談してください（Metaが Threads で取り消しの知らせを送るかは、未確認です）。そのうえで、プライバシーポリシーの5の2項の Threads の記載（「Metaから取り消しの知らせが本サービスに届いたときに、直ちに…削除を行います」）を見直すかどうかを、オーナーと開発で決めます。**それまでは `LEGAL_FINAL=true` にしないでください**（審査も申請しません）。
+     5. **(a)になるまで、`LEGAL_FINAL=true` にせず、審査も申請しないでください。** (b)・(c) のときは、開発で直して本番に出してから、1からやり直します。3点がすべて合っていても届かないときは、4の最後の項目のとおり、開発に相談し、プライバシーポリシーの見直しを決めるまで `LEGAL_FINAL=true` にしません。
+     6. Instagram・Facebook も、`SNS_APPROVED` に入れる前に、1〜5と同じ手順で(a)になることを確かめます（2-3-1の8・2-3-4の7）。
+     - Threadsの利用者が、どの画面からデータの削除を求めるか（Data Deletion Requests URL に知らせが届く操作）は、公式の説明が見つかっていません（未確認）。そのため、ここで確かめられるのは、取り消しの知らせ（Deauthorize）だけです。データ削除の求めも、このサービスでは同じシークレット・同じIDの照合で処理しますが、Metaから届く中身が同じかは確かめられていません。
+
+**(4) 申請の準備**
+
+9. 「設定」→「ベーシック」を埋める。
+   - アプリアイコン：512×512〜1024×1024ピクセル、5MB未満、JPEG・GIF・PNG。Metaのロゴや「Facebook」「FB」の文字は使わない。今の `public/icon-512.png` は512×512で、ミチシルベの図柄です（このまま使うか、サービス専用のものを作るかは運営者が決める）。
+   - プライバシーポリシーのURL：`https://（公開URL）/service/legal/privacy`
+   - 利用規約のURL：`https://（公開URL）/service/legal/terms`（ライブにするのに必須）
+   - ユーザーデータの削除：削除の手順のURL `https://（公開URL）/service/legal/data-deletion`（ログイン不要のページ）。公式は「削除の手順のURL」か「コールバックのURL」のどちらかを求めています。この欄でどちらを選べるかは、画面で確かめてください。
+   - カテゴリ：アプリに合うものを選ぶ。
+   - アプリの目的（App Purpose）：「Clients」（アプリの役割を持たない一般の人が使うため）。
+   - 連絡先のメール：審査の結果が届くので、受け取れるアドレスにする。
+   - 公式の「ライブにするのに要るもの」には、EUで事業をする場合のデータ保護責任者（Data Protection Officer）の連絡先も挙がっています。
+   - **プライバシーポリシーと利用規約は、審査の前に確定版にしておきます**（`LEGAL_FINAL=true`。2-5）。確定版にするのは、8の「受け口の確認」で(a)（成功）になってからです（URLの登録・本番への反映・`THREADS_APP_SECRET` の3点が合っていても知らせが届かない場合は、8の4の最後の項目のとおり、開発に相談し、プライバシーポリシーの見直しを決めるまで確定版にしません）。Instagram・Facebook は、`SNS_APPROVED` に入れる前に、同じ手順で(a)になることを確かめます（8の6）。「（案）」のまま審査に出した場合の扱いは、確かめていません。
+10. 審査用のアカウントを用意する。このサービスは、ログインして、契約かテスト利用が有効でないと連携できません。審査用のアカウント（メールとパスワード）を `/service/signup` で作り、`/admin/service` で「テスト利用」を付与します。**審査担当者がアプリに入れないと、申請全体が却下されます**（公式）。審査の期間中は、テスト利用を取り消さないでください（取り消すと、そのアカウントの連携も消えます）。Threadsへのログインは、審査担当者が自分のテスト用のアカウントで行います。運営者個人のMeta・Threadsのログイン情報は、申請に書かないでください。
+11. 権限ごとに画面録画を撮る（3本）。**録画が無い権限は、承認されません。**
+    - 撮り方（公式のガイド）：1080p以上、画面の幅は1440以下に下げる、できるだけマウスで操作、音声なし。ログアウトした状態から撮り始め、このサービスへのログインと、Threadsのログイン・許可の画面もすべて映す。
+    - 画面は日本語だけなので、英語の字幕でボタンの意味を説明します（日本語だけの画面でも、字幕を付ければ受け入れられるかは未確認）。
+    - `threads_basic`：連携したアカウント（「Threads @ユーザー名」）と、マイページのThreadsの行の「最近の投稿」から開く「Threadsの最近の投稿」で、自分の投稿の一覧と、本文・画像・動画を見せる。この一覧は連携した本人にしか見えず、保存しないことを字幕で伝える。
+    - `threads_content_publish`：「投稿を作る」で投稿を作って公開し、カレンダーの「投稿済み」と「Threadsで見る」、Threadsのアプリでの同じ投稿を見せる（公式の要件は、このサービスの画面とThreadsのアプリの両方で結果を見せること）。
+    - `threads_manage_replies`：ツリーを公開し、Threadsで、2件目が1件目への本人の返信としてつながっているところを見せる。
+    - 台本と英語の字幕は、申請用一式の4章にあります。
+12. 申請する：「App Review」→「Permissions and Features」で、3つの権限の Advanced Access を求める。続けて、ビジネス確認、データの扱いの質問（Data Handling Questions）、アプリの設定、アプリの確認（App Verification：入り方の説明と審査用のログイン）を順に済ませる。権限ごとに、使う理由の説明（使い回しは不可）と録画を付けて「Submit for Review」を押し、Platform Onboarding Terms に同意する。結果は、公式の目安では通常1週間以内です。
+    - データの扱いの質問は、ビジネス確認が済んでいると、申請の流れの中で出ることがあります。質問の項目は、調査で取得できていません（申請用一式の7章）。
+    - **未確認**：公式のアプリの作り方の説明には、Tech Provider（顧客や他のビジネスポートフォリオのために使われるアプリ）が済ませる追加の手順が書かれています。このサービス（一般の利用者が自分のThreadsをつなぐ）が Tech Provider に当たり、その手順が要るかは、申請の画面で確かめてください。
+
+**(5) 承認の後**
+
+13. **承認されるまで、アプリをライブにしないでください。** 公式は、開発と審査が済んでからライブにするよう求めています。公式の説明では、ライブのアプリが求められるのは審査で承認された権限だけです。このため、承認の前にライブにすると、テスターも含めて連携できなくなると考えられます（調査の結論）。また、開発モードで作ったデータは、ライブにすると役割の無い人にも見えるようになります（Threads の投稿に当てはまるかは未確認）。
+14. 承認されたら、左メニューの「Publish」で、必要な項目（アイコン・プライバシーポリシー・データ削除のURLなど）がそろっていることを確かめて、ライブにする。
+15. 本番の `SNS_APPROVED` に `threads` を足す（`fly secrets set -a sq-ai-bijika SNS_APPROVED=threads`。ほかに審査を通ったSNSがあれば、`threads,instagram` のようにカンマ区切りで並べる。上書きなので、すでに入れている id も書く）。そのあと、管理画面（`/admin/service`）の「設定の確認」で、一般の利用者に出しているSNSに Threads が入ったことと、アプリの役割を持たないThreadsアカウントで、連携から投稿までできることを確かめる。
+16. ライブにした後は、**毎年、Data Use Checkup で、データの扱いの質問に答えます**（公式）。
+17. 販売の開始（`SERVICE_OPEN=true`）は、2-4 の条件をすべて満たしてから決めてください。
 
 ### 2-3. X（X Developer Portal）（当面は使わない）
 
@@ -113,6 +204,14 @@ TikTokの「アプリの審査」と「投稿の監査（Audit）」は、別々
 5. 利用者のInstagramは、**プロアカウント（ビジネス／クリエイター）である**必要があります（個人アカウントには投稿できません）。
 6. 投稿できるもの：画像（**JPEGのみ**）とリール動画（MP4・MOV）。テキストのみの投稿はできません。画像・動画は、公開URL（`https://（公開URL）/media/...`）からMeta側が取得します。
 7. アプリIDとアプリシークレットを控える。
+8. 連携の取り消しとデータ削除の受け口のURLを登録する（Threadsと同じ仕組み。2-2の5）。公式の説明では、Instagram の管理画面の「Business login settings」に欄があります（ログインした画面での表記は未確認）。
+   - Deauthorize callback URL：`https://（公開URL）/service/meta/instagram/deauthorize`
+   - Data deletion request URL：`https://（公開URL）/service/meta/instagram/data-deletion`
+   - 「設定」→「ベーシック」のユーザーデータの削除に、削除の手順のURLを入れる場合：`https://（公開URL）/service/legal/data-deletion`
+   - 署名は `INSTAGRAM_APP_SECRET` で確かめます。どのシークレットで署名されるか、`user_id` がどのIDか（Instagramでは、連携のときに受け取るIDが2種類あります）は未確認です。テスターでアプリを外し、実物で確かめてください。
+   - **`SNS_APPROVED` に `instagram` を入れる前に、2-2の8の「受け口の確認」と同じ手順で(a)になることを確かめてください。** シークレットは `INSTAGRAM_APP_SECRET`、ログのSNS名は `instagram`（例：`[meta] instagram deauthorize bad signature`）、知らせは「Instagramの側で、本サービスへの許可が取り消されたため…」で始まります。アプリを外すのは、Instagram の設定画面（アプリやウェブサイトへの許可を管理する画面。メニューの名前は未確認）からです。(a)にならないときの扱い（開発で直す・開発に相談する）も、2-2の8と同じです。(a)になるまで `SNS_APPROVED` に `instagram` を入れません。
+
+**Instagram の審査の手順（ビジネス確認、権限ごとの録画、Access verification、アプリの設定など）は、次の段階で書きます。** 上の1〜8は、審査の手順としては足りていません（4のビジネス確認の扱いも、そのときに公式の説明に合わせて直します）。審査に通るまでは `SNS_APPROVED` に `instagram` を入れないでください。
 
 ### 2-3-2. TikTok（TikTok for Developers）
 
@@ -137,6 +236,14 @@ TikTokの「アプリの審査」と「投稿の監査（Audit）」は、別々
 4. 連携のとき、投稿に必要な権限が許可されたかを確認し、足りなければ連携を止めます。投稿できる（CREATE_CONTENT の作業ができる）ページが**1つだけ**のとき、そのページが投稿先になります。2つ以上あるときは連携を止め、Facebookの画面でページを1つだけ選び直すよう案内します（サービス内でページを選ぶ画面は、まだありません）。個人のタイムラインには投稿できません。
 5. 投稿できるもの：テキスト、画像（10枚まで）、動画1本。本文の上限（63,206文字）と画像の枚数（10枚）は、公式に明記が見つからなかった目安です。本文なしの画像の投稿と、動画の `file_url` 方式での投稿は、テスターのページで動くかを確かめてください。アプリIDとアプリシークレットを控える。
 6. Graph APIは `v22.0` を使っています（2027年5月20日まで使えます）。それまでに新しい版に上げて、動作を確かめてください。
+7. 連携の取り消しとデータ削除の受け口のURLを登録する（Threadsと同じ仕組み。2-2の5）。公式の説明では、Facebook Login for Business の設定に欄があります（ログインした画面での表記は未確認）。
+   - Deauthorize Callback URL：`https://（公開URL）/service/meta/facebook/deauthorize`
+   - Data Deletion Request URL：`https://（公開URL）/service/meta/facebook/data-deletion`
+   - 「設定」→「ベーシック」のユーザーデータの削除に、削除の手順のURLを入れる場合：`https://（公開URL）/service/legal/data-deletion`
+   - 署名は `FACEBOOK_APP_SECRET` で確かめ、`user_id`（アプリごとのFacebookのユーザーID）で連携を探します。届く中身は、テスターでアプリを外し、実物で確かめてください（未確認）。
+   - **`SNS_APPROVED` に `facebook` を入れる前に、2-2の8の「受け口の確認」と同じ手順で(a)になることを確かめてください。** シークレットは `FACEBOOK_APP_SECRET`、ログのSNS名は `facebook`（例：`[meta] facebook deauthorize bad signature`）、知らせは「Facebookページの側で、本サービスへの許可が取り消されたため…」で始まります。アプリを外すのは、Facebook の設定画面（アプリやウェブサイトへの許可を管理する画面。メニューの名前は未確認）からです。(a)にならないときの扱い（開発で直す・開発に相談する）も、2-2の8と同じです。(a)になるまで `SNS_APPROVED` に `facebook` を入れません。
+
+**Facebookページの審査の手順（「設定」→「ベーシック」、権限ごとの録画、`public_profile`、申請前30日以内の呼び出し、Tech Provider の質問、公開後に届く削除の依頼への対応など）は、次の段階で書きます。** 審査に通るまでは `SNS_APPROVED` に `facebook` を入れないでください。
 
 ### 2-3-5. YouTube（Google Cloud）
 
@@ -148,6 +255,30 @@ TikTokの「アプリの審査」と「投稿の監査（Audit）」は、別々
 6. **OAuth同意画面が「テスト中」の間は、更新用のトークンが7日で切れます**（テストユーザーは100人まで）。テスト中は、連携から7日以内に実行される予約で試してください。7日を過ぎると「連携のやり直しが必要」になります。
 7. 本文の1行目がタイトル（100文字まで）になり、収まる場合は「#Shorts」を付けて投稿します（3分以内で、正方形か縦長の動画がショートとして扱われます）。説明（本文全体）は5,000バイト（日本語でおよそ1,600文字）まで、半角の `<` `>` は全角に置き換えて送ります。連携のとき、動画のアップロードの権限（`youtube.upload`）が許可されたかを確認します。
 8. 開発者ポリシーにより、プライバシーポリシーに「YouTube API Services を利用している」ことと、Googleのプライバシーポリシーへのリンクを、利用規約にYouTube利用規約へのリンクと同意の文を入れています。クライアントIDとシークレットを控える。
+9. **連携を消すときの扱い**（開発者ポリシー III.D.2 の1段落目・2段落目に合わせたもの。プライバシーポリシーの4-2・5）。満たしていない点・確かめていない点は、この項目の最後に「未対応」「未確認」として書いています。
+   - 公式（III.D.2）が求めていること：
+     - 1段落目：利用者が許可を取り消せる、分かりやすく簡単な方法を用意する。その方法で取り消されたら、すぐにプログラムでトークンを取り消して、Googleに知らせる。その許可で受け取って保存した情報は、できるだけ早く、遅くとも取り消しから7日（暦日）以内に削除する。
+     - 2段落目：プライバシーポリシーに、Googleのセキュリティの設定のページ（`https://security.google.com/settings/security/permissions`）へのリンクを載せる。利用者がそのページで取り消した場合も、その利用者の情報を削除する。そのために、トークンがまだ有効かを定期的に確かめ、更新できない利用者の情報を削除する。削除は、できるだけ早く、遅くとも取り消しから30日（暦日）以内に行う。
+   - 1段落目への対応：取り消しの方法は、マイページの「解除」です（データ削除の手順のページで説明しています）。マイページの「解除」、契約の終了、テスト利用の取り消しでは、Googleにトークンの取り消し（`https://oauth2.googleapis.com/revoke`）を送ってから、その場で連携の情報を消します（7日を待ちません）。取り消しに失敗しても、連携の情報は消し、サーバーのログに `[youtube revoke]` で始まる行を残します。公式の説明では、取り消すと、このサービスのプロジェクトに与えた許可がすべて外れます（同じGoogleアカウントを、このサービスの別の利用者も連携している場合に、その連携も使えなくなるかは未確認）。
+   - 2段落目への対応：Googleのセキュリティの設定のページへのリンクは、プライバシーポリシーの4-2（5の2項から参照）と、データ削除の手順のページに載せています。1時間ごとの処理で、有効なYouTubeの連携のうち、最後に確かめてから24時間以上たったもの（まだ確かめていないものを含む）について、トークンを更新して、まだ有効かを確かめます（連携ごとに1日1回）。連携したときと、トークンを更新できたとき（投稿の前の更新を含む）にも、確かめた日時を記録します。
+     - 更新できたとき：新しいトークンを保存します。
+     - 更新できないとき（Googleが `invalid_grant` などを返したとき、更新用のトークンが無いとき）：「再連携が必要」にします。そのまま28日たつと、1時間ごとの処理で、解除と同じように消して（Googleへのトークンの取り消しも送ります）、利用者のマイページで知らせます。投稿の前のトークンの更新で気づいた場合も、同じく「再連携が必要」になり、そこから28日で消えます。
+     - 確かめられなかったとき（通信のエラー、Googleの 5xx・429、このサービスの設定の誤り（`invalid_client`：`GOOGLE_CLIENT_ID`・`GOOGLE_CLIENT_SECRET` の誤り）など、取り消し・失効を示さないエラー）：状態を変えずに、次の1時間ごとの処理で確かめ直します（設定の誤りで、全員の連携を「再連携が必要」にしないため）。このとき、サーバーのログに `[youtube token check] 確かめられませんでした` で始まる行が出ます。キーが未設定のときは、確かめません。
+     - 取り消しから消すまでは、最も遅い場合で約29.1日です（気づくまで最長約25時間と、気づいてから28日と最長1時間）。30日以内に収まり、残りは約1日です。
+   - 6のとおり、テスト中は更新用のトークンが7日で切れます。7日を過ぎると、1日1回の確認（または投稿の前の更新）で「再連携が必要」になり、再連携しないまま28日たつと、その連携は消えます。
+   - この仕組みを入れる前から「再連携が必要」のままのYouTubeの連携は、最後に更新した日時から数えます。そのため、すでに28日を過ぎているものは、今回の変更が本番に出た後の最初の処理で消えます。
+   - **満たしていない点・確かめていない点**：
+     - **未対応**：30日までの残りは約1日です。サーバーが止まっている間や、上の「確かめられなかったとき」が続く間は、気づくのも消すのも遅れ、取り消しから30日を超えることがあります。そうなりそうなときに運営者へ知らせる仕組みや、30日を超えないよう消す仕組みはありません。`[youtube token check] 確かめられませんでした` の行が続いていないかを、運営者がログで確かめてください（とくに `invalid_client` は、キーを直すまで毎時間続きます）。
+     - **未対応**：Googleへのトークンの取り消しに失敗したとき（1段落目）、やり直す仕組みはありません（トークンも消すため、あとから送り直せません）。
+     - **未確認**：公式は、削除を「できるだけ早く（as soon as possible）」行うようにも書いています。このサービスは、利用者が再連携できるよう、気づいてから28日待ってから消します。この待ち方で、Googleの確認・YouTubeの監査に通るかは確かめていません。
+
+**YouTube の審査（Googleの確認・YouTubeの監査）の申請の手順（デモ動画、ブランドの確認など）は、まだ書いていません。** 上の9は III.D.2 への対応で、審査に要るほかの項目には、まだ対応していないものがあります（未対応）。たとえば次のものです。
+- III.E.4.c：トークン以外の、保存した情報（チャンネルID・チャンネル名・動画のID）は、30日を超えて置かず、30日ごとに取り直すか、削除する（トークンは、III.E.4.a により、必要な間は保存してよい）。今は、チャンネルIDとチャンネル名は連携のときに取ったままで、動画のIDは連携している間は残しています。
+- III.E.4.g：保存した情報の削除を求められたとき、本サービスのアカウントが削除されたときは、7日以内に削除する（今のプライバシーポリシーは、お問い合わせに「速やかに対応します」と書くだけで、7日の期限を守る手順もありません）。
+- YouTube API Services 利用規約 9.1：投稿のボタンの近くに、決まった警告文（YouTube 利用規約に従うことの確認）を出す（今は出していません）。
+- III.C：利用者の明示の同意なしに、タイトルの切り詰め・「#Shorts」の付け足し・半角の `<` `>` の置き換えをしない（7のとおり、今は行っているため、違反のおそれがあります）。
+
+これらが済み、Googleの確認とYouTubeの監査の両方に通るまでは、`SNS_APPROVED` に `youtube` を入れないでください。
 
 ### 2-3-6. AIによる生成（任意）
 
@@ -185,7 +316,7 @@ TikTokの「アプリの審査」と「投稿の監査（Audit）」は、別々
 
 ```
 fly secrets set -a sq-ai-bijika \
-  SERVICE_BASE_URL=https://（公開URL） SERVICE_CONTACT_EMAIL=（問い合わせ用のメールアドレス） \
+  SERVICE_BASE_URL=https://（公開URL） SERVICE_CONTACT_EMAIL=（問い合わせ用のメールアドレス） SERVICE_REPRESENTATIVE=（代表者の氏名） \
   STRIPE_SECRET_KEY=sk_live_... STRIPE_WEBHOOK_SECRET=whsec_... STRIPE_PRICE_ID=price_... \
   SNS_TOKEN_KEY=$(openssl rand -hex 32) APP_SECRET=$(openssl rand -hex 32) \
   THREADS_APP_ID=... THREADS_APP_SECRET=... \
@@ -194,8 +325,14 @@ fly secrets set -a sq-ai-bijika \
   FACEBOOK_APP_ID=... FACEBOOK_APP_SECRET=... \
   GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
 # Xは使わない方針のため、X_CLIENT_ID・X_CLIENT_SECRET は登録しない。登録しなければ、Xは、このサービスのSNSとしては画面に出ない（販売ページの説明・申込み・投稿フォーム・ツリーの説明・文字数の上限の説明）。ただし、次の場所にはXの名前が出る：マイページの連携欄（ほかの未設定のSNSと同じく「X：準備中」。出さない場合は画面の修正が必要）、販売ページの料金の比較表（比べている他社の条件）、販売ページのよくある質問（「Xには投稿できますか？」に「提供していません」と答える）、法務文書（利用規約・特商法表記の対応SNSの一覧は「運営者が提供を始めたもの」という書き方なので食い違わないが、利用規約の上限の条と特商法の「利用上の制限」にはXの月の上限の記載が残り、プライバシーポリシーには X Corp. が残る。使わない間は消すかどうかを検討する）。将来Xを使う場合だけ足す（2-3）
+# THREADS_APP_ID・THREADS_APP_SECRET は、Threads用のアプリIDとシークレット（Threads app ID・Threads app secret。2-2の3）。
+# 各SNSのキーは、審査の前に登録してよい（SNS_APPROVED に入れるまでは、一般の利用者には出ず、テスト利用の利用者だけが連携できる）
 # 任意：AI（使うものだけ）・無料トライアル
 fly secrets set -a sq-ai-bijika ANTHROPIC_API_KEY=... OPENAI_API_KEY=... SERVICE_TRIAL_DAYS=7
+# 各SNSの審査を通り、アプリをライブにしたら、そのSNSの id を足す（例：Threadsが通ったら threads、Instagramも通ったら threads,instagram。値は上書きなので、すでに入れている id も書く）
+fly secrets set -a sq-ai-bijika SNS_APPROVED=threads
+# 法務文書の内容の確認が済み、未記入の【】が無くなったら（販売の開始より前でもよい。各SNSの審査の申請より前に済ませる。Threadsは、2-2の8の「受け口の確認」で(a)になってから。URLの登録・本番への反映・THREADS_APP_SECRET の3点が合っていても知らせが届かないときは、開発に相談し、プライバシーポリシーの見直しを決めるまで設定しない。Instagram・Facebookは、SNS_APPROVED に入れる前に、同じ手順で(a)になることを確かめる（2-3-1の8・2-3-4の7））
+fly secrets set -a sq-ai-bijika LEGAL_FINAL=true
 ```
 
 - `SERVICE_TRIAL_DAYS`：無料期間の日数（1〜30。未設定なら無料期間なし）。初めて申し込む人だけが対象で、Stripeの決済ページでカードの登録が必要、期間が終わると自動で課金されます。最終確認画面に、無料期間・自動課金・解約の期限を自動で表示します。**規約・特商法表記は無料期間ありの内容にも対応していますが、実施する前に運営者が内容を確認してください。**
@@ -203,15 +340,29 @@ fly secrets set -a sq-ai-bijika ANTHROPIC_API_KEY=... OPENAI_API_KEY=... SERVICE
 
 - `SNS_TOKEN_KEY` は、SNSのトークンを暗号化する鍵です。**一度決めたら変更しないでください**（変更すると、連携済みのアカウントがすべて使えなくなります）。
 - 各SNSのキーが未設定なら、そのSNSの連携ボタンは「準備中」と表示されます。
+- **`SNS_APPROVED`**：各SNSの審査（MetaのApp Reviewなど）を通ったSNSの id を、カンマ区切りで登録します（`threads`・`instagram`・`facebook`・`tiktok`・`youtube`・`x`）。入っていないSNSは、キーを登録していても、一般の利用者には「準備中」と表示し、販売ページ・最終確認画面の対応SNSにも書きません。連携を始めるURLを直接開いても、サーバー側で断ります。
+  - テスト利用の利用者（管理画面で付与したアカウント）には、キーが登録済みなら、審査前のSNSも「審査前（テスト利用のみ）」と添えて連携ボタンを出します。審査の前に、SNS側でテスターに登録したアカウントで試すとき・審査用の録画を撮るときに使います。
+  - TikTokは、アプリの審査を通ったら `tiktok` を足します（監査の前に一般の利用者が連携できるかは未確認・実物で確かめる）。投稿の監査（Audit）は、これとは別に `TIKTOK_AUDITED` で示します（2-3-2）。
+  - 管理画面（`/admin/service`）の「設定の確認」に、一般の利用者に出しているSNSと、id を入れたのにキーが無いもの・綴りの違う id を表示します。
+- **`LEGAL_FINAL=true`**：法務文書（規約・特商法表記・プライバシーポリシー）を確定版として表示します。`true` 以外の値では確定版にしません。未記入の `【】` が1つでも残っている間は、設定しても「（案）」と草案の注意書きは外れません（管理画面の「設定の確認」に「草案の表示のままです」と出ます）。設定するのは、Threadsの「受け口の確認」（2-2の8）で(a)になってからです（Instagram・Facebookは、`SNS_APPROVED` に入れる前に、同じ手順で確かめます）。2-5 を参照。
+- **Metaの受け口（連携の取り消し・データ削除）**：新しい環境変数は要りません。届いた `signed_request` は、SNSごとのアプリのシークレット（Threadsは `THREADS_APP_SECRET`、Instagramは `INSTAGRAM_APP_SECRET`、Facebookは `FACEBOOK_APP_SECRET`）で確かめます。シークレットが未設定のSNSの受け口は、503 を返して何もしません。データ削除の求めに返す状況のページのURLは、`SERVICE_BASE_URL` から作ります（未設定のときは、届いたリクエストのアドレスから作ります）。各アプリの管理画面に登録するURLは、2-2の5、2-3-1の8、2-3-4の7 と、`.env.example` に書いています。
+  - この受け口を入れる前に連携した Facebook・Instagram の連携は、Metaから届く求めと照合するためのIDを控えていないため、起動のときに自動で「再連携が必要」になります（利用者が連携し直すと、IDが控えられて有効に戻ります）。
+- `SERVICE_LEGAL_DIR`（任意）：法務文書の置き場所です。未設定なら、リポジトリの `legal/` の文書を出します。設定している場合は、そのフォルダの文書が公開ページ（`/service/legal/*`）に出るので、2-5 のとおり、`legal/` の変更をそちらにも反映してください。
 - **販売の開始は、運営者が `SERVICE_OPEN=true` を設定したときだけ**です。次の条件がすべてそろわないと、販売ページは「準備中」の表示で、申込みはできません（誤って公開しても、壊れた状態で販売されません）。
   - Stripeの3つ（`STRIPE_SECRET_KEY`・`STRIPE_WEBHOOK_SECRET`・`STRIPE_PRICE_ID`）と `SERVICE_BASE_URL`
   - `SERVICE_CONTACT_EMAIL`（特商法表記とプライバシーポリシーの連絡先に、自動で表示されます）
-  - `SNS_TOKEN_KEY` と、6つのSNSのうち1つ以上のキー
+  - `SNS_TOKEN_KEY` と、審査済み（`SNS_APPROVED`）でキーを登録したSNSが1つ以上（キーを登録しただけでは足りません）
+  - 法務文書に、未記入の `【】` が残っていないこと（2-5）
 - **`SERVICE_OPEN=true` は、使うSNSの審査・設定が終わり、テストモードで通しの動作確認が済んだあとに設定してください。** 審査が終わる前に開くと、契約したのに連携できない利用者が出ます。
 
 ### 2-5. 公開前の確認
 
-- `legal/サービス利用規約_案.md`、`legal/サービス特定商取引法表記_案.md`、`legal/サービスプライバシーポリシー_案.md` は**草案**です。内容を運営者（必要に応じて弁護士などの専門家）が確認してから公開してください。`【メールアドレス】` は `SERVICE_CONTACT_EMAIL`、`【代表者の氏名】` は `SERVICE_REPRESENTATIVE` の値に自動で置き換わります。草案である旨の表示（「（案）」と冒頭の注意書き）は、`SERVICE_OPEN=true` で販売を開始すると、公開ページから自動で外れます。
+- `legal/サービス利用規約_案.md`、`legal/サービス特定商取引法表記_案.md`、`legal/サービスプライバシーポリシー_案.md` は**草案**です。内容を運営者（必要に応じて弁護士などの専門家）が確認してから公開してください。`【メールアドレス】` は `SERVICE_CONTACT_EMAIL`、`【代表者の氏名】` は `SERVICE_REPRESENTATIVE` の値に自動で置き換わります。草案である旨の表示（「（案）」と冒頭の注意書き）は、`SERVICE_OPEN=true` で販売を開始すると、公開ページから自動で外れます。販売を開始する前でも、内容の確認が済んだら `LEGAL_FINAL=true` を登録すると外れます（各SNSの審査では、公開されたプライバシーポリシーなどのURLを登録するため、審査の前に確定版にしておきます。「（案）」のまま審査に出した場合の扱いは確かめていません）。`LEGAL_FINAL=true` を登録するのは、Threadsの「受け口の確認」（2-2の8）で(a)になってからです。URLの登録・本番への反映・`THREADS_APP_SECRET` の3点が合っていても知らせが届かないときは、開発に相談し、プライバシーポリシーの見直しを決めるまで登録しません。Instagram・Facebookは、`SNS_APPROVED` に入れる前に、同じ手順で(a)になることを確かめます（2-3-1の8・2-3-4の7）。販売の開始と `LEGAL_FINAL=true` のどちらの場合も、未記入の `【】` が残っている間は外れません（管理画面の「設定の確認」で、残っている箇所を確かめられます）。
+- **`LEGAL_FINAL=true` を設定したら、公開ページを確かめる**：ログアウトした状態で `/service/legal/privacy`・`/service/legal/terms`・`/service/legal/tokushoho` を開き、「（案）」、「※ これは運営者による草案です」の注意書き、`【】` のどれも残っていないことを確かめてください。データ削除の手順のページ（`/service/legal/data-deletion`）も、ログインなしで開けることを確かめます（各SNSの審査では、これらのURLを登録します）。2026年10月15日に本番の `/service/legal/privacy` を開いたときは、「（案）」、草案の注意書き、`【代表者の氏名】`、`【メールアドレス】` がそのまま出ていました。
+- **本番に出ている法務文書の出どころを確かめる**：2026年10月15日に本番の `/service/legal/privacy` を開いたところ、「メンバーペイ」の記載があり、X Corp. の記載が無く、改定日が2026年10月14日の文書が出ていました。リポジトリの `legal/` のプライバシーポリシーは Stripe と X Corp. を書いていて（今回の改定で、改定日は2026年10月15日）、手元のGitの履歴にも、サービスの3つの法務文書に「メンバーペイ」と書いた版はありません。このため、本番では環境変数 `SERVICE_LEGAL_DIR`（法務文書の置き場所）で、リポジトリの `legal/` ではない場所の文書が出ている可能性が高いと考えています（未確認）。`fly secrets list -a sq-ai-bijika` に `SERVICE_LEGAL_DIR` があるかを確かめ、ある場合は `fly ssh console -a sq-ai-bijika -C "printenv SERVICE_LEGAL_DIR"` で場所を確かめてください。
+  - **`SERVICE_LEGAL_DIR` を使っている場合は、リポジトリの `legal/` の変更（今回のプライバシーポリシー・利用規約の改定を含む）を、そちらの文書にも反映してください。** 反映しないと、デプロイしても公開ページは古い文書のままです。未記入の `【】` の確認（管理画面の「設定の確認」）と `LEGAL_FINAL` の判定も、そちらの文書で行われます。
+  - 使っていない場合は、本番に出ているプログラムの版を確かめてください（`ai-bijika-system/**` の変更は、`main` への push で `deploy-ai-bijika.yml` が本番に出します）。
+- **`SNS_APPROVED` を確かめる**：入れているのが、審査に通り、アプリをライブにしたSNSの id だけかを、管理画面（`/admin/service`）の「設定の確認」の「審査済みのSNS（SNS_APPROVED）」の行で確かめてください（一般の利用者に出しているSNS、id を入れたのにキーが無いもの、綴りの違う id が出ます）。審査の前のSNSを入れると、一般の利用者にも連携ボタンが出ますが、SNS側でアプリの役割を持たない人は連携できません。販売を始めるには、ここに1つ以上のSNSが出ている必要があります（2-4）。
 - プライバシーポリシーの事業者の正式名称（OpenAI・TikTokの運営会社など）と所在国は、各社の契約書・公表情報で確認して直してください。
 - 最終確認画面は、当サービスの画面（Stripeの決済ページの手前）に置いています。この構成で特商法の「最終確認画面」の要件を満たすかは、専門家に確認してください。
 - 消費税・インボイス（適格請求書）の扱いを、税理士などに確認する（Stripeの請求書に登録番号を表示する設定など）。
@@ -223,7 +374,7 @@ fly secrets set -a sq-ai-bijika ANTHROPIC_API_KEY=... OPENAI_API_KEY=... SERVICE
 1. `https://（公開URL）/service` を開き、アカウントを作成する。
 2. 最終確認画面で同意し、Stripeの決済ページでテストカードを入力する。
 3. マイページに戻り、「契約中」になることを確認する。
-4. 「Threadsを連携」で連携し、1〜2分後の日時で予約する。時間になったら投稿されることを確認する。
+4. 「Threadsを連携」で連携し、1〜2分後の日時で予約する。時間になったら投稿されることを確認する（`SNS_APPROVED` に `threads` が入っていない間は、決済で契約したアカウントには「Threadsを連携」が出ません。審査の前は、テスト利用を付与したアカウントで試してください。2-2）。
 5. 「解約する」を押し、次回更新が止まる表示になることを確認する。
 
 ## 4. 運用上の注意と、今の制限
