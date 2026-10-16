@@ -4,6 +4,7 @@
 const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
 const { normalize } = require('./post');
+const { idString } = require('./ids');
 
 const API_VERSION = 'v22.0';
 const HOST = 'graph.facebook.com';
@@ -41,7 +42,8 @@ function authUrl({ state, redirectUri }) {
   return `${AUTH_URL}?${new URLSearchParams({ client_id: c.appId, redirect_uri: redirectUri, scope: SCOPES, response_type: 'code', state, auth_type: 'rerequest' }).toString()}`;
 }
 
-async function call({ method = 'GET', path, query, form }) {
+// raw：true なら、応答の JSON と元の文字列 { json, text } を返す（大きな数値のIDを、丸めずに取り出すため。lib/sns/ids.js）
+async function call({ method = 'GET', path, query, form, raw }) {
   const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
   let r;
   try {
@@ -49,7 +51,7 @@ async function call({ method = 'GET', path, query, form }) {
   } catch (e) {
     throw new SnsError(`Facebookに接続できませんでした (${e.message})`, { retriable: true });
   }
-  if (r.status >= 200 && r.status < 300 && r.json) return r.json;
+  if (r.status >= 200 && r.status < 300 && r.json) return raw ? { json: r.json, text: r.text } : r.json;
   const em = r.json && r.json.error;
   const err = classify(r.status, em && em.message ? `Facebook: ${em.message}` : '');
   // HTTPステータスではなく、Graph API のエラーコードで分ける（公式のエラー処理のガイド）
@@ -77,14 +79,24 @@ async function exchangeCode({ code, redirectUri }) {
   const granted = new Set((perms.data || []).filter((x) => x.status === 'granted').map((x) => x.permission));
   const missing = REQUIRED_PERMISSIONS.filter((x) => !granted.has(x));
   if (missing.length) throw new SnsError('Facebookページへの投稿に必要な許可が得られませんでした。もう一度連携し、表示されるすべての項目を許可してください。');
-  const pages = await call({ path: `/${API_VERSION}/me/accounts`, query: { fields: 'id,name,access_token,tasks', access_token: long.access_token } });
+  const pagesRes = await call({ path: `/${API_VERSION}/me/accounts`, query: { fields: 'id,name,access_token,tasks', access_token: long.access_token }, raw: true });
+  const pages = pagesRes.json;
   // 投稿できる（CREATE_CONTENT の作業ができる）ページだけを候補にする
   const list = (pages.data || []).filter((pg) => pg && pg.access_token && (!Array.isArray(pg.tasks) || pg.tasks.includes('CREATE_CONTENT')));
   if (!list.length) throw new SnsError('投稿できるFacebookページが見つかりませんでした。ページで投稿できる役割があるかをご確認ください。ページがビジネスポートフォリオにひも付いている場合は、ビジネス側での役割も必要です。');
   // 意図しないページに投稿しないよう、候補が2つ以上のときは連携を止める（ページを選ぶ画面は、Facebookの連携画面で行う）
   if (list.length > 1) throw new SnsError(`投稿できるFacebookページが${list.length}つあります。もう一度連携し、Facebookの画面でページを選ぶところで、投稿に使うページを1つだけ選んでください。`);
   const page = list[0];
-  return { accessToken: page.access_token, refreshToken: '', expiresAt: '', externalUserId: String(page.id), handle: page.name || '' };
+  // 連携した人のアプリスコープのユーザーID（Metaから届くデータ削除の求めの user_id は、この種類のIDと公式に書かれている。
+  // 取り消しの知らせ（Deauthorize）の中身は未確認・実物で確かめる）。
+  // externalUserId はページIDのため、照合用に別に控える。取れなければ、削除の求めに応えられないので連携を止める
+  // IDが JSON の数値で届いても、桁を丸めない（範囲外で取り出せなければ ''。丸めた値は保存しない）
+  const meRes = await call({ path: `/${API_VERSION}/me`, query: { fields: 'id', access_token: long.access_token }, raw: true });
+  const meId = meRes.json ? idString(meRes.json.id, meRes.text, 'id') : '';
+  if (!meId) throw new SnsError('FacebookのユーザーIDを取得できませんでした。時間をおいて、もう一度連携してください。');
+  const pageId = idString(page.id, pagesRes.text, 'id');
+  if (!pageId) throw new SnsError('FacebookページのIDを取得できませんでした。時間をおいて、もう一度連携してください。');
+  return { accessToken: page.access_token, refreshToken: '', expiresAt: '', externalUserId: pageId, handle: page.name || '', providerUserId: meId };
 }
 
 // ページトークンは期限がないため更新は不要

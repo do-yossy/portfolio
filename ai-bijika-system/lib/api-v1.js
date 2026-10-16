@@ -41,7 +41,8 @@ function postView(p) {
     id: p.id, group_id: p.group_id || '', status: p.status, category: p.category || 'text',
     account: { id: p.account_id, platform: p.platform || '', handle: p.handle || '' },
     text: p.text, media_ids: mediaIds, tree, scheduled_at: p.scheduled_at, posted_at: p.posted_at || '',
-    external_id: p.external_id || '', error: p.last_error || '',
+    // permalink：投稿へのリンク（今は Threads だけ。取得できなかった場合は空）
+    external_id: p.external_id || '', permalink: p.permalink || '', error: p.last_error || '',
   };
 }
 

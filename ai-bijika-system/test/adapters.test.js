@@ -152,6 +152,50 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
   ok(thLen && emojiSamples.every((t) => thLen(t) === th.textLength(t)), `画面の文字数の表示も、Threadsはサーバーと同じ数え方にする（${emojiSamples.length}種で一致）`);
   ok(/\b300\b|5分/.test(th.validatePost({ post: { category: 'video', text: '', medias: [{ kind: 'video', durationSec: 301 }] } }) || ''), 'Threadsの動画は5分まで');
 
+  console.log('Threads 投稿へのリンク（permalink）');
+  mock = installHttpsMock(async (c) => (c.method === 'GET' && c.path.startsWith('/v1.0/pub1?') ? { status: 200, json: { id: 'pub1', permalink: 'https://www.threads.net/@u1/post/AbC' } } : null));
+  let pl = await th.permalink({ accessToken: 'tok', mediaId: 'pub1' });
+  mock.restore();
+  const plQ = new URLSearchParams(mock.calls[0].path.split('?')[1]);
+  ok(pl === 'https://www.threads.net/@u1/post/AbC' && mock.calls.length === 1 && mock.calls[0].method === 'GET' && mock.calls[0].path.startsWith('/v1.0/pub1?') && plQ.get('fields') === 'permalink' && plQ.get('access_token') === 'tok', '公開した投稿のIDで GET /{media-id}?fields=permalink を呼び、投稿へのリンクを返す');
+  mock = installHttpsMock(async () => ({ status: 500, json: { error: { message: 'down' } } }));
+  err = null; pl = 'x';
+  try { pl = await th.permalink({ accessToken: 'tok', mediaId: 'pub1' }); } catch (e) { err = e; }
+  mock.restore();
+  ok(!err && pl === '', 'リンクを取得できなくても例外にせず、空を返す（投稿の成否に関係させない）');
+  mock = installHttpsMock(async () => ({ status: 200, json: { id: 'pub1' } }));
+  pl = await th.permalink({ accessToken: 'tok', mediaId: 'pub1' });
+  mock.restore();
+  ok(pl === '', 'permalink が返らない投稿（公式：著作権の問題がある投稿など）は、空を返す');
+  mock = installHttpsMock(async () => ({ status: 200, json: { id: 'pub1', permalink: 'javascript:alert(1)' } }));
+  pl = await th.permalink({ accessToken: 'tok', mediaId: 'pub1' });
+  mock.restore();
+  ok(pl === '', 'https でないリンクは使わない');
+  mock = installHttpsMock(async () => ({ status: 200, json: {} }));
+  pl = await th.permalink({ accessToken: 'tok', mediaId: '' });
+  mock.restore();
+  ok(pl === '' && mock.calls.length === 0, '投稿のIDが分からない（公開の応答が失われた）ときは、問い合わせない');
+
+  console.log('Threads 最近の投稿（本人の一覧）');
+  mock = installHttpsMock(async (c) => (c.method === 'GET' && c.path.startsWith('/v1.0/u1/threads?') ? { status: 200, json: { data: [
+    { id: 'm1', media_type: 'IMAGE', media_url: 'https://cdn.example.test/1.jpg', permalink: 'https://www.threads.net/@u1/post/1', text: '画像の投稿', timestamp: '2026-10-15T01:02:03+0000' },
+    { id: 'm2', media_type: 'VIDEO', media_url: 'http://cdn.example.test/2.mp4', thumbnail_url: 'https://cdn.example.test/2.jpg', text: '', timestamp: '2026-10-14T01:02:03+0000' },
+  ], paging: { cursors: { before: 'b', after: 'a' } } } } : null));
+  const recent = await th.listRecent({ accessToken: 'tok', externalUserId: 'u1' });
+  mock.restore();
+  const rq = new URLSearchParams(mock.calls[0].path.split('?')[1]);
+  ok(mock.calls.length === 1 && rq.get('fields') === 'id,media_type,media_url,thumbnail_url,permalink,text,timestamp' && rq.get('limit') === '20' && rq.get('access_token') === 'tok', '本人の投稿の一覧を GET /{user-id}/threads で、調べた fields（id・media_type・media_url・thumbnail_url・permalink・text・timestamp）を指定して取る');
+  ok(recent.length === 2 && recent[0].id === 'm1' && recent[0].mediaType === 'IMAGE' && recent[0].mediaUrl === 'https://cdn.example.test/1.jpg' && recent[0].permalink === 'https://www.threads.net/@u1/post/1' && recent[0].text === '画像の投稿' && recent[0].timestamp === '2026-10-15T01:02:03+0000', '本文・画像・リンク・投稿日時を返す');
+  ok(recent[1].mediaUrl === '' && recent[1].thumbnailUrl === 'https://cdn.example.test/2.jpg' && recent[1].permalink === '', 'https でないURLは使わない（無いものは空）');
+  mock = installHttpsMock(async () => ({ status: 400, json: { error: { message: 'expired', code: 190 } } }));
+  err = null; try { await th.listRecent({ accessToken: 'tok', externalUserId: 'u1' }); } catch (e) { err = e; }
+  mock.restore();
+  ok(err && err.authError === true, '一覧の取得で認証エラーなら、再連携が必要と分かる形で投げる');
+  mock = installHttpsMock(async () => ({ status: 200, json: { data: [] } }));
+  await th.listRecent({ accessToken: 'tok', externalUserId: 'u1', limit: 500 });
+  mock.restore();
+  ok(new URLSearchParams(mock.calls[0].path.split('?')[1]).get('limit') === '50', '取得する件数は50件までにする');
+
   console.log('X ツリー');
   let tn = 0;
   mock = installHttpsMock(async () => ({ status: 201, json: { data: { id: `t${++tn}` } } }));
@@ -279,6 +323,7 @@ const vid = (n) => ({ kind: 'video', mime: 'video/mp4', url: `https://example.te
     if (c.path.includes('/oauth/access_token')) return { status: 200, json: { access_token: 'ut' } };
     if (c.path.includes('/me/permissions')) return { status: 200, json: { data: perms } };
     if (c.path.includes('/me/accounts')) return { status: 200, json: { data: pages } };
+    if (c.path.startsWith('/v22.0/me?')) return { status: 200, json: { id: 'fbuser1' } };
     return null;
   });
   const allPerms = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement'].map((p) => ({ permission: p, status: 'granted' }));

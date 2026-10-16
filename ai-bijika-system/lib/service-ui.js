@@ -3,6 +3,8 @@
 const { escapeHtml, icon, layout, crest } = require('./ui');
 const core = require('./service-core');
 const registry = require('./sns');
+// YouTube の、再連携が必要なまま連携を消すまでの日数（マイページの文言をこの定数にそろえる。根拠は lib/sns/scheduler.js）
+const { YOUTUBE_REAUTH_DELETE_DAYS } = require('./sns/scheduler');
 
 const yen = (n) => `${Number(n).toLocaleString('ja-JP')}円`;
 const nameOf = () => escapeHtml(core.serviceName());
@@ -43,7 +45,7 @@ function wrap(title, body) {
 }
 
 function legalLinks() {
-  return `<div class="legal-links"><a href="/service/legal/terms">利用規約</a><a href="/service/legal/tokushoho">特定商取引法に基づく表記</a><a href="/service/legal/privacy">プライバシーポリシー</a></div>`;
+  return `<div class="legal-links"><a href="/service/legal/terms">利用規約</a><a href="/service/legal/tokushoho">特定商取引法に基づく表記</a><a href="/service/legal/privacy">プライバシーポリシー</a><a href="/service/legal/data-deletion">データ削除の手順</a></div>`;
 }
 
 function topNav(user) {
@@ -56,8 +58,9 @@ function topNav(user) {
 const aiLib = () => require('./ai');
 // このサービスのAIで作れるもの（画像・動画）を、説明に使う言葉にする。どちらも作れなければ ''
 const aiKinds = () => { const av = aiLib().available(); return [av.image && '画像', av.video && '動画'].filter(Boolean).join('・'); };
-// 実際に使えるSNS（キーが設定されているもの）
-const liveSns = () => registry.list().filter((p) => p.isConfigured());
+// 実際に使えるSNS（キーが設定済み かつ 審査済み（SNS_APPROVED）のもの。販売ページ・申込みはこれだけを書く）。
+// ログイン後の画面では、テスト利用の利用者の契約（sub）を渡すと、審査前のSNSも含める（連携ボタンと同じ判定）
+const liveSns = (sub) => core.liveSns({ sub });
 const snsNames = () => { const l = liveSns(); return l.length ? l.map((p) => p.label).join('・') : ''; };
 // TikTokの投稿の監査（Audit）を通るまでの制限（LP・最終確認画面・サービスの説明のページで同じ文を使う）
 const TT_PRE_AUDIT = '公開範囲は「自分のみ」に限られ、投稿するTikTokアカウントは非公開にする必要があり、投稿できるのはこのサービス全体で24時間に5人まで';
@@ -78,13 +81,13 @@ function aiLimitsText() {
   if (av.video) parts.push(`動画 1日${l.video}回・1か月${m.video}回`);
   return parts.length ? `AIによる生成の上限は、${parts.join('、')}です（日本時間。自動運用で作る分も含みます）` : '';
 }
-const xLive = () => liveSns().some((p) => p.id === 'x');
-// ツリー（連投）ができる、使えるSNSの名前（ThreadsとXのうち設定済みのもの）。無ければ ''
-const treeLive = () => liveSns().filter((p) => p.id === 'threads' || p.id === 'x').map((p) => p.label).join('と');
-// かんたん投稿で選べる、使えるSNSの文字数の上限（設定済みのSNSだけを書く）。
+const xLive = (sub) => liveSns(sub).some((p) => p.id === 'x');
+// ツリー（連投）ができる、使えるSNSの名前（ThreadsとXのうち、liveSns に入るもの）。無ければ ''
+const treeLive = (sub) => liveSns(sub).filter((p) => p.id === 'threads' || p.id === 'x').map((p) => p.label).join('と');
+// かんたん投稿で選べる、使えるSNSの文字数の上限（liveSns に入るSNSだけを書く）。
 // かんたん投稿の本文は2,200文字まで（入力欄の上限）なので、それより長く書けるSNSも2,200と書く
-function quickLimitText() {
-  const ids = liveSns().map((p) => p.id);
+function quickLimitText(sub) {
+  const ids = liveSns(sub).map((p) => p.id);
   const parts = [];
   if (ids.includes('threads')) parts.push('Threads 500（絵文字は1つで2文字以上に数えます）');
   if (ids.includes('x')) parts.push('X 日本語140文字（重み280）');
@@ -503,13 +506,22 @@ function checkoutResultPage({ user, kind }) {
 
 const STATUS_LABEL = { test: ['テスト利用中（運営者が付与・料金なし）', 'badge-ok'], active: ['契約中', 'badge-ok'], trialing: ['契約中（お試し）', 'badge-ok'], past_due: ['お支払いの確認が必要', 'badge-ng'], unpaid: ['お支払いの確認が必要', 'badge-ng'], canceled: ['解約済み', 'badge-off'], incomplete: ['お支払い手続き中', 'badge-warn'], incomplete_expired: ['未完了', 'badge-off'], none: ['未契約', 'badge-off'] };
 const POST_STATUS = { draft: ['下書き', 'badge-off'], pending: ['予約中', 'badge-warn'], publishing: ['投稿中', 'badge-warn'], posted: ['投稿済み', 'badge-ok'], failed: ['失敗', 'badge-ng'], cancelled: ['取り消し', 'badge-off'] };
+// https のURLだけをリンク・画像に使う（SNSから受け取った値を画面に入れるため）
+const httpsUrl = (u) => { const s = String(u || ''); try { return new URL(s).protocol === 'https:' ? s : ''; } catch { return ''; } };
+// 投稿済みの予約の「Threadsで見る」リンク（保存した投稿へのリンク（permalink）があるときだけ。今は Threads だけが保存する）
+function viewOnSnsLink(p, before = '') {
+  const href = p.status === 'posted' ? httpsUrl(p.permalink) : '';
+  if (!href) return '';
+  const label = (registry.get(p.platform) || {}).label || 'SNS';
+  return `${before}<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}で見る</a>`;
+}
 const toLocalInput = (ms) => {
   const d = new Date(ms + 9 * 3600 * 1000);
   return d.toISOString().slice(0, 16);
 };
 
 // マイページ：上限と、今の利用状況
-function usageCard(userId) {
+function usageCard(userId, sub) {
   const st = require('./service-store');
   const nowIso = new Date().toISOString();
   const [mf, mt] = core.jstMonthBounds(nowIso);
@@ -517,7 +529,7 @@ function usageCard(userId) {
   const rows = [
     ['連携しているSNSアカウント', `${st.SnsAccounts.countForUser(userId)} / ${L.maxAccounts}件`],
     ['未投稿の予約', `${st.ScheduledPosts.countPending(userId)} / ${L.maxPending}件`],
-    ...(xLive() ? [['今月のXへの投稿（日本時間の暦月・ツリーは1件ずつ）', `${st.ScheduledPosts.countXUnits(userId, mf, mt)} / ${L.xPerMonth}件`]] : []),
+    ...(xLive(sub) ? [['今月のXへの投稿（日本時間の暦月・ツリーは1件ずつ）', `${st.ScheduledPosts.countXUnits(userId, mf, mt)} / ${L.xPerMonth}件`]] : []),
     ['同じ日（日本時間）に投稿する予約', `1日${L.maxPerDay}件まで`],
   ];
   const am = aiLib().monthlyLimits();
@@ -530,7 +542,7 @@ function usageCard(userId) {
 
 // マイページ：AIの自動運用
 const MEDIA_LABEL = { none: '文章だけ', image: '文章＋画像', video: '文章＋動画' };
-function autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail }) {
+function autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail, sub }) {
   const aiAuto = require('./ai-auto');
   // TikTokは対象外。YouTubeは動画が必要なため、動画の生成を提供していない間は対象外
   const targets = activeAccounts.filter((a) => a.platform !== 'tiktok' && (a.platform !== 'youtube' || aiAvail.video));
@@ -560,7 +572,7 @@ function autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail }) {
       <div class="btn-row" style="margin-top:8px"><button class="btn btn-primary" type="submit">ルールを追加</button></div></form>
       <script>(function(){var a=document.getElementById('autoAcc'),y=document.getElementById('autoYt');function f(){var o=a.options[a.selectedIndex];y.style.display=o&&o.dataset.platform==='youtube'?'block':'none';}a.addEventListener('change',f);f();})();</script>`
     : (() => {
-      const autoNames = liveSns().filter((p) => p.id !== 'tiktok' && (p.id !== 'youtube' || aiAvail.video)).map((p) => p.label);
+      const autoNames = liveSns(sub).filter((p) => p.id !== 'tiktok' && (p.id !== 'youtube' || aiAvail.video)).map((p) => p.label);
       return autoNames.length ? `<p class="small">自動運用に使えるSNS（${escapeHtml(autoNames.join('・'))}）を先に連携してください。</p>` : '<p class="small">自動運用に使えるSNSは、準備中です。</p>';
     })();
   return `<div class="card" id="autorules"><div class="card-title">AIで自動運用する</div>
@@ -569,21 +581,41 @@ function autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail }) {
 }
 
 // ── マイページ ──
-function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], mcpConnections = [], newKey = '', aiAvail = {}, autoRules = [] }) {
+// SNS側の操作（Metaから届いた取り消しの知らせ・削除の求め）や、再連携が必要なまま28日（YOUTUBE_REAUTH_DELETE_DAYS）たったこと（YouTube）で、
+// 連携の情報を削除したことの知らせ（lib/meta-deletion.js の Notices。YouTube は lib/sns/scheduler.js）
+const REMOVAL_WHY = {
+  deletion: (label) => `${label}の側で、本サービスが受け取った情報の削除が求められたため`,
+  deauthorize: (label) => `${label}の側で、本サービスへの許可が取り消されたため`,
+  expired: (label) => `${label}の連携が「再連携が必要」のまま${YOUTUBE_REAUTH_DELETE_DAYS}日たったため`,
+};
+function removalNoticesHtml(notices, csrf) {
+  return (notices || []).map((n) => {
+    const label = escapeHtml((registry.get(n.platform) || {}).label || n.platform);
+    const why = (REMOVAL_WHY[n.kind] || REMOVAL_WHY.deauthorize)(label);
+    return `<div class="notice warn" style="margin:0 0 14px"><div>${why}、${escapeHtml(core.formatJst(n.created_at))}に、その連携の情報を削除しました（未投稿の予約・下書きと自動運用の設定は取り消し、投稿済みの予約に保存していた投稿のID・リンクも削除しました）。続けて使う場合は、もう一度連携してください。
+      <form class="inline" method="POST" action="/service/app/notice/${escapeHtml(n.id)}/dismiss"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">閉じる</button></form></div></div>`;
+  }).join('');
+}
+
+function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], mcpConnections = [], newKey = '', aiAvail = {}, autoRules = [], removalNotices = [] }) {
   const active = !!sub && ['active', 'trialing', 'test'].includes(sub.status);
   const [stLabel, stClass] = STATUS_LABEL[(sub && sub.status) || 'none'] || STATUS_LABEL.none;
   const accHtml = accounts.length ? accounts.map((a) => {
     const ad = registry.get(a.platform);
     const bad = a.status !== 'active';
     return `<div class="acct-row"><span><b>${escapeHtml(ad ? ad.label : a.platform)}</b> ${escapeHtml(a.handle || '')}
-      ${bad ? '<span class="badge-ng">再連携が必要</span>' : ''}</span>
-      <span>${bad ? `<a class="btn btn-sm" href="/service/connect/${escapeHtml(a.platform)}">再連携</a> ` : ''}
+      ${bad ? '<span class="badge-ng">再連携が必要</span>' : ''}${bad && a.platform === 'youtube' ? `<span class="small">（再連携しないまま${YOUTUBE_REAUTH_DELETE_DAYS}日たつと、この連携の情報を削除します）</span>` : ''}</span>
+      <span>${bad ? `<a class="btn btn-sm" href="/service/connect/${escapeHtml(a.platform)}">再連携</a> ` : ''}${!bad && active && a.platform === 'threads' ? `<a class="btn btn-sm" href="/service/app/threads/${escapeHtml(a.id)}/recent">最近の投稿</a> ` : ''}
       <form class="inline" method="POST" action="/service/app/account/${escapeHtml(a.id)}/disconnect" onsubmit="return confirm('連携を解除します。未投稿の予約は取り消されます。よろしいですか？')">
         <input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">解除</button></form></span></div>`;
   }).join('') : '<p class="small">まだ連携しているSNSがありません。</p>';
-  const connectBtns = registry.list().map((p) => p.isConfigured() && snsReady
-    ? `<a class="btn btn-sm btn-primary" href="/service/connect/${p.id}">${escapeHtml(p.label)}を連携</a>`
-    : `<span class="small">${escapeHtml(p.label)}：準備中</span>`).join(' ');
+  // 連携ボタンは、審査済み（SNS_APPROVED）のSNSだけ。テスト利用の利用者には、審査前のSNSも「審査前（テスト利用のみ）」と添えて出す
+  // （サーバー側でも、core.startConnect で同じ判定をかける）
+  const connectBtns = registry.list().map((p) => {
+    const mode = snsReady ? core.connectMode(p.id, sub) : '';
+    if (!mode) return `<span class="small">${escapeHtml(p.label)}：準備中</span>`;
+    return `<a class="btn btn-sm btn-primary" href="/service/connect/${p.id}">${escapeHtml(p.label)}を連携</a>${mode === 'test' ? ' <span class="badge-warn">審査前（テスト利用のみ）</span>' : ''}`;
+  }).join(' ');
   const activeAccounts = accounts.filter((a) => a.status === 'active');
   // かんたん投稿では、投稿ごとの設定が必要なYouTubeは選べない（「投稿を作る」画面で設定する）。
   // TikTokのアカウントが2つ以上あるときも、アカウントごとに設定を確かめるため、「投稿を作る」画面から投稿してもらう
@@ -628,7 +660,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <div class="field"><label class="lbl" for="at">投稿日時（日本時間）</label><input id="at" type="datetime-local" name="at" value="${defaultAt}" required></div>
       <div class="btn-row"><button class="btn btn-primary" type="submit" name="mode" value="schedule">予約する</button>
         <button class="btn btn-ghost" type="submit" name="mode" value="now" onclick="return confirm('今すぐ投稿します。よろしいですか？')">今すぐ投稿</button></div>
-      <p class="small">文字数の上限：${quickLimitText()}。かんたん投稿の入力欄は2,200文字までです（SNSごとの上限のほうが短い場合は、その上限まで）。上の文字数は目安です（絵文字などの数え方は、SNSごとに異なります）。</p>
+      <p class="small">文字数の上限：${quickLimitText(sub)}。かんたん投稿の入力欄は2,200文字までです（SNSごとの上限のほうが短い場合は、その上限まで）。上の文字数は目安です（絵文字などの数え方は、SNSごとに異なります）。</p>
     </form>
     <script>
     function cnt(){var t=document.getElementById('text').value;document.getElementById('count').textContent=Array.from(t).length+'文字';}
@@ -676,7 +708,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
     const ad = registry.get(p.platform);
     return `<tr><td style="white-space:nowrap">${escapeHtml(core.formatJstShort(p.scheduled_at))}</td><td style="white-space:nowrap">${escapeHtml(ad ? ad.label : '')}<br><span class="small">${escapeHtml(p.handle || '')}</span></td>
       <td>${p.media_id ? '<span class="badge-off">添付あり</span> ' : ''}${escapeHtml(p.text.length > 60 ? `${p.text.slice(0, 60)}…` : p.text)}${p.last_error ? `<br><span class="small">${escapeHtml(p.last_error)}</span>` : ''}</td>
-      <td><span class="${c}">${l}</span>${p.status === 'pending' ? `<br><form class="inline" method="POST" action="/service/app/post/${escapeHtml(p.id)}/cancel"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">取り消し</button></form>` : ''}</td></tr>`;
+      <td><span class="${c}">${l}</span>${viewOnSnsLink(p, '<br>')}${p.status === 'pending' ? `<br><form class="inline" method="POST" action="/service/app/post/${escapeHtml(p.id)}/cancel"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">取り消し</button></form>` : ''}</td></tr>`;
   }).join('') : '<tr><td colspan="4" class="small">予約はまだありません。</td></tr>';
   const renewal = sub && sub.current_period_end ? core.formatJst(sub.current_period_end) : '';
   const billing = sub && sub.status === 'test' ? `<div class="card"><div class="card-title">ご利用の状態</div><p class="small">状態：<span class="${stClass}">${stLabel}</span><br>運営者が動作確認のために付与したテスト利用です。料金はかかりません。運営者が取り消すと、SNSの連携とAIアシスタントとの接続が解除され、APIキーが無効になり、未投稿の予約・下書きが取り消されます。</p></div>` : sub && sub.stripe_subscription_id ? `
@@ -699,13 +731,14 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
     ${flash ? `<div class="notice ${flash.type === 'error' ? 'error' : ''}" style="margin:0 0 14px"><div>${escapeHtml(flash.text)}</div></div>` : ''}
     ${notActive}
     ${billing}
-    ${active ? usageCard(user.id) : ''}
+    ${active ? usageCard(user.id, sub) : ''}
+    ${removalNoticesHtml(removalNotices, csrf)}
     <div class="card"><div class="card-title">連携しているSNS</div>${accHtml}
       <div class="btn-row" style="margin-top:10px">${active ? connectBtns : '<span class="small">ご契約後に連携できます。</span>'}</div></div>
     ${active ? `<div class="card"><div class="card-title">投稿の作成と管理</div><p class="small">ツリー（連投）・複数の画像・SNSごとの本文・下書きは「投稿を作る」から。予約の一覧はカレンダーで確認できます。</p>
       <div class="btn-row"><a class="btn btn-primary" href="/service/app/compose">投稿を作る</a><a class="btn" href="/service/app/calendar">カレンダー・下書き</a></div></div>` : ''}
     ${compose}
-    ${active && aiAvail.text ? autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail }) : ''}
+    ${active && aiAvail.text ? autoRulesCard({ accounts, activeAccounts, autoRules, csrf, aiAvail, sub }) : ''}
     ${active && !aiAvail.text ? '<div class="card"><div class="card-title">AIで投稿を作る</div><p class="small">「投稿を作る」画面の「ご自身のAIで作る」から、投稿先の条件を入れた指示文をコピーして、ChatGPT・Claude・Gemini を開けます（自動で入力されない場合は、貼り付けて送信します）。できた文章や画像を貼り付けて、予約・投稿してください。AIアシスタント（MCP対応）から、このツールを操作して投稿することもできます（下の「AIアシスタントとの接続」）。</p><div class="btn-row"><a class="btn btn-sm btn-primary" href="/service/app/compose">投稿を作る</a></div></div>' : ''}
     ${active ? `<div class="card" id="apikeys"><div class="card-title">APIキー（外部のツール・AIから投稿するとき）</div>
       ${newKey ? `<div class="notice"><div>新しいAPIキーです。<b>この画面を閉じると二度と表示されません</b>。安全な場所に保存してください。<br><code style="word-break:break-all">${escapeHtml(newKey)}</code></div></div>` : ''}
@@ -735,7 +768,7 @@ const PLATFORM_LIMITS = {
   youtube: { text: 5000, media: '動画1本が必須（本文の1行目がタイトル。説明はバイト数で数え、日本語は1文字3バイト）' },
 };
 
-function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
+function composePage({ user, accounts, csrf, aiAvail = {}, draft = null, sub = null }) {
   const act = accounts.filter((a) => a.status === 'active');
   const labelOf = (a) => `${(registry.get(a.platform) || {}).label || a.platform} ${a.handle || ''}`;
   const accJson = JSON.stringify(act.map((a) => ({ id: a.id, platform: a.platform, label: labelOf(a), limit: (PLATFORM_LIMITS[a.platform] || {}).text || 2200, rule: (PLATFORM_LIMITS[a.platform] || {}).media || '' }))).replace(/</g, '\\u003c');
@@ -750,7 +783,7 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
         <label class="check"><input type="radio" name="cat" value="text" checked><span>テキスト</span></label>
         <label class="check"><input type="radio" name="cat" value="image"><span>画像</span></label>
         <label class="check"><input type="radio" name="cat" value="video"><span>動画</span></label>
-        ${treeLive() ? '<label class="check"><input type="radio" name="cat" value="tree"><span>ツリー（連投）</span></label>' : ''}</div></div>
+        ${treeLive(sub) ? '<label class="check"><input type="radio" name="cat" value="tree"><span>ツリー（連投）</span></label>' : ''}</div></div>
       <div class="field"><span class="lbl">投稿先</span><div id="accs"></div></div>
       <div class="field" style="border:1px dashed #c9bfa6;border-radius:12px;padding:10px"><span class="lbl">AIに作らせる（内容は必ずご自身で確認してください）</span>
         <input type="text" id="aiTheme" maxlength="500" placeholder="テーマ・内容（例：朝活のメリットを3つ）">
@@ -773,7 +806,7 @@ function composePage({ user, accounts, csrf, aiAvail = {}, draft = null }) {
         <input type="file" id="mediaFile" multiple accept="image/jpeg,image/png,video/mp4,video/quicktime">
         <div class="small">JPEG・PNG（8MBまで）／MP4・MOV（100MBまで）。選んだ順に並びます。</div>
         <div id="mediaList" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div></div>
-      ${treeLive() ? `<div class="field" id="treeField" style="display:none"><span class="lbl">ツリーの2件目以降（${escapeHtml(treeLive())}だけ。1件目は上の本文です）</span>
+      ${treeLive(sub) ? `<div class="field" id="treeField" style="display:none"><span class="lbl">ツリーの2件目以降（${escapeHtml(treeLive(sub))}だけ。1件目は上の本文です）</span>
         <div id="treeList"></div><button type="button" class="btn btn-sm" id="addCard">＋ 投稿を追加</button></div>` : ''}
       <div class="field" id="ttField" style="display:none;border:1px solid #d9d0bb;border-radius:12px;padding:10px">
         <span class="lbl">TikTokの設定（<b id="ttNick">TikTok</b>）</span>
@@ -922,7 +955,7 @@ function calendarPage({ user, month, posts, drafts, csrf, flash }) {
       const [l, c] = POST_STATUS[p.status] || [p.status, 'badge-off'];
       const ad = registry.get(p.platform);
       const snippet = String(p.text || '').slice(0, 24);
-      return `<div class="cal-item" title="${escapeHtml(p.text || '')}"><span class="${c}" style="font-size:10px;padding:0 6px">${escapeHtml(l)}</span> ${hm} <b>${escapeHtml(ad ? ad.label : '')}</b><br><span class="small">${escapeHtml(snippet)}${p.text && p.text.length > 24 ? '…' : ''}</span>${p.last_error && (p.status === 'failed' || p.status === 'pending') ? `<br><span class="small" style="color:#8a2c1f">${escapeHtml(String(p.last_error).slice(0, 120))}</span>` : ''}
+      return `<div class="cal-item" title="${escapeHtml(p.text || '')}"><span class="${c}" style="font-size:10px;padding:0 6px">${escapeHtml(l)}</span> ${hm} <b>${escapeHtml(ad ? ad.label : '')}</b><br><span class="small">${escapeHtml(snippet)}${p.text && p.text.length > 24 ? '…' : ''}</span>${viewOnSnsLink(p, '<br>')}${p.last_error && (p.status === 'failed' || p.status === 'pending') ? `<br><span class="small" style="color:#8a2c1f">${escapeHtml(String(p.last_error).slice(0, 120))}</span>` : ''}
         ${p.status === 'pending' ? `<form class="inline" method="POST" action="/service/app/post/${escapeHtml(p.id)}/cancel" onsubmit="return confirm('この予約を取り消します。')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><input type="hidden" name="back" value="calendar"><button class="linkbtn" type="submit">取り消す</button></form>` : ''}</div>`;
     }).join('');
     cells += `<div class="cal-cell${isToday(d) ? ' cal-today' : ''}"><div class="cal-day">${d}</div>${items}</div>`;
@@ -955,14 +988,158 @@ function calendarPage({ user, month, posts, drafts, csrf, flash }) {
   `);
 }
 
+// ── Threadsの最近の投稿（連携した本人だけ。開くたびにThreadsから取得し、保存しない）──
+// media_type の値は公式のリファレンス（Threads Media）による。カルーセルの子の中身は取得していない（lib/sns/threads.js の listRecent）
+const THREADS_MEDIA_TYPE = { TEXT_POST: 'テキスト', IMAGE: '画像', VIDEO: '動画', CAROUSEL_ALBUM: 'カルーセル（複数の画像・動画）', AUDIO: '音声', REPOST_FACADE: '再投稿' };
+function threadsRecentMedia(t) {
+  const media = 'style="max-width:100%;max-height:420px;border-radius:10px;display:block;margin-top:8px"';
+  if (t.mediaType === 'VIDEO' && t.mediaUrl) {
+    return `<video controls preload="metadata" playsinline ${t.thumbnailUrl ? `poster="${escapeHtml(t.thumbnailUrl)}"` : ''} src="${escapeHtml(t.mediaUrl)}" ${media}></video>`;
+  }
+  const img = t.mediaType === 'VIDEO' ? t.thumbnailUrl : (t.mediaType === 'IMAGE' || t.mediaType === 'CAROUSEL_ALBUM' ? t.mediaUrl : '');
+  const imgHtml = img ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(t.mediaType === 'VIDEO' ? '動画のサムネイル' : '投稿の画像')}" loading="lazy" referrerpolicy="no-referrer" ${media}>` : '';
+  if (t.mediaType === 'CAROUSEL_ALBUM') return `${imgHtml}<p class="small">カルーセルの画像・動画は、すべてをこの画面には出していません。「Threadsで見る」から、Threadsでご覧ください。</p>`;
+  if (t.mediaType === 'AUDIO' || t.mediaType === 'REPOST_FACADE') return `${imgHtml}<p class="small">この種類の投稿の中身は、この画面には出していません。「Threadsで見る」から、Threadsでご覧ください。</p>`;
+  if ((t.mediaType === 'IMAGE' || t.mediaType === 'VIDEO') && !img) return '<p class="small">画像・動画を取得できませんでした。「Threadsで見る」から、Threadsでご覧ください。</p>';
+  if (t.mediaType === 'VIDEO') return `${imgHtml}<p class="small">動画を取得できなかったため、サムネイルを表示しています。動画は「Threadsで見る」から、Threadsでご覧ください。</p>`;
+  return imgHtml;
+}
+function threadsRecentPage({ user, account, items = [], error = '' }) {
+  const handle = account ? escapeHtml(account.handle || '') : '';
+  const list = items.length ? items.map((t, i) => {
+    const kind = THREADS_MEDIA_TYPE[t.mediaType] || t.mediaType || '投稿';
+    const when = t.timestamp && !Number.isNaN(Date.parse(t.timestamp)) ? core.formatJst(t.timestamp) : '';
+    const snippet = t.text.length > 40 ? `${t.text.slice(0, 40)}…` : t.text;
+    return `<details class="th-post"${i === 0 ? ' open' : ''}><summary><span class="badge-off">${escapeHtml(kind)}</span> <span class="small">${escapeHtml(when)}</span> ${escapeHtml(snippet || '（本文なし）')}</summary>
+      <div class="th-body">
+        <table class="t kv"><tr><th>投稿日時</th><td>${when ? `${escapeHtml(when)}（日本時間）` : '不明'}</td></tr><tr><th>種類</th><td>${escapeHtml(kind)}</td></tr></table>
+        ${t.text ? `<div class="th-text">${escapeHtml(t.text)}</div>` : '<p class="small">本文はありません。</p>'}
+        ${threadsRecentMedia(t)}
+        <p>${t.permalink ? `<a class="btn btn-sm" href="${escapeHtml(t.permalink)}" target="_blank" rel="noopener noreferrer">Threadsで見る</a>` : '<span class="small">Threadsがこの投稿へのリンクを返さなかったため、リンクはありません。</span>'}</p>
+      </div></details>`;
+  }).join('') : (error ? '' : '<p class="small">Threadsの投稿はまだありません。</p>');
+  return wrap('Threadsの最近の投稿', `
+    <style>.svc .th-post{border-bottom:1px solid #eee7d6;padding:8px 0}.svc .th-post summary{cursor:pointer;line-height:1.6}.svc .th-body{padding:8px 0 4px}.svc .th-text{white-space:pre-wrap;word-break:break-word;margin:10px 0}</style>
+    ${topNav(user)}
+    <header class="page-head"><div class="eyebrow">Threads</div><h1>Threadsの最近の投稿</h1>
+      <p class="small"><a href="/service/app">マイページ</a> ／ <a href="/service/app/calendar">カレンダー・下書き</a></p></header>
+    ${error ? `<div class="notice error" style="margin:0 0 14px"><div>${escapeHtml(error)}</div></div>` : ''}
+    ${account ? `<div class="card"><div class="card-title">Threads ${handle} の最近の投稿</div>
+      <p class="small">連携したご本人だけが見られます。この一覧は、開くたびにThreadsから取得して表示するだけで、本サービスには保存しません。投稿を選ぶと、本文・画像・動画を表示します（新しい順に最大20件）。</p>
+      ${list}</div>` : ''}
+    ${legalLinks()}
+  `);
+}
+
 function legalPage(title, html, user) {
   return wrap(title, `${topNav(user)}<div class="legal-doc">${html}</div><p class="small"><a href="/service">サービス紹介に戻る</a></p>`);
+}
+
+// ── データ削除の手順（ログイン不要。各SNSのアプリの「ユーザーデータ削除の手順のURL」に登録できる）──
+// 内容は、プライバシーポリシーの5と、実際の動き（SnsAccounts.remove・lib/meta-deletion.js）に合わせること。
+// 各SNSの設定画面の名前（どのメニューから許可を外すか）は、公式で確かめられていないため書いていない（実物で確かめてから足す）
+const contactHtml = () => {
+  const mail = core.contactEmail();
+  return `<a href="/contact">お問い合わせフォーム</a>${mail ? `（またはメール：<a href="mailto:${escapeHtml(mail)}">${escapeHtml(mail)}</a>）` : ''}`;
+};
+const NOT_DELETED_HTML = `<ul>
+  <li>SNS上に公開された投稿そのものは、本サービスでの解除や削除の求めでは削除されません。SNS上の投稿は、各SNSで削除してください。</li>
+  <li>利用者が本サービスで作成した投稿の本文・日時などの投稿の情報（SNSでの投稿のIDとリンクを除きます）と、同意の記録は、本サービスのアカウントの情報として残ります（プライバシーポリシーの6）。</li>
+  <li>Metaから届いた削除の求め・取り消しの知らせを受け付けた記録（確認コード、SNSの種類、求めの種類、受け付けた日時、処理の状態、削除した連携の件数）と、SNS側の操作などで連携の情報を削除したことをマイページでお知らせするための記録（本サービスのアカウント、SNSの種類、削除の理由、削除した日時、お知らせを閉じた日時）は、処理の状況の確認とお問い合わせへの対応のために保存します。これらの記録には、SNSのIDなど、SNSのアカウントを特定できる情報は含みません（プライバシーポリシーの5）。</li>
+</ul>`;
+const deletionLookupForm = (code = '') => `<form method="GET" action="/service/meta/deletion" class="btn-row" style="margin:8px 0">
+  <input type="text" name="code" maxlength="64" value="${escapeHtml(code)}" placeholder="確認コード" aria-label="確認コード" style="max-width:320px">
+  <button class="btn btn-sm btn-primary" type="submit">状況を確かめる</button></form>`;
+
+function dataDeletionPage({ user }) {
+  return wrap('データ削除の手順', `${topNav(user)}<div class="legal-doc">
+    <h1>データ削除の手順</h1>
+    <p>「${nameOf()}」（以下「本サービス」）が、各SNSとの連携で受け取った情報（SNSのID・ユーザー名・ページ名・連携に使うトークン、本サービスから投稿した投稿のID・投稿へのリンクなど）を削除する方法です。受け取る情報と、その使い方は、<a href="/service/legal/privacy">プライバシーポリシー</a>の2-2と5をご覧ください。</p>
+
+    <h2>1. マイページで連携を解除する</h2>
+    <ol><li>本サービスにログインし、<a href="/service/app">マイページ</a>を開きます。</li><li>「連携しているSNS」の欄で、削除したいSNSのアカウントの「解除」を押します。</li></ol>
+    <p>解除すると、直ちに次のことを行います。</p>
+    <ul>
+      <li>その連携の情報（SNSのID・ユーザー名・ページ名・トークンなど）を削除します。</li>
+      <li>そのアカウントへの未投稿の予約・下書きと、自動運用の設定を取り消します。</li>
+      <li>投稿済みの予約に保存していた、SNSでの投稿のIDと、投稿へのリンクを削除します。</li>
+    </ul>
+    <p>本サービスでの解除は、本サービスが保存している情報を削除するものです。YouTubeの連携は、あわせてGoogleに、本サービスへの許可の取り消しを送ります（Googleでの取り消しに失敗した場合も、本サービスの情報は削除します）。ほかのSNSの側で本サービスに与えた許可を外すには、2の方法で取り消してください。なお、本サービスの契約が終了したときも、同じように連携の情報を削除します。</p>
+
+    <h2>2. 各SNSの設定画面から取り消す</h2>
+    <p>各SNSのアカウントの設定画面（アプリやウェブサイトへの許可を管理する画面）から、本サービスへの許可を取り消せます。YouTubeは、Googleのセキュリティの設定のページ（<a href="https://security.google.com/settings/security/permissions" target="_blank" rel="noopener">https://security.google.com/settings/security/permissions</a>）から取り消せます。取り消したときの本サービスでの扱いは、次のとおりです。</p>
+    <ul>
+      <li><b>Threads・Instagram・Facebook</b>：Metaから取り消しの知らせが本サービスに届いたときに、直ちに1と同じ削除を行います。</li>
+      <li><b>TikTok・YouTube</b>：本サービスには、SNS側での取り消しの知らせを受け取る仕組みがありません。取り消したあとは投稿できなくなります。TikTokの情報は、マイページで解除するか、契約が終わるまで残ります。YouTubeは、本サービスが1日1回、連携のトークンを更新して、連携がまだ有効かをGoogleに確かめます（投稿の前にも更新します）。Googleの側で取り消されたことなどにより、トークンを更新できないことを検知すると、マイページに「再連携が必要」と表示し、そのまま${YOUTUBE_REAUTH_DELETE_DAYS}日たつと、1と同じように連携の情報を削除し、マイページでお知らせします（Googleの側で取り消してから30日以内に削除できるよう、この日数にしています）。早く削除したい場合は、1の方法で解除してください。</li>
+      <li>SNS側で取り消したあとも、マイページに連携が残っている場合は、マイページで解除するか、4の方法でご連絡ください。</li>
+    </ul>
+
+    <h2>3. Metaから届く削除の求め（Threads・Instagram・Facebook）</h2>
+    <p>Metaの設定画面から、本サービスが受け取った情報の削除を求めると、Metaから本サービスに削除の求めが届きます。本サービスは、これを受け取ると、直ちにそのSNSアカウントについて1と同じ削除を行います（そのアカウントを本サービスで連携しているすべての利用者の分）。あわせて、確認コードと、処理の状況を確かめられるページのURLをMetaに返します。</p>
+    <p>状況のページ（/service/meta/deletion?code=確認コード）では、ログインせずに、その求めの処理の状況を確かめられます。該当する連携が無かった場合（すでに解除済みの場合など）は、削除したとは表示せず、該当する連携が見つからなかったことを表示します。確認コードをお持ちの場合は、ここに入力して確かめることもできます。</p>
+    ${deletionLookupForm()}
+
+    <h2>4. お問い合わせ</h2>
+    <p>上の方法で削除できない場合や、本サービスのアカウントそのもの、投稿の本文などの削除を求める場合は、${contactHtml()}からご連絡ください。本人確認のうえ、速やかに対応します。</p>
+
+    <h2>削除されないもの</h2>
+    ${NOT_DELETED_HTML}
+  </div>${legalLinks()}<p class="small"><a href="/service">サービス紹介に戻る</a></p>`);
+}
+
+// ── Metaから届いた削除の求めの、処理の状況（ログイン不要。確認コードで開く）──
+// 誰でも開けるため、利用者やSNSアカウントを特定できる情報（ID・ユーザー名・メールアドレス・消した件数）は出さない
+// （該当する連携があって削除したかどうかだけを示す。消すものが無かったときに「削除しました」と書かないため）
+const DELETION_KIND = { deletion: 'データ削除の求め（Metaから）', deauthorize: '連携の取り消しの知らせ（Metaから）' };
+const DELETION_STATUS = { completed: '完了（削除しました）' };
+function metaDeletionStatusPage({ request, code = '', user }) {
+  if (!request) {
+    return wrap('削除の状況', `${topNav(user)}<div class="legal-doc"><h1>削除の状況</h1>
+      <p>${code ? 'この確認コードの求めは見つかりませんでした。確認コード（半角の英数字32文字）を、もう一度お確かめください。' : '確認コードを入力してください。'}</p>
+      ${deletionLookupForm(code)}
+      <p>ご不明な点は、${contactHtml()}から、確認コードを添えてご連絡ください。削除の方法は「<a href="/service/legal/data-deletion">データ削除の手順</a>」をご覧ください。</p>
+    </div>${legalLinks()}`);
+  }
+  const label = escapeHtml((registry.get(request.platform) || {}).label || request.platform);
+  const done = request.status === 'completed';
+  // 該当する連携が無かった（消した件数が0）ときは「削除しました」と書かない（すでに解除済みの場合などを含む）
+  const statusText = done && !request.found ? '受付済み（該当する連携は見つかりませんでした）' : (DELETION_STATUS[request.status] || '処理中');
+  return wrap('削除の状況', `${topNav(user)}<div class="legal-doc"><h1>削除の状況</h1>
+    <table class="t kv">
+      <tr><th>確認コード</th><td><code>${escapeHtml(request.code)}</code></td></tr>
+      <tr><th>SNS</th><td>${label}</td></tr>
+      <tr><th>求めの種類</th><td>${escapeHtml(DELETION_KIND[request.kind] || request.kind)}</td></tr>
+      <tr><th>受け付けた日時</th><td>${escapeHtml(core.formatJst(request.created_at))}（日本時間）</td></tr>
+      <tr><th>状態</th><td>${escapeHtml(statusText)}</td></tr>
+    </table>
+    ${!done ? '<p>削除の処理中です。時間をおいて、このページをもう一度開いてください。</p>'
+    : request.found ? '<p>このSNSアカウントについて、本サービスが保存していた連携の情報（SNSのID・ユーザー名・ページ名・連携に使うトークン）と、投稿済みの予約に保存していたSNSでの投稿のID・投稿へのリンクを削除し、未投稿の予約・下書きと自動運用の設定を取り消しました。そのアカウントを本サービスで連携していたすべての利用者の分が対象です。</p>'
+    : '<p>受け付けました。該当する連携は見つかりませんでした（すでに解除済みの場合を含みます）。本サービスのマイページに、このSNSアカウントの連携が残っている場合は、マイページで解除するか、確認コードを添えてお問い合わせください。</p>'}
+    <h2>削除されないもの</h2>
+    ${NOT_DELETED_HTML}
+    <p>ご不明な点は、${contactHtml()}から、確認コードを添えてご連絡ください。削除のほかの方法は「<a href="/service/legal/data-deletion">データ削除の手順</a>」をご覧ください。</p>
+  </div>${legalLinks()}`);
 }
 
 // 運営用：設定の確認（値は表示せず、設定されているかだけを示す）
 function settingsChecklist(env = process.env) {
   const has = (...ks) => ks.every((k) => !!env[k]);
   const base = String(env.SERVICE_BASE_URL || '');
+  // 審査済みのSNS（SNS_APPROVED）：一般の利用者に出すSNSと、入れたのにキーが無いもの・知らない id を示す
+  const approved = [...core.approvedSns(env)];
+  const liveLabels = core.liveSns({ env }).map((p) => p.label);
+  const noKey = approved.filter((id) => registry.get(id) && !registry.get(id).isConfigured(env)).map((id) => registry.get(id).label);
+  const unknownIds = approved.filter((id) => !registry.get(id));
+  const approvedNote = [
+    approved.length ? `設定値：${approved.join(',')}。一般の利用者に出すSNS：${liveLabels.length ? liveLabels.join('・') : 'なし'}` : '未設定（一般の利用者には、どのSNSも「準備中」と表示します）',
+    noKey.length ? `キーが未設定のため出していないSNS：${noKey.join('・')}` : '',
+    unknownIds.length ? `知らない id（綴りを確かめる）：${unknownIds.join(',')}` : '',
+    '各SNSの審査（MetaのApp Reviewなど）を通ったSNSの id だけを、カンマ区切りで設定する（threads・instagram・facebook・tiktok・youtube・x。例：threads,instagram）。入っていないSNSは、一般の利用者には「準備中」と表示し、テスト利用の利用者だけが連携できる。1つも無い間は販売を開始しません。TikTokの投稿の監査（Audit）は、別に TIKTOK_AUDITED で示す',
+  ].filter(Boolean).join('。');
+  const legalLeft = core.legalPlaceholders().length;
+  const legalFinalNote = env.LEGAL_FINAL === 'true' && legalLeft
+    ? '設定されていますが、未記入の【】が残っているため、草案の表示のままです'
+    : '運営者（必要に応じて弁護士などの専門家）が3つの文書の内容を確かめてから設定する。設定すると、販売の開始（SERVICE_OPEN）の前でも、規約・特商法表記・プライバシーポリシーの「（案）」と草案の注意書きを外す（各SNSの審査に、確定版の文書を見せるため）。【】が残っている間は外れません';
   return [
     ['管理画面のパスワード（ADMIN_PASSWORD）', !!env.ADMIN_PASSWORD && env.ADMIN_PASSWORD !== 'changeme', '必須。未設定だと既定の弱いパスワードになり、テスト利用の付与もできません'],
     ['サービスのURL（SERVICE_BASE_URL）', /^https:\/\//.test(base), base ? `設定値：${base}` : '例：https://michishirube-post.fly.dev。SNS連携・画像の投稿・AIアシスタントとの接続に必要'],
@@ -974,6 +1151,7 @@ function settingsChecklist(env = process.env) {
     ['TikTok（TIKTOK_CLIENT_KEY・TIKTOK_CLIENT_SECRET）', has('TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'), ''],
     ['Facebook（FACEBOOK_APP_ID・FACEBOOK_APP_SECRET）', has('FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET'), ''],
     ['YouTube（GOOGLE_CLIENT_ID・GOOGLE_CLIENT_SECRET）', has('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'), ''],
+    ['審査済みのSNS（SNS_APPROVED）', liveLabels.length > 0, approvedNote],
     ['AIの文章（ANTHROPIC_API_KEY）', has('ANTHROPIC_API_KEY'), '任意'],
     ['AIの画像（OPENAI_API_KEY）', has('OPENAI_API_KEY'), '任意'],
     ['AIの動画（GEMINI_API_KEY・AI_DAILY_VIDEO）', aiLib().available().video, '当面は提供しない（設定しない）。提供するときは規約・プライバシーポリシーの改定が必要'],
@@ -981,7 +1159,8 @@ function settingsChecklist(env = process.env) {
     ['問い合わせ先（SERVICE_CONTACT_EMAIL）', has('SERVICE_CONTACT_EMAIL'), '販売に必要'],
     ['代表者の氏名（SERVICE_REPRESENTATIVE）', has('SERVICE_REPRESENTATIVE'), 'プライバシーポリシーの事業者情報に表示する（販売前に設定）'],
     ['法務文書の未記入の箇所（【】）', core.legalPlaceholders().length === 0, core.legalPlaceholders().length ? `残っている箇所：${core.legalPlaceholders().join('、')}` : '規約・特商法表記・プライバシーポリシーに、未記入の【】はありません'],
-    ['販売の開始（SERVICE_OPEN=true）', env.SERVICE_OPEN === 'true', '各SNSの審査・テスト・法務文書の確認（【】の箇所をすべて埋める）が済んでから設定する。【】が残っている間は、設定しても販売を開始しません'],
+    ['法務文書の確定（LEGAL_FINAL=true）', env.LEGAL_FINAL === 'true' && legalLeft === 0, legalFinalNote],
+    ['販売の開始（SERVICE_OPEN=true）', env.SERVICE_OPEN === 'true', '各SNSの審査・テスト・法務文書の確認（【】の箇所をすべて埋める）が済んでから設定する。【】が残っている間と、審査済みのSNS（SNS_APPROVED）が1つも無い間は、設定しても販売を開始しません'],
   ];
 }
 
@@ -1043,4 +1222,4 @@ function apiDocsPage(user, baseUrl) {
     </div>`);
 }
 
-module.exports = { compareActive, lpPage, settingsChecklist, composePage, calendarPage, apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, adminServicePage };
+module.exports = { compareActive, lpPage, settingsChecklist, composePage, calendarPage, threadsRecentPage, apiDocsPage, landingPage, authPage, checkoutPage, checkoutResultPage, dashboardPage, legalPage, dataDeletionPage, metaDeletionStatusPage, adminServicePage };

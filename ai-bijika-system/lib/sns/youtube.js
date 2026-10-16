@@ -53,6 +53,8 @@ async function call({ host, method = 'GET', path, headers = {}, body, timeoutMs 
   const em = r.json && r.json.error;
   const msg = em && (em.message || em.error_description || (typeof em === 'string' ? em : ''));
   const err = classify(r.status, msg ? `YouTube: ${msg}` : '');
+  // トークンの受け口（oauth2.googleapis.com）のエラーコード（OAuth 2.0 の error。例：invalid_grant・invalid_client）を控える
+  if (r.json && typeof r.json.error === 'string') err.oauthError = r.json.error;
   if (r.json && r.json.error === 'invalid_grant') { err.authError = true; err.retriable = false; }
   // 403 の理由ごとの扱い（公式のエラー一覧）。再連携が必要なのは、権限が足りない場合だけ
   const reason = em && typeof em === 'object' && Array.isArray(em.errors) && em.errors[0] ? em.errors[0].reason : '';
@@ -96,6 +98,20 @@ async function refresh({ refreshToken }) {
   const c = creds();
   const t = (await call({ host: 'oauth2.googleapis.com', method: 'POST', path: '/token', headers: FORM_H, body: form({ refresh_token: refreshToken, client_id: c.clientId, client_secret: c.clientSecret, grant_type: 'refresh_token' }) })).json;
   return tokenResult(t, refreshToken);
+}
+
+// トークンの取り消し。連携の解除・契約の終了・テスト利用の取り消し・自動削除で、DBの行（トークン）を消す前に呼ぶ（lib/sns/disconnect.js）。
+// YouTube API Services の Developer Policies（III.D.2 Revocation）：利用者が許可を取り消したら、すぐにプログラムでトークンを取り消す。
+// 公式（OAuth 2.0 for Web Server Applications の Token revocation）：POST https://oauth2.googleapis.com/revoke に
+// token=<トークン> を application/x-www-form-urlencoded で送る。token は更新用のトークンでもアクセストークンでもよい
+// （アクセストークンなら、対応する更新用のトークンも取り消される）。成功は 200、失敗は 400 とエラーコード。
+// 公式の Key Point：取り消すと、本サービスのプロジェクトに与えた許可がすべて外れ、発行したアクセストークン・更新用のトークンが無効になる
+// （このため、同じGoogleアカウントを本サービスの別の利用者も連携している場合は、その連携も無効になると考えられる。未確認）。
+// 失敗したときは例外（SnsError）を投げる。呼ぶ側は、失敗しても行を消す
+async function revoke({ token }) {
+  if (!token) throw new SnsError('取り消すトークンがありません。');
+  await call({ host: 'oauth2.googleapis.com', method: 'POST', path: '/revoke', headers: FORM_H, body: form({ token }), timeoutMs: 15000 });
+  return true;
 }
 
 // 本文の1行目をタイトル（100文字まで）、全体を説明にする。「#Shorts」は、上限に収まる場合だけ添える
@@ -144,4 +160,4 @@ async function publish(args) {
   return { externalId: String((r.json && r.json.id) || '') };
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, titleAndDescription, usesPkce: false, PRIVACY, mediaRule: '動画1本が必須（本文の1行目がタイトル）' };
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, revoke, publish, titleAndDescription, usesPkce: false, PRIVACY, mediaRule: '動画1本が必須（本文の1行目がタイトル）' };

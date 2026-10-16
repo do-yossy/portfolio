@@ -5,6 +5,7 @@ const { request, encodeForm } = require('../http-client');
 const { SnsError, classify, ambiguous } = require('./errors');
 const poll = require('./poll');
 const { normalize } = require('./post');
+const { idString } = require('./ids');
 
 const HOST = 'graph.threads.net';
 const AUTH_URL = 'https://threads.com/oauth/authorize';
@@ -42,7 +43,8 @@ function authUrl({ state, redirectUri }) {
   return `${AUTH_URL}?${q.toString()}`;
 }
 
-async function call(method, path, { form, query } = {}) {
+// raw：true なら、応答の JSON と元の文字列 { json, text } を返す（大きな数値のIDを、丸めずに取り出すため。lib/sns/ids.js）
+async function call(method, path, { form, query, raw } = {}) {
   const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
   const body = form ? encodeForm(form) : undefined;
   let r;
@@ -55,7 +57,7 @@ async function call(method, path, { form, query } = {}) {
   } catch (e) {
     throw new SnsError(`Threadsに接続できませんでした (${e.message})`, { retriable: true });
   }
-  if (r.status >= 200 && r.status < 300 && r.json) return r.json;
+  if (r.status >= 200 && r.status < 300 && r.json) return raw ? { json: r.json, text: r.text } : r.json;
   // エラー文は、入れ子（error.message）と入れ子でない形（error_message）のどちらでも読む
   const msg = (r.json && r.json.error && r.json.error.message) || (r.json && r.json.error_message);
   const err = classify(r.status, msg ? `Threads: ${msg}` : '');
@@ -66,19 +68,28 @@ async function call(method, path, { form, query } = {}) {
 // 認可コード → 短期トークン → 長期トークン（約60日）
 async function exchangeCode({ code, redirectUri }) {
   const c = creds();
-  const short = await call('POST', '/oauth/access_token', {
-    form: { client_id: c.appId, client_secret: c.appSecret, grant_type: 'authorization_code', redirect_uri: redirectUri, code },
+  const shortRes = await call('POST', '/oauth/access_token', {
+    form: { client_id: c.appId, client_secret: c.appSecret, grant_type: 'authorization_code', redirect_uri: redirectUri, code }, raw: true,
   });
+  const short = shortRes.json;
   const long = await call('GET', '/access_token', {
     query: { grant_type: 'th_exchange_token', client_secret: c.appSecret, access_token: short.access_token },
   });
-  const me = await call('GET', '/v1.0/me', { query: { fields: 'id,username', access_token: long.access_token } });
+  const meRes = await call('GET', '/v1.0/me', { query: { fields: 'id,username', access_token: long.access_token }, raw: true });
+  const me = meRes.json;
+  // IDが JSON の数値で届いても、桁を丸めない（範囲外で取り出せなければ ''。丸めた値は保存しない）
+  const meId = idString(me.id, meRes.text, 'id');
+  const tokenUserId = idString(short.user_id, shortRes.text, 'user_id');
+  const externalUserId = meId || tokenUserId;
+  if (!externalUserId) throw new SnsError('ThreadsのユーザーIDを取得できませんでした。時間をおいて、もう一度連携してください。');
   return {
     accessToken: long.access_token,
     refreshToken: '',
     expiresAt: new Date(Date.now() + (Number(long.expires_in) || 60 * 24 * 3600) * 1000).toISOString(),
-    externalUserId: String(me.id || short.user_id),
+    externalUserId,
     handle: me.username ? `@${me.username}` : '',
+    // トークンの応答の user_id も控える（Metaから届く削除の求めの照合用。/me の id と同じかは未確認・実物で確かめる）
+    providerUserId: tokenUserId,
   };
 }
 
@@ -204,6 +215,44 @@ async function publishOne({ accessToken, externalUserId, text, medias, replyTo }
   return String(published.id);
 }
 
+// SNSから受け取ったURLは、https のものだけを使う（画面のリンク・画像に入れるため。javascript: などを入れない）
+function safeUrl(u) {
+  const s = String(u || '').trim();
+  if (!s || s.length > 2000) return '';
+  try { return new URL(s).protocol === 'https:' ? s : ''; } catch { return ''; }
+}
+
+// 公開した投稿の permalink（Threadsで投稿を開くURL）。公式：GET /{media-id}?fields=permalink。
+// 公式の説明では、著作権で問題のある投稿などでは permalink が返らない。取得できなければ ''（投稿の成否には関係させない。呼ぶ側は失敗しても投稿済みのまま）
+async function permalink({ accessToken, mediaId }) {
+  if (!mediaId) return '';
+  try {
+    const r = await call('GET', `/v1.0/${encodeURIComponent(mediaId)}`, { query: { fields: 'permalink', access_token: accessToken } });
+    return safeUrl(r && r.permalink).slice(0, 500);
+  } catch { return ''; }
+}
+
+// 連携した本人の最近の投稿（threads_basic の録画の要件：本人の投稿の一覧と、本文・画像・動画の中身を見せる）。
+// 公式：GET /{user-id}/threads（その利用者が作った投稿の一覧。新しい順・ページ分けあり）。ここでは最初のページだけを使う。
+// 取得したものは画面に出すだけで、DBには保存しない（Allowed Usage：作った本人にだけ見せる）。
+// media_type の値（TEXT_POST・IMAGE・VIDEO・CAROUSEL_ALBUM・AUDIO・REPOST_FACADE）は公式のリファレンス（Threads Media）による。
+// カルーセルの子の中身（children）の形は公式に書かれていないため取得しない（カルーセルは「Threadsで見る」から見てもらう）。
+// 実物のAPIでの応答の形（media_url がどの種類で返るか など）は未確認・実物で確かめる
+const RECENT_FIELDS = 'id,media_type,media_url,thumbnail_url,permalink,text,timestamp';
+async function listRecent({ accessToken, externalUserId, limit = 20 }) {
+  const n = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
+  const r = await call('GET', `/v1.0/${encodeURIComponent(externalUserId)}/threads`, { query: { fields: RECENT_FIELDS, limit: String(n), access_token: accessToken } });
+  return (Array.isArray(r && r.data) ? r.data : []).slice(0, n).map((t) => ({
+    id: String(t.id || ''),
+    mediaType: String(t.media_type || ''),
+    mediaUrl: safeUrl(t.media_url),
+    thumbnailUrl: safeUrl(t.thumbnail_url),
+    permalink: safeUrl(t.permalink),
+    text: String(t.text || ''),
+    timestamp: String(t.timestamp || ''),
+  }));
+}
+
 // 投稿。ツリーは1件目→2件目以降を前の投稿への返信として順に公開する
 async function publish(args) {
   const { accessToken, externalUserId } = args;
@@ -230,4 +279,4 @@ async function publish(args) {
   return { externalId: first };
 }
 
-module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, usesPkce: false, mediaRule: '画像・動画は任意（最大20件のカルーセル、ツリー25件まで）' };
+module.exports = { id, label, maxLength, isConfigured, textLength, validatePost, authUrl, exchangeCode, refresh, publish, permalink, listRecent, usesPkce: false, mediaRule: '画像・動画は任意（最大20件のカルーセル、ツリー25件まで）' };

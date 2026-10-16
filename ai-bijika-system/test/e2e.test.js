@@ -9,6 +9,8 @@ const http = require('http');
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aibj-e2e-'));
 process.env.SNS_TOKEN_KEY = crypto.randomBytes(32).toString('hex');
+// 各SNSの審査（SNS_APPROVED）を通った状態で試す（審査前の扱いは、途中で SNS_APPROVED を変えて確かめる）
+process.env.SNS_APPROVED = 'threads,x,instagram,tiktok,facebook,youtube';
 process.env.STRIPE_SECRET_KEY = 'sk_test_x';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_e2e';
 process.env.STRIPE_PRICE_ID = 'price_e2e';
@@ -44,6 +46,17 @@ const mock = installHttpsMock(async (c) => {
     if (c.path === '/v1.0/4242/threads') return { status: 200, json: { id: 'cont_1' } };
     if (c.path === '/v1.0/4242/threads_publish') return { status: 200, json: { id: 'post_e2e' } };
     if (c.method === 'GET' && /^\/v1\.0\/cont_1\?fields=status/.test(c.path)) return { status: 200, json: { status: 'FINISHED' } };
+    // 投稿へのリンク（permalink）と、本人の最近の投稿の一覧
+    if (c.method === 'GET' && c.path.startsWith('/v1.0/post_e2e?')) return { status: 200, json: { id: 'post_e2e', permalink: 'https://www.threads.net/@e2e_user/post/E2E' } };
+    if (c.method === 'GET' && c.path.startsWith('/v1.0/4242/threads?')) {
+      return { status: 200, json: { data: [
+        { id: 'r1', media_type: 'IMAGE', media_url: 'https://cdn.threads.test/recent-img-e2e.jpg', permalink: 'https://www.threads.net/@e2e_user/post/R1', text: '最近の投稿マーカーE2E\n2行目', timestamp: '2026-10-15T03:00:00+0000' },
+        { id: 'r2', media_type: 'VIDEO', media_url: 'https://cdn.threads.test/recent-vid-e2e.mp4', thumbnail_url: 'https://cdn.threads.test/recent-thumb-e2e.jpg', permalink: 'https://www.threads.net/@e2e_user/post/R2', text: '動画の投稿マーカーE2E', timestamp: '2026-10-14T03:00:00+0000' },
+        { id: 'r3', media_type: 'CAROUSEL_ALBUM', permalink: 'https://www.threads.net/@e2e_user/post/R3', text: 'カルーセルの投稿マーカーE2E', timestamp: '2026-10-13T03:00:00+0000' },
+        { id: 'r4', media_type: 'TEXT_POST', text: 'リンクの無い投稿マーカーE2E', timestamp: '2026-10-12T03:00:00+0000' },
+        { id: 'r5', media_type: 'IMAGE', media_url: 'https://cdn.threads.test/x.jpg', text: '<script>alert(1)</script>', timestamp: '2026-10-11T03:00:00+0000' },
+      ], paging: { cursors: { before: 'b', after: 'a' } } } };
+    }
   }
   return null;
 });
@@ -93,6 +106,11 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 302 && r.headers.location === '/service', '販売開始前は、アカウントを作っても申込み画面へは進まない');
   r = await req('GET', '/service/checkout');
   ok(r.status === 302 && r.headers.location === '/service', '販売開始前は、申込み画面を開けない');
+  r = await req('GET', '/service/legal/privacy');
+  ok(r.status === 200 && r.text.includes('（案）') && r.text.includes('草案'), '販売開始前は、法務文書に草案である旨の表示を出す');
+  process.env.LEGAL_FINAL = 'true';
+  r = await req('GET', '/service/legal/privacy');
+  ok(r.status === 200 && r.text.includes('（案）') && r.text.includes('草案'), 'LEGAL_FINAL=true でも、未記入の【】が残っている間は、草案である旨の表示を外さない');
   cookie = '';
   process.env.SERVICE_OPEN = 'true';
   process.env.SERVICE_CONTACT_EMAIL = 'support@example.com';
@@ -106,6 +124,19 @@ function webhook(event, secret = 'whsec_e2e') {
   }
   process.env.SERVICE_LEGAL_DIR = legalTmp;
   process.env.SERVICE_REPRESENTATIVE = '代表 太郎';
+  // 審査済みのSNS（SNS_APPROVED）が無い間は、ほかの条件がそろっても販売を開始しない。法務文書は、販売とは別に LEGAL_FINAL で確定版にできる
+  const approvedAll = process.env.SNS_APPROVED;
+  process.env.SNS_APPROVED = '';
+  r = await req('GET', '/service');
+  ok(r.text.includes('ただいま準備中'), '審査済みのSNS（SNS_APPROVED）が無ければ、SERVICE_OPEN=true で【】が埋まっていても、販売を開始しない');
+  r = await req('GET', '/service/legal/privacy');
+  ok(r.status === 200 && !r.text.includes('（案）') && !r.text.includes('草案') && r.text.includes('代表 太郎'), 'LEGAL_FINAL=true で【】が埋まっていれば、販売の開始前でも、プライバシーポリシーを確定版として表示する');
+  r = await req('GET', '/service/legal/terms');
+  ok(r.status === 200 && !r.text.includes('（案）') && !r.text.includes('草案'), 'LEGAL_FINAL=true なら、販売の開始前でも、利用規約を確定版として表示する');
+  delete process.env.LEGAL_FINAL;
+  r = await req('GET', '/service/legal/terms');
+  ok(r.text.includes('（案）') && r.text.includes('草案'), 'LEGAL_FINAL が無く、販売も開始していなければ、草案である旨の表示のまま');
+  process.env.SNS_APPROVED = approvedAll;
 
   console.log('販売ページ');
   r = await req('GET', '/service');
@@ -290,6 +321,12 @@ function webhook(event, secret = 'whsec_e2e') {
   const appCsrf = csrfOf(r.text);
 
   console.log('SNS連携と予約');
+  process.env.SNS_APPROVED = 'instagram'; // Threads は審査前
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('Threads：準備中') && !r.text.includes('href="/service/connect/threads"') && !r.text.includes('審査前（テスト利用のみ）'), '審査前のSNSは、契約中の一般の利用者のマイページに連携ボタンを出さない');
+  r = await req('GET', '/service/connect/threads');
+  ok(r.status === 403 && r.text.includes('準備中') && store.SnsAccounts.listForUser(userIdForSub).length === 0, '審査前のSNSの連携は、URLを直接開いても始められない（サーバー側で断る）');
+  process.env.SNS_APPROVED = approvedAll;
   r = await req('GET', '/service/connect/threads');
   ok(r.status === 302 && r.headers.location.startsWith('https://threads.com/oauth/authorize'), 'Threadsの認可画面へ移動する');
   const st = new URL(r.headers.location).searchParams.get('state');
@@ -314,6 +351,67 @@ function webhook(event, secret = 'whsec_e2e') {
   await scheduler.tick();
   const posted = store.ScheduledPosts.listForUser(userIdForSub).find((p) => p.text === '今すぐテスト');
   ok(posted && posted.status === 'posted' && posted.external_id === 'post_e2e', '実行時刻が来た投稿がThreadsへ投稿される');
+
+  console.log('Threadsの投稿へのリンク（permalink）');
+  ok(posted.permalink === 'https://www.threads.net/@e2e_user/post/E2E', '投稿したあとで、Threadsの投稿へのリンクを保存する');
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('<a href="https://www.threads.net/@e2e_user/post/E2E" target="_blank" rel="noopener noreferrer">Threadsで見る</a>'), 'マイページの予約と投稿の履歴に「Threadsで見る」を出す');
+  ok((r.text.match(/Threadsで見る/g) || []).length === 1, '「Threadsで見る」は、リンクを保存した投稿済みの予約にだけ出す（予約中の投稿には出さない）');
+  r = await req('GET', '/service/app/calendar');
+  ok(r.text.includes('href="https://www.threads.net/@e2e_user/post/E2E"') && r.text.includes('Threadsで見る'), 'カレンダーに「Threadsで見る」を出す');
+
+  console.log('Threadsの最近の投稿（本人だけ・保存しない）');
+  const recentPath = `/service/app/threads/${accId}/recent`;
+  r = await req('GET', '/service/app');
+  ok(r.text.includes(`href="${recentPath}"`) && r.text.includes('最近の投稿'), 'マイページのThreadsの連携の行に「最近の投稿」を出す');
+  const tablesSnapshot = () => {
+    const { db } = require('../db');
+    const out = {};
+    for (const t of db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()) out[t.name] = JSON.stringify(db.prepare(`SELECT * FROM "${t.name}"`).all());
+    return out;
+  };
+  const before = tablesSnapshot();
+  const callsBeforeRecent = mock.calls.length;
+  r = await req('GET', recentPath);
+  const recentCalls = mock.calls.slice(callsBeforeRecent).filter((c) => c.host === 'graph.threads.net');
+  ok(r.status === 200 && r.text.includes('<h1>Threadsの最近の投稿</h1>') && r.text.includes('@e2e_user'), '「Threadsの最近の投稿」を開ける');
+  ok(recentCalls.length === 1 && recentCalls[0].path.startsWith('/v1.0/4242/threads?') && new URLSearchParams(recentCalls[0].path.split('?')[1]).get('access_token') === 'th_long', '連携した本人のトークンで、本人の投稿の一覧をThreadsから取得する');
+  ok(r.text.includes('最近の投稿マーカーE2E\n2行目') && r.text.includes('src="https://cdn.threads.test/recent-img-e2e.jpg"'), '本文と画像を表示する');
+  ok(/<video[^>]+src="https:\/\/cdn\.threads\.test\/recent-vid-e2e\.mp4"/.test(r.text) && r.text.includes('poster="https://cdn.threads.test/recent-thumb-e2e.jpg"'), '動画を再生できる形で表示する');
+  ok(r.text.includes('2026年10月15日 12:00（日本時間）') && r.text.includes('2026年10月14日 12:00'), '投稿日時を日本時間で表示する');
+  ok(r.text.includes('href="https://www.threads.net/@e2e_user/post/R1"') && r.text.includes('Threadsで見る') && r.text.includes('リンクはありません'), '各投稿に「Threadsで見る」を出す（リンクが返らない投稿には出さない）');
+  ok(r.text.includes('カルーセルの投稿マーカーE2E') && r.text.includes('Threadsでご覧ください'), 'カルーセルは、Threadsで見るよう案内する');
+  ok(!r.text.includes('<script>alert(1)</script>') && r.text.includes('&lt;script&gt;alert(1)&lt;/script&gt;'), '投稿の本文は、そのままHTMLとして出さない（エスケープする）');
+  ok(/no-store/.test(r.headers['cache-control'] || ''), 'ブラウザにも残さない（Cache-Control: no-store）');
+  const after = tablesSnapshot();
+  const allAfter = Object.values(after).join('\n');
+  ok(!allAfter.includes('マーカーE2E') && !allAfter.includes('recent-img-e2e') && !allAfter.includes('/post/R1') && Object.keys(before).every((t) => t === 'sessions' || before[t] === after[t]), '取得した投稿はDBに保存しない（どの表にも残らず、表の中身も変わらない）');
+  // 他人の連携・存在しない連携・Threads以外の連携は 404（他人のトークンでThreadsを呼ばない）
+  const otherUser = require('../db').Users.create({ email: 'recent-other@example.com', passwordHash: 'h', passwordSalt: 's' });
+  store.Subscriptions.upsert(otherUser, { status: 'active' });
+  const otherAcc = store.SnsAccounts.upsert({ userId: otherUser, platform: 'threads', externalUserId: '9999', handle: '@other_user', accessTokenEnc: require('../lib/crypto-box').encrypt('other_tok', require('../lib/crypto-box').keyFromEnv()), expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() });
+  const otherAccId = typeof otherAcc === 'object' ? otherAcc.id : otherAcc;
+  const callsBeforeOther = mock.calls.length;
+  r = await req('GET', `/service/app/threads/${otherAccId}/recent`);
+  ok(r.status === 404 && !r.text.includes('@other_user') && mock.calls.slice(callsBeforeOther).every((c) => c.host !== 'graph.threads.net'), '他人の連携の最近の投稿は見られない（404。Threadsにも問い合わせない）');
+  r = await req('GET', '/service/app/threads/deadbeefdeadbeefdead/recent');
+  ok(r.status === 404, '存在しない連携は404');
+  r = await req('GET', '/service/app');
+  ok(!r.text.includes(`/service/app/threads/${otherAccId}/recent`), 'マイページには、本人の連携の「最近の投稿」だけを出す');
+  store.SnsAccounts.remove(otherAccId, otherUser);
+  store.SnsAccounts.setStatus(accId, 'reauth_required');
+  r = await req('GET', '/service/app');
+  ok(!r.text.includes(`href="${recentPath}"`), '再連携が必要な連携には「最近の投稿」を出さない');
+  const callsBeforeBad = mock.calls.length;
+  r = await req('GET', recentPath);
+  ok(r.status === 409 && r.text.includes('再連携') && mock.calls.slice(callsBeforeBad).every((c) => c.host !== 'graph.threads.net'), '再連携が必要な連携は、Threadsに問い合わせずに、やり直しを案内する');
+  store.SnsAccounts.setStatus(accId, 'active');
+  {
+    const saved = cookie; cookie = '';
+    r = await req('GET', recentPath);
+    ok(r.status === 302 && r.headers.location === '/service/login', 'ログインしていなければ見られない');
+    cookie = saved;
+  }
   // 画像の添付（アップロード → 予約 → 投稿）
   const rawUpload = (buf, headers) => new Promise((resolve, reject) => {
     const q = http.request(`${base}/service/app/media`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/octet-stream', 'Content-Length': buf.length, ...headers } }, (res) => {
@@ -362,6 +460,8 @@ function webhook(event, secret = 'whsec_e2e') {
   ok(r.status === 401, 'キーなしは401');
   r = await api('GET', '/api/v1/accounts', 'sqk_' + '0'.repeat(48));
   ok(r.status === 401, '違うキーは401');
+  r = await api('GET', '/api/v1/posts?status=posted', apiKey);
+  ok(r.status === 200 && r.json.posts.some((p) => p.text === '今すぐテスト' && p.permalink === 'https://www.threads.net/@e2e_user/post/E2E'), 'REST API の投稿の一覧にも、Threadsの投稿へのリンク（permalink）を含める');
   r = await api('GET', '/api/v1/accounts', apiKey);
   ok(r.status === 200 && r.json.accounts.length === 1 && r.json.accounts[0].id === accId && !('access_token_enc' in r.json.accounts[0]), 'SNS一覧を取得できる（トークンは含まない）');
   r = await api('POST', '/api/v1/media', apiKey, undefined, jpegBuf);
@@ -698,6 +798,7 @@ function webhook(event, secret = 'whsec_e2e') {
   r = await req('GET', '/admin/service');
   ok(r.status === 200 && r.text.includes('e2e@example.com') && r.text.includes('契約者一覧'), '運営者は契約状況を確認できる');
   ok(r.text.includes('設定の確認') && r.text.includes('SNS_TOKEN_KEY') && !r.text.includes(process.env.SNS_TOKEN_KEY) && !r.text.includes('sk_test_x'), '設定の確認は、値を出さずに設定の有無だけを示す');
+  ok(r.text.includes('審査済みのSNS（SNS_APPROVED）') && r.text.includes('法務文書の確定（LEGAL_FINAL=true）'), '設定の確認に、審査済みのSNS（SNS_APPROVED）と法務文書の確定（LEGAL_FINAL）の行を出す');
   ok(r.text.includes('同意の記録') && r.text.includes('e2e@example.com') && r.text.includes('申込み'), '運営者画面で同意の記録を見られる');
   r = await req('GET', '/admin/service/consents.csv');
   ok(r.status === 200 && r.headers['content-type'].includes('text/csv') && r.text.includes('e2e@example.com') && r.text.includes('利用規約'), '同意の記録をCSVでダウンロードできる');
@@ -726,6 +827,12 @@ function webhook(event, secret = 'whsec_e2e') {
   cookie = testerCookie;
   r = await req('GET', '/service/app');
   ok(r.text.includes('テスト利用中') && r.text.includes('料金はかかりません') && !r.text.includes('解約する'), 'マイページにテスト利用中と表示し、解約ボタンは出さない');
+  process.env.SNS_APPROVED = ''; // どのSNSも審査前
+  r = await req('GET', '/service/app');
+  ok(r.text.includes('href="/service/connect/threads"') && r.text.includes('審査前（テスト利用のみ）'), 'テスト利用の利用者には、審査前のSNSの連携ボタンを「審査前（テスト利用のみ）」と添えて出す');
+  r = await req('GET', '/service/connect/threads');
+  ok(r.status === 302 && r.headers.location.startsWith('https://threads.com/oauth/authorize'), 'テスト利用の利用者は、審査前のSNSでも連携を始められる');
+  process.env.SNS_APPROVED = approvedAll;
   r = await req('GET', '/service/app/compose');
   ok(r.status === 200, 'テスト利用で投稿を作る画面を使える');
   r = await req('POST', '/service/app/apikey', { body: { csrf: csrfOf((await req('GET', '/service/app')).text), label: 't' } });
