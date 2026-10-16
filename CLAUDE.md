@@ -71,6 +71,16 @@ DBは標準の `node:sqlite`（`DatabaseSync`）。起動時に `--experimental-
 ### Python連携
 求人媒体への投稿・成績取得は Playwright ベースのPythonスクリプト（`*/scripts/*_poster.py` `*_metrics.py`）を Node から `spawn` して呼ぶ。Node側だけ見ても処理が追えない箇所がある。
 
+### サクモン（`products/sakumon/`）は別系統
+先生向け文面ひな形集の月額サブスク（980円・税込）。**Cloudflare Workers + D1** で動く別構成で、上の「依存ゼロ主義（`node:http` / `node:sqlite`）」の対象外（Workers では動かないため）。ただし npm 依存はゼロ。AI API・VPS は使わない方針。現状・残りの手順・設定は `products/sakumon/README.md` が正本。
+
+- テスト: `cd products/sakumon && npm test`（`ok(cond, name)` 形式。D1 は `node:sqlite` で代用）
+- デプロイ: GitHub Actions には載っていない。`npx wrangler deploy` を手動で行う（`products/**` は自動デプロイ対象外）
+- 秘密情報（`STRIPE_*` など）は `wrangler secret put` で本人が入力する。チャットに貼らない・コードや `wrangler.toml` に書かない
+- 決済は Stripe。会社が販売者になる前提で、Managed Payments は使わない（`src/stripe.js`）
+- 本人確認は URL ではなく Cookie の会員証 + メールの確認コード。この方式を崩さない（`src/db.js` `src/login.js`）
+- 販促文面・LP・`legal/` の下書きは、監査役を通す前に外へ出さない。`legal/` の【　】はオーナーの情報・判断が要るので推測で埋めない
+
 ## デプロイ
 
 **`main` への push が即デプロイ**。GitHub Actions がパスフィルタで振り分ける：
