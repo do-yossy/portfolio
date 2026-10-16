@@ -1,0 +1,12 @@
+name = "sakumon"
+main = "src/worker.js"
+compatibility_date = "2026-01-01"
+
+# database_id は `npx wrangler d1 create sakumon` の出力で置き換える
+[[d1_databases]]
+binding = "DB"
+database_name = "sakumon"
+database_id = "2f6654aa-7b10-463b-ad6e-e441e42dd771"
+
+# 秘密情報は wrangler secret put で登録する(ここには書かない)
+#   STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_ID
