@@ -1,0 +1,12 @@
+name = "sakumon"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+
+# データベース(D1)。`wrangler d1 create sakumon` で作成した database_id をここに入れる。
+[[d1_databases]]
+binding = "DB"
+database_name = "sakumon"
+database_id = "ここにD1のIDを入れる"
+
+# 秘密情報は wrangler.toml に書かない。`wrangler secret put <名前>` で登録する:
+#   STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_ID / SESSION_SECRET
