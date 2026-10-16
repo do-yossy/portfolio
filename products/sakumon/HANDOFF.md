@@ -1,6 +1,6 @@
 # サクモン 引き継ぎメモ(2026-10-16時点)
 
-別のトークで続きをするときは、この全文を最初に貼ってください。詳細の正本は `products/sakumon/README.md` です。
+Web版/ローカルのClaude Codeや別のチャットで続きをするときの引き継ぎ。コードの正本は `README.md`、この資料は「決定事項・現状・保留事項」。先に `README.md` と、リポジトリ直下の `CLAUDE.md` のサクモンの節も読むこと。
 
 ## 何か
 先生向けの文面ひな形集(学級通信・保護者向けお知らせなど)の月額サブスク。月額980円(税込)。AIは使わず、完成した文面のひな形を渡す。
@@ -16,8 +16,8 @@
 - コード: portfolio リポジトリの `products/sakumon/`(main にマージ済み。PR #366)
 - 公開URL: https://sakumon.sakumon-app.workers.dev
 - LP(トップ)は**非公開**(「準備中」を表示)。`wrangler.toml` の `LP_PUBLIC` を `"true"` にして `npx wrangler deploy` で公開。公開は、オーナーの承認と監査役のレビューが済んでから
-- 確認用の画面見本: `C:\Users\sqtan\portfolio\下書き\サクモン画面_確認用\`(6画面のHTML)
-- 記録(メモ): `C:\Users\sqtan\.claude\projects\C--Users-sqtan\memory\`
+- 確認用の画面見本はオーナーのPCの `下書き/サクモン画面_確認用/`(リポジトリには無い)。必要なら `src/pages.js` から再生成できる
+- Web版では、オーナーのPCのCloudflareログイン(wrangler)・Chrome拡張・メモは使えない。デプロイするには、この環境に Cloudflare の API トークンが要る(オーナーが環境変数(Secrets)に登録する。Claude は作らない・貼らせない)
 
 ## できていること
 - Worker 稼働、D1 作成・テーブル作成済み
