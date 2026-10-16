@@ -112,7 +112,7 @@ export const landing = () =>
 <h2>よくある質問</h2>
 <details><summary>支払い方法は?</summary><p>クレジットカードです。決済は Stripe を通じて行われ、カード番号はサクモンには保存されません。</p></details>
 <details><summary>解約はどうすればいいですか?</summary><p>申し込み後のあなた専用ページに、解約・支払い方法の変更・請求書の確認へのリンクがあります。いつでも、ご自身で手続きできます。解約しても、請求期間の終わりまでは利用できます。</p></details>
-<details><summary>ログインは必要ですか?</summary><p>アカウント登録やパスワードはありません。お申し込みをしたブラウザが、そのまま会員として認識されます。ページのアドレスだけを他の人に伝えても、開くことはできません。</p></details>
+<details><summary>ログインは必要ですか?</summary><p>パスワードはありません。お申し込みをしたブラウザは、そのまま会員として使えます。別の端末や、ブラウザのデータを消した後は、お申し込みのメールアドレスに届く6桁の確認コードでログインできます。</p></details>
 <details><summary>複数の端末で使えますか?</summary><p>同じ契約で使える端末は、最大3台までです。4台目で使い始めると、最も古い端末の利用が終了します。</p></details>
 </section>
 
@@ -132,7 +132,7 @@ export const successPage = () =>
 <p class="note">次回からは、このブラウザで、下のアドレスを開くだけで使えます。ブックマークしておくと便利です。</p>
 <div class="urlbox">https://sakumon.sakumon-app.workers.dev/m</div>
 </div>
-<div class="warn"><strong>会員として使えるのは、お申し込みをしたブラウザです。</strong><br>アドレスだけを他の人に伝えても、開けません。ブラウザの閲覧データ(Cookie)を消すと、会員として認識されなくなります。</div>
+<div class="warn"><strong>会員として使えるのは、お申し込みをしたブラウザです。</strong><br>アドレスだけを他の人に伝えても、開けません。別の端末で使うときや、ブラウザのデータを消したときは、<a href="/login">ログイン</a>から、お申し込みのメールアドレスに届く確認コードで入れます。</div>
 <h3>この後の流れ</h3>
 <ol class="steps">
 <li><p>「ひな形を開く」を押して、使いたいひな形を選びます。</p></li>
@@ -142,13 +142,55 @@ export const successPage = () =>
 </div>`,
   );
 
+const FORM_CSS = `<style>
+form{margin:16px 0}
+label{display:block;font-weight:700;margin-bottom:6px}
+input[type=email],input[type=text]{width:100%;font-size:18px;padding:13px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-family:inherit}
+input:focus{outline:2px solid var(--brand);border-color:var(--brand)}
+.err{background:#fde8e8;border:1px solid #f0b4b4;color:#8a1f1f;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:15px}
+@media (prefers-color-scheme:dark){.err{background:#3a1c1c;border-color:#6b3030;color:#f3b4b4}}
+</style>`;
+
+export const loginPage = (error) =>
+  layout(
+    'ログイン',
+    `${FORM_CSS}<div class="hero" style="padding-top:8px">
+<h1 style="font-size:28px">ログイン</h1>
+<p class="lead">お申し込みのときに入力したメールアドレスに、6桁の確認コードを送ります。</p>
+${error ? `<div class="err">${esc(error)}</div>` : ''}
+<form method="post" action="/login">
+<label for="email">メールアドレス</label>
+<input id="email" name="email" type="email" autocomplete="email" inputmode="email" required>
+<p style="margin-top:16px"><button class="btn" type="submit">確認コードを送る</button></p>
+</form>
+<p class="note">まだお申し込みがない方は、<a href="/subscribe">こちらから</a>どうぞ。</p>
+</div>`,
+  );
+
+export const codePage = (email, error) =>
+  layout(
+    '確認コードの入力',
+    `${FORM_CSS}<div class="hero" style="padding-top:8px">
+<h1 style="font-size:28px">確認コードを入力</h1>
+<p class="lead">${esc(email)} に、契約中のアドレスであれば、確認コードを送りました。メールが届かないときは、迷惑メールのフォルダも確認してください。</p>
+${error ? `<div class="err">${esc(error)}</div>` : ''}
+<form method="post" action="/login/verify">
+<input type="hidden" name="email" value="${esc(email)}">
+<label for="code">6桁の確認コード</label>
+<input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required>
+<p style="margin-top:16px"><button class="btn" type="submit">ログイン</button></p>
+</form>
+<p class="note">コードの有効期間は10分です。<a href="/login">メールアドレスを入力し直す</a></p>
+</div>`,
+  );
+
 export const claimedPage = () =>
   layout(
     'このお申し込みは開始済みです',
     `<div class="hero"><h1 style="font-size:28px">このお申し込みは開始済みです</h1>
 <p class="lead">この画面は、お申し込みをしたブラウザでのみ開けます。別のブラウザや端末からは、開けません。</p>
-<p class="note">お申し込みをしたブラウザで、会員ページをご利用ください。</p>
-<p><a class="btn sub" href="/m">会員ページへ</a></p></div>`,
+<p class="note">お申し込みをしたブラウザで、会員ページをご利用ください。別の端末では、メールの確認コードでログインできます。</p>
+<p><a class="btn sub" href="/login">メールでログインする</a></p></div>`,
   );
 
 export const pendingPage = () =>
@@ -189,7 +231,8 @@ export const inactivePage = () =>
     'ご利用にはお申し込みが必要です',
     `<div class="hero"><h1 style="font-size:28px">ご利用にはお申し込みが必要です</h1>
 <p class="lead">このブラウザは、有効な会員として確認できません。解約済み、お支払いが確認できていない、または、お申し込みをしたブラウザではない可能性があります。</p>
-<p><a class="btn" href="/subscribe">申し込む</a></p></div>`,
+<p><a class="btn" href="/login">メールでログインする</a></p>
+<p class="note">まだお申し込みがない方は、<a href="/subscribe">こちらから</a>どうぞ。</p></div>`,
   );
 
 export const notFound = () =>

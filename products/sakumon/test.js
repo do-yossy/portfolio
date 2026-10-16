@@ -28,14 +28,19 @@ function makeDb() {
 }
 
 const SECRET = 'whsec_test';
-const env = { DB: makeDb(), STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_PRICE_ID: 'price_x' };
+const env = { DB: makeDb(), STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_PRICE_ID: 'price_x', RESEND_API_KEY: 're_test', MAIL_FROM: 'サクモン <login@example.test>' };
+const sentMails = [];
 
 // Stripe API の擬似応答(申込完了画面が Checkout Session を取りにいく)
 const realFetch = globalThis.fetch;
-globalThis.fetch = async (u) => {
+globalThis.fetch = async function (u) {
   const m = String(u).match(/checkout\/sessions\/(cs_\w+)/);
   if (m) {
     return new Response(JSON.stringify({ id: m[1], status: 'complete', customer: 'cus_1', subscription: 'sub_1', payment_status: 'paid', customer_details: { email: 'a@example.com' } }), { status: 200 });
+  }
+  if (String(u) === 'https://api.resend.com/emails') {
+    sentMails.push(JSON.parse(arguments[1].body));
+    return new Response('{"id":"m1"}', { status: 200 });
   }
   return new Response('{}', { status: 404 });
 };
@@ -123,6 +128,59 @@ ok(m2 && m2.status === 'active', 'subscription.createdが先に届いても契�
 
 ok((await get('/')).status === 200, 'LPが表示される');
 ok((await get('/nope')).status === 404, '未定義のパスは404');
+
+// --- メールの確認コードでログイン ---
+const post = (path, fields, cookie) =>
+  worker.fetch(new Request(`https://x.test${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', ...(cookie ? { cookie } : {}) },
+    body: new URLSearchParams(fields).toString(),
+  }), env);
+const codeOf = (mail) => mail.text.match(/([0-9]{6})/)[1];
+const resetInterval = () => env.DB.prepare('UPDATE login_codes SET last_sent = last_sent - 120').run();
+
+await send({ id: 'e8', type: 'checkout.session.completed', data: { object: { mode: 'subscription', customer: 'cus_3', subscription: 'sub_3', payment_status: 'paid', customer_details: { email: 'Teacher@Example.com' } } } });
+ok((await get('/login')).status === 200, 'ログイン画面が表示される');
+
+const r0 = await post('/login', { email: 'nobody@example.com' });
+ok(r0.status === 200 && sentMails.length === 0, '登録のないアドレスには送らず、同じ画面を返す');
+const rCanceled = await post('/login', { email: 'a@example.com' });
+ok(rCanceled.status === 200 && sentMails.length === 0, '解約済みの人にはコードを送らない');
+
+const r1 = await post('/login', { email: 'teacher@example.com' });
+ok(r1.status === 200 && sentMails.length === 1, '契約中のアドレスにコードを送る(大文字小文字は区別しない)');
+ok(sentMails[0].to[0] === 'teacher@example.com' && sentMails[0].from.includes('login@example.test'), '宛先と差出人が正しい');
+ok(/^\d{6}$/.test(codeOf(sentMails[0])), '6桁のコード');
+ok(!(await r1.text()).includes(codeOf(sentMails[0])), 'コードは画面に表示されない');
+
+await post('/login', { email: 'teacher@example.com' });
+ok(sentMails.length === 1, '60秒以内の再送は受け付けない');
+
+const code1 = codeOf(sentMails[0]);
+const wrong = await post('/login/verify', { email: 'teacher@example.com', code: code1 === '000000' ? '111111' : '000000' });
+ok(wrong.status === 400 && !wrong.headers.get('set-cookie'), '違うコードではログインできない');
+const good = await post('/login/verify', { email: 'Teacher@example.com', code: code1 });
+const loginCookie = cookieOf(good);
+ok(good.status === 303 && good.headers.get('location') === '/m' && loginCookie.startsWith('sakumon_session='), '正しいコードでログインでき、会員証が渡る');
+ok((await get('/m', loginCookie)).status === 200, 'ログイン後は会員ページが見える');
+const reuse = await post('/login/verify', { email: 'teacher@example.com', code: code1 });
+ok(reuse.status === 400, '使ったコードは再利用できない');
+
+await resetInterval();
+await post('/login', { email: 'teacher@example.com' });
+const code2 = codeOf(sentMails[1]);
+for (let i = 0; i < 5; i++) await post('/login/verify', { email: 'teacher@example.com', code: code2 === '123456' ? '654321' : '123456' });
+ok((await post('/login/verify', { email: 'teacher@example.com', code: code2 })).status === 400, '5回間違えると、正しいコードでも使えなくなる');
+
+await resetInterval();
+await post('/login', { email: 'teacher@example.com' });
+await env.DB.prepare('UPDATE login_codes SET expires_at = expires_at - 700').run();
+ok((await post('/login/verify', { email: 'teacher@example.com', code: codeOf(sentMails[sentMails.length - 1]) })).status === 400, '期限(10分)を過ぎたコードは使えない');
+
+for (let i = 0; i < 6; i++) { await resetInterval(); await post('/login', { email: 'teacher@example.com' }); }
+ok(sentMails.length <= 1 + 1 + 1 + 5 + 0, '1時間に送れるのは5通まで');
+const crossOrigin = await worker.fetch(new Request('https://x.test/login', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://evil.test' }, body: 'email=teacher@example.com' }), env);
+ok(crossOrigin.status === 404, '他のサイトからの送信は受け付けない');
 
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);

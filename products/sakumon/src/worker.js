@@ -4,7 +4,8 @@ import {
   newToken, claimCheckout, createSession, findBySession,
 } from './db.js';
 import { TEMPLATES, findTemplate } from './content.js';
-import { html, landing, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound } from './pages.js';
+import { html, landing, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
+import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
@@ -112,6 +113,31 @@ export default {
       // 2回目以降: すでにこのブラウザが会員証を持っていれば、そのまま案内する。持っていなければ渡さない
       const me = await currentMember(request, env);
       return me && me.customer_id === m.customer_id ? html(successPage()) : html(claimedPage(), 403);
+    }
+
+    // メールの確認コードでログイン(別の端末・Cookie消去後の入口)
+    if (pathname === '/login' && method === 'GET') return html(loginPage());
+    if ((pathname === '/login' || pathname === '/login/verify') && method === 'POST') {
+      const origin = request.headers.get('origin');
+      if (origin && origin !== url.origin) return notFound();
+      const form = await request.formData().catch(() => null);
+      if (!form) return html(loginPage('入力内容を読み取れませんでした。もう一度お試しください。'), 400);
+      const email = normalizeEmail(form.get('email'));
+
+      if (pathname === '/login') {
+        // 契約の有無にかかわらず同じ画面を返す(登録の有無を外から探られないため)
+        try {
+          const issued = await issueCode(env.DB, email);
+          if (issued) await sendCodeMail(env, issued.email, issued.code);
+        } catch (e) {
+          console.error('login mail failed:', e && e.message);
+        }
+        return html(codePage(email));
+      }
+
+      const token = await verifyCode(env.DB, email, form.get('code'));
+      if (!token) return html(codePage(email, '確認コードが正しくないか、期限が切れています。'), 400);
+      return new Response(null, { status: 303, headers: { Location: '/m', 'Set-Cookie': sessionCookie(token), 'Cache-Control': 'no-store' } });
     }
 
     if (pathname === '/m' || pathname.startsWith('/m/')) {

@@ -24,3 +24,14 @@ CREATE TABLE IF NOT EXISTS claimed_checkouts (
   id TEXT PRIMARY KEY,
   created_at INTEGER NOT NULL
 );
+
+-- メールの確認コード(ログイン用)。メールアドレスごとに1行、コードはハッシュで保存
+CREATE TABLE IF NOT EXISTS login_codes (
+  email TEXT PRIMARY KEY,
+  code_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_sent INTEGER NOT NULL,
+  window_start INTEGER NOT NULL,
+  sent_in_window INTEGER NOT NULL DEFAULT 0
+);
