@@ -235,5 +235,8 @@ export const inactivePage = () =>
 <p class="note">まだお申し込みがない方は、<a href="/subscribe">こちらから</a>どうぞ。</p></div>`,
   );
 
+export const comingSoonPage = () =>
+  layout('サクモン', `<div class="hero"><h1 style="font-size:28px">サクモン</h1><p class="lead">ただいま準備中です。</p></div>`);
+
 export const notFound = () =>
   html(layout('見つかりません', `<div class="hero"><h1 style="font-size:28px">見つかりません</h1><p><a class="btn sub" href="/">トップへ</a></p></div>`), 404);

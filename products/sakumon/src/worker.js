@@ -4,7 +4,7 @@ import {
   newToken, claimCheckout, createSession, findBySession,
 } from './db.js';
 import { TEMPLATES, findTemplate } from './content.js';
-import { html, landing, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
+import { html, landing, comingSoonPage, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
 
 const json = (obj, status = 200) =>
@@ -86,7 +86,8 @@ export default {
     const method = request.method;
 
     if (pathname === '/stripe/webhook' && method === 'POST') return webhook(request, env);
-    if (pathname === '/' && method === 'GET') return html(landing());
+    // LPは、オーナーの承認と監査役のレビューが済むまで非公開。公開するときは wrangler.toml の LP_PUBLIC を "true" にする
+    if (pathname === '/' && method === 'GET') return html(env.LP_PUBLIC === 'true' ? landing() : comingSoonPage());
 
     if (pathname === '/subscribe' && method === 'GET') {
       const s = await createCheckoutSession(env, url.origin);

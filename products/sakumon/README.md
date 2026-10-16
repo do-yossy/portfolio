@@ -13,6 +13,7 @@
 ## 現在の状態
 
 - 公開 URL: https://sakumon.sakumon-app.workers.dev (Cloudflare Workers 無料枠。アカウントの workers.dev サブドメインを `sakumon-app` に変更済み)
+- **LP(トップページ)は非公開。** `wrangler.toml` の `LP_PUBLIC = "false"` の間、トップは「準備中」を表示する。オーナーの承認と監査役のレビューが済んだら `"true"` にして `npx wrangler deploy`(`/subscribe` `/login` `/m` は直接URLで動く)
 - D1 データベース `sakumon` 作成済み・`schema.sql` 適用済み(`wrangler.toml` に database_id 記載)
 - **確認コードのメールは、まだ送れない。** `RESEND_API_KEY`(秘密)と `MAIL_FROM`(変数)が未設定。下の「メール送信の設定」を参照
 - **Stripe は未接続。** `/subscribe`(申込)は、Secrets が未登録の間は失敗する

@@ -126,7 +126,13 @@ await send({ id: 'e7', type: 'customer.subscription.created', data: { object: { 
 const m2 = await env.DB.prepare('SELECT * FROM members WHERE customer_id = ?').bind('cus_2').first();
 ok(m2 && m2.status === 'active', 'subscription.createdが先に届いても契約者が作られる');
 
-ok((await get('/')).status === 200, 'LPが表示される');
+const closed = await (await get('/')).text();
+ok(closed.includes('準備中') && !closed.includes('月額プランに申し込む'), 'LP_PUBLICが未設定なら、トップは「準備中」でLPは出ない');
+env.LP_PUBLIC = 'false';
+ok(!(await (await get('/')).text()).includes('月額プランに申し込む'), 'LP_PUBLIC=falseでもLPは出ない');
+env.LP_PUBLIC = 'true';
+ok((await (await get('/')).text()).includes('月額プランに申し込む'), 'LP_PUBLIC=trueならLPが表示される');
+delete env.LP_PUBLIC;
 ok((await get('/nope')).status === 404, '未定義のパスは404');
 
 // --- メールの確認コードでログイン ---
