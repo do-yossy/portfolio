@@ -61,7 +61,7 @@ document.querySelectorAll('[data-copy]').forEach(function(b){
   });
 });`;
 
-const layout = (title, inner, { index = false, script = false } = {}) => `<!doctype html>
+export const layout = (title, inner, { index = false, script = false } = {}) => `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 ${index ? '' : '<meta name="robots" content="noindex">'}
@@ -74,7 +74,10 @@ ${inner}
 export const html = (body, status = 200, headers = {}) =>
   new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
 
-export const landing = () =>
+// 法務ページは、会社情報がそろって公開スイッチが入るまで出さない。そのあいだはリンクも出さない
+const legalLinks = `<p><a href="/legal/tokushoho">特定商取引法に基づく表記</a>　<a href="/legal/terms">利用規約</a>　<a href="/legal/privacy">プライバシーポリシー</a></p>`;
+
+export const landing = (legalOpen = false) =>
   layout(
     'サクモン | 先生のための文面ひな形集',
     `<div class="hero">
@@ -116,7 +119,7 @@ export const landing = () =>
 <details><summary>複数の端末で使えますか?</summary><p>同じ契約で使える端末は、最大3台までです。4台目で使い始めると、最も古い端末の利用が終了します。</p></details>
 </section>
 
-<footer>© サクモン</footer>`,
+<footer>${legalOpen ? legalLinks : ''}© サクモン</footer>`,
     { index: true },
   );
 
