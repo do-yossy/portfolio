@@ -199,7 +199,9 @@ ok(crossOrigin.status === 404, '他のサイトからの送信は受け付けな
 
 // --- 法務ページ(空欄があるうちは公開されない) ---
 const FULL = { ...COMPANY, phone: '請求があれば遅滞なく開示します', refundPolicy: 'テスト返金方針', retentionPeriod: '解約から5年', enactedDate: '2026年10月1日', jurisdiction: '大阪地方裁判所' };
-ok(legalMissing(COMPANY).length > 0 && legalMissing(COMPANY).includes('retentionPeriod'), '会社情報が未記入のうちは、必須項目が不足と判定される');
+const BLANK = { ...COMPANY, retentionPeriod: '' };
+ok(legalMissing(COMPANY).length === 0, '会社情報の必須項目は、すべて記入済み');
+ok(legalMissing(BLANK).length === 1 && legalMissing(BLANK)[0] === 'retentionPeriod', '空欄にすると、不足として判定される');
 ok(!legalMissing(COMPANY).includes('refundPolicy') && !legalMissing(COMPANY).includes('enactedDate'), '返金の方針と制定日は、記入済み');
 ok(!legalMissing(COMPANY).includes('phone') && !legalMissing(COMPANY).includes('jurisdiction'), '電話番号の表示と管轄裁判所は、記入済み');
 ok(legalMissing(FULL).length === 0, '全項目を埋めれば不足なし');
@@ -207,20 +209,24 @@ for (const p of ['/legal/tokushoho', '/legal/terms', '/legal/privacy']) {
   env.LEGAL_PUBLIC = undefined;
   ok((await get(p)).status === 404, p + ': スイッチ未設定なら404');
   env.LEGAL_PUBLIC = 'true';
-  ok((await get(p)).status === 404, p + ': スイッチが"true"でも、空欄があれば404(公開されない)');
+  ok((await get(p)).status === 200, p + ': スイッチが"true"で全項目が記入済みなら公開される');
 }
 delete env.LEGAL_PUBLIC;
 ok(!legalOpen({ LEGAL_PUBLIC: 'false' }, FULL), 'スイッチが"false"なら、全項目が埋まっていても公開されない');
 ok(legalOpen({ LEGAL_PUBLIC: 'true' }, FULL), 'スイッチが"true"で全項目が埋まれば公開される');
-ok(!legalOpen({ LEGAL_PUBLIC: 'true' }, COMPANY), 'スイッチが"true"でも、空欄があれば公開されない');
+ok(!legalOpen({ LEGAL_PUBLIC: 'true' }, BLANK), 'スイッチが"true"でも、空欄があれば公開されない');
+ok(!legalOpen({}, COMPANY) && !legalOpen({ LEGAL_PUBLIC: 'false' }, COMPANY), '全項目が記入済みでも、スイッチが入るまでは公開されない');
 const tk = tokushohoPage(FULL), tkBlank = tokushohoPage(COMPANY);
 ok(tk.includes('安藤 嘉啓') && tk.includes('大阪府大阪市浪速区') && tk.includes('月額980円(税込)') && tk.includes('テスト返金方針') && !tk.includes('【未記入'), '特商法の表記に、記入済みの内容が出る');
-ok(privacyPage(COMPANY).includes('【未記入:保管期間】') && tkBlank.includes('請求があれば遅滞なく開示します') && tkBlank.includes('返金しません'), '空欄は【未記入】と目立つ表示になり、記入済みの内容は出る(確認用)');
+ok(privacyPage(BLANK).includes('【未記入:保管期間】') && privacyPage(COMPANY).includes('契約期間中および解約後1年間') && tkBlank.includes('請求があれば遅滞なく開示します') && tkBlank.includes('返金しません'), '空欄は【未記入】と目立つ表示になり、記入済みの内容は出る(確認用)');
 ok(termsPage(FULL).includes('大阪地方裁判所') && termsPage(FULL).includes('2026年10月1日') && !termsPage(FULL).includes('【未記入'), '規約に、管轄と制定日が出る');
 ok(privacyPage(FULL).includes('解約から5年') && privacyPage(FULL).includes('Stripe') && privacyPage(FULL).includes('Resend'), 'プライバシーポリシーに、保管期間と委託先が出る');
 ok(!landing(false).includes('/legal/terms') && landing(true).includes('/legal/terms'), 'LPの法務リンクは、公開できるときだけ出る');
 env.LP_PUBLIC = 'true';
 ok(!(await (await get('/')).text()).includes('/legal/'), '法務が未公開のうちは、LPに法務リンクが出ない');
+env.LEGAL_PUBLIC = 'true';
+ok((await (await get('/')).text()).includes('/legal/terms'), '法務が公開できる状態なら、LPのフッターに法務リンクが出る');
+delete env.LEGAL_PUBLIC;
 delete env.LP_PUBLIC;
 
 // --- 請求の方式(申込月は日割り・翌月1日から毎月1日に自動継続) ---
