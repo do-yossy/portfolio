@@ -2,7 +2,10 @@
 // D1 は node:sqlite で代用し、本物の schema.sql と SQL を通す。
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import worker from './src/worker.js';
+import worker, { legalOpen } from './src/worker.js';
+import { COMPANY, legalMissing } from './src/company.js';
+import { tokushohoPage, termsPage, privacyPage } from './src/legal.js';
+import { landing } from './src/pages.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, name) => {
@@ -187,6 +190,30 @@ for (let i = 0; i < 6; i++) { await resetInterval(); await post('/login', { emai
 ok(sentMails.length <= 1 + 1 + 1 + 5 + 0, '1時間に送れるのは5通まで');
 const crossOrigin = await worker.fetch(new Request('https://x.test/login', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://evil.test' }, body: 'email=teacher@example.com' }), env);
 ok(crossOrigin.status === 404, '他のサイトからの送信は受け付けない');
+
+// --- 法務ページ(空欄があるうちは公開されない) ---
+const FULL = { ...COMPANY, phone: '請求があれば遅滞なく開示します', refundPolicy: 'テスト返金方針', retentionPeriod: '解約から5年', enactedDate: '2026年10月1日', jurisdiction: '大阪地方裁判所' };
+ok(legalMissing(COMPANY).length > 0 && legalMissing(COMPANY).includes('phone') && legalMissing(COMPANY).includes('refundPolicy'), '会社情報が未記入のうちは、必須項目が不足と判定される');
+ok(legalMissing(FULL).length === 0, '全項目を埋めれば不足なし');
+for (const p of ['/legal/tokushoho', '/legal/terms', '/legal/privacy']) {
+  env.LEGAL_PUBLIC = undefined;
+  ok((await get(p)).status === 404, p + ': スイッチ未設定なら404');
+  env.LEGAL_PUBLIC = 'true';
+  ok((await get(p)).status === 404, p + ': スイッチが"true"でも、空欄があれば404(公開されない)');
+}
+delete env.LEGAL_PUBLIC;
+ok(!legalOpen({ LEGAL_PUBLIC: 'false' }, FULL), 'スイッチが"false"なら、全項目が埋まっていても公開されない');
+ok(legalOpen({ LEGAL_PUBLIC: 'true' }, FULL), 'スイッチが"true"で全項目が埋まれば公開される');
+ok(!legalOpen({ LEGAL_PUBLIC: 'true' }, COMPANY), 'スイッチが"true"でも、空欄があれば公開されない');
+const tk = tokushohoPage(FULL), tkBlank = tokushohoPage(COMPANY);
+ok(tk.includes('安藤 嘉啓') && tk.includes('大阪府大阪市浪速区') && tk.includes('月額980円(税込)') && tk.includes('テスト返金方針') && !tk.includes('【未記入'), '特商法の表記に、記入済みの内容が出る');
+ok(tkBlank.includes('【未記入:返金の方針】') && tkBlank.includes('【未記入:電話番号の表示】'), '空欄は【未記入】と目立つ表示になる(確認用)');
+ok(termsPage(FULL).includes('大阪地方裁判所') && termsPage(FULL).includes('2026年10月1日') && !termsPage(FULL).includes('【未記入'), '規約に、管轄と制定日が出る');
+ok(privacyPage(FULL).includes('解約から5年') && privacyPage(FULL).includes('Stripe') && privacyPage(FULL).includes('Resend'), 'プライバシーポリシーに、保管期間と委託先が出る');
+ok(!landing(false).includes('/legal/terms') && landing(true).includes('/legal/terms'), 'LPの法務リンクは、公開できるときだけ出る');
+env.LP_PUBLIC = 'true';
+ok(!(await (await get('/')).text()).includes('/legal/'), '法務が未公開のうちは、LPに法務リンクが出ない');
+delete env.LP_PUBLIC;
 
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
