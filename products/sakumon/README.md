@@ -2,7 +2,7 @@
 
 先生向け文面ひな形集の月額サブスク(980円・税込)。AI API は使わない。サーバーは借りず、Cloudflare Workers + D1 の無料枠で動かす。
 
-- 決済: Stripe Checkout(月額プラン)
+- 決済: Stripe Checkout(月額プラン)。**申込月は日割り、翌月1日(日本時間0時)から毎月1日に自動継続**(`src/stripe.js` の `billingPlan`。Checkout の `subscription_data[billing_cycle_anchor]` + `proration_behavior`)。月末の2日以内の申込は、日割り額がJPYの最低決済額(50円)を下回りうるため日割りせず、初回は翌月1日
 - 契約状態: Stripe Webhook → D1(`members` テーブル)
 - 会員ページ: `/m`。購入したブラウザに渡す会員証(HttpOnly Cookie)で本人確認する。URLに秘密は含まない。契約が `active` / `trialing` の間だけ教材が見える
 - 会員証は1回の申込につき最初の1回だけ受け取れる。同じ契約で使える端末は最大3台(古いものから失効)

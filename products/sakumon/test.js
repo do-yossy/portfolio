@@ -6,6 +6,7 @@ import worker, { legalOpen } from './src/worker.js';
 import { COMPANY, legalMissing } from './src/company.js';
 import { tokushohoPage, termsPage, privacyPage } from './src/legal.js';
 import { landing } from './src/pages.js';
+import { billingPlan } from './src/stripe.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, name) => {
@@ -33,6 +34,7 @@ function makeDb() {
 const SECRET = 'whsec_test';
 const env = { DB: makeDb(), STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_PRICE_ID: 'price_x', RESEND_API_KEY: 're_test', MAIL_FROM: 'サクモン <login@example.test>' };
 const sentMails = [];
+let lastCheckoutBody = '';
 
 // Stripe API の擬似応答(申込完了画面が Checkout Session を取りにいく)
 const realFetch = globalThis.fetch;
@@ -40,6 +42,10 @@ globalThis.fetch = async function (u) {
   const m = String(u).match(/checkout\/sessions\/(cs_\w+)/);
   if (m) {
     return new Response(JSON.stringify({ id: m[1], status: 'complete', customer: 'cus_1', subscription: 'sub_1', payment_status: 'paid', customer_details: { email: 'a@example.com' } }), { status: 200 });
+  }
+  if (String(u).endsWith('/v1/checkout/sessions') && arguments[1] && arguments[1].method === 'POST') {
+    lastCheckoutBody = arguments[1].body;
+    return new Response(JSON.stringify({ id: 'cs_new', url: 'https://checkout.stripe.test/c/pay/cs_new' }), { status: 200 });
   }
   if (String(u) === 'https://api.resend.com/emails') {
     sentMails.push(JSON.parse(arguments[1].body));
@@ -216,6 +222,23 @@ ok(!landing(false).includes('/legal/terms') && landing(true).includes('/legal/te
 env.LP_PUBLIC = 'true';
 ok(!(await (await get('/')).text()).includes('/legal/'), '法務が未公開のうちは、LPに法務リンクが出ない');
 delete env.LP_PUBLIC;
+
+// --- 請求の方式(申込月は日割り・翌月1日から毎月1日に自動継続) ---
+const at = (s) => Date.parse(s + '+09:00');
+const jstOf = (sec) => new Date(sec * 1000 + 9 * 3600 * 1000).toISOString().slice(0, 16);
+const p1 = billingPlan(at('2026-10-17T12:00:00'));
+ok(jstOf(p1.anchor) === '2026-11-01T00:00' && p1.proration === 'create_prorations', '月の途中の申込: 翌月1日0時(日本時間)が請求日で、申込月は日割り');
+ok(jstOf(billingPlan(at('2026-12-15T09:00:00')).anchor) === '2027-01-01T00:00', '12月の申込は、翌年1月1日が請求日(年またぎ)');
+ok(jstOf(billingPlan(at('2026-10-01T00:00:00')).anchor) === '2026-11-01T00:00', '月初(1日0時)の申込も、翌月1日が請求日');
+ok(billingPlan(at('2026-10-29T12:00:00')).proration === 'create_prorations', '月末まで2日以上あれば日割りで請求する');
+ok(billingPlan(at('2026-10-30T12:00:00')).proration === 'none' && billingPlan(at('2026-10-31T12:00:00')).proration === 'none', '月末の2日以内は、最低決済額(50円)を下回るため日割りせず、翌月1日が初回の請求');
+// UTCでは前日でも、日本時間で翌日なら、日本時間で数える
+ok(jstOf(billingPlan(Date.parse('2026-10-31T16:00:00Z')).anchor) === '2026-12-01T00:00', '日本時間11月1日0時(UTC10月31日16時)の申込は、12月1日が請求日');
+const sub = await get('/subscribe');
+ok(sub.status === 303 && String(sub.headers.get('location')).startsWith('https://checkout.stripe.test/'), '申込ボタンはStripeの決済画面へ転送する');
+const sent = new URLSearchParams(lastCheckoutBody);
+ok(/^\d{10}$/.test(sent.get('subscription_data[billing_cycle_anchor]')) && ['create_prorations', 'none'].includes(sent.get('subscription_data[proration_behavior]')), 'Stripeに、請求日と日割りの指定を送っている');
+ok(Number(sent.get('subscription_data[billing_cycle_anchor]')) * 1000 > Date.now() && sent.get('managed_payments[enabled]') === 'false' && sent.get('mode') === 'subscription', '請求日は未来で、Managed Paymentsは使わない');
 
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);

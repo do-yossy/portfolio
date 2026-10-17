@@ -46,9 +46,28 @@ async function api(env, method, path, params) {
   return json;
 }
 
-export function createCheckoutSession(env, origin) {
+// ---- 請求の方式: 申込月は日割り、翌月1日(日本時間0時)から毎月1日に自動継続 ----
+const JST_MS = 9 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+// 残りがこれより短いと、日割り額がJPYの最低決済額(50円)を下回りうるので、日割り請求をしない(次の1日まで無料)
+const MIN_PRORATION_MS = 2 * DAY_MS;
+
+// 翌月1日0時(日本時間)のUNIX秒と、申込月の扱い(日割りにするか)
+export function billingPlan(nowMs = Date.now()) {
+  const jst = new Date(nowMs + JST_MS);
+  const anchorMs = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + 1, 1) - JST_MS;
+  return {
+    anchor: Math.floor(anchorMs / 1000),
+    proration: anchorMs - nowMs < MIN_PRORATION_MS ? 'none' : 'create_prorations',
+  };
+}
+
+export function createCheckoutSession(env, origin, nowMs = Date.now()) {
+  const plan = billingPlan(nowMs);
   return api(env, 'POST', '/checkout/sessions', {
     mode: 'subscription',
+    'subscription_data[billing_cycle_anchor]': String(plan.anchor),
+    'subscription_data[proration_behavior]': plan.proration,
     // 会社が販売者として売る前提(特商法表記)。Managed Payments(Stripeが販売者)は使わない
     'managed_payments[enabled]': 'false',
     'line_items[0][price]': env.STRIPE_PRICE_ID,
