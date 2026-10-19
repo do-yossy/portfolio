@@ -70,6 +70,8 @@ export function createCheckoutSession(env, origin, nowMs = Date.now()) {
     'subscription_data[proration_behavior]': plan.proration,
     // 会社が販売者として売る前提(特商法表記)。Managed Payments(Stripeが販売者)は使わない
     'managed_payments[enabled]': 'false',
+    // 閲覧者の国に合わせた通貨の自動変換(Adaptive Pricing)は使わない。常に円(980円・日割りも円)で表示・請求する
+    'adaptive_pricing[enabled]': 'false',
     'line_items[0][price]': env.STRIPE_PRICE_ID,
     'line_items[0][quantity]': '1',
     success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,

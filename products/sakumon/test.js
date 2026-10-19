@@ -245,6 +245,7 @@ ok(sub.status === 303 && String(sub.headers.get('location')).startsWith('https:/
 const sent = new URLSearchParams(lastCheckoutBody);
 ok(/^\d{10}$/.test(sent.get('subscription_data[billing_cycle_anchor]')) && ['create_prorations', 'none'].includes(sent.get('subscription_data[proration_behavior]')), 'Stripeに、請求日と日割りの指定を送っている');
 ok(Number(sent.get('subscription_data[billing_cycle_anchor]')) * 1000 > Date.now() && sent.get('managed_payments[enabled]') === 'false' && sent.get('mode') === 'subscription', '請求日は未来で、Managed Paymentsは使わない');
+ok(sent.get('adaptive_pricing[enabled]') === 'false', '通貨の自動変換(Adaptive Pricing)を使わない=常に円で表示・請求する');
 
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
