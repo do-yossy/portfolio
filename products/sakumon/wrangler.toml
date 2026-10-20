@@ -10,9 +10,9 @@ database_id = "2f6654aa-7b10-463b-ad6e-e441e42dd771"
 
 # LPの公開スイッチ。承認・監査が済むまで "false"(トップは「準備中」を表示)
 [vars]
-LP_PUBLIC = "false"
+LP_PUBLIC = "true"
 # 法務ページ(特商法・規約・プライバシー)の公開スイッチ。"true" でも、src/company.js に空欄があるあいだは404のまま
-LEGAL_PUBLIC = "false"
+LEGAL_PUBLIC = "true"
 
 # 秘密情報は wrangler secret put で登録する(ここには書かない)
 #   STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_ID
