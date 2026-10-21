@@ -4,7 +4,7 @@ import {
   newToken, claimCheckout, createSession, findBySession,
 } from './db.js';
 import { TEMPLATES, findTemplate } from './content.js';
-import { html, landing, comingSoonPage, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
+import { html, landing, samplePage, SAMPLE_ID, comingSoonPage, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
 
 const json = (obj, status = 200) =>
@@ -17,6 +17,12 @@ const LEGAL_PAGES = { '/legal/tokushoho': tokushohoPage, '/legal/terms': termsPa
 export const legalOpen = (env, company = COMPANY) => env.LEGAL_PUBLIC === 'true' && legalMissing(company).length === 0;
 
 const COOKIE = 'sakumon_session';
+
+// 流入元の目印(?src=note など)。英小文字・数字・_・- の30文字まで。それ以外は無視する
+const srcOf = (url) => {
+  const v = (url.searchParams.get('src') || '').toLowerCase();
+  return /^[a-z0-9_-]{1,30}$/.test(v) ? v : '';
+};
 
 function readCookie(request, name) {
   for (const part of (request.headers.get('cookie') || '').split(';')) {
@@ -93,14 +99,19 @@ export default {
 
     if (pathname === '/stripe/webhook' && method === 'POST') return webhook(request, env);
     // LPは、オーナーの承認と監査役のレビューが済むまで非公開。公開するときは wrangler.toml の LP_PUBLIC を "true" にする
-    if (pathname === '/' && method === 'GET') return html(env.LP_PUBLIC === 'true' ? landing(legalOpen(env)) : comingSoonPage());
+    if (pathname === '/' && method === 'GET') return html(env.LP_PUBLIC === 'true' ? landing(legalOpen(env), srcOf(url)) : comingSoonPage());
+
+    // ひな形の見本(申し込む前に見られる)。LPと同じく、LP_PUBLIC が "true" のときだけ出す
+    if (pathname === '/sample' && method === 'GET') {
+      return env.LP_PUBLIC === 'true' ? html(samplePage(findTemplate(SAMPLE_ID), srcOf(url), legalOpen(env))) : notFound();
+    }
 
     // 法務ページ。LEGAL_PUBLIC が "true" で、会社情報の必須項目がすべて埋まっているときだけ公開する(空欄があれば404)
     const legalPage = LEGAL_PAGES[pathname];
     if (legalPage && method === 'GET') return legalOpen(env) ? html(legalPage(COMPANY)) : notFound();
 
     if (pathname === '/subscribe' && method === 'GET') {
-      const s = await createCheckoutSession(env, url.origin);
+      const s = await createCheckoutSession(env, url.origin, Date.now(), srcOf(url));
       return redirect(s.url);
     }
 

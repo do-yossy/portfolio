@@ -62,9 +62,9 @@ export function billingPlan(nowMs = Date.now()) {
   };
 }
 
-export function createCheckoutSession(env, origin, nowMs = Date.now()) {
+export function createCheckoutSession(env, origin, nowMs = Date.now(), src = '') {
   const plan = billingPlan(nowMs);
-  return api(env, 'POST', '/checkout/sessions', {
+  const params = {
     mode: 'subscription',
     'subscription_data[billing_cycle_anchor]': String(plan.anchor),
     'subscription_data[proration_behavior]': plan.proration,
@@ -76,7 +76,13 @@ export function createCheckoutSession(env, origin, nowMs = Date.now()) {
     'line_items[0][quantity]': '1',
     success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/`,
-  });
+  };
+  // 流入元(note・threads など)を、契約に記録する。個人を特定する情報は入れない
+  if (src) {
+    params['metadata[src]'] = src;
+    params['subscription_data[metadata][src]'] = src;
+  }
+  return api(env, 'POST', '/checkout/sessions', params);
 }
 
 export const getCheckoutSession = (env, id) => api(env, 'GET', `/checkout/sessions/${encodeURIComponent(id)}`);

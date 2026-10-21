@@ -1,4 +1,5 @@
 import { TEMPLATES } from './content.js';
+import { COMPANY } from './company.js';
 
 export const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -61,10 +62,10 @@ document.querySelectorAll('[data-copy]').forEach(function(b){
   });
 });`;
 
-export const layout = (title, inner, { index = false, script = false } = {}) => `<!doctype html>
+export const layout = (title, inner, { index = false, script = false, meta = '' } = {}) => `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-${index ? '' : '<meta name="robots" content="noindex">'}
+${index ? '' : '<meta name="robots" content="noindex">'}${meta}
 <title>${esc(title)}</title>
 <style>${CSS}</style></head><body>
 <div class="wrap"><header class="top"><a class="logo" href="/">サクモン</a></header>
@@ -77,14 +78,21 @@ export const html = (body, status = 200, headers = {}) =>
 // 法務ページは、会社情報がそろって公開スイッチが入るまで出さない。そのあいだはリンクも出さない
 const legalLinks = `<p><a href="/legal/tokushoho">特定商取引法に基づく表記</a>　<a href="/legal/terms">利用規約</a>　<a href="/legal/privacy">プライバシーポリシー</a></p>`;
 
-export const landing = (legalOpen = false) =>
-  layout(
+const LP_META = '<meta name="description" content="先生が保護者向けの文書を書くときの「書き出し」を用意する、文面ひな形集。月額980円(税込)。いつでも解約できます。">\n<meta property="og:type" content="website">\n<meta property="og:title" content="サクモン | 先生のための文面ひな形集">\n<meta property="og:description" content="学級通信も、保護者へのお知らせも。ゼロから書かない。月額980円(税込)・いつでも解約できます。">\n<meta name="twitter:card" content="summary">';
+
+const contactLink = `<p><a href="${esc(encodeURI(COMPANY.contactUrl))}" rel="noopener">お問い合わせ</a></p>`;
+
+// src: 流入元の目印(note・threads など)。申込ボタンと見本ページに引き継ぎ、Stripe の契約に記録する
+export const landing = (legalOpen = false, src = '') => {
+  const q = src ? '?src=' + encodeURIComponent(src) : '';
+  return layout(
     'サクモン | 先生のための文面ひな形集',
     `<div class="hero">
 <h1>学級通信も、保護者へのお知らせも。<br>ゼロから書かない。</h1>
 <p class="lead">サクモンは、先生が保護者向けの文書を書くときの「書き出し」を用意する、文面ひな形集です。ひな形を開いて、{{ }} の部分をご自身の内容に書き換えてお使いいただけます。</p>
-<p><a class="btn" href="/subscribe">月額プランに申し込む</a></p>
+<p><a class="btn" href="/subscribe${q}">月額プランに申し込む</a></p>
 <p class="note">月額980円(税込)・いつでも解約できます</p>
+<p><a href="/sample${q}">申し込む前に、ひな形の見本を1つ見る →</a></p>
 </div>
 
 <section>
@@ -99,15 +107,15 @@ export const landing = (legalOpen = false) =>
 <li><h3>ひな形を開く</h3><p>申し込み後、そのブラウザで会員ページが開きます。使いたいひな形を選びます。</p></li>
 <li><h3>書き換えてコピー</h3><p>{{ }} の部分を、ご自身の学級の内容に書き換えてお使いいただけます。</p></li>
 </ol>
-<p class="note">ひな形は、ご自身で確認して書き換えてお使いください。児童・保護者の個人情報(病名など)の取り扱いは、所属校・自治体のルールに従ってください。ページ上で文字を入力する欄はなく、入力した内容がサクモンに送られることはありません。</p>
+<p class="note">ひな形は、ご自身で確認して書き換えてお使いください。児童・保護者の個人情報(病名など)の取り扱いは、所属校・自治体のルールに従ってください。ひな形のページには文字を入力する欄がなく、{{ }} を書き換えた内容がサクモンに送られることはありません(ご契約のメールアドレスなどは除きます)。</p>
 </section>
 
 <section>
 <h2>料金</h2>
 <div class="price">
 <div class="yen">980円<small>／月(税込)</small></div>
-<ul><li>すべてのひな形が使えます</li><li>お申し込みの月は、月末までの日割り料金(月の最後の2日間のお申し込みは、お申し込み月の料金なし)</li><li>翌月1日から、毎月1日に自動で更新</li><li>いつでも解約できます</li><li>解約後も、請求期間の終わり(月末)まで使えます</li></ul>
-<div><a class="btn" href="/subscribe">月額プランに申し込む</a></div>
+<ul><li>すべてのひな形が使えます</li><li>お申し込みの月は、月末までの日割り料金(月の最後の2日間のお申し込みは、お申し込み月の料金なし)</li><li>翌月1日から、毎月1日に自動で更新</li><li>いつでも解約できます</li><li>解約後も、請求期間の終わり(月末)まで使えます</li><li>お支払い済みの料金の返金はありません</li></ul>
+<div><a class="btn" href="/subscribe${q}">月額プランに申し込む</a></div>
 </div>
 </section>
 
@@ -120,9 +128,32 @@ export const landing = (legalOpen = false) =>
 <details><summary>複数の端末で使えますか?</summary><p>同じ契約で使える端末は、最大3台までです。4台目で使い始めると、最も古い端末の利用が終了します。</p></details>
 </section>
 
-<footer>${legalOpen ? legalLinks : ''}© サクモン</footer>`,
-    { index: true },
+<footer>${legalOpen ? legalLinks + contactLink : ''}© サクモン</footer>`,
+    { index: true, meta: LP_META },
   );
+};
+
+// 申し込む前に見られる、ひな形の見本(集客用に共有できるページ)
+export const SAMPLE_ID = 'gakkyu-tsushin';
+export const samplePage = (t, src = '', legalOpen = false) => {
+  const q = src ? '?src=' + encodeURIComponent(src) : '';
+  const meta = '<meta name="description" content="サクモンのひな形の見本です。{{ }} の部分を書き換えてお使いいただけます。">\n<meta property="og:type" content="website">\n<meta property="og:title" content="ひな形の見本 | サクモン">\n<meta name="twitter:card" content="summary">';
+  return layout(
+    `ひな形の見本 | サクモン`,
+    `<div class="hero" style="padding-top:8px">
+<a class="back" href="/${q}">← サクモンのトップへ</a>
+<h1 style="font-size:26px">ひな形の見本:${esc(t.title)}</h1>
+<p class="note">サクモンのひな形の見本です。{{ }} の部分を、ご自身の内容に書き換えてお使いください。児童・保護者の個人情報(病名など)は、所属校・自治体のルールに従って取り扱ってください。</p>
+<pre class="tpl" id="tpl">${esc(t.body)}</pre>
+<button class="btn" type="button" data-copy="#tpl">文面をコピー</button>
+<section><h2>ほかのひな形も使いたい方へ</h2>
+<p>サクモンには、この見本を含めて${TEMPLATES.length}点のひな形があります。月額980円(税込)。お申し込みの月は日割り、翌月1日から毎月1日に自動で更新します。解約は、毎月の末日(日本時間)までに手続きしてください。お支払い済みの料金の返金はありません。</p>
+<p><a class="btn" href="/subscribe${q}">月額プランに申し込む</a></p></section>
+<footer>運営:${esc(COMPANY.sellerName)}${legalOpen ? legalLinks + contactLink : ''}</footer>
+</div>`,
+    { index: true, script: true, meta },
+  );
+};
 
 export const successPage = () =>
   layout(
