@@ -6,6 +6,7 @@ import worker, { legalOpen } from './src/worker.js';
 import { COMPANY, legalMissing } from './src/company.js';
 import { tokushohoPage, termsPage, privacyPage } from './src/legal.js';
 import { landing } from './src/pages.js';
+import { TEMPLATES, CATEGORIES } from './src/content.js';
 import { validEmail, buildSql, hashToken } from './scripts/recovery-link.mjs';
 import { billingPlan } from './src/stripe.js';
 
@@ -337,6 +338,58 @@ ok(sql.includes("lower(email) = 'teacher@example.com'") && sql.includes("status 
 let threw = false;
 try { buildSql('x@example.com', 'zz', 24); } catch { threw = true; }
 ok(threw, '発行スクリプト: 不正なハッシュは受け付けない');
+
+// --- 教材(ひな形)の中身の品質 ---
+ok(TEMPLATES.length >= 16, 'ひな形は16点以上ある');
+ok(new Set(TEMPLATES.map((t) => t.id)).size === TEMPLATES.length && TEMPLATES.every((t) => /^[a-z0-9-]+$/.test(t.id)), 'ひな形のIDは、重複せず、英小文字・数字・ハイフンだけ');
+ok(TEMPLATES.every((t) => CATEGORIES.includes(t.category)) && CATEGORIES.every((c) => TEMPLATES.some((t) => t.category === c)), 'すべてのひな形が、分類に属し、どの分類にも1点以上ある');
+ok(TEMPLATES.every((t) => t.title && t.use && t.body && t.example && Array.isArray(t.tips) && t.tips.length >= 2), 'すべてのひな形に、題名・使う場面・本文・記入例・ポイント(2つ以上)がある');
+ok(TEMPLATES.every((t) => t.body.includes('{{') && t.body.includes('}}')), '本文には、書き換える部分({{ }})がある');
+ok(TEMPLATES.every((t) => !t.example.includes('{{') && !t.example.includes('}}')), '記入例には、{{ }} が残っていない');
+ok(TEMPLATES.every((t) => (t.body.match(/\{\{/g) || []).length === (t.body.match(/\}\}/g) || []).length), '本文の {{ と }} の数が合っている');
+{
+  // 記入例の「月日(曜日)」が、2026年のカレンダーと合っているか
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  let bad = [];
+  for (const t of TEMPLATES) {
+    for (const m of t.example.matchAll(/(\d{1,2})月(\d{1,2})日\((日|月|火|水|木|金|土)\)/g)) {
+      const d = new Date(Date.UTC(2026, Number(m[1]) - 1, Number(m[2])));
+      if (days[d.getUTCDay()] !== m[3]) bad.push(`${t.id}: ${m[0]}`);
+    }
+  }
+  ok(bad.length === 0, '記入例の日付と曜日が、2026年のカレンダーと合っている' + (bad.length ? ' → ' + bad.join(', ') : ''));
+}
+{
+  // 実在の個人情報・病名が、記入例や本文に紛れ込んでいないか
+  const banned = ['インフルエンザ', '新型コロナ', 'ノロウイルス', '骨折', '診断', 'アレルギー', '@', 'http', '電話番号:', '090-', '080-'];
+  const hit = [];
+  for (const t of TEMPLATES) for (const w of banned) if (t.body.includes(w) || t.example.includes(w)) hit.push(`${t.id}: ${w}`);
+  ok(hit.length === 0, '本文と記入例に、病名・診断・連絡先などの個人情報が入っていない' + (hit.length ? ' → ' + hit.join(', ') : ''));
+  const bannedClaims = ['必ず効果', '誰でも', 'No.1', '日本一', '時短', '大幅', '劇的'];
+  const hit2 = [];
+  for (const t of TEMPLATES) for (const w of bannedClaims) if ([t.use, t.body, t.example, ...t.tips].join('').includes(w)) hit2.push(`${t.id}: ${w}`);
+  ok(hit2.length === 0, '根拠のない効果の断定がない' + (hit2.length ? ' → ' + hit2.join(', ') : ''));
+}
+ok(TEMPLATES.every((t) => t.example.includes('○○')), '記入例の担任名は、架空の「○○」になっている');
+const memberHtml = await (await get('/m', recCookie)).text();
+ok(TEMPLATES.every((t) => memberHtml.includes(`/m/t/${t.id}`)) && CATEGORIES.every((c) => memberHtml.includes(c)) && memberHtml.includes(`全${TEMPLATES.length}点`) && memberHtml.includes('/m/guide'), '会員ページに、全ひな形・分類・使い方ガイドへのリンクが出る');
+let pagesOk = true;
+for (const t of TEMPLATES) {
+  const r = await get(`/m/t/${t.id}`, recCookie);
+  const h = await r.text();
+  if (r.status !== 200 || !h.includes('記入例') || !h.includes('書き方のポイント') || !h.includes('data-copy="#tpl"') || !h.includes('data-copy="#ex"') || !h.includes(t.use.slice(0, 8))) pagesOk = false;
+}
+ok(pagesOk, 'すべてのひな形のページが表示され、本文・記入例のコピー・書き方のポイントがある');
+const guide = await get('/m/guide', recCookie);
+const guideHtml = await guide.text();
+ok(guide.status === 200 && guideHtml.includes('出す前のチェック') && guideHtml.includes('個人情報の扱い') && guideHtml.includes('所属校'), '使い方ガイドが表示される');
+ok((await get('/m/guide')).status === 403, '使い方ガイドも、会員だけが見られる');
+env.LP_PUBLIC = 'true';
+const lpAll = await (await get('/')).text();
+ok(lpAll.includes(`全${TEMPLATES.length}点`) && TEMPLATES.every((t) => lpAll.includes(t.title)), 'LPに、ひな形の全点数と、すべての題名が出る');
+const smpl = await (await get('/sample')).text();
+ok(smpl.includes('記入例を見る') && smpl.includes(`${TEMPLATES.length}点のひな形`), '見本ページに、記入例と、全点数が出る');
+delete env.LP_PUBLIC;
 
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
