@@ -44,6 +44,7 @@ export const forgetEvent = (db, id) => db.prepare('DELETE FROM events WHERE id =
 export const isActive = (m) => !!m && (m.status === 'active' || m.status === 'trialing');
 
 // ---- ブラウザ単位の会員証 ----
+// (入り直しのリンクの消費は、このブロックの下の consumeRecoveryLink)
 export const MAX_DEVICES = 3;
 
 async function sha256Hex(s) {
@@ -72,4 +73,20 @@ export async function findBySession(db, token) {
     .prepare('SELECT m.* FROM sessions s JOIN members m ON m.customer_id = s.customer_id WHERE s.id = ?')
     .bind(await sha256Hex(token))
     .first();
+}
+
+// 運営が発行した、1回限りの入り直しのリンク(recovery_links)を使う。使えれば新しい会員証(Cookie用トークン)を返す
+export async function consumeRecoveryLink(db, token) {
+  if (!/^[0-9a-f]{48}$/.test(String(token || ''))) return null;
+  const id = await sha256Hex(token);
+  const row = await db.prepare('SELECT * FROM recovery_links WHERE id = ? AND used = 0 AND expires_at > ?').bind(id, now()).first();
+  if (!row) return null;
+  // 先に使用済みにする。同時に2回押されても、片方しか通らない
+  const r = await db.prepare('UPDATE recovery_links SET used = 1 WHERE id = ? AND used = 0').bind(id).run();
+  if (!((r.meta?.changes ?? r.changes) > 0)) return null;
+  const member = await db.prepare('SELECT * FROM members WHERE customer_id = ?').bind(row.customer_id).first();
+  if (!isActive(member)) return null;
+  const sessionToken = newToken();
+  await createSession(db, member.customer_id, sessionToken);
+  return sessionToken;
 }

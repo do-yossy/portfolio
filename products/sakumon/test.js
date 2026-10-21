@@ -6,6 +6,7 @@ import worker, { legalOpen } from './src/worker.js';
 import { COMPANY, legalMissing } from './src/company.js';
 import { tokushohoPage, termsPage, privacyPage } from './src/legal.js';
 import { landing } from './src/pages.js';
+import { validEmail, buildSql, hashToken } from './scripts/recovery-link.mjs';
 import { billingPlan } from './src/stripe.js';
 
 let pass = 0, fail = 0;
@@ -287,6 +288,55 @@ const lpRefund = await (await get('/')).text();
 ok(lpRefund.includes('お支払い済みの料金の返金はありません') && lpRefund.includes('ご契約のメールアドレスなどは除きます'), 'LPに、返金なしと、「送られない」の範囲の限定が書かれている');
 delete env.LP_PUBLIC;
 ok(privacyPage(COMPANY).includes('流入元の目印'), 'プライバシーポリシーに、流入元の目印の取得が書かれている');
+
+// --- メールのログインが未設定のあいだの復旧(問い合わせ経由・入り直しのリンク) ---
+const envOff = { ...env, RESEND_API_KEY: undefined, MAIL_FROM: undefined };
+const getOff = (path, cookie) => worker.fetch(new Request(`https://x.test${path}`, { headers: cookie ? { cookie } : {} }), envOff);
+const postOff = (path, fields) => worker.fetch(new Request(`https://x.test${path}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields).toString() }), envOff);
+
+const loginOff = await getOff('/login');
+const loginOffHtml = await loginOff.text();
+ok(loginOff.status === 200 && !loginOffHtml.includes('name="email"') && loginOffHtml.includes('お問い合わせフォーム') && loginOffHtml.includes('二重のご請求'), 'メール未設定のあいだ、/login はフォームを出さず、問い合わせの案内と二重請求の注意を出す');
+const before = sentMails.length;
+await postOff('/login', { email: 'teacher@example.com' });
+ok(sentMails.length === before, 'メール未設定のあいだは、確認コードを送ろうとしない');
+const inactiveOff = await (await getOff('/m')).text();
+ok(inactiveOff.includes('お問い合わせフォーム') && !inactiveOff.includes('メールでログインする'), '会員でないときの画面も、問い合わせの案内に切り替わる');
+const lpOff = await (await worker.fetch(new Request('https://x.test/'), { ...envOff, LP_PUBLIC: 'true' })).text();
+ok(lpOff.includes('入り直しのためのリンクをお送りします') && !lpOff.includes('6桁の確認コードでログインできます'), 'LPのよくある質問が、メール未設定の実態に合っている');
+ok(termsPage(COMPANY, false).includes('入り直しのためのリンク') && !termsPage(COMPANY, false).includes('確認コードで、利用者を確認します') && !privacyPage(COMPANY, false).includes('Resend') && privacyPage(COMPANY, false).includes('入り直しのためのリンク'), '規約・プライバシーポリシーも、メール未設定の実態に合っている(Resendへの委託は書かない)');
+ok(privacyPage(COMPANY, true).includes('Resend') && termsPage(COMPANY, true).includes('確認コードで、利用者を確認します'), 'メール設定後は、確認コードの記載に戻る');
+
+// 入り直しのリンク(運営が発行)
+const rToken = 'ab'.repeat(24);
+const rHash = hashToken(rToken);
+const issue = (id, customer, exp, used = 0) => env.DB.prepare('INSERT INTO recovery_links (id, customer_id, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, customer, exp, used, Math.floor(Date.now() / 1000)).run();
+await issue(rHash, 'cus_3', Math.floor(Date.now() / 1000) + 3600);
+const recGet = await get(`/recover/${rToken}`);
+ok(recGet.status === 200 && (await recGet.text()).includes('このブラウザで入り直す'), '入り直しのリンクを開くと、確認のボタンが出る(開いただけでは使われない)');
+ok((await get(`/recover/${rToken}`)).status === 200, '開くだけなら、何度でも開ける');
+const recPost = await post(`/recover/${rToken}`, {});
+const recCookie = cookieOf(recPost);
+ok(recPost.status === 303 && recPost.headers.get('location') === '/m' && recCookie.startsWith('sakumon_session='), 'ボタンを押すと、会員証が渡され、会員ページへ進む');
+ok((await get('/m', recCookie)).status === 200, '入り直したブラウザで、会員ページが見える');
+ok((await post(`/recover/${rToken}`, {})).status === 403, '1回使ったリンクは、もう使えない');
+await issue(hashToken('cd'.repeat(24)), 'cus_3', Math.floor(Date.now() / 1000) - 10);
+ok((await post(`/recover/${'cd'.repeat(24)}`, {})).status === 403, '期限切れのリンクは使えない');
+ok((await post(`/recover/${'ef'.repeat(24)}`, {})).status === 403, '発行されていないリンクは使えない');
+await issue(hashToken('12'.repeat(24)), 'cus_1', Math.floor(Date.now() / 1000) + 3600);
+ok((await post(`/recover/${'12'.repeat(24)}`, {})).status === 403, '解約済みの会員のリンクは使えない');
+const crossRec = await worker.fetch(new Request(`https://x.test/recover/${'34'.repeat(24)}`, { method: 'POST', headers: { origin: 'https://evil.test' } }), env);
+ok(crossRec.status === 404, '他のサイトからの送信は受け付けない');
+ok((await get('/recover/xyz')).status === 404 || (await get('/recover/xyz')).status === 403, '形式の違うリンクは使えない');
+
+// 発行スクリプト(SQLの組み立てと入力の検証)
+ok(validEmail('teacher@example.com') && validEmail('a.b+c@ex-ample.co.jp'), '発行スクリプト: 通常のメールアドレスは使える');
+ok(!validEmail("x'; DROP TABLE members;--@example.com") && !validEmail('a"b@example.com') && !validEmail('a b@example.com') && !validEmail('a%b@example.com') && !validEmail('a$b@example.com'), '発行スクリプト: SQL・シェルに危険な文字を含むアドレスは受け付けない');
+const sql = buildSql('Teacher@Example.com', rHash, 24, 1000);
+ok(sql.includes("lower(email) = 'teacher@example.com'") && sql.includes("status IN ('active','trialing')") && sql.includes(`'${rHash}'`) && sql.includes('1000 + 0') === false && sql.includes('87400'), '発行スクリプト: 契約中の会員だけが対象で、メールは小文字にそろえ、有効期限(24時間)が入る');
+let threw = false;
+try { buildSql('x@example.com', 'zz', 24); } catch { threw = true; }
+ok(threw, '発行スクリプト: 不正なハッシュは受け付けない');
 
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);

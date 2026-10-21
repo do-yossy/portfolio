@@ -35,3 +35,12 @@ CREATE TABLE IF NOT EXISTS login_codes (
   window_start INTEGER NOT NULL,
   sent_in_window INTEGER NOT NULL DEFAULT 0
 );
+
+-- 運営が発行する、1回限りの入り直しのリンク(メールのログインが未設定のあいだの復旧手段)。トークンはSHA-256で保存する
+CREATE TABLE IF NOT EXISTS recovery_links (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);

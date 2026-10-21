@@ -1,10 +1,10 @@
 import { verifySignature, createCheckoutSession, getCheckoutSession, createPortalSession } from './stripe.js';
 import {
   upsertMember, insertMemberIfAbsent, setStatus, recordEvent, forgetEvent, isActive,
-  newToken, claimCheckout, createSession, findBySession,
+  newToken, claimCheckout, createSession, findBySession, consumeRecoveryLink,
 } from './db.js';
 import { TEMPLATES, findTemplate } from './content.js';
-import { html, landing, samplePage, SAMPLE_ID, comingSoonPage, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
+import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
 
 const json = (obj, status = 200) =>
@@ -99,7 +99,7 @@ export default {
 
     if (pathname === '/stripe/webhook' && method === 'POST') return webhook(request, env);
     // LPは、オーナーの承認と監査役のレビューが済むまで非公開。公開するときは wrangler.toml の LP_PUBLIC を "true" にする
-    if (pathname === '/' && method === 'GET') return html(env.LP_PUBLIC === 'true' ? landing(legalOpen(env), srcOf(url)) : comingSoonPage());
+    if (pathname === '/' && method === 'GET') return html(env.LP_PUBLIC === 'true' ? landing(legalOpen(env), srcOf(url), mailLoginOn(env)) : comingSoonPage());
 
     // ひな形の見本(申し込む前に見られる)。LPと同じく、LP_PUBLIC が "true" のときだけ出す
     if (pathname === '/sample' && method === 'GET') {
@@ -108,7 +108,7 @@ export default {
 
     // 法務ページ。LEGAL_PUBLIC が "true" で、会社情報の必須項目がすべて埋まっているときだけ公開する(空欄があれば404)
     const legalPage = LEGAL_PAGES[pathname];
-    if (legalPage && method === 'GET') return legalOpen(env) ? html(legalPage(COMPANY)) : notFound();
+    if (legalPage && method === 'GET') return legalOpen(env) ? html(legalPage(COMPANY, mailLoginOn(env))) : notFound();
 
     if (pathname === '/subscribe' && method === 'GET') {
       const s = await createCheckoutSession(env, url.origin, Date.now(), srcOf(url));
@@ -130,14 +130,27 @@ export default {
       if (await claimCheckout(env.DB, s.id)) {
         const token = newToken();
         await createSession(env.DB, m.customer_id, token);
-        return html(successPage(), 200, { 'Set-Cookie': sessionCookie(token) });
+        return html(successPage(mailLoginOn(env)), 200, { 'Set-Cookie': sessionCookie(token) });
       }
       // 2回目以降: すでにこのブラウザが会員証を持っていれば、そのまま案内する。持っていなければ渡さない
       const me = await currentMember(request, env);
-      return me && me.customer_id === m.customer_id ? html(successPage()) : html(claimedPage(), 403);
+      return me && me.customer_id === m.customer_id ? html(successPage(mailLoginOn(env))) : html(claimedPage(mailLoginOn(env)), 403);
     }
 
     // メールの確認コードでログイン(別の端末・Cookie消去後の入口)
+    // 運営が発行した、1回限りの入り直しのリンク(メールのログインが未設定のあいだの復旧手段)
+    const rec = pathname.match(/^\/recover\/([0-9a-f]{48})$/);
+    if (rec && method === 'GET') return html(recoverPage(rec[1]));
+    if (rec && method === 'POST') {
+      const origin = request.headers.get('origin');
+      if (origin && origin !== url.origin) return notFound();
+      const token = await consumeRecoveryLink(env.DB, rec[1]);
+      if (!token) return html(recoverFailPage(), 403);
+      return new Response(null, { status: 303, headers: { Location: '/m', 'Set-Cookie': sessionCookie(token), 'Cache-Control': 'no-store' } });
+    }
+
+    // メールの確認コードでログイン。メール送信が未設定のあいだは、問い合わせ経由の案内を出す
+    if ((pathname === '/login' || pathname === '/login/verify') && !mailLoginOn(env)) return html(loginOffPage());
     if (pathname === '/login' && method === 'GET') return html(loginPage());
     if ((pathname === '/login' || pathname === '/login/verify') && method === 'POST') {
       const origin = request.headers.get('origin');
@@ -165,8 +178,8 @@ export default {
     if (pathname === '/m' || pathname.startsWith('/m/')) {
       if (method !== 'GET') return notFound();
       const member = await currentMember(request, env);
-      if (!member) return html(inactivePage(), 403);
-      if (!isActive(member)) return html(inactivePage(), 403);
+      if (!member) return html(inactivePage(mailLoginOn(env)), 403);
+      if (!isActive(member)) return html(inactivePage(mailLoginOn(env)), 403);
       if (pathname === '/m') return html(memberPage(TEMPLATES));
       if (pathname === '/m/portal') {
         const p = await createPortalSession(env, member.customer_id, `${url.origin}/m`);
