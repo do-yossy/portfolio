@@ -4,7 +4,7 @@ import {
   newToken, claimCheckout, createSession, findBySession, consumeRecoveryLink,
 } from './db.js';
 import { TEMPLATES, findTemplate } from './content.js';
-import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
+import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
 
 const json = (obj, status = 200) =>
@@ -181,6 +181,7 @@ export default {
       if (!member) return html(inactivePage(mailLoginOn(env)), 403);
       if (!isActive(member)) return html(inactivePage(mailLoginOn(env)), 403);
       if (pathname === '/m') return html(memberPage(TEMPLATES));
+      if (pathname === '/m/guide') return html(guidePage());
       if (pathname === '/m/portal') {
         const p = await createPortalSession(env, member.customer_id, `${url.origin}/m`);
         return redirect(p.url);

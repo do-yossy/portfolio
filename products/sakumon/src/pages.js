@@ -1,4 +1,4 @@
-import { TEMPLATES } from './content.js';
+import { TEMPLATES, templatesByCategory } from './content.js';
 import { COMPANY } from './company.js';
 
 export const esc = (s) =>
@@ -23,6 +23,8 @@ p{margin:0 0 14px}
 .btn.sub{background:transparent;color:var(--brand);border:1.5px solid var(--brand)}
 @media (prefers-color-scheme:dark){.btn{color:#0e1512}.btn.sub{color:var(--brand)}}
 .note{font-size:14px;color:var(--sub)}
+ul.tips{padding-left:1.3em;margin:0;display:flex;flex-direction:column;gap:6px}
+ul.tips li{font-size:15px}
 section{padding:34px 0;border-top:1px solid var(--line)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
@@ -100,8 +102,9 @@ export const landing = (legalOpen = false, src = '', mail = true) => {
 </div>
 
 <section>
-<h2>こんなひな形が入っています</h2>
-<div class="grid">${TEMPLATES.map((t) => `<div class="card"><h3>${esc(t.title)}</h3></div>`).join('')}</div>
+<h2>こんなひな形が入っています(全${TEMPLATES.length}点)</h2>
+<p class="note" style="margin-bottom:6px">どのひな形にも、使う場面の説明、記入例(架空の内容)、書き方のポイントが付いています。</p>
+${templatesByCategory().map((g) => `<h3 style="margin:18px 0 8px">${esc(g.category)}</h3><div class="grid">${g.items.map((t) => `<div class="card"><h3>${esc(t.title)}</h3><p>${esc(t.use)}</p></div>`).join('')}</div>`).join('')}
 </section>
 
 <section>
@@ -150,6 +153,7 @@ export const samplePage = (t, src = '', legalOpen = false) => {
 <p class="note">サクモンのひな形の見本です。{{ }} の部分を、ご自身の内容に書き換えてお使いください。児童・保護者の個人情報(病名など)は、所属校・自治体のルールに従って取り扱ってください。</p>
 <pre class="tpl" id="tpl">${esc(t.body)}</pre>
 <button class="btn" type="button" data-copy="#tpl">文面をコピー</button>
+<details style="margin-top:14px"><summary>記入例を見る(架空の内容)</summary><pre class="tpl" id="ex" style="margin-top:10px">${esc(t.example)}</pre></details>
 <section><h2>ほかのひな形も使いたい方へ</h2>
 <p>サクモンには、この見本を含めて${TEMPLATES.length}点のひな形があります。月額980円(税込)。お申し込みの月は日割り、翌月1日から毎月1日に自動で更新します。解約は、毎月の末日(日本時間)までに手続きしてください。お支払い済みの料金の返金はありません。</p>
 <p><a class="btn" href="/subscribe${q}">月額プランに申し込む</a></p></section>
@@ -237,29 +241,40 @@ export const pendingPage = () =>
     `<div class="hero"><h1>お支払いを確認しています</h1><p class="lead">確認が終わっていません。少し待ってから、このページを再読み込みしてください。</p></div>`,
   );
 
-export const memberPage = (templates) =>
-  layout(
+export const memberPage = (templates) => {
+  const groups = templatesByCategory().map((g) => ({ category: g.category, items: g.items.filter((t) => templates.includes(t)) })).filter((g) => g.items.length);
+  return layout(
     'サクモン 会員ページ',
     `<div class="hero" style="padding-bottom:20px">
-<h1 style="font-size:28px">ひな形一覧</h1>
-<p class="lead">使いたいものを選んでください。</p>
-<ul class="list">${templates.map((t) => `<li><a href="/m/t/${esc(t.id)}">${esc(t.title)}<span>開いて書き換える →</span></a></li>`).join('')}</ul>
+<h1 style="font-size:28px">ひな形一覧(全${templates.length}点)</h1>
+<p class="lead">使いたいものを選んでください。はじめての方は、「使い方ガイド」をご覧ください。</p>
+<p><a class="btn sub" href="/m/guide">使い方ガイド</a></p>
+${groups.map((g) => `<h2 style="margin:22px 0 10px;font-size:18px">${esc(g.category)}</h2><ul class="list">${g.items.map((t) => `<li><a href="/m/t/${esc(t.id)}">${esc(t.title)}<span>${esc(t.use)}</span></a></li>`).join('')}</ul>`).join('')}
 </div>
 <section>
 <h3>ご契約について</h3>
 <p><a class="btn sub" href="/m/portal">解約・支払い方法の変更・請求書</a></p>
 </section>`,
   );
+};
 
 export const templatePage = (t) =>
   layout(
     t.title,
     `<div class="hero" style="padding-top:8px">
 <a class="back" href="/m">← 一覧へ戻る</a>
+<p class="note">${esc(t.category)}</p>
 <h1 style="font-size:26px">${esc(t.title)}</h1>
+<p class="lead" style="font-size:16px">${esc(t.use)}</p>
 <p class="note">{{ }} の部分を、ご自身の内容に書き換えてお使いください。コピーしたあと、お使いのワープロやメールで編集できます。児童・保護者の個人情報(病名など)は、所属校・自治体のルールに従って取り扱ってください。</p>
 <pre class="tpl" id="tpl">${esc(t.body)}</pre>
 <button class="btn" type="button" data-copy="#tpl">文面をコピー</button>
+<section><h2>記入例(架空の内容)</h2>
+<pre class="tpl" id="ex">${esc(t.example)}</pre>
+<button class="btn sub" type="button" data-copy="#ex">記入例をコピー</button></section>
+<section><h2>書き方のポイント</h2>
+<ul class="tips">${t.tips.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>
+<p><a class="back" href="/m">← 一覧へ戻る</a></p>
 </div>`,
     { script: true },
   );
@@ -305,4 +320,53 @@ export const recoverFailPage = () =>
     `<div class="hero" style="padding-top:8px"><h1 style="font-size:28px">このリンクは使えません</h1>
 <p class="lead">期限が切れているか、すでに使われています。</p>
 <p>お手数ですが、${contactAnchor}から、もう一度ご連絡ください。</p></div>`,
+  );
+
+// 会員向けの使い方ガイド
+export const guidePage = () =>
+  layout(
+    '使い方ガイド | サクモン',
+    `<div class="hero" style="padding-top:8px">
+<a class="back" href="/m">← ひな形一覧へ</a>
+<h1 style="font-size:28px">使い方ガイド</h1>
+<p class="lead">ひな形を、保護者向けの文書に、仕上げるまでの流れと、気をつけたいことです。</p>
+
+<section><h2>1. 使い方の流れ</h2>
+<ol class="steps">
+<li><h3>ひな形を選ぶ</h3><p>一覧から、場面に合うものを開きます。「使う場面」の説明で、合っているか確かめられます。</p></li>
+<li><h3>{{ }} を書き換える</h3><p>「文面をコピー」(コピーできないときは、文面を選んで、手動でコピーしてください)で、ワープロやメールに貼り付け、{{ }} の部分を、ご自身の学級の内容に書き換えます。「記入例」を、見ながら書けます。</p></li>
+<li><h3>読み直して、出す</h3><p>下の「出す前のチェック」で、確かめてから、配付や送信をします。</p></li>
+</ol></section>
+
+<section><h2>2. 書き換えるときのコツ</h2>
+<ul class="tips">
+<li>{{ }} が、すべて、書き換わっているか、検索(「{{」)で確かめます。</li>
+<li>ひな形の文は、ご自身の言葉に、直して構いません。学級の様子や、先生の人柄が出るところは、書き換えたほうが、伝わります。</li>
+<li>長くしすぎず、「いつ・どこで・何を・いつまでに」を、先に書きます。</li>
+<li>学級の様子は、ひとつの場面を、具体的に書きます。</li>
+</ul></section>
+
+<section><h2>3. 出す前のチェック</h2>
+<ul class="tips">
+<li>日付と曜日は、カレンダーと、合っているか。</li>
+<li>時刻・場所・持ち物・提出日・連絡方法は、合っているか。</li>
+<li>{{ }} が、残っていないか。</li>
+<li>児童・保護者の名前や、体調などの個人情報が、ほかの人の目に触れる形で、入っていないか。</li>
+<li>所属校・自治体の、文書のルール(様式、決裁、配付の方法)に、合っているか。</li>
+</ul></section>
+
+<section><h2>4. 個人情報の扱い</h2>
+<ul class="tips">
+<li>児童の名前や、病名など体調の詳しい情報は、ほかの人の目に触れる文書には、書きません。</li>
+<li>個別の連絡(けがの連絡、欠席の返信など)は、学校の決まりに従った方法で行います。</li>
+<li>サクモンのひな形のページには、文字を入力する欄がなく、{{ }} を書き換えた内容が、サクモンに送られることは、ありません。書き換えは、お使いのワープロやメールの上で行います。</li>
+</ul></section>
+
+<section><h2>5. ご注意</h2>
+<ul class="tips">
+<li>ひな形は、書き出しの助けとして、用意したものです。実際に使うときの判断と責任は、ご利用の先生にあります。</li>
+<li>学校ごとに、文書の決まりが違います。ひな形が、所属校の様式と、合わない場合は、所属校の様式を、優先してください。</li>
+<li>けが・体調不良の連絡などは、管理職への報告や連絡の方法が、決まっている場合があります。このひな形は、その代わりにはなりません。</li>
+</ul></section>
+</div>`,
   );
