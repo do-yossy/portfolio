@@ -44,3 +44,15 @@ CREATE TABLE IF NOT EXISTS recovery_links (
   used INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
+
+-- 会員からのご意見・アンケート。個人を特定する情報(メールなど)は持たず、会員の識別子(customer_id)だけを持つ。連投を防ぐために使う
+CREATE TABLE IF NOT EXISTS feedback (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id TEXT NOT NULL,
+  rating INTEGER NOT NULL,
+  template_id TEXT,
+  want TEXT,
+  trouble TEXT,
+  comment TEXT,
+  created_at INTEGER NOT NULL
+);

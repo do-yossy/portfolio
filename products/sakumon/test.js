@@ -9,6 +9,7 @@ import { landing } from './src/pages.js';
 import { TEMPLATES, CATEGORIES } from './src/content.js';
 import { validEmail, buildSql, hashToken } from './scripts/recovery-link.mjs';
 import { billingPlan } from './src/stripe.js';
+import { buildSql as fbSql, report as fbReport } from './scripts/feedback-report.mjs';
 
 let pass = 0, fail = 0;
 const ok = (cond, name) => {
@@ -384,6 +385,33 @@ const guide = await get('/m/guide', recCookie);
 const guideHtml = await guide.text();
 ok(guide.status === 200 && guideHtml.includes('出す前のチェック') && guideHtml.includes('個人情報の扱い') && guideHtml.includes('所属校'), '使い方ガイドが表示される');
 ok((await get('/m/guide')).status === 403, '使い方ガイドも、会員だけが見られる');
+
+// --- アンケート ---
+ok((await get('/m/feedback')).status === 403, 'アンケートは、会員だけが開ける');
+ok((await post('/m/feedback', { rating: '5' })).status === 403, 'アンケートの送信も、会員だけができる');
+const fbForm = await (await get('/m/feedback?t=' + TEMPLATES[0].id, recCookie)).text();
+ok(fbForm.includes('name="rating"') && fbForm.includes(TEMPLATES[0].title) && fbForm.includes('個人が分かる内容は書かないでください'), 'アンケートの画面に、満足度・対象のひな形・個人情報の注意が出る');
+ok(memberHtml.includes('/m/feedback'), '会員ページに、アンケートへのリンクが出る');
+const noRate = await post('/m/feedback', { want: 'あれがほしい' }, recCookie);
+ok(noRate.status === 400, '満足度がないと送れない');
+const fbSent = await post('/m/feedback', { rating: '4', t: TEMPLATES[0].id, want: '夏の保護者会の案内', trouble: '', comment: 'とても助かる' }, recCookie);
+ok(fbSent.status === 200 && (await fbSent.text()).includes('ありがとうございました'), 'アンケートを送れる');
+const fbRow = await env.DB.prepare('SELECT * FROM feedback ORDER BY id DESC').first();
+ok(fbRow && fbRow.rating === 4 && fbRow.template_id === TEMPLATES[0].id && fbRow.want === '夏の保護者会の案内' && fbRow.trouble === null && !Object.keys(fbRow).includes('email'), 'アンケートが保存される(メールアドレスは持たない)');
+await post('/m/feedback', { rating: '9' }, recCookie);
+await post('/m/feedback', { rating: '3', t: 'no-such' }, recCookie);
+const fbRow2 = await env.DB.prepare('SELECT * FROM feedback ORDER BY id DESC').first();
+ok(fbRow2.rating === 3 && fbRow2.template_id === null, '範囲外の満足度は保存されず、存在しないひな形IDは無視される');
+for (let i = 0; i < 4; i++) await post('/m/feedback', { rating: '5' }, recCookie);
+ok((await post('/m/feedback', { rating: '5' }, recCookie)).status === 429, '1人あたり24時間に5件までで止まる');
+ok(/FROM feedback WHERE created_at > [0-9]+ ORDER BY/.test(fbSql(30)) && !/;/.test(fbSql(30)), '集計用のSQLは、SELECTだけで固定されている');
+let badDays = false; try { fbSql('1; DROP TABLE feedback'); } catch { badDays = true; }
+ok(badDays, '集計の日数に不正な値を入れると拒否される');
+const rep = fbReport([{ id: 1, rating: 4, template_id: 't1', want: 'ほしい\nもの', trouble: null, comment: null, created_at: 1790000000 }], 30);
+ok(rep.includes('平均: 4.00') && rep.includes('ほしい もの') && rep.includes('従わない'), '集計が出力され、自由記述は注意書き付きで1行にまとまる');
+ok(fbReport([], 30).includes('まだご意見はありません'), 'ご意見が0件のときの出力');
+ok(privacyPage(COMPANY, false).includes('ご意見・アンケート'), 'プライバシーポリシーに、アンケートの取得が書かれている');
+
 env.LP_PUBLIC = 'true';
 const lpAll = await (await get('/')).text();
 ok(lpAll.includes(`全${TEMPLATES.length}点`) && TEMPLATES.every((t) => lpAll.includes(t.title)), 'LPに、ひな形の全点数と、すべての題名が出る');

@@ -1,10 +1,10 @@
 import { verifySignature, createCheckoutSession, getCheckoutSession, createPortalSession } from './stripe.js';
 import {
   upsertMember, insertMemberIfAbsent, setStatus, recordEvent, forgetEvent, isActive,
-  newToken, claimCheckout, createSession, findBySession, consumeRecoveryLink,
+  newToken, claimCheckout, createSession, findBySession, consumeRecoveryLink, saveFeedback,
 } from './db.js';
 import { TEMPLATES, findTemplate } from './content.js';
-import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
+import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, feedbackPage, feedbackThanksPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
 
 const json = (obj, status = 200) =>
@@ -176,10 +176,23 @@ export default {
     }
 
     if (pathname === '/m' || pathname.startsWith('/m/')) {
-      if (method !== 'GET') return notFound();
+      if (method !== 'GET' && !(method === 'POST' && pathname === '/m/feedback')) return notFound();
       const member = await currentMember(request, env);
       if (!member) return html(inactivePage(mailLoginOn(env)), 403);
       if (!isActive(member)) return html(inactivePage(mailLoginOn(env)), 403);
+      if (pathname === '/m/feedback') {
+        if (method === 'GET') return html(feedbackPage(findTemplate(url.searchParams.get('t') || '')));
+        const origin = request.headers.get('origin');
+        if (origin && origin !== url.origin) return notFound();
+        const form = await request.formData().catch(() => null);
+        const text = (k) => String((form && form.get(k)) || '').replace(/[ --]/g, '').trim().slice(0, 1000);
+        const kept = { rating: text('rating'), want: text('want'), trouble: text('trouble'), comment: text('comment') };
+        const tpl = findTemplate(text('t'));
+        if (!/^[1-5]$/.test(kept.rating)) return html(feedbackPage(tpl, '満足度を選んでください。', kept), 400);
+        const saved = await saveFeedback(env.DB, member.customer_id, { rating: Number(kept.rating), templateId: tpl && tpl.id, want: kept.want, trouble: kept.trouble, comment: kept.comment });
+        if (!saved) return html(feedbackPage(tpl, '本日は、これ以上送れません。明日以降に、もう一度お試しください。', kept), 429);
+        return html(feedbackThanksPage());
+      }
       if (pathname === '/m') return html(memberPage(TEMPLATES));
       if (pathname === '/m/guide') return html(guidePage());
       if (pathname === '/m/portal') {
