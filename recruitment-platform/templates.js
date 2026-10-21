@@ -44,6 +44,7 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     jobs:      (c) => `/admin/jobs?co=${c}`,
     analytics: (c) => `/admin/analytics?co=${c}`,
     logs:      (c) => `/admin/logs?co=${c}`,
+    accounts:  (c) => `/admin/accounts?co=${c}`,
     site:      ()  => '/jobs',
   };
   const getHref = (key, c) => pageHref[key] ? pageHref[key](c) : `/admin/ops?tab=posts&co=${c}`;
@@ -56,6 +57,7 @@ function adminLayout(title, content, active = 'posts', co = 'sq') {
     { key: 'jobs',      icon: '💼', label: '求人管理' },
     { key: 'analytics', icon: '📈', label: '分析・レポート' },
     { key: 'logs',      icon: '📋', label: '投稿ログ' },
+    { key: 'accounts',  icon: '🔐', label: 'アカウント・契約状況' },
     { key: 'site',      icon: '🌐', label: '求人サイトを見る' },
   ].map(n => `<a href="${getHref(n.key, co)}" class="${n.key === active ? 'active' : ''}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('');
 
@@ -2724,4 +2726,84 @@ const COMPANIES_ORDER = Object.keys(COMPANIES);
 const CALL_STATUSES_LIST = ['新規', '不通', '対応中', '終了'];
 function mediaName(id) { if (id === 'all') return 'すべての媒体'; const m = OPS_MEDIA.find(x => x.id === id); return m ? m.name : (id || '-'); }
 
-module.exports = { adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobsListPageV2, jobDetailPage, jobDetailPageV2, topPageV2, privacyPolicyPage, esc, opsPage, callsPage };
+// ── アカウント・契約状況ページ（2026-10-21追加）──────────────────────────
+function accountsPage({ co = 'sq', companies = [], media = [], contracts = {}, accounts = {}, ov = {}, creds = {}, vpn = false, contractOptions = [], accountOptions = [] } = {}) {
+  const sel = (opts, cur, attrs) => `<select ${attrs}>` + opts.map(o => `<option value="${esc(o)}"${o === (cur || '') ? ' selected' : ''}>${o || '（未設定）'}</option>`).join('') + '</select>';
+  const g = (o, c, m, k) => (((o || {})[c] || {})[m] || {})[k] || 0;
+  const badge = (txt, color) => `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${color}1a;color:${color};border:1px solid ${color}55">${esc(txt)}</span>`;
+
+  // 会社ごとの稼働まとめ（自動）
+  let activeCos = 0;
+  const rows = companies.map(c => {
+    const cells = media.map(m => {
+      const live = g(ov.jobs, c.id, m.id, 'live'), total = g(ov.jobs, c.id, m.id, 'total');
+      const a7 = g(ov.apps7, c.id, m.id, 'n'), a30 = g(ov.apps30, c.id, m.id, 'n');
+      const manual = (accounts[c.id + '|' + m.id] || {});
+      const auto = (live > 0 || a30 > 0) ? '稼働（自動判定）' : '';
+      let lines = '';
+      if (live || total) lines += `<div>公開 <b>${live}</b>件${total !== live ? ` / 全${total}件` : ''}</div>`;
+      if (a30 || a7) lines += `<div>応募 7日 <b>${a7}</b> ・ 30日 <b>${a30}</b></div>`;
+      if (m.id === 'kyujinbox') {
+        const posted = g(ov.kb, c.id, 'kyujinbox', 'posted');
+        const last = (((ov.kb || {})[c.id] || {}).kyujinbox || {}).last || '';
+        lines += `<div>${creds[c.id] ? badge('ログイン情報あり', '#16a34a') : badge('ログイン情報なし', '#94a3b8')}</div>`;
+        if (posted) lines += `<div>投稿済み <b>${posted}</b>件${last ? '（最終 ' + esc(String(last).slice(0, 10)) + '）' : ''}</div>`;
+      }
+      if (!lines) lines = '<div style="color:#94a3b8">データなし</div>';
+      const autoBadge = auto && !manual.account_status ? `<div>${badge(auto, '#2563eb')}</div>` : '';
+      return `<td style="vertical-align:top;min-width:150px;font-size:12px;line-height:1.5">
+        ${autoBadge}${lines}
+        <div style="margin-top:4px">${sel(accountOptions, manual.account_status, `data-co="${c.id}" data-media="${m.id}" onchange="saveAccount(this)" style="font-size:12px;padding:2px 4px;max-width:140px"`)}</div>
+        <input type="text" value="${esc(manual.note || '')}" placeholder="メモ" data-co="${c.id}" data-media="${m.id}" onchange="saveAccount(this)" style="font-size:11px;padding:2px 4px;width:136px;margin-top:2px">
+      </td>`;
+    }).join('');
+    const anyActive = media.some(m => g(ov.jobs, c.id, m.id, 'live') > 0 || g(ov.apps30, c.id, m.id, 'n') > 0);
+    if (anyActive) activeCos++;
+    const ct = contracts[c.id] || {};
+    return `<tr data-co-row="${c.id}">
+      <td style="white-space:nowrap;vertical-align:top"><b>${esc(c.label)}</b><div style="font-size:11px;color:#64748b">${esc(c.name)}</div></td>
+      <td style="vertical-align:top;min-width:190px">
+        ${sel(contractOptions, ct.contract_status, `id="ct-${c.id}" style="font-size:12px;padding:2px 4px;max-width:190px" onchange="saveContract('${c.id}')"`)}
+        <input type="date" id="cd-${c.id}" value="${esc(ct.contract_date || '')}" style="font-size:11px;padding:2px 4px;margin-top:3px" onchange="saveContract('${c.id}')">
+        <input type="text" id="cn-${c.id}" value="${esc(ct.note || '')}" placeholder="契約メモ" style="font-size:11px;padding:2px 4px;width:180px;margin-top:2px" onchange="saveContract('${c.id}')">
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  const th = 'padding:8px 10px;text-align:left;font-size:12px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;white-space:nowrap';
+  return `
+<div class="page-header">
+  <h2>🔐 アカウント・契約状況</h2>
+  <p>会社ごとの契約状況と、媒体ごとのアカウントの状況をまとめて確認・更新します。数字（公開件数・応募数・投稿数）は、システムのデータから自動で集計しています。</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+  <div class="card card-sm"><div class="card-title">VPN</div><div class="card-value" style="font-size:20px">${vpn ? '🟢 接続中' : '🔴 未接続'}</div><div class="card-sub">求人ボックスの投稿に必要</div></div>
+  <div class="card card-sm"><div class="card-title">稼働中の会社（自動）</div><div class="card-value">${activeCos}<span style="font-size:14px"> / ${companies.length}社</span></div><div class="card-sub">公開求人または直近30日の応募がある会社</div></div>
+  <div class="card card-sm"><div class="card-title">集計の期間</div><div class="card-value" style="font-size:16px">7日: ${esc(ov.d7 || '')}〜<br>30日: ${esc(ov.d30 || '')}〜</div><div class="card-sub">応募は重複を除く（JST）</div></div>
+</div>
+<div class="card" style="overflow-x:auto;padding:0">
+  <table style="border-collapse:collapse;width:100%">
+    <thead><tr>
+      <th style="${th}">会社</th>
+      <th style="${th}">契約状況</th>
+      ${media.map(m => `<th style="${th}">${esc(m.name)}</th>`).join('')}
+    </tr></thead>
+    <tbody>${rows.replace(/<tr /g, '<tr style="border-bottom:1px solid #e2e8f0" ')}</tbody>
+  </table>
+</div>
+<p style="font-size:12px;color:#64748b;margin-top:10px">※「契約状況」「アカウントの状況」「メモ」は手入力です（選ぶと自動で保存されます）。青いバッジの「稼働（自動判定）」は、公開中の求人または直近30日の応募があることから、システムが判定したものです。</p>
+<script>
+async function saveContract(co) {
+  const body = { kind: 'contract', company: co, contractStatus: document.getElementById('ct-' + co).value, contractDate: document.getElementById('cd-' + co).value, note: document.getElementById('cn-' + co).value };
+  try { const r = await fetch('/api/ops/accounts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const d = await r.json(); toast(d.ok ? '契約状況を保存しました' : ('保存に失敗: ' + (d.error || '')), d.ok ? 'success' : 'error'); } catch (e) { toast('通信エラー: ' + e.message, 'error'); }
+}
+async function saveAccount(el) {
+  const td = el.closest('td'); const co = el.dataset.co, media = el.dataset.media;
+  const status = td.querySelector('select').value, note = td.querySelector('input[type=text]').value;
+  try { const r = await fetch('/api/ops/accounts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'account', company: co, media, accountStatus: status, note }) }); const d = await r.json(); toast(d.ok ? 'アカウントの状況を保存しました' : ('保存に失敗: ' + (d.error || '')), d.ok ? 'success' : 'error'); } catch (e) { toast('通信エラー: ' + e.message, 'error'); }
+}
+</script>`;
+}
+
+module.exports = { accountsPage, adminLayout, publicLayout, dashboardPage, adminJobsPage, adminApplicantsPage, adminLogsPage, adminAnalyticsPage, loginPage, jobsListPage, jobsListPageV2, jobDetailPage, jobDetailPageV2, topPageV2, privacyPolicyPage, esc, opsPage, callsPage };

@@ -897,9 +897,98 @@ const MediaPosts = {
   },
 };
 
+// ── アカウント・契約状況（2026-10-21追加）─────────────────────────────
+// 会社ごとの契約状況（手入力）と、会社×媒体ごとのアカウント状況（手入力）を保存する。
+// 掲載数・応募数・投稿数などの数字は、jobs / applicants から自動集計する（overview）。
+db.exec(`
+  CREATE TABLE IF NOT EXISTS company_contracts (
+    company         TEXT PRIMARY KEY,
+    contract_status TEXT DEFAULT '',
+    contract_date   TEXT DEFAULT '',
+    note            TEXT DEFAULT '',
+    updated_at      TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS account_status (
+    company        TEXT NOT NULL,
+    media          TEXT NOT NULL,
+    account_status TEXT DEFAULT '',
+    note           TEXT DEFAULT '',
+    updated_at     TEXT NOT NULL,
+    PRIMARY KEY (company, media)
+  );
+`);
+
+const CONTRACT_STATUSES = ['', '未契約', '手続き中（契約書確認・書類準備）', '契約済み', '解約・停止'];
+const ACCOUNT_STATUSES = ['', '稼働中', '準備中', '停止（BAN・制限）', '未作成'];
+
+function mediaKey(v) {
+  const s = String(v || '').toLowerCase();
+  if (s.includes('indeed')) return 'indeed';
+  if (s.includes('求人ボックス') || s.includes('kyujinbox')) return 'kyujinbox';
+  if (s.includes('スタンバイ') || s.includes('stanby') || s.includes('standby')) return 'stanby';
+  if (s.includes('google') || s.includes('しごと検索')) return 'google';
+  if (s.includes('engage')) return 'engage';
+  if (s.includes('シニアジョブ') || s.includes('seniorjob')) return 'seniorjob';
+  return '';
+}
+function jstDateStr(daysAgo) {
+  const t = new Date(Date.now() + 9 * 3600 * 1000 - daysAgo * 86400000);
+  return t.toISOString().slice(0, 10);
+}
+
+const AccountStatus = {
+  CONTRACT_STATUSES, ACCOUNT_STATUSES,
+  listContracts() { return db.prepare('SELECT * FROM company_contracts').all(); },
+  listAccounts() { return db.prepare('SELECT * FROM account_status').all(); },
+  upsertContract({ company, contractStatus = '', contractDate = '', note = '' }) {
+    db.prepare(`INSERT INTO company_contracts (company, contract_status, contract_date, note, updated_at) VALUES (?,?,?,?,?)
+      ON CONFLICT(company) DO UPDATE SET contract_status=excluded.contract_status, contract_date=excluded.contract_date, note=excluded.note, updated_at=excluded.updated_at`)
+      .run(company, contractStatus, contractDate, note, now());
+  },
+  upsertAccount({ company, media, accountStatus = '', note = '' }) {
+    db.prepare(`INSERT INTO account_status (company, media, account_status, note, updated_at) VALUES (?,?,?,?,?)
+      ON CONFLICT(company, media) DO UPDATE SET account_status=excluded.account_status, note=excluded.note, updated_at=excluded.updated_at`)
+      .run(company, media, accountStatus, note, now());
+  },
+  // 初期値：ユーザーから聞いている事実だけを入れる（既に入力済みの行は上書きしない）
+  seedDefaults() {
+    const ts = now();
+    const c = db.prepare(`INSERT OR IGNORE INTO company_contracts (company, contract_status, contract_date, note, updated_at) VALUES (?,?,?,?,?)`);
+    for (const co of ['gp', 'jd', 'pk']) c.run(co, '手続き中（契約書確認・書類準備）', '', '新規アカウント（2026-10時点・初期値。実態に合わせて更新してください）', ts);
+    const a = db.prepare(`INSERT OR IGNORE INTO account_status (company, media, account_status, note, updated_at) VALUES (?,?,?,?,?)`);
+    a.run('pk', 'kyujinbox', '準備中', '求人7種類を非公開で保存済み。投稿は保留（2026-10-19ユーザー指示）', ts);
+  },
+  // 自動集計：公開中の求人数・投稿済み数・応募数（7日/30日）
+  overview() {
+    const d7 = jstDateStr(7), d30 = jstDateStr(30);
+    const jobs = {}, kb = {}, apps7 = {}, apps30 = {};
+    const bump = (o, co, m, k, n = 1) => { ((o[co] = o[co] || {})[m] = o[co][m] || {})[k] = (o[co][m][k] || 0) + n; };
+    for (const j of db.prepare('SELECT company, target_media, is_published, kyujinbox_posted_at FROM jobs').all()) {
+      let media = []; try { media = JSON.parse(j.target_media || '[]'); } catch { media = []; }
+      const keys = [...new Set(media.map(mediaKey).filter(Boolean))];
+      for (const m of keys) {
+        bump(jobs, j.company, m, 'total');
+        if (j.is_published) bump(jobs, j.company, m, 'live');
+        if (m === 'kyujinbox' && j.kyujinbox_posted_at) {
+          bump(kb, j.company, 'kyujinbox', 'posted');
+          const cur = (kb[j.company].kyujinbox.last || '');
+          if (j.kyujinbox_posted_at > cur) kb[j.company].kyujinbox.last = j.kyujinbox_posted_at;
+        }
+      }
+    }
+    for (const r of db.prepare(`SELECT company, media, source_media, substr(applied_at,1,10) d FROM applicants WHERE is_duplicate = 0 OR is_duplicate IS NULL`).all()) {
+      const m = mediaKey(r.media) || mediaKey(r.source_media) || ''; if (!m || !r.d) continue;
+      if (r.d >= d30) bump(apps30, r.company, m, 'n');
+      if (r.d >= d7) bump(apps7, r.company, m, 'n');
+    }
+    return { jobs, kb, apps7, apps30, d7, d30 };
+  },
+};
+try { AccountStatus.seedDefaults(); } catch (e) { console.error('[account_status] seed失敗', e.message); }
+
 module.exports = {
   db, Jobs, Applicants, Applications, Logs, Analytics, generateId,
-  Ops, MediaPosts, COMPANIES, MEDIA, CALL_STATUSES, ACTIVE_CALL_STATUSES,
+  Ops, MediaPosts, AccountStatus, COMPANIES, MEDIA, CALL_STATUSES, ACTIVE_CALL_STATUSES,
   jstDayStartUtcISO, jstWeekStartUtcISO,
   findDuplicateInfo: (nPhone, nEmail) => Applicants.findDuplicateInfo(nPhone, nEmail),
 };

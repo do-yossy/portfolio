@@ -1638,6 +1638,39 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     return;
   }
 
+﻿  // ── Admin: アカウント・契約状況ページ（2026-10-21追加）──
+  if (pathname === '/admin/accounts' && method === 'GET') {
+    const AS = require('./db').AccountStatus;
+    const contracts = {}, accounts = {};
+    for (const c of AS.listContracts()) contracts[c.company] = c;
+    for (const a of AS.listAccounts()) accounts[a.company + '|' + a.media] = a;
+    const creds = {};
+    for (const c of OPS_COMPANIES) { const e = kyujinboxEnvForCompany(c.id); creds[c.id] = !!(e.KYUJINBOX_EMAIL && e.KYUJINBOX_PASSWORD); }
+    let vpn = false; try { vpn = await checkVPN(); } catch {}
+    send(res, 200, T.adminLayout('アカウント・契約状況', T.accountsPage({
+      co, companies: OPS_COMPANIES, media: OPS_MEDIA, contracts, accounts, ov: AS.overview(), creds, vpn,
+      contractOptions: AS.CONTRACT_STATUSES, accountOptions: AS.ACCOUNT_STATUSES,
+    }), 'accounts', co));
+    return;
+  }
+
+  // ── API: アカウント・契約状況の保存 ──
+  if (pathname === '/api/ops/accounts' && method === 'PUT') {
+    if (!requireAuth(req, res)) return;
+    const body = await parseJSON(req);
+    const AS = require('./db').AccountStatus;
+    const okCo = c => OPS_COMPANIES.some(x => x.id === c);
+    if (body.kind === 'contract' && okCo(body.company)) {
+      AS.upsertContract({ company: body.company, contractStatus: String(body.contractStatus || '').slice(0, 60), contractDate: String(body.contractDate || '').slice(0, 10), note: String(body.note || '').slice(0, 300) });
+      sendJSON(res, 200, { ok: true }); return;
+    }
+    if (body.kind === 'account' && okCo(body.company) && OPS_MEDIA.some(x => x.id === body.media)) {
+      AS.upsertAccount({ company: body.company, media: body.media, accountStatus: String(body.accountStatus || '').slice(0, 60), note: String(body.note || '').slice(0, 300) });
+      sendJSON(res, 200, { ok: true }); return;
+    }
+    sendJSON(res, 400, { ok: false, error: '会社または媒体が正しくありません' }); return;
+  }
+
   // ── Admin: 運用管理ページ（3タブ）──
   if (pathname === '/admin/ops' && method === 'GET') {
     const tab = query.tab || 'posts';
