@@ -918,6 +918,8 @@ db.exec(`
   );
 `);
 
+try { db.exec("ALTER TABLE company_contracts ADD COLUMN reward_count INTEGER DEFAULT 0"); } catch {}
+
 const CONTRACT_STATUSES = ['', '未契約', '手続き中（契約書確認・書類準備）', '契約済み', '解約・停止'];
 const ACCOUNT_STATUSES = ['', '稼働中', '準備中', '停止（BAN・制限）', '未作成'];
 
@@ -940,10 +942,10 @@ const AccountStatus = {
   CONTRACT_STATUSES, ACCOUNT_STATUSES,
   listContracts() { return db.prepare('SELECT * FROM company_contracts').all(); },
   listAccounts() { return db.prepare('SELECT * FROM account_status').all(); },
-  upsertContract({ company, contractStatus = '', contractDate = '', note = '' }) {
-    db.prepare(`INSERT INTO company_contracts (company, contract_status, contract_date, note, updated_at) VALUES (?,?,?,?,?)
-      ON CONFLICT(company) DO UPDATE SET contract_status=excluded.contract_status, contract_date=excluded.contract_date, note=excluded.note, updated_at=excluded.updated_at`)
-      .run(company, contractStatus, contractDate, note, now());
+  upsertContract({ company, contractStatus = '', contractDate = '', note = '', rewardCount = 0 }) {
+    db.prepare(`INSERT INTO company_contracts (company, contract_status, contract_date, note, reward_count, updated_at) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(company) DO UPDATE SET contract_status=excluded.contract_status, contract_date=excluded.contract_date, note=excluded.note, reward_count=excluded.reward_count, updated_at=excluded.updated_at`)
+      .run(company, contractStatus, contractDate, note, Math.max(0, parseInt(rewardCount, 10) || 0), now());
   },
   upsertAccount({ company, media, accountStatus = '', note = '' }) {
     db.prepare(`INSERT INTO account_status (company, media, account_status, note, updated_at) VALUES (?,?,?,?,?)

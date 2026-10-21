@@ -1661,7 +1661,7 @@ tags: Googleしごと検索・求人媒体で求職者が検索するキーワ�
     const AS = require('./db').AccountStatus;
     const okCo = c => OPS_COMPANIES.some(x => x.id === c);
     if (body.kind === 'contract' && okCo(body.company)) {
-      AS.upsertContract({ company: body.company, contractStatus: String(body.contractStatus || '').slice(0, 60), contractDate: String(body.contractDate || '').slice(0, 10), note: String(body.note || '').slice(0, 300) });
+      AS.upsertContract({ company: body.company, contractStatus: String(body.contractStatus || '').slice(0, 60), contractDate: String(body.contractDate || '').slice(0, 10), note: String(body.note || '').slice(0, 300), rewardCount: Math.max(0, parseInt(body.rewardCount, 10) || 0) });
       sendJSON(res, 200, { ok: true }); return;
     }
     if (body.kind === 'account' && okCo(body.company) && OPS_MEDIA.some(x => x.id === body.media)) {

@@ -2767,6 +2767,7 @@ function accountsPage({ co = 'sq', companies = [], media = [], contracts = {}, a
         <input type="date" id="cd-${c.id}" value="${esc(ct.contract_date || '')}" style="font-size:11px;padding:2px 4px;margin-top:3px" onchange="saveContract('${c.id}')">
         <input type="text" id="cn-${c.id}" value="${esc(ct.note || '')}" placeholder="契約メモ" style="font-size:11px;padding:2px 4px;width:180px;margin-top:2px" onchange="saveContract('${c.id}')">
       </td>
+      <td style="vertical-align:top;white-space:nowrap"><input type="number" min="0" step="1" id="rc-${c.id}" value="${Number(ct.reward_count) || 0}" style="width:72px;font-size:13px;padding:3px 5px" onchange="saveContract('${c.id}')"> 件</td>
       ${cells}
     </tr>`;
   }).join('');
@@ -2780,6 +2781,7 @@ function accountsPage({ co = 'sq', companies = [], media = [], contracts = {}, a
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
   <div class="card card-sm"><div class="card-title">VPN</div><div class="card-value" style="font-size:20px">${vpn ? '🟢 接続中' : '🔴 未接続'}</div><div class="card-sub">求人ボックスの投稿に必要</div></div>
   <div class="card card-sm"><div class="card-title">稼働中の会社（自動）</div><div class="card-value">${activeCos}<span style="font-size:14px"> / ${companies.length}社</span></div><div class="card-sub">公開求人または直近30日の応募がある会社</div></div>
+  <div class="card card-sm"><div class="card-title">報酬が発生した件数（手入力・全社合計）</div><div class="card-value">${companies.reduce((s, c) => s + (Number((contracts[c.id] || {}).reward_count) || 0), 0)}<span style="font-size:14px"> 件</span></div><div class="card-sub">下の表の「報酬が発生した件数」の合計</div></div>
   <div class="card card-sm"><div class="card-title">集計の期間</div><div class="card-value" style="font-size:16px">7日: ${esc(ov.d7 || '')}〜<br>30日: ${esc(ov.d30 || '')}〜</div><div class="card-sub">応募は重複を除く（JST）</div></div>
 </div>
 <div class="card" style="overflow-x:auto;padding:0">
@@ -2787,6 +2789,7 @@ function accountsPage({ co = 'sq', companies = [], media = [], contracts = {}, a
     <thead><tr>
       <th style="${th}">会社</th>
       <th style="${th}">契約状況</th>
+      <th style="${th}">報酬が発生した件数<br><span style="font-weight:400;font-size:11px;color:#64748b">（手入力）</span></th>
       ${media.map(m => `<th style="${th}">${esc(m.name)}</th>`).join('')}
     </tr></thead>
     <tbody>${rows.replace(/<tr /g, '<tr style="border-bottom:1px solid #e2e8f0" ')}</tbody>
@@ -2795,7 +2798,7 @@ function accountsPage({ co = 'sq', companies = [], media = [], contracts = {}, a
 <p style="font-size:12px;color:#64748b;margin-top:10px">※「契約状況」「アカウントの状況」「メモ」は手入力です（選ぶと自動で保存されます）。青いバッジの「稼働（自動判定）」は、公開中の求人または直近30日の応募があることから、システムが判定したものです。</p>
 <script>
 async function saveContract(co) {
-  const body = { kind: 'contract', company: co, contractStatus: document.getElementById('ct-' + co).value, contractDate: document.getElementById('cd-' + co).value, note: document.getElementById('cn-' + co).value };
+  const body = { kind: 'contract', company: co, contractStatus: document.getElementById('ct-' + co).value, contractDate: document.getElementById('cd-' + co).value, note: document.getElementById('cn-' + co).value, rewardCount: parseInt(document.getElementById('rc-' + co).value, 10) || 0 };
   try { const r = await fetch('/api/ops/accounts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const d = await r.json(); toast(d.ok ? '契約状況を保存しました' : ('保存に失敗: ' + (d.error || '')), d.ok ? 'success' : 'error'); } catch (e) { toast('通信エラー: ' + e.message, 'error'); }
 }
 async function saveAccount(el) {
