@@ -6,7 +6,7 @@ import worker, { legalOpen } from './src/worker.js';
 import { COMPANY, legalMissing } from './src/company.js';
 import { tokushohoPage, termsPage, privacyPage } from './src/legal.js';
 import { landing } from './src/pages.js';
-import { TEMPLATES, CATEGORIES } from './src/content.js';
+import { TEMPLATES, CATEGORIES, LEVELS, forLevel } from './src/content.js';
 import { validEmail, buildSql, hashToken } from './scripts/recovery-link.mjs';
 import { billingPlan } from './src/stripe.js';
 import { buildSql as fbSql, report as fbReport } from './scripts/feedback-report.mjs';
@@ -381,6 +381,16 @@ for (const t of TEMPLATES) {
   if (r.status !== 200 || !h.includes('記入例') || !h.includes('書き方のポイント') || !h.includes('data-copy="#tpl"') || !h.includes('data-copy="#ex"') || !h.includes(t.use.slice(0, 8))) pagesOk = false;
 }
 ok(pagesOk, 'すべてのひな形のページが表示され、本文・記入例のコピー・書き方のポイントがある');
+// --- 校種の切り替え ---
+ok(TEMPLATES.every((t) => !t.levels || (Array.isArray(t.levels) && t.levels.length && t.levels.every((l) => Object.hasOwn(LEVELS, l)))), 'levels は、定義された校種だけ');
+ok(Object.keys(LEVELS).every((l) => TEMPLATES.filter((t) => forLevel(t, l)).length >= 16), 'どの校種でも、16点以上のひな形が見られる');
+ok(TEMPLATES.some((t) => t.levels && !t.levels.includes('elementary')), '中学・高校だけのひな形がある');
+const lvJ = await (await get('/m?level=junior', recCookie)).text();
+const lvE = await (await get('/m?level=elementary', recCookie)).text();
+const lvX = await (await get('/m?level=bogus', recCookie)).text();
+const jOnly = TEMPLATES.find((t) => t.levels && !t.levels.includes('elementary'));
+ok(lvJ.includes('/m/t/' + jOnly.id) && !lvE.includes('/m/t/' + jOnly.id) && lvX.includes('/m/t/' + jOnly.id), '校種で絞り込め、不正な指定は「すべて」になる');
+ok(lvJ.includes('中学校向け') && lvJ.includes('level=high') && lvJ.includes('level=elementary'), '校種の切り替えリンクが出る');
 const guide = await get('/m/guide', recCookie);
 const guideHtml = await guide.text();
 ok(guide.status === 200 && guideHtml.includes('出す前のチェック') && guideHtml.includes('個人情報の扱い') && guideHtml.includes('所属校'), '使い方ガイドが表示される');
