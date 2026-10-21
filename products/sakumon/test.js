@@ -247,6 +247,47 @@ ok(/^\d{10}$/.test(sent.get('subscription_data[billing_cycle_anchor]')) && ['cre
 ok(Number(sent.get('subscription_data[billing_cycle_anchor]')) * 1000 > Date.now() && sent.get('managed_payments[enabled]') === 'false' && sent.get('mode') === 'subscription', '請求日は未来で、Managed Paymentsは使わない');
 ok(sent.get('adaptive_pricing[enabled]') === 'false', '通貨の自動変換(Adaptive Pricing)を使わない=常に円で表示・請求する');
 
+// --- 集客の導線(流入元の目印・見本ページ・共有用のメタ情報) ---
+env.LP_PUBLIC = 'true';
+const lpSrc = await (await get('/?src=note')).text();
+ok(lpSrc.includes('href="/subscribe?src=note"') && lpSrc.includes('href="/sample?src=note"'), 'LPは、流入元(src)を、申込ボタンと見本のリンクに引き継ぐ');
+const lpPlain = await (await get('/')).text();
+ok(lpPlain.includes('href="/subscribe"') && !lpPlain.includes('?src='), 'srcがなければ、リンクにsrcは付かない');
+const lpBad = await (await get('/?src=%3Cscript%3Ealert(1)%3C%2Fscript%3E')).text();
+ok(!lpBad.includes('<script>alert') && !lpBad.includes('?src='), '不正なsrc(記号を含む)は、無視される');
+ok(lpPlain.includes('property="og:title"') && lpPlain.includes('name="description"') && !lpPlain.includes('noindex'), 'LPに共有用のメタ情報があり、検索の対象になる');
+const sm = await get('/sample?src=threads');
+const smHtml = await sm.text();
+ok(sm.status === 200 && smHtml.includes('{{月}}') && smHtml.includes('data-copy="#tpl"') && smHtml.includes('href="/subscribe?src=threads"'), '見本ページ: ひな形の中身・コピーボタン・申込への導線(src引き継ぎ)がある');
+ok(smHtml.includes('児童・保護者の個人情報'), '見本ページにも、個人情報の注意がある');
+env.LEGAL_PUBLIC = 'true';
+const lpLegal = await (await get('/')).text();
+ok(lpLegal.includes('お問い合わせ') && lpLegal.includes('/legal/terms'), '法務が公開できる状態なら、LPのフッターに、お問い合わせへのリンクも出る');
+delete env.LEGAL_PUBLIC;
+delete env.LP_PUBLIC;
+ok((await get('/sample')).status === 404, 'LPが非公開のあいだは、見本ページも404');
+await get('/subscribe?src=note');
+ok(new URLSearchParams(lastCheckoutBody).get('metadata[src]') === 'note' && new URLSearchParams(lastCheckoutBody).get('subscription_data[metadata][src]') === 'note', '流入元(src)を、Stripeの決済と契約のメタデータに記録する');
+await get('/subscribe');
+ok(!new URLSearchParams(lastCheckoutBody).has('metadata[src]'), 'srcがなければ、メタデータは付けない');
+await get('/subscribe?src=BAD%20VALUE!');
+ok(!new URLSearchParams(lastCheckoutBody).has('metadata[src]'), '不正なsrcは、Stripeに送らない');
+await get('/subscribe?src=Note');
+ok(new URLSearchParams(lastCheckoutBody).get('metadata[src]') === 'note', 'srcは小文字にそろえる');
+
+// --- 審査指摘の反映(見本ページの運営者表示・条件の明記・流入元のポリシー記載) ---
+env.LP_PUBLIC = 'true';
+const smNoLegal = await (await get('/sample')).text();
+ok(smNoLegal.includes('運営:株式会社Social Quality') && smNoLegal.includes('返金はありません') && smNoLegal.includes('毎月の末日') && smNoLegal.includes('日割り'), '見本ページに、運営者名と、料金・解約・返金の条件が書かれている');
+env.LEGAL_PUBLIC = 'true';
+const smLegal = await (await get('/sample')).text();
+ok(smLegal.includes('/legal/tokushoho') && smLegal.includes('お問い合わせ'), '法務が公開できる状態なら、見本ページにも法務リンクとお問い合わせが出る');
+delete env.LEGAL_PUBLIC;
+const lpRefund = await (await get('/')).text();
+ok(lpRefund.includes('お支払い済みの料金の返金はありません') && lpRefund.includes('ご契約のメールアドレスなどは除きます'), 'LPに、返金なしと、「送られない」の範囲の限定が書かれている');
+delete env.LP_PUBLIC;
+ok(privacyPage(COMPANY).includes('流入元の目印'), 'プライバシーポリシーに、流入元の目印の取得が書かれている');
+
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
