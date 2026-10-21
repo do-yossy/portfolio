@@ -281,6 +281,9 @@ export const templatePage = (t) =>
   );
 
 // 会員からのアンケート。個人情報は書かないよう案内する
+export const SCHOOL_LEVELS = { elementary: '小学校', junior: '中学校', high: '高校', special: '特別支援学校', other: 'その他' };
+export const ROLES = { homeroom: '学級・ホームルーム担任', subject: '教科担当', club: '部活動', grade: '学年・校務分掌', other: 'その他' };
+
 export const feedbackPage = (tpl, error, kept = {}) =>
   layout(
     'ご意見・ご要望',
@@ -296,6 +299,13 @@ ${tpl ? `<input type="hidden" name="t" value="${esc(tpl.id)}"><p>対象のひな
 <fieldset><legend><strong>満足度(必須)</strong></legend>
 ${[5, 4, 3, 2, 1].map((n) => `<label><input type="radio" name="rating" value="${n}" ${String(kept.rating) === String(n) ? 'checked' : ''} required> ${n}${n === 5 ? '(とても満足)' : n === 1 ? '(不満)' : ''}</label>`).join('')}
 </fieldset>
+<fieldset><legend><strong>校種(任意)</strong></legend>
+${Object.entries(SCHOOL_LEVELS).map(([k, v]) => `<label><input type="radio" name="school_level" value="${k}" ${kept.school_level === k ? 'checked' : ''}> ${v}</label>`).join('')}
+</fieldset>
+<fieldset><legend><strong>主な担当(任意・複数選べます)</strong></legend>
+${Object.entries(ROLES).map(([k, v]) => `<label><input type="checkbox" name="roles" value="${k}" ${(kept.roles || []).includes(k) ? 'checked' : ''}> ${v}</label>`).join('')}
+</fieldset>
+<p class="note">校種と担当は、必要なひな形を考える参考にします。学校名や、個人が分かる内容は書かないでください。</p>
 <label for="want">こんなひな形・場面がほしい(任意)</label>
 <textarea id="want" name="want" maxlength="1000">${esc(kept.want || '')}</textarea>
 <label for="trouble">使いにくい点・困った点(任意)</label>

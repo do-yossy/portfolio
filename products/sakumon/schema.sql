@@ -54,5 +54,10 @@ CREATE TABLE IF NOT EXISTS feedback (
   want TEXT,
   trouble TEXT,
   comment TEXT,
+  school_level TEXT,
+  roles TEXT,
   created_at INTEGER NOT NULL
 );
+-- 既存のDBには、次の2行を1回だけ実行する(school_level: 校種、roles: 担当。どちらも選択式で任意)
+-- ALTER TABLE feedback ADD COLUMN school_level TEXT;
+-- ALTER TABLE feedback ADD COLUMN roles TEXT;
