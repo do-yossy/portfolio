@@ -3,7 +3,7 @@ import {
   upsertMember, insertMemberIfAbsent, setStatus, recordEvent, forgetEvent, isActive,
   newToken, claimCheckout, createSession, findBySession, consumeRecoveryLink, saveFeedback,
 } from './db.js';
-import { TEMPLATES, findTemplate } from './content.js';
+import { TEMPLATES, LEVELS, findTemplate } from './content.js';
 import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, SCHOOL_LEVELS, ROLES, feedbackPage, feedbackThanksPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
 
@@ -195,7 +195,7 @@ export default {
         if (!saved) return html(feedbackPage(tpl, '本日は、これ以上送れません。明日以降に、もう一度お試しください。', kept), 429);
         return html(feedbackThanksPage());
       }
-      if (pathname === '/m') return html(memberPage(TEMPLATES));
+      if (pathname === '/m') { const lv = url.searchParams.get('level'); return html(memberPage(TEMPLATES, Object.hasOwn(LEVELS, lv) ? lv : '')); }
       if (pathname === '/m/guide') return html(guidePage());
       if (pathname === '/m/portal') {
         const p = await createPortalSession(env, member.customer_id, `${url.origin}/m`);
