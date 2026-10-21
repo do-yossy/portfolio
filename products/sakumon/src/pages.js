@@ -81,9 +81,13 @@ const legalLinks = `<p><a href="/legal/tokushoho">特定商取引法に基づく
 const LP_META = '<meta name="description" content="先生が保護者向けの文書を書くときの「書き出し」を用意する、文面ひな形集。月額980円(税込)。いつでも解約できます。">\n<meta property="og:type" content="website">\n<meta property="og:title" content="サクモン | 先生のための文面ひな形集">\n<meta property="og:description" content="学級通信も、保護者へのお知らせも。ゼロから書かない。月額980円(税込)・いつでも解約できます。">\n<meta name="twitter:card" content="summary">';
 
 const contactLink = `<p><a href="${esc(encodeURI(COMPANY.contactUrl))}" rel="noopener">お問い合わせ</a></p>`;
+const contactAnchor = `<a href="${esc(encodeURI(COMPANY.contactUrl))}" rel="noopener">お問い合わせフォーム</a>`;
+
+// メール送信(Resend)が設定されているか。設定されると、メールの確認コードのログインに自動で切り替わる。未設定のあいだは、問い合わせ経由の手動の復旧を案内する
+export const mailLoginOn = (env) => !!(env.RESEND_API_KEY && env.MAIL_FROM);
 
 // src: 流入元の目印(note・threads など)。申込ボタンと見本ページに引き継ぎ、Stripe の契約に記録する
-export const landing = (legalOpen = false, src = '') => {
+export const landing = (legalOpen = false, src = '', mail = true) => {
   const q = src ? '?src=' + encodeURIComponent(src) : '';
   return layout(
     'サクモン | 先生のための文面ひな形集',
@@ -124,7 +128,7 @@ export const landing = (legalOpen = false, src = '') => {
 <details><summary>料金はいつ請求されますか?</summary><p>お申し込みのときに、その月の残りの日数分の日割り料金(税込)をお支払いいただきます。金額は、決済画面に表示されます。翌月1日からは、毎月1日に月額980円(税込)が自動で請求されます。その月の最後の2日間(最終日とその前日)にお申し込みの場合は、お申し込み時のお支払いはなく、翌月1日が初回です。</p></details>
 <details><summary>支払い方法は?</summary><p>クレジットカードです。決済は Stripe を通じて行われ、カード番号はサクモンには保存されません。</p></details>
 <details><summary>解約はどうすればいいですか?</summary><p>申し込み後のあなた専用ページに、解約・支払い方法の変更・請求書の確認へのリンクがあります。いつでも、ご自身で手続きできます。解約しても、請求期間の終わり(月末)までは利用できます。翌月分の請求を避けるには、毎月の末日(日本時間)までに解約の手続きを完了してください。</p></details>
-<details><summary>ログインは必要ですか?</summary><p>パスワードはありません。お申し込みをしたブラウザは、会員として使えます(会員証の有効期間は最長1年です)。別の端末や、ブラウザのデータを消した後は、お申し込みのメールアドレスに届く6桁の確認コードでログインできます。</p></details>
+<details><summary>ログインは必要ですか?</summary><p>パスワードはありません。お申し込みをしたブラウザは、会員として使えます(会員証の有効期間は最長1年です)。${mail ? '別の端末や、ブラウザのデータを消した後は、お申し込みのメールアドレスに届く6桁の確認コードでログインできます。' : '別の端末で使いたいときや、ブラウザのデータを消したときは、' + contactAnchor + 'からご連絡ください。ご本人の確認のうえ、入り直しのためのリンクをお送りします。新しくお申し込みをする前に、必ずご連絡ください(二重のご請求を防ぐためです)。'}</p></details>
 <details><summary>複数の端末で使えますか?</summary><p>同じ契約で使える端末は、最大3台までです。4台目で使い始めると、最も古い端末の利用が終了します。</p></details>
 </section>
 
@@ -155,7 +159,7 @@ export const samplePage = (t, src = '', legalOpen = false) => {
   );
 };
 
-export const successPage = () =>
+export const successPage = (mail = true) =>
   layout(
     'お申し込みありがとうございます',
     `<div class="hero">
@@ -167,7 +171,7 @@ export const successPage = () =>
 <p class="note">次回からは、このブラウザで、下のアドレスを開くだけで使えます。ブックマークしておくと便利です。</p>
 <div class="urlbox">https://sakumon.sakumon-app.workers.dev/m</div>
 </div>
-<div class="warn"><strong>会員として使えるのは、お申し込みをしたブラウザです。</strong><br>アドレスだけを他の人に伝えても、開けません。別の端末で使うときや、ブラウザのデータを消したときは、<a href="/login">ログイン</a>から、お申し込みのメールアドレスに届く確認コードで入れます。</div>
+<div class="warn"><strong>会員として使えるのは、お申し込みをしたブラウザです。</strong><br>アドレスだけを他の人に伝えても、開けません。別の端末で使うときや、ブラウザのデータを消したときは、${mail ? '<a href="/login">ログイン</a>から、お申し込みのメールアドレスに届く確認コードで入れます。' : contactAnchor + 'からご連絡ください。ご本人の確認のうえ、入り直しのためのリンクをお送りします。'}</div>
 <h3>この後の流れ</h3>
 <ol class="steps">
 <li><p>「ひな形を開く」を押して、使いたいひな形を選びます。</p></li>
@@ -219,13 +223,12 @@ ${error ? `<div class="err">${esc(error)}</div>` : ''}
 </div>`,
   );
 
-export const claimedPage = () =>
+export const claimedPage = (mail = true) =>
   layout(
     'このお申し込みは開始済みです',
     `<div class="hero"><h1 style="font-size:28px">このお申し込みは開始済みです</h1>
 <p class="lead">この画面は、お申し込みをしたブラウザでのみ開けます。別のブラウザや端末からは、開けません。</p>
-<p class="note">お申し込みをしたブラウザで、会員ページをご利用ください。別の端末では、メールの確認コードでログインできます。</p>
-<p><a class="btn sub" href="/login">メールでログインする</a></p></div>`,
+${mail ? '<p class="note">お申し込みをしたブラウザで、会員ページをご利用ください。別の端末では、メールの確認コードでログインできます。</p><p><a class="btn sub" href="/login">メールでログインする</a></p>' : '<p class="note">お申し込みをしたブラウザで、会員ページをご利用ください。別の端末で使いたいときは、' + contactAnchor + 'からご連絡ください。</p>'}</div>`,
   );
 
 export const pendingPage = () =>
@@ -261,12 +264,12 @@ export const templatePage = (t) =>
     { script: true },
   );
 
-export const inactivePage = () =>
+export const inactivePage = (mail = true) =>
   layout(
     'ご利用にはお申し込みが必要です',
     `<div class="hero"><h1 style="font-size:28px">ご利用にはお申し込みが必要です</h1>
 <p class="lead">このブラウザは、有効な会員として確認できません。解約済み、お支払いが確認できていない、または、お申し込みをしたブラウザではない可能性があります。</p>
-<p><a class="btn" href="/login">メールでログインする</a></p>
+${mail ? '<p><a class="btn" href="/login">メールでログインする</a></p>' : '<p class="note">お申し込み済みで、別の端末などから入れない場合は、' + contactAnchor + 'からご連絡ください。ご本人の確認のうえ、入り直しのためのリンクをお送りします。新しくお申し込みをする前に、必ずご連絡ください(二重のご請求を防ぐためです)。</p>'}
 <p class="note">まだお申し込みがない方は、<a href="/subscribe">こちらから</a>どうぞ。</p></div>`,
   );
 
@@ -275,3 +278,31 @@ export const comingSoonPage = () =>
 
 export const notFound = () =>
   html(layout('見つかりません', `<div class="hero"><h1 style="font-size:28px">見つかりません</h1><p><a class="btn sub" href="/">トップへ</a></p></div>`), 404);
+
+// メールのログインが未設定のあいだの /login
+export const loginOffPage = () =>
+  layout(
+    '別の端末で使うには',
+    `<div class="hero" style="padding-top:8px"><h1 style="font-size:28px">別の端末で使うには</h1>
+<p class="lead">現在、メールの確認コードによるログインは、ご用意していません。</p>
+<p>別の端末で使いたいとき、ブラウザのデータを消したときは、${contactAnchor}からご連絡ください。ご本人の確認のうえ、入り直しのためのリンク(1回限り・有効期間24時間)をお送りします。</p>
+<p class="note">新しくお申し込みをする前に、必ずご連絡ください(二重のご請求を防ぐためです)。</p></div>`,
+  );
+
+// 入り直しのリンク(お問い合わせへの返信で、運営から送る1回限りのリンク)。ボタンを押して初めて使われる(メールの自動プレビューで消費されないため)
+export const recoverPage = (token) =>
+  layout(
+    '入り直し',
+    `<div class="hero" style="padding-top:8px"><h1 style="font-size:28px">入り直し</h1>
+<p class="lead">下のボタンを押すと、このブラウザが、会員として登録されます。</p>
+<form method="post" action="/recover/${esc(token)}"><p><button class="btn" type="submit">このブラウザで入り直す</button></p></form>
+<p class="note">このリンクは、1回だけ使えます。他の人に教えないでください。</p></div>`,
+  );
+
+export const recoverFailPage = () =>
+  layout(
+    'このリンクは使えません',
+    `<div class="hero" style="padding-top:8px"><h1 style="font-size:28px">このリンクは使えません</h1>
+<p class="lead">期限が切れているか、すでに使われています。</p>
+<p>お手数ですが、${contactAnchor}から、もう一度ご連絡ください。</p></div>`,
+  );
