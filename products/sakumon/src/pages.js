@@ -248,7 +248,7 @@ export const memberPage = (templates) => {
     `<div class="hero" style="padding-bottom:20px">
 <h1 style="font-size:28px">ひな形一覧(全${templates.length}点)</h1>
 <p class="lead">使いたいものを選んでください。はじめての方は、「使い方ガイド」をご覧ください。</p>
-<p><a class="btn sub" href="/m/guide">使い方ガイド</a></p>
+<p><a class="btn sub" href="/m/guide">使い方ガイド</a> <a class="btn sub" href="/m/feedback">ご意見・ご要望を送る</a></p>
 ${groups.map((g) => `<h2 style="margin:22px 0 10px;font-size:18px">${esc(g.category)}</h2><ul class="list">${g.items.map((t) => `<li><a href="/m/t/${esc(t.id)}">${esc(t.title)}<span>${esc(t.use)}</span></a></li>`).join('')}</ul>`).join('')}
 </div>
 <section>
@@ -274,10 +274,40 @@ export const templatePage = (t) =>
 <button class="btn sub" type="button" data-copy="#ex">記入例をコピー</button></section>
 <section><h2>書き方のポイント</h2>
 <ul class="tips">${t.tips.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>
+<p><a class="back" href="/m/feedback?t=${esc(t.id)}">このひな形について、ご意見を送る</a></p>
 <p><a class="back" href="/m">← 一覧へ戻る</a></p>
 </div>`,
     { script: true },
   );
+
+// 会員からのアンケート。個人情報は書かないよう案内する
+export const feedbackPage = (tpl, error, kept = {}) =>
+  layout(
+    'ご意見・ご要望',
+    `${FORM_CSS}<style>textarea{width:100%;min-height:90px;font-size:17px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-family:inherit}fieldset{border:0;padding:0;margin:18px 0 0}fieldset label{display:inline-block;margin:6px 14px 6px 0;font-weight:400}</style>
+<div class="hero" style="padding-top:8px">
+<a class="back" href="/m">← 一覧へ戻る</a>
+<h1 style="font-size:26px">ご意見・ご要望</h1>
+<p class="lead" style="font-size:16px">サクモンをよくするために、使ってみた感想を教えてください。1分ほどで終わります。いただいたご意見は、ひな形の追加や見直しの参考にします。</p>
+<p class="note">児童・保護者・同僚の氏名や、学校名など、個人が分かる内容は書かないでください。お返事が必要なご連絡は、お問い合わせフォームからお願いします(こちらからは返信できません)。</p>
+${error ? `<div class="err">${esc(error)}</div>` : ''}
+<form method="post" action="/m/feedback">
+${tpl ? `<input type="hidden" name="t" value="${esc(tpl.id)}"><p>対象のひな形:<strong>${esc(tpl.title)}</strong></p>` : ''}
+<fieldset><legend><strong>満足度(必須)</strong></legend>
+${[5, 4, 3, 2, 1].map((n) => `<label><input type="radio" name="rating" value="${n}" ${String(kept.rating) === String(n) ? 'checked' : ''} required> ${n}${n === 5 ? '(とても満足)' : n === 1 ? '(不満)' : ''}</label>`).join('')}
+</fieldset>
+<label for="want">こんなひな形・場面がほしい(任意)</label>
+<textarea id="want" name="want" maxlength="1000">${esc(kept.want || '')}</textarea>
+<label for="trouble">使いにくい点・困った点(任意)</label>
+<textarea id="trouble" name="trouble" maxlength="1000">${esc(kept.trouble || '')}</textarea>
+<label for="comment">そのほか(任意)</label>
+<textarea id="comment" name="comment" maxlength="1000">${esc(kept.comment || '')}</textarea>
+<p style="margin-top:16px"><button class="btn" type="submit">送信する</button></p>
+</form></div>`,
+  );
+
+export const feedbackThanksPage = () =>
+  layout('ありがとうございました', `<div class="hero"><h1 style="font-size:28px">ありがとうございました</h1><p class="lead">いただいたご意見は、今後の改善の参考にします。</p><p><a class="btn" href="/m">ひな形一覧へ戻る</a></p></div>`);
 
 export const inactivePage = (mail = true) =>
   layout(
