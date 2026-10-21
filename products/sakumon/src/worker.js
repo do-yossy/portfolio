@@ -4,7 +4,7 @@ import {
   newToken, claimCheckout, createSession, findBySession, consumeRecoveryLink, saveFeedback,
 } from './db.js';
 import { TEMPLATES, findTemplate } from './content.js';
-import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, feedbackPage, feedbackThanksPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
+import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, SCHOOL_LEVELS, ROLES, feedbackPage, feedbackThanksPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
 
 const json = (obj, status = 200) =>
@@ -187,9 +187,11 @@ export default {
         const form = await request.formData().catch(() => null);
         const text = (k) => String((form && form.get(k)) || '').replace(/[ --]/g, '').trim().slice(0, 1000);
         const kept = { rating: text('rating'), want: text('want'), trouble: text('trouble'), comment: text('comment') };
+        kept.school_level = Object.hasOwn(SCHOOL_LEVELS, text('school_level')) ? text('school_level') : '';
+        kept.roles = form ? form.getAll('roles').map(String).filter((r, i, a) => Object.hasOwn(ROLES, r) && a.indexOf(r) === i) : [];
         const tpl = findTemplate(text('t'));
         if (!/^[1-5]$/.test(kept.rating)) return html(feedbackPage(tpl, '満足度を選んでください。', kept), 400);
-        const saved = await saveFeedback(env.DB, member.customer_id, { rating: Number(kept.rating), templateId: tpl && tpl.id, want: kept.want, trouble: kept.trouble, comment: kept.comment });
+        const saved = await saveFeedback(env.DB, member.customer_id, { rating: Number(kept.rating), templateId: tpl && tpl.id, want: kept.want, trouble: kept.trouble, comment: kept.comment, schoolLevel: kept.school_level, roles: kept.roles.join(',') });
         if (!saved) return html(feedbackPage(tpl, '本日は、これ以上送れません。明日以降に、もう一度お試しください。', kept), 429);
         return html(feedbackThanksPage());
       }

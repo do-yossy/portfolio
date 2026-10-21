@@ -402,7 +402,14 @@ await post('/m/feedback', { rating: '9' }, recCookie);
 await post('/m/feedback', { rating: '3', t: 'no-such' }, recCookie);
 const fbRow2 = await env.DB.prepare('SELECT * FROM feedback ORDER BY id DESC').first();
 ok(fbRow2.rating === 3 && fbRow2.template_id === null, '範囲外の満足度は保存されず、存在しないひな形IDは無視される');
-for (let i = 0; i < 4; i++) await post('/m/feedback', { rating: '5' }, recCookie);
+const fbMulti = await worker.fetch(new Request('https://x.test/m/feedback', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: recCookie }, body: 'rating=5&school_level=junior&roles=subject&roles=club&roles=hack&roles=subject' }), env);
+const fbRow3 = await env.DB.prepare('SELECT * FROM feedback ORDER BY id DESC').first();
+ok(fbMulti.status === 200 && fbRow3.school_level === 'junior' && fbRow3.roles === 'subject,club', '校種と担当(複数)が保存され、不正な値と重複は捨てられる');
+await post('/m/feedback', { rating: '5', school_level: 'evil' }, recCookie);
+ok((await env.DB.prepare('SELECT * FROM feedback ORDER BY id DESC').first()).school_level === null, '不正な校種は保存されない');
+ok(fbForm.includes('name="school_level"') && fbForm.includes('name="roles"') && fbForm.includes('中学校') && fbForm.includes('部活動'), 'アンケートに、校種と担当の選択欄が出る');
+ok(fbReport([{ id: 1, rating: 4, template_id: null, want: null, trouble: null, comment: null, school_level: 'junior', roles: 'subject,club', created_at: 1790000000 }], 30).includes('junior=1') , '集計に、校種・担当の内訳が出る');
+for (let i = 0; i < 2; i++) await post('/m/feedback', { rating: '5' }, recCookie);
 ok((await post('/m/feedback', { rating: '5' }, recCookie)).status === 429, '1人あたり24時間に5件までで止まる');
 ok(/FROM feedback WHERE created_at > [0-9]+ ORDER BY/.test(fbSql(30)) && !/;/.test(fbSql(30)), '集計用のSQLは、SELECTだけで固定されている');
 let badDays = false; try { fbSql('1; DROP TABLE feedback'); } catch { badDays = true; }

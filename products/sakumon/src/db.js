@@ -96,8 +96,8 @@ export async function saveFeedback(db, customer, f) {
   const recent = await db.prepare('SELECT COUNT(*) AS n FROM feedback WHERE customer_id = ? AND created_at > ?').bind(customer, now() - 86400).first();
   if (recent && recent.n >= 5) return false;
   await db
-    .prepare('INSERT INTO feedback (customer_id, rating, template_id, want, trouble, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(customer, f.rating, f.templateId || null, f.want || null, f.trouble || null, f.comment || null, now())
+    .prepare('INSERT INTO feedback (customer_id, rating, template_id, want, trouble, comment, school_level, roles, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(customer, f.rating, f.templateId || null, f.want || null, f.trouble || null, f.comment || null, f.schoolLevel || null, f.roles || null, now())
     .run();
   return true;
 }
