@@ -218,6 +218,9 @@ footer{padding:54px 0 46px;border-top:1px solid var(--line)}
 .prod-price{font-size:.88rem;color:var(--muted);margin-bottom:8px}
 .prod-price b{font-family:'Space Grotesk','Noto Sans JP',sans-serif;font-size:1.7rem;color:var(--ink);letter-spacing:-.02em;margin:0 3px}
 .prod-note{font-size:.76rem;color:var(--muted);line-height:1.8;margin-bottom:22px}
+.prod-avail{font-size:.92rem;line-height:1.8;color:var(--ink);background:#fbf5ea;border-left:3px solid #9a5a12;border-radius:10px;padding:12px 16px;margin:0 0 18px}
+.prod-sample{font-size:.88rem;line-height:1.8;color:var(--ink);margin:16px 0 0 58%}
+.prod-legal{font-size:.8rem;margin:-4px 0 22px}.prod-legal a{text-decoration:underline;text-underline-offset:3px;margin-right:14px}
 .prod .ctas{display:flex;gap:12px;flex-wrap:wrap}
 .prod-vis{position:relative}
 .prod-vis img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--line);box-shadow:0 16px 40px rgba(21,18,13,.12)}
@@ -257,14 +260,15 @@ footer{padding:54px 0 46px;border-top:1px solid var(--line)}
       <span class="prod-badge">月額サービス</span>
       <h3>投稿は、週に一度の準備で。</h3>
       <p class="prod-lead">毎日その場で考えて、SNSごとに何度も同じ内容を投稿する手間を減らします。本文と画像・動画を用意して、投稿先と日時を選ぶだけ。あとは決めた日時に自動で投稿します。</p>
+      <p class="prod-avail"><b>いま使えるSNS</b>：TikTok（審査中のため、公開範囲は「自分のみ」に限られます）・YouTube（ショート）。Threads・Instagram・Facebookページは、Meta の審査中のため、まだ連携できません（使えるようになる時期は未定です）。2026年10月時点の状況です。最新の状況は、サービスのページでご確認ください。</p>
       <ul><li>1回の入力で、選んだSNSへまとめて予約（SNSごとに本文を変えることもできます）</li><li>予約と結果はカレンダーで確認。下書きに保存して、あとから予約</li><li>日本時間で、最大90日先まで予約</li><li>つなげるSNSアカウントは合計10件まで（同じSNSの複数のアカウントも可）</li><li>一時的なエラーは自動で再試行し、結果はマイページで確認</li></ul>
       <div class="prod-price">月額<b>1,100円</b>（税込・月払い・自動更新）</div>
+      <p class="prod-legal"><a href="https://post.social-quality.com/service/legal/tokushoho" target="_blank" rel="noopener">特定商取引法に基づく表記</a><a href="https://post.social-quality.com/service/legal/terms" target="_blank" rel="noopener">利用規約</a></p>
       <p class="prod-note">プランは1つ。予約・カレンダー・下書き・AI・API連携を、追加料金なしで使えます。いつでも解約でき、お支払い済みの期間の終わりまで使えます。</p>
       <div class="ctas"><a class="btn" href="https://post.social-quality.com/service/lp" target="_blank" rel="noopener" data-mag><span>サービスのページ・お申込み <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a></div>
     </div>
-    <div class="prod-vis" aria-hidden="true"><img src="img/sns/screen-calendar.webp" alt="" width="900" height="1571" loading="lazy" style="max-height:540px;object-fit:cover;object-position:top"></div>
+    <div class="prod-vis"><img src="img/sns/screen-calendar.webp" alt="" width="900" height="1571" loading="lazy" style="max-height:540px;object-fit:cover;object-position:top"><p class="prod-sample" style="margin:14px 0 0">画面は見本です。画面の Threads・Instagram・Facebook は、Meta の審査中のため、今は使えません。</p></div>
   </div>
-  <p class="prod-note" style="margin-top:12px;text-align:right">画面は見本です（表示はサンプルで、今は使えないSNSも含みます）。</p>
   <div class="sns-grid">
     <div class="cell" data-rv><span class="no">SNS</span><h4>対象のSNS</h4><p>いま使えるSNS：TikTok・YouTube（ショート）。TikTok は審査中のため、公開範囲が「自分のみ」に限られます。Threads・Instagram・Facebookページは、Meta の審査中のため、まだ連携できません（審査に通るかどうか・時期は未定です）。2026年10月時点の状況です。最新の状況は、サービスのページでご確認ください。</p></div>
     <div class="cell" data-rv><span class="no">AI・API</span><h4>AIやAPIとつなぐ</h4><p>投稿先の条件を入れた指示文で、お使いのAI（ChatGPT・Claude・Gemini）を開けます。APIキーやAIアシスタント（MCP）から、そのまま予約もできます（TikTok への投稿は、サービスの画面からだけです）。AIが作った内容は、投稿の前に必ずご自身で確認してください。</p></div>
@@ -280,7 +284,7 @@ footer{padding:54px 0 46px;border-top:1px solid var(--line)}
     <div class="sc"><h3>コーポレートサイト（プレミアム）</h3><p>ページ数無制限。CMS（WordPress など）の導入、SEOの基本対策まで。</p><div class="pr">¥250,000〜</div><p class="svnote">納期の目安：約3〜4週間</p></div>
     <div class="sc"><h3>LINE公式アカウント構築</h3><p>リッチメニュー・ステップ配信・チャットボット・自動応答・分析ダッシュボードまで一括で構築します。</p><div class="pr">¥50,000〜</div><p class="svnote">納期の目安：約1〜2週間</p></div>
   </div>
-  <p class="svnote" style="margin-top:14px;color:var(--muted)">納品前の修正は回数無制限で対応します（当初の仕様を大きく超える変更は、別途お見積りになる場合があります）。</p>
+  <p class="svnote" style="margin-top:14px;color:var(--muted)">すべて修正回数無制限・見積もり無料です。</p>
 </div></section>
 
 <section id="dev" class="svsec"><div class="wrap">
@@ -289,7 +293,7 @@ footer{padding:54px 0 46px;border-top:1px solid var(--line)}
     <div class="sc"><h3>業務効率化ツール・業務システム</h3><p>予約管理・請求書・在庫・勤怠など、手作業をデジタル化。管理画面・CSV出力・自動計算まで対応します。</p><div class="pr">¥200,000〜</div><p class="svnote">納期：要相談（通常3〜6週間）</p></div>
     <div class="sc"><h3>スマホアプリ開発</h3><p>iOS・Android の両方に対応。ログイン・決済・プッシュ通知・管理画面まで含むアプリを開発します。</p><div class="pr">¥400,000〜</div><p class="svnote">納期：要相談</p></div>
     <div class="sc"><h3>AI活用ツール開発</h3><p>ChatGPT・Claude の API を使った、文章添削・自動応答・業務自動化などの企業向けツールを開発します。</p><div class="pr">¥500,000〜</div><p class="svnote">納期：要相談</p></div>
-    <div class="sc"><h3>Excel業務の自動化・データ収集</h3><p>マクロ・自動集計・PDF出力などの Excel 業務の自動化や、価格・レビューなどのデータ収集ツール。</p><div class="pr">¥30,000〜</div><p class="svnote">内容に応じてお見積り</p></div>
+    <div class="sc"><h3>Excel業務の自動化・データ収集</h3><p>マクロ・自動集計・PDF出力などの Excel 業務の自動化や、価格・レビューなどのデータ収集ツール。</p><div class="pr">¥30,000〜（参考価格）</div><p class="svnote">内容に応じてお見積り</p></div>
   </div>
 </div></section>
 
