@@ -205,17 +205,17 @@ const addAccounts = (u, n) => { for (let i = 0; i < n; i++) store.SnsAccounts.up
 
   console.log('画面：プラン');
   const lpOn = ui.lpPage({ user: null, billingReady: true });
-  ok(lpOn.includes('プランは2つ。') && !lpOn.includes('プランはひとつだけ。') && lpOn.includes('id="agency-plan"') && lpOn.includes('3,300円') && lpOn.includes('連携できるSNSアカウントは30件まで'), '30件プランが設定されていれば、販売ページに30件プランの段を出し、見出しを「プランは2つ。」にする');
+  ok(lpOn.includes('プランは2つ。') && !lpOn.includes('プランは1つだけ。') && lpOn.includes('id="agency-plan"') && lpOn.includes('3,300円') && lpOn.includes('連携できるSNSアカウントは30件まで'), '30件プランが設定されていれば、販売ページに30件プランの段を出し、見出しを「プランは2つ。」にする');
   const cmpPart = lpOn.slice(lpOn.indexOf('料金の比べ方'), lpOn.indexOf('料金の比べ方') + 2500);
   ok(!lpOn.includes('料金の比べ方') || (!cmpPart.slice(0, cmpPart.indexOf('</table>')).includes('3,300円') && !cmpPart.slice(0, cmpPart.indexOf('</table>')).includes('30アカウント')), '比較（サービスA）は通常プランだけの比較のまま、30件プランを混ぜない');
   ok(lpOn.includes('href="/service/signup"') && !lpOn.includes('/service/checkout?plan=agency'), 'ログインしていない人には、30件プランの直接の申込みリンクは出さない');
   ok(ui.lpPage({ user: { email: 'a' }, billingReady: true }).includes('/service/checkout?plan=agency'), 'ログイン済みの人には、30件プランで申込みに進むリンクを出す');
   delete process.env.SERVICE_PRICE_JPY_AGENCY;
   let lpOff = ui.lpPage({ user: null, billingReady: true });
-  ok(lpOff.includes('プランはひとつだけ。') && !lpOff.includes('agency-plan'), 'SERVICE_PRICE_JPY_AGENCY が未設定なら、販売ページは今まで通り（プランはひとつだけ）');
+  ok(lpOff.includes('プランは1つだけ。') && !lpOff.includes('agency-plan'), 'SERVICE_PRICE_JPY_AGENCY が未設定なら、販売ページは今まで通り（プランはひとつだけ）');
   delete process.env.STRIPE_PRICE_ID_AGENCY;
   lpOff = ui.lpPage({ user: null, billingReady: true });
-  ok(lpOff.includes('プランはひとつだけ。') && !lpOff.includes('30件プラン') && lpOff.includes('連携できるアカウント（最大）'), 'STRIPE_PRICE_ID_AGENCY が未設定なら、30件プランを出さない');
+  ok(lpOff.includes('プランは1つだけ。') && !lpOff.includes('30件プラン') && lpOff.includes('連携できるアカウント（最大）'), 'STRIPE_PRICE_ID_AGENCY が未設定なら、30件プランを出さない');
   process.env.STRIPE_PRICE_ID_AGENCY = 'price_ag'; process.env.SERVICE_PRICE_JPY_AGENCY = '3300';
 
   let co = ui.checkoutPage({ user: { email: 'a' }, csrf: 'c', plan: 'agency', agencyOffered: true });

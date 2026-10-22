@@ -2,6 +2,7 @@
 // 月額SNS自動投稿サービスの画面（既存の lib/ui.js のレイアウトとデザインを使う）
 const { escapeHtml, icon, layout, crest } = require('./ui');
 const core = require('./service-core');
+const LP_SHOTS = require('./service-lp-images');
 const registry = require('./sns');
 // YouTube の、再連携が必要なまま連携を消すまでの日数（マイページの文言をこの定数にそろえる。根拠は lib/sns/scheduler.js）
 const { YOUTUBE_REAUTH_DELETE_DAYS } = require('./sns/scheduler');
@@ -202,7 +203,7 @@ body{background:#0B141A}
 .svc .lp h2{display:block}.svc .lp h2::after{content:none;display:none}
 .svc .lp .grid>*{min-width:0}
 .svc .lp pre{max-width:100%;box-sizing:border-box}
-.svc .lp section[id]{scroll-margin-top:calc(72px + env(safe-area-inset-top, 0px))}
+.svc .lp section[id]{scroll-margin-top:calc(84px + env(safe-area-inset-top, 0px))}
 .svc nav.svc-nav a{color:#5EDDC0}
 .svc nav.svc-nav .small{color:#A7B7C0}
 .svc .lp ul.chips{list-style:none;padding:0}
@@ -213,12 +214,30 @@ body{background:#0B141A}
 .svc .lp .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .svc .lp .chip{display:inline-flex;align-items:center;gap:7px;background:var(--lp-s2);border:1px solid var(--lp-line);border-radius:999px;padding:5px 12px;font-size:13.5px;font-weight:700;color:var(--lp-ink)}
 .svc .lp .chip i{width:9px;height:9px;border-radius:50%;background:var(--lp-acc);display:inline-block}
-.svc .lp .price{background:var(--lp-s1);border:1px solid rgba(94,221,192,.35);border-radius:16px;padding:16px;margin:14px 0}
-.svc .lp .price .amount{font-size:40px;font-weight:800;color:#fff;letter-spacing:.01em;line-height:1.2}
-.svc .lp .price .amount small{font-size:14px;font-weight:600;color:var(--lp-mute);margin-left:4px}
-.svc .lp .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
-.svc .lp .stat{background:var(--lp-s1);border:1px solid var(--lp-line);border-radius:12px;padding:10px 8px;text-align:center}
-.svc .lp .stat b{display:block;font-size:22px;color:#fff;line-height:1.3}
+.svc .lp .tag .n{color:#fff;margin-right:7px;font-variant-numeric:tabular-nums}
+.svc .lp h1 .em{background:linear-gradient(transparent 68%,rgba(94,221,192,.45) 68%);padding:0 2px}
+.svc .lp .hero-pic{position:relative;height:340px;border-radius:18px;overflow:hidden;margin:18px 0 6px;background:linear-gradient(160deg,#F6EFE2 0%,#E9DDC6 100%)}
+.svc .lp .hero-pic .desk{position:absolute;left:0;right:0;bottom:0;height:44%;background:linear-gradient(#D8C19C,#C7AC82)}
+.svc .lp .hero-pic .laptop{position:absolute;right:16px;top:30px;width:150px;height:96px;border-radius:8px 8px 3px 3px;background:#26343E;border:5px solid #34444F;box-sizing:border-box}
+.svc .lp .hero-pic .laptop::before{content:"";position:absolute;left:8px;right:8px;top:8px;height:8px;border-radius:4px;background:rgba(94,221,192,.7);box-shadow:0 14px 0 -1px rgba(234,241,244,.35),0 28px 0 -1px rgba(234,241,244,.2)}
+.svc .lp .hero-pic .laptop::after{content:"";position:absolute;left:-18px;right:-18px;bottom:-12px;height:8px;border-radius:0 0 10px 10px;background:#B9C2C8}
+.svc .lp .hero-pic .book{position:absolute;right:34px;top:174px;width:92px;height:118px;border-radius:6px;background:#FBF8F1;border:1px solid #D9CFB8;transform:rotate(-9deg);box-shadow:0 6px 12px rgba(60,40,10,.18)}
+.svc .lp .hero-pic .book::before{content:"";position:absolute;left:12px;right:12px;top:16px;height:4px;border-radius:2px;background:#C9BFA6;box-shadow:0 12px 0 #C9BFA6,0 24px 0 #C9BFA6,0 36px 0 #C9BFA6}
+.svc .lp .hero-pic .cup{position:absolute;right:140px;top:140px;width:44px;height:36px;border-radius:4px 4px 18px 18px;background:#fff;box-shadow:0 5px 8px rgba(60,40,10,.2)}
+.svc .lp .hero-pic .plant{position:absolute;left:-16px;top:-16px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle at 60% 60%,#8DB89B,#5F9A78);opacity:.85}
+.svc .lp .hero-pic .plant::after{content:"";position:absolute;left:58px;top:70px;width:70px;height:70px;border-radius:50%;background:#7AAE8C;opacity:.8}
+.svc .lp .hero-card{position:absolute;left:12px;bottom:12px;width:min(250px,calc(100% - 24px));background:#0F1D25;border:1px solid var(--lp-line);border-radius:14px;padding:12px 14px;box-shadow:0 10px 24px rgba(0,0,0,.35);color:var(--lp-ink)}
+.svc .lp .hero-card h3{font-size:13px;margin:0 0 6px}
+.svc .lp .hero-card ul{list-style:none;margin:0;padding:0}
+.svc .lp .hero-card li{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;line-height:1.4;padding:6px 0;border-top:1px solid var(--lp-line)}
+.svc .lp .hero-card li i{width:8px;height:8px;border-radius:50%;background:var(--lp-acc);flex:none}
+.svc .lp .hero-card li em{margin-left:auto;font-style:normal;font-size:11px;font-weight:700;color:var(--lp-acc);border:1px solid rgba(94,221,192,.45);border-radius:999px;padding:0 8px;white-space:nowrap}
+.svc .lp .hero-card li em.lim{color:#F2C879;border-color:rgba(242,200,121,.5)}
+.svc .lp .shot{margin:14px 0 4px;border:1px solid var(--lp-line);border-radius:14px;overflow:hidden;background:var(--lp-s2)}
+.svc .lp .shot img{display:block;width:100%;height:auto}
+.svc .lp .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:16px 0}
+.svc .lp .stat{background:var(--lp-s1);border:1px solid var(--lp-line);border-radius:12px;padding:12px 8px;text-align:center}
+.svc .lp .stat b{display:block;font-size:26px;color:var(--lp-acc);line-height:1.3}
 .svc .lp .stat span{font-size:11.5px;color:var(--lp-mute)}
 .svc .lp .btn-lp{display:block;text-align:center;background:var(--lp-acc);color:var(--lp-acc-ink);font-weight:800;border-radius:12px;padding:14px 16px;text-decoration:none;margin:12px 0 4px;min-height:44px;box-sizing:border-box}
 .svc .lp .soon{background:var(--lp-s2);border:1px dashed rgba(234,241,244,.3);border-radius:12px;padding:12px;text-align:center;color:var(--lp-ink);margin:12px 0}
@@ -237,13 +256,24 @@ body{background:#0B141A}
 .svc .lp ol.steps li{counter-increment:s;position:relative;padding:12px 12px 12px 52px;background:var(--lp-s1);border:1px solid var(--lp-line);border-radius:14px;margin:0 0 10px}
 .svc .lp ol.steps li::before{content:counter(s);position:absolute;left:12px;top:12px;width:28px;height:28px;border-radius:50%;background:var(--lp-acc);color:var(--lp-acc-ink);font-weight:800;display:grid;place-items:center;font-size:14px}
 .svc .lp .paper{background:var(--lp-paper);color:var(--lp-paper-ink);border-radius:18px;padding:20px}
+.svc .lp .band{position:relative;overflow:hidden;padding-bottom:104px}
+.svc .lp .band .minis{position:absolute;left:0;right:0;bottom:-6px;height:84px;display:flex;justify-content:center;gap:14px;align-items:flex-end}
+.svc .lp .band .mini{width:78px;height:70px;border-radius:8px 8px 0 0;background:#fff;border:1px solid #D9CFB8;border-bottom:none;position:relative;box-shadow:0 -2px 8px rgba(60,40,10,.08)}
+.svc .lp .band .mini::before{content:"";position:absolute;left:0;right:0;top:0;height:14px;border-radius:7px 7px 0 0;background:#0B6B57}
+.svc .lp .band .mini::after{content:"";position:absolute;left:8px;right:8px;top:22px;bottom:0;background:radial-gradient(circle,#C9BFA6 2px,transparent 2.5px) 0 0/12px 12px}
+.svc .lp .band .mini.hi::after{background:radial-gradient(circle,#0B6B57 3px,transparent 3.5px) 12px 12px/24px 24px,radial-gradient(circle,#C9BFA6 2px,transparent 2.5px) 0 0/12px 12px}
+.svc .lp .plan{border:1px solid rgba(94,221,192,.4);border-radius:18px;padding:20px 16px;background:rgba(18,32,41,.55)}
+.svc .lp .plan .amount{font-size:42px;font-weight:800;line-height:1.2;color:#fff}
+.svc .lp .plan .amount small{font-size:14px;font-weight:600;margin-left:4px;color:var(--lp-mute)}
+.svc .lp .plan .sub{border-top:1px solid var(--lp-line);margin-top:18px;padding-top:14px}
 .svc .lp .paper h2,.svc .lp .paper h3{color:var(--lp-paper-ink)}
 .svc .lp .paper .small,.svc .lp .paper .mute{color:#4A5862}
 .svc .lp .paper a{color:#0B6B57}
 .svc .lp .paper .btn-lp{background:#0E1A22;color:#fff}
 .svc .lp .paper .soon{background:#fff;color:#0E1A22;border-color:#C9C2B3}
-.svc .lp table.t{width:100%;border-collapse:collapse;font-size:13.5px;table-layout:fixed}
-.svc .lp table.t th,.svc .lp table.t td{border-bottom:1px solid #DDD5C5;padding:8px 6px;text-align:left;vertical-align:top;word-break:break-word;white-space:normal}
+.svc .lp table.t{width:100%;border-collapse:collapse;font-size:13.5px;table-layout:fixed;color:var(--lp-ink)}
+.svc .lp table.t th{color:#fff}
+.svc .lp table.t th,.svc .lp table.t td{border-bottom:1px solid var(--lp-line);padding:8px 6px;text-align:left;vertical-align:top;word-break:break-word;white-space:normal}
 .svc .lp details{background:var(--lp-s1);border:1px solid var(--lp-line);border-radius:12px;padding:12px 14px;margin:0 0 8px}
 .svc .lp summary{cursor:pointer;font-weight:700;color:#fff;min-height:24px}
 .svc .lp details p{margin:8px 0 0;color:var(--lp-ink);font-size:14px}
@@ -285,22 +315,36 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
   const apiBase = String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, '') || 'https://（サービスのURL）';
   // このサービスのAIで作れるもの（設定で使えるものだけ。使えないものを作れるように読ませない）
   const ownAiKinds = [av.text && '文章', av.image && '画像', av.video && '動画'].filter(Boolean).join('・');
+  // 番号つきの段のタグ（01〜09）。画面の見本の画像は、Threadsの見本なので、Threadsが使えるときだけ出す（使えないSNSを使えるように見せない）
+  const tag = (n, t) => `<span class="tag"><span class="n">${n}</span>${t}</span>`;
+  const shotOk = live.some((p) => p.id === 'threads');
+  const shot = (key, alt, mockHtml) => shotOk
+    ? `<div class="shot"><img src="${LP_SHOTS[key]}" alt="${alt}" width="${key === 'compose' ? 390 : 560}" height="${key === 'compose' ? 584 : 597}" loading="lazy" decoding="async"></div>`
+    : mockHtml;
+  const heroCard = live.length
+    ? `<ul>${live.map((p) => `<li><i aria-hidden="true"></i>${escapeHtml(p.label)}<em${p.id === 'tiktok' && ttLimited ? ' class="lim"' : ''}>${p.id === 'tiktok' && ttLimited ? '制限あり' : '利用可'}</em></li>`).join('')}</ul><p class="small" style="margin:6px 0 0">各SNSの審査・仕様により、使える機能や公開範囲が制限される場合があります。</p>`
+    : '<p class="small" style="margin:0">対応SNSは準備中です。</p>';
   return wrap(`SNSの予約投稿を月額${price}で`, `${LP_CSS}
     ${topNav(user)}
     <div class="lp">
     <section>
-      <span class="tag">SNS予約投稿</span>
-      <h1>${multi ? '複数のSNSへの投稿を、まとめて予約。' : 'SNSへの投稿を、まとめて予約。'}</h1>
-      <p class="mute">発信を続けたいけれど、毎日その場で投稿する時間がない。そんな方のための、予約投稿のサービスです。投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p>
       ${snsChips}
+      <h1>${multi ? '複数のSNSへの投稿を、<span class="em">まとめて予約。</span>' : 'SNSへの投稿を、<span class="em">まとめて予約。</span>'}</h1>
+      <p class="mute">発信を続けたいけれど、毎日その場で投稿する時間がない。そんな方のための、予約投稿のサービスです。投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p>
+      ${cta('hero')}
+      <p class="small">月額${price}（税込）／自動更新・いつでも解約できます。</p>${cmp ? `
+      <p class="small">参考：${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン（${yen(COMPARE.price)}・${COMPARE.note}）と比べて、${halfWord}（${annualNote}）。${diffs}などの条件は異なります（${checked}に${COMPARE.name}の公式サイト（料金と概要のページ）で確認。詳しくは下の「料金の比べ方」）。</p>` : ''}
+      <div class="hero-pic">
+        <div class="desk" aria-hidden="true"></div><div class="plant" aria-hidden="true"></div><div class="laptop" aria-hidden="true"></div><div class="cup" aria-hidden="true"></div><div class="book" aria-hidden="true"></div>
+        <div class="hero-card"><h3>使えるSNS</h3>${heroCard}</div>
+      </div>
       ${ttLimited ? `<p class="small">${ttNote}</p>` : ''}
-      <div class="price"><div class="small">月額</div><div class="amount">${price}<small>（税込）</small></div><div class="small">自動更新／いつでも解約できます</div>${cmp ? `<p class="small" style="margin:8px 0 0">参考：${COMPARE.name}（${COMPARE.desc}）の最安の有料プラン（${yen(COMPARE.price)}・${COMPARE.note}）と比べて、${halfWord}（${annualNote}）。${diffs}などの条件は異なります（${checked}に${COMPARE.name}の公式サイト（料金と概要のページ）で確認。詳しくは下の「料金の比べ方」）。</p>` : ''}</div>
       <div class="stats">
+        <div class="stat"><b>${price}</b><span>月額（税込）</span></div>
         <div class="stat"><b>${live.length ? `${live.length}つ` : '準備中'}</b><span>使えるSNS</span></div>
         <div class="stat"><b>90日</b><span>先まで予約できる</span></div>
         <div class="stat"><b>${L.maxAccounts}件</b><span>${agencyLp ? `連携できるアカウント（通常プラン。${agencyMax}件のプランもあります）` : '連携できるアカウント（最大）'}</span></div>
       </div>
-      ${cta('hero')}
     </section>
 
     <section>
@@ -313,35 +357,35 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
     </section>
 
     <section>
-      <span class="tag">投稿を作る</span>
+      ${tag('01', 'まとめて投稿')}
       <h2>${multi ? '1回の入力で、複数のSNSへ。' : '投稿をまとめて作って、予約する。'}</h2>
       <p class="mute">本文と画像・動画を用意して、投稿先と日時を選ぶだけです。${multi ? 'SNSごとに本文を変えることもできます。' : ''}複数の画像（カルーセル）、動画${treeNames ? `、${escapeHtml(treeNames)}のツリー（連投）` : ''}にも対応し、下書きに保存して、あとから予約することもできます。</p>
-      <div class="mock" aria-hidden="true">
+      ${shot('compose', '「投稿を作る」画面の見本。投稿の種類と投稿先を選ぶ欄が並んでいます（架空のアカウント名）', `<div class="mock" aria-hidden="true">
         <div class="row"><span class="pill">投稿先</span><div class="bar"></div></div>
         <div class="row"><span class="pill">本文</span><div class="bar"></div></div>
         <div class="row"><div class="bar" style="flex:.7"></div></div>
         <div class="row"><span class="pill">日時</span><div class="bar" style="flex:.5"></div></div>
-      </div>
-      <p class="small">画面のイメージです。</p>
+      </div>`)}
+      <p class="small">画面のイメージです（架空のアカウント名の見本です）。実際の画面と異なる場合があります。</p>
     </section>
 
     <section>
-      <span class="tag">カレンダー</span>
+      ${tag('02', '予約カレンダー')}
       <h2>予約も結果も、ひと目でわかる。</h2>
       <p class="mute">日本時間で最大90日先まで予約できます。予約はカレンダーで一覧でき、投稿の結果（予約中・投稿済み・失敗）はカレンダーとマイページで確認できます。一時的なエラーは自動で再試行し、失敗したときは理由を表示します。</p>
-      <div class="mock" aria-hidden="true"><div class="cal">${Array.from({ length: 14 }, (_, i) => `<div class="${[2, 5, 9, 12].includes(i) ? 'on' : ''}">${i + 1}</div>`).join('')}</div></div>
-      <p class="small">画面のイメージです。</p>
+      ${shot('calendar', 'カレンダー画面の見本。日付ごとに、予約中と投稿済みの投稿が並んでいます（架空の予約）', `<div class="mock" aria-hidden="true"><div class="cal">${Array.from({ length: 14 }, (_, i) => `<div class="${[2, 5, 9, 12].includes(i) ? 'on' : ''}">${i + 1}</div>`).join('')}</div></div>`)}
+      <p class="small">画面のイメージです（架空の予約の見本です）。実際の画面と異なる場合があります。</p>
     </section>
 
     <section>
-      <span class="tag">SNSごとの決まり</span>
+      ${tag('03', 'SNSごとの決まり')}
       <h2>文字数は入力しながら、条件は保存のときに確かめる。</h2>
       <p class="mute">投稿を作る画面では、本文の文字数を、選んだSNSごとの数え方で表示します。SNSごとの条件（文字数・画像や動画の形式など）は保存するときに確かめ、合わないときは予約せずにお知らせします。</p>
     </section>
 
     <section id="ai">
-      <span class="tag">AI</span>
-      <h2>AIと一緒に、投稿をつくる。</h2>
+      ${tag('04', 'AI')}
+      <h2>AIとつないで、投稿づくりを楽に。</h2>
       <div class="grid">
         <div class="card"><h3>ご自身のAIで作る</h3><p class="small">「投稿を作る」画面でテーマを入れてボタンを押すと、指示文をコピーしてから、AIを開きます。文章は ChatGPT・Claude・Gemini で作れます（指示文には、投稿先のSNSの条件（文字数など）を自動で入れます）。画像は ChatGPT・Gemini で作れます。自動で入力されない場合は、貼り付けて送信してください。できた文章は本文に貼り付け、画像は保存して添付します。各AIのご利用条件・料金は、それぞれのサービスに従います。</p></div>
         ${ownAiKinds ? `<div class="card"><h3>このサービスのAIで作る</h3><p class="small">テーマを入れると、AIが${ownAiKinds}を作ります（1日・1か月の回数に上限があります）。</p></div>` : ''}
@@ -359,7 +403,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
     </section>
 
     <section>
-      <span class="tag">使い方</span>
+      ${tag('05', '使い方')}
       <h2>使い方は、5つの手順。</h2>
       <ol class="steps">
         <li><h3>アカウントを作って申し込む</h3><p class="small">お支払いは、確認画面で内容をご確認いただいたあとに始まります。</p></li>
@@ -371,15 +415,15 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
     </section>
 
     <section>
-      <span class="tag">使えるSNS</span>
+      ${tag('06', '使えるSNS')}
       <h2>${live.length ? (multi ? `${live.length}つのSNSに、まとめて投稿。` : `${escapeHtml(live[0].label)}に投稿。`) : '使えるSNSは、準備中です。'}</h2>
       ${live.length ? live.map((p) => `<div class="card"><h3>${escapeHtml(p.label)}</h3><p class="small">${escapeHtml(String(SNS_RULES[p.id] || '').replace(/^[^：]*：/, ''))}</p></div>`).join('') : '<p class="mute">各SNSの準備ができたものから、ここに表示します。</p>'}
       <p class="small">各SNSの審査・仕様により、使える機能や公開範囲が制限される場合があります。</p>
     </section>
 
     <section>
-      <span class="tag">安全</span>
-      <h2>アカウントを守るための仕組み。</h2>
+      ${tag('07', '安全')}
+      <h2>大切なアカウントを、安全に。</h2>
       <div class="card"><ul class="dots">
         <li>各SNSの公式の連携（OAuth）を使います。SNSのパスワードをお預かりすることはありません。</li>
         <li>連携に使う情報（トークン）は、暗号化して保存します。マイページから、いつでも連携を解除できます。</li>
@@ -388,17 +432,19 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
       </ul></div>
     </section>
 
-    <section class="paper">
+    <section class="paper band">
       <h2>発信を、続けられる形に。</h2>
       <p class="mute">投稿をまとめて作っておけば、決めた日時に自動で投稿します。</p>
       ${cta('band')}
+      <div class="minis" aria-hidden="true"><div class="mini"></div><div class="mini hi"></div><div class="mini"></div></div>
     </section>
 
-    <section class="paper">
-      <span class="tag" style="color:#0B6B57;border-color:#0B6B57">料金</span>
-      <h2>${agencyLp ? 'プランは2つ。' : 'プランはひとつだけ。'}</h2>
+    <section>
+      ${tag('08', '料金')}
+      <h2>${agencyLp ? 'プランは2つ。' : 'プランは1つだけ。'}</h2>
+      <div class="plan">
       ${agencyLp ? '<h3>通常プラン</h3>' : ''}
-      <div style="font-size:42px;font-weight:800;line-height:1.2">${price}<small style="font-size:14px;font-weight:600;margin-left:4px">／月（税込）</small></div>
+      <div class="amount">${price}<small>／月（税込）</small></div>
       <p class="small">1か月ごとの自動更新です。いつでも解約でき、解約後も契約期間の終わりまでご利用いただけます。${trialDays ? `初めての方は${trialDays}日間無料です（お支払い方法の登録が必要。期間が終わると自動で課金が始まります）。` : ''}</p>
       <ul class="dots small">
         <li>連携できるSNSアカウントは${L.maxAccounts}件まで</li>
@@ -418,9 +464,9 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
         <tr>${th('無料体験')}<td>${trialDays ? `${trialDays}日間（初めての方）` : 'なし'}</td><td>${COMPARE.trial}</td></tr>
       </table></div>
       <p class="small">${COMPARE.name}の価格・条件は、${checked}に同社の公式サイト（料金と概要のページ）で確認したものです（その後、変わっている場合があります）。機能・上限・使えるSNSは、両者で異なります。いちばん安いサービスであることをお約束するものではありません。</p>` : ''}
-      ${agencyLp ? `<div style="border-top:1px solid #C9C2B3;margin-top:18px;padding-top:14px" id="agency-plan">
+      ${agencyLp ? `<div class="sub" id="agency-plan">
         <h3>${escapeHtml(core.PLAN_LABEL.agency)}</h3>
-        <div style="font-size:42px;font-weight:800;line-height:1.2">${agencyPrice}<small style="font-size:14px;font-weight:600;margin-left:4px">／月（税込）</small></div>
+        <div class="amount">${agencyPrice}<small>／月（税込）</small></div>
         <p class="small">SNSの運用を代行するなど、たくさんのアカウントを扱う方のためのプランです。連携できるSNSアカウントを${agencyMax}件までにした、通常プランの上位のプランです。1か月ごとの自動更新で、いつでも解約できます。</p>
         <ul class="dots small">
           <li>連携できるSNSアカウントは${agencyMax}件まで（通常プランは${L.maxAccounts}件まで）</li>
@@ -431,6 +477,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
         ${billingReady && user ? `<a class="btn-lp" href="/service/checkout?plan=agency">${escapeHtml(core.PLAN_LABEL.agency)}で申込みに進む</a>` : ''}
       </div>` : ''}
       ${cta('pricing')}
+      </div>
     </section>
 
     <section>
@@ -445,7 +492,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
     </section>
 
     <section>
-      <span class="tag">よくある質問</span>
+      ${tag('09', 'よくある質問')}
       <h2>よくある質問</h2>
       <details><summary>どのSNSに投稿できますか？</summary><p>${names ? `現在は、${escapeHtml(names)}に投稿できます。` : '対応SNSは準備中です。'}${ttLimited ? ttNote : ''}各SNSの審査・仕様により、使える機能や公開範囲が制限される場合があります。</p></details>
       ${xLive() ? '' : '<details><summary>Xには投稿できますか？</summary><p>現在、Xへの投稿は提供していません。</p></details>'}
