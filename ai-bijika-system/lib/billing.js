@@ -12,6 +12,8 @@ function config(env = process.env) {
     secretKey: env.STRIPE_SECRET_KEY || '',
     webhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
     priceId: env.STRIPE_PRICE_ID || '',
+    // 30件プラン（SNS運用代行向け）の価格ID。未設定なら30件プランは売らない（lib/service-core.js の agencyOffered）
+    priceIdAgency: env.STRIPE_PRICE_ID_AGENCY || '',
     baseUrl: String(env.SERVICE_BASE_URL || '').replace(/\/+$/, ''),
   };
 }
@@ -22,7 +24,8 @@ function isConfigured(env = process.env) {
   return !!(c.secretKey && c.webhookSecret && c.priceId && /^https?:\/\//.test(c.baseUrl));
 }
 
-async function stripeRequest(method, path, params) {
+// opts.idempotencyKey：同じ呼び出しを繰り返しても1回しか実行されないようにする Idempotency-Key ヘッダー（Stripeの公式の仕組み。24時間で失効）
+async function stripeRequest(method, path, params, opts = {}) {
   const c = config();
   if (!c.secretKey) throw new Error('STRIPE_SECRET_KEY が未設定です');
   const body = params ? encodeForm(params) : null;
@@ -30,6 +33,7 @@ async function stripeRequest(method, path, params) {
     host: STRIPE_HOST, method, path,
     headers: {
       Authorization: `Bearer ${c.secretKey}`,
+      ...(opts.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : {}),
       ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
     },
     body: body || undefined,
@@ -42,11 +46,13 @@ async function stripeRequest(method, path, params) {
 }
 
 // Checkout（サブスクリプション）の作成。戻り値は Stripe の決済ページURL
-async function createCheckoutSession({ userId, email, customerId, trialDays = 0 }) {
+// plan：'standard'（通常）／'agency'（30件プラン。STRIPE_PRICE_ID_AGENCY が未設定なら作らない）
+async function createCheckoutSession({ userId, email, customerId, trialDays = 0, plan = 'standard' }) {
   const c = config();
+  if (plan === 'agency' && !c.priceIdAgency) throw new Error('30件プランの価格（STRIPE_PRICE_ID_AGENCY）が未設定です');
   const params = {
     mode: 'subscription',
-    'line_items': [{ price: c.priceId, quantity: 1 }],
+    'line_items': [{ price: plan === 'agency' ? c.priceIdAgency : c.priceId, quantity: 1 }],
     success_url: `${c.baseUrl}/service/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${c.baseUrl}/service/checkout/cancel`,
     client_reference_id: userId,
@@ -108,16 +114,30 @@ function applySubscription(sub, hintedUserId, createdSec) {
   if (known && known.stripe_subscription_id && known.stripe_subscription_id !== sub.id && ['canceled', 'incomplete_expired'].includes(sub.status)) return known;
   if (createdSec && known && known.stripe_event_created > createdSec) return known; // 古い情報は無視
   const item = sub.items && sub.items.data && sub.items.data[0];
+  const priceId = (item && item.price && item.price.id) || '';
+  // プランは、契約の価格IDから判定して同期する（Webhookが唯一の真実）。どちらの価格でもない・価格が付いていないイベントでは、プランを変えない
+  const plan = require('./service-core').planFromPriceId(priceId);
+  const nowPlan = plan || (known && known.plan) || 'standard';
+  // 次回の更新日からの切り替えの予約：切り替わった（プランが予約のプランになった）か、Stripe側で予約が無くなった（schedule が null）ら空にする
+  // （schedule の項目が無いオブジェクトでは判断しない）
+  let pending = (known && known.pending_plan) || '';
+  if (pending && (nowPlan === pending || sub.schedule === null)) pending = '';
   const saved = Subscriptions.upsert(userId, {
+    ...(plan ? { plan } : {}),
+    pending_plan: pending,
     stripe_customer_id: customerId,
     stripe_subscription_id: sub.id,
     status: sub.status,
     current_period_end: periodEndOf(sub),
     cancel_at_period_end: !!sub.cancel_at_period_end,
-    price_id: (item && item.price && item.price.id) || '',
+    price_id: priceId,
     stripe_event_created: createdSec || (known && known.stripe_event_created) || 0,
   });
-  if (sub.status === 'canceled' || sub.status === 'incomplete_expired') endAccess(userId);
+  if (sub.status === 'canceled' || sub.status === 'incomplete_expired') {
+    endAccess(userId);
+    // 紹介された人が、最初の有料の請求の前に契約を終えたら、紹介の特典は付けない
+    require('./referral').onSubscriptionEnded(userId);
+  }
   return saved;
 }
 
@@ -183,7 +203,12 @@ async function handleEvent(event) {
     case 'invoice.payment_failed': {
       const subId = typeof obj.subscription === 'string' ? obj.subscription
         : (obj.parent && obj.parent.subscription_details && obj.parent.subscription_details.subscription) || '';
-      if (subId) applySubscription(await stripeRequest('GET', `/v1/subscriptions/${encodeURIComponent(subId)}`), undefined, Math.floor(Date.now() / 1000));
+      if (subId) {
+        const saved = applySubscription(await stripeRequest('GET', `/v1/subscriptions/${encodeURIComponent(subId)}`), undefined, Math.floor(Date.now() / 1000));
+        // 紹介された人の、無料期間のあとの最初の有料の請求（amount_paid > 0）が払われたら、紹介した人に特典を付ける。
+        // 付与に失敗したら例外のまま（Webhookが500になり、Stripeが再送する。このイベントは処理済みにしない）
+        if (event.type === 'invoice.paid' && saved && Number(obj.amount_paid) > 0) await require('./referral').onFirstPaidInvoice(saved.user_id);
+      }
       break;
     }
     default:
@@ -214,13 +239,102 @@ async function syncCheckoutSession(userId, sessionId) {
 async function setCancelAtPeriodEnd(userId, cancel) {
   const s = Subscriptions.get(userId);
   if (!s || !s.stripe_subscription_id) throw new Error('契約情報が見つかりません');
+  // 通常プランへの切り替えを予約している（subscription schedule が付いている）間は、先に予約を外す
+  // （schedule が付いた契約を直接更新できるかは未確認。解約すれば切り替えは不要になるため）
+  if (cancel && s.pending_plan) await releasePlanSchedule(userId);
   const sub = await stripeRequest('POST', `/v1/subscriptions/${encodeURIComponent(s.stripe_subscription_id)}`, {
     cancel_at_period_end: cancel ? 'true' : 'false',
   });
   return applySubscription(sub, userId, Math.floor(Date.now() / 1000));
 }
 
+// ── プランの変更 ──
+// 通常→30件：すぐ切り替える。契約の items の価格を入れ替え、日割りは proration_behavior=create_prorations（次回の請求に日割りの差額が載る）。
+// 30件→通常：次回の更新日から。Stripe の subscription schedule（from_subscription で作り、現在の期間のあとに通常の価格のフェーズを足す）で予約する。
+//   連携が通常プランの上限を超えているときは断る（解除してから変えてもらう）。無料期間中は、まだ請求が無いため、すぐ切り替える（最初の請求から通常の価格）。
+// ※ 呼び出し方は Stripe の公式ドキュメント（Subscription schedules・Update a subscription）に合わせたが、実物のStripe（テストモード）では未確認。
+const NOW_SEC = () => Math.floor(Date.now() / 1000);
+const priceIdOf = (price) => (price && typeof price === 'object' ? price.id : price) || '';
+const fail = (error) => ({ ok: false, error });
+
+async function changePlan(userId, target) {
+  const core = require('./service-core');
+  const c = config();
+  const cur = Subscriptions.get(userId);
+  if (!['standard', 'agency'].includes(target)) return fail('プランが正しくありません。');
+  if (!cur || !cur.stripe_subscription_id) return fail('契約情報が見つかりません。');
+  if (!['active', 'trialing'].includes(cur.status)) return fail('お支払いが確認できている契約のときだけ、プランを変更できます。');
+  if (cur.cancel_at_period_end) return fail('解約の手続き中は、プランを変更できません。先に解約を取り消してください。');
+  const plan = core.planOf(cur);
+  const subPath = `/v1/subscriptions/${encodeURIComponent(cur.stripe_subscription_id)}`;
+
+  if (target === plan) {
+    // 30件プランで、通常への切り替えを予約している場合の「予約の取り消し」
+    if (plan === 'agency' && cur.pending_plan === 'standard') { await releasePlanSchedule(userId); return { ok: true, released: true }; }
+    return { ok: true, unchanged: true };
+  }
+
+  if (target === 'agency') {
+    if (!core.agencyOffered() || !c.priceIdAgency) return fail('30件プランは、現在お申込みいただけません。');
+    const sub = await stripeRequest('GET', subPath);
+    const items = (sub.items && sub.items.data) || [];
+    if (items.length !== 1) return fail('契約の内容を確認できませんでした。お問い合わせください。');
+    if (sub.schedule) return fail('予約中の変更があるため、プランを変更できません。お問い合わせください。');
+    const updated = await stripeRequest('POST', subPath, {
+      items: [{ id: items[0].id, price: c.priceIdAgency }],
+      proration_behavior: 'create_prorations',
+    });
+    applySubscription(updated, userId, NOW_SEC());
+    // Webhookの前に画面へ反映する（価格IDから判定できなかった場合に備えて、変更したプランを直接保存する）
+    Subscriptions.upsert(userId, { plan: 'agency' });
+    return { ok: true, plan: 'agency' };
+  }
+
+  // 30件 → 通常
+  const n = SnsAccounts.countForUser(userId);
+  const max = core.LIMITS.maxAccounts;
+  if (n > max) return fail(`連携しているSNSアカウントが${n}件あります。通常プランは${max}件までのため、${n - max}件以上を解除してから変更してください。`);
+  if (cur.pending_plan === 'standard') return { ok: true, unchanged: true };
+  const sub = await stripeRequest('GET', subPath);
+  const items = (sub.items && sub.items.data) || [];
+  if (items.length !== 1) return fail('契約の内容を確認できませんでした。お問い合わせください。');
+  if (sub.schedule) return fail('予約中の変更があるため、プランを変更できません。お問い合わせください。');
+  if (sub.status === 'trialing') {
+    const updated = await stripeRequest('POST', subPath, { items: [{ id: items[0].id, price: c.priceId }], proration_behavior: 'none' });
+    applySubscription(updated, userId, NOW_SEC());
+    Subscriptions.upsert(userId, { plan: 'standard' });
+    return { ok: true, plan: 'standard', immediate: true };
+  }
+  const sched = await stripeRequest('POST', '/v1/subscription_schedules', { from_subscription: sub.id });
+  const p0 = sched && sched.phases && sched.phases[0];
+  const i0 = p0 && p0.items && p0.items[0];
+  if (!sched.id || !p0 || !i0) return fail('プランの変更を予約できませんでした。時間をおいてもう一度お試しください。');
+  // 更新では、残す現在のフェーズも、指定しない項目は消えるため、全部渡す（公式の説明）。契約のメタデータ（user_id）も渡す
+  await stripeRequest('POST', `/v1/subscription_schedules/${encodeURIComponent(sched.id)}`, {
+    end_behavior: 'release',
+    phases: [
+      { items: [{ price: priceIdOf(i0.price), quantity: i0.quantity || 1 }], start_date: p0.start_date, end_date: p0.end_date, metadata: { user_id: userId } },
+      { items: [{ price: c.priceId, quantity: 1 }], duration: { interval: 'month', interval_count: 1 }, proration_behavior: 'none', metadata: { user_id: userId } },
+    ],
+  });
+  // 古いイベントで予約の表示が消えないよう、確定した時刻も進める
+  Subscriptions.upsert(userId, { pending_plan: 'standard', stripe_event_created: NOW_SEC() });
+  return { ok: true, plan: 'agency', scheduled: 'standard' };
+}
+
+// 通常プランへの切り替えの予約を取り消す（契約はそのまま。subscription schedule を release する）
+async function releasePlanSchedule(userId) {
+  const cur = Subscriptions.get(userId);
+  if (!cur || !cur.stripe_subscription_id) return { ok: false };
+  const sub = await stripeRequest('GET', `/v1/subscriptions/${encodeURIComponent(cur.stripe_subscription_id)}`);
+  const sid = sub.schedule && typeof sub.schedule === 'object' ? sub.schedule.id : sub.schedule;
+  if (sid) await stripeRequest('POST', `/v1/subscription_schedules/${encodeURIComponent(sid)}/release`);
+  Subscriptions.upsert(userId, { pending_plan: '' });
+  return { ok: true };
+}
+
 module.exports = {
+  changePlan, releasePlanSchedule,
   isConfigured, config, createCheckoutSession, createPortalSession, verifyWebhook, handleEvent,
   setCancelAtPeriodEnd, applySubscription, stripeRequest, syncCheckoutSession, endAccess, grantTest, revokeTest,
 };

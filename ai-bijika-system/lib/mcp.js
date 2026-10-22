@@ -44,8 +44,8 @@ function accountInfo(userId) {
   const [mf, mt] = core.jstMonthBounds(nowIso);
   const day = ai.day();
   return {
-    subscription: { status: sub.status || 'none', current_period_end: sub.current_period_end || '', cancel_at_period_end: !!sub.cancel_at_period_end },
-    limits: { accounts: core.LIMITS.maxAccounts, pending: core.LIMITS.maxPending, per_day: core.LIMITS.maxPerDay, x_per_month: core.LIMITS.xPerMonth, ai_per_day: ai.limits() },
+    subscription: { status: sub.status || 'none', plan: core.planOf(sub), pending_plan: sub.pending_plan || '', current_period_end: sub.current_period_end || '', cancel_at_period_end: !!sub.cancel_at_period_end },
+    limits: { accounts: core.accountLimitFor(userId), pending: core.LIMITS.maxPending, per_day: core.LIMITS.maxPerDay, x_per_month: core.LIMITS.xPerMonth, ai_per_day: ai.limits() },
     usage: { accounts: st.SnsAccounts.countForUser(userId), pending: st.ScheduledPosts.countPending(userId), drafts: st.ScheduledPosts.countDrafts(userId),
       x_this_month: st.ScheduledPosts.countXUnits(userId, mf, mt), ai_today: { text: st.AiUsage.used(userId, day, 'text'), image: st.AiUsage.used(userId, day, 'image'), video: st.AiUsage.used(userId, day, 'video') } },
     ai_available: ai.available(),
@@ -169,4 +169,4 @@ async function handle({ req, res, method, pathname }) {
   return true;
 }
 
-module.exports = { handle, TOOLS };
+module.exports = { handle, TOOLS, accountInfo };

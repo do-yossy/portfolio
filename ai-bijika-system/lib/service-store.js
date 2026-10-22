@@ -164,6 +164,10 @@ try { db.exec("ALTER TABLE auto_rules ADD COLUMN options TEXT DEFAULT '{}'"); } 
 try { db.exec("ALTER TABLE ai_jobs ADD COLUMN payload TEXT DEFAULT ''"); } catch { /* 既にある */ }
 // テスト利用を付ける前の状態（取り消すときに戻す）
 try { db.exec("ALTER TABLE subscriptions ADD COLUMN pre_test_status TEXT DEFAULT ''"); } catch { /* 既にある */ }
+// プラン：'standard'（通常。連携10件）／'agency'（SNS運用代行向け。連携30件）。Stripeの契約の価格IDから判定して同期する（lib/billing.js の applySubscription）。
+// pending_plan：次回の更新日から切り替わる予約中のプラン（30件→通常。Stripeの subscription schedule で予約する）。切り替わった・取り消したら空にする
+try { db.exec("ALTER TABLE subscriptions ADD COLUMN plan TEXT NOT NULL DEFAULT 'standard'"); } catch { /* 既にある */ }
+try { db.exec("ALTER TABLE subscriptions ADD COLUMN pending_plan TEXT NOT NULL DEFAULT ''"); } catch { /* 既にある */ }
 // AIで作ったメディアか（TikTokなどで「AI生成」の表示をするため）
 try { db.exec("ALTER TABLE media_assets ADD COLUMN ai_generated INTEGER NOT NULL DEFAULT 0"); } catch { /* 既にある */ }
 // SNS側の利用者IDの控え（Meta から届く、データ削除の求め・連携の取り消しの知らせの照合に使う。lib/meta-deletion.js）
@@ -234,18 +238,18 @@ const Subscriptions = {
     const cur = this.get(userId);
     if (!cur) {
       db.prepare(`INSERT INTO subscriptions (user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end,
-        cancel_at_period_end, price_id, agreed_at, agreed_version, stripe_event_created, pre_test_status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        cancel_at_period_end, price_id, agreed_at, agreed_version, stripe_event_created, pre_test_status, plan, pending_plan, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         userId, fields.stripe_customer_id || '', fields.stripe_subscription_id || '', fields.status || 'none',
         fields.current_period_end || '', fields.cancel_at_period_end ? 1 : 0, fields.price_id || '',
-        fields.agreed_at || '', fields.agreed_version || '', fields.stripe_event_created || 0, fields.pre_test_status || '', t, t);
+        fields.agreed_at || '', fields.agreed_version || '', fields.stripe_event_created || 0, fields.pre_test_status || '', fields.plan || 'standard', fields.pending_plan || '', t, t);
       return this.get(userId);
     }
     const next = { ...cur, ...fields };
     db.prepare(`UPDATE subscriptions SET stripe_customer_id=?, stripe_subscription_id=?, status=?, current_period_end=?,
-      cancel_at_period_end=?, price_id=?, agreed_at=?, agreed_version=?, stripe_event_created=?, pre_test_status=?, updated_at=? WHERE user_id=?`).run(
+      cancel_at_period_end=?, price_id=?, agreed_at=?, agreed_version=?, stripe_event_created=?, pre_test_status=?, plan=?, pending_plan=?, updated_at=? WHERE user_id=?`).run(
       next.stripe_customer_id || '', next.stripe_subscription_id || '', next.status || 'none', next.current_period_end || '',
-      next.cancel_at_period_end ? 1 : 0, next.price_id || '', next.agreed_at || '', next.agreed_version || '', next.stripe_event_created || 0, next.pre_test_status || '', t, userId);
+      next.cancel_at_period_end ? 1 : 0, next.price_id || '', next.agreed_at || '', next.agreed_version || '', next.stripe_event_created || 0, next.pre_test_status || '', next.plan || 'standard', next.pending_plan || '', t, userId);
     return this.get(userId);
   },
   // サービスを使える状態か（契約中、または解約手続き済みでも期間末まで）
@@ -673,10 +677,89 @@ const ApiKeys = {
   },
 };
 
+// ── 紹介（紹介した人も、紹介された人も、1か月無料）──
+// referral_codes：利用者ごとの紹介コード（推測しにくいランダム。メールアドレスなど個人が分かる情報は含めない）
+// referrals：誰が誰を紹介したかの記録（users 側には持たない）。referred_user_id は一意（1人は1回だけ紹介される）。
+//   status：pending（紹介された人の初回の有料の請求を待っている）／rewarded（特典を付与済み）／held（紹介した人が契約中でなく保留）／
+//           capped（紹介した人の特典の上限に達した）／void（無効。void_reason に理由：self＝自分自身、canceled＝最初の請求の前に解約、prior＝すでに契約したことがある）
+//   reward_granted_at：特典を付ける処理を始めた日時。空のときだけ付与できる（二重に付与しないための印。lib/referral.js）
+db.exec(`
+  CREATE TABLE IF NOT EXISTS referral_codes (
+    user_id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS referrals (
+    id TEXT PRIMARY KEY,
+    referrer_user_id TEXT NOT NULL,
+    referred_user_id TEXT NOT NULL UNIQUE,
+    code TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    void_reason TEXT NOT NULL DEFAULT '',
+    reward_granted_at TEXT NOT NULL DEFAULT '',
+    reward_amount INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_user_id);
+`);
+
+const ReferralCodes = {
+  // 利用者の紹介コード（なければ作る）。20桁の16進数（80ビットのランダム）で、推測しにくい。メールアドレスなどは含めない
+  forUser(userId) {
+    const ex = db.prepare('SELECT code FROM referral_codes WHERE user_id = ?').get(userId);
+    if (ex) return ex.code;
+    const code = require('crypto').randomBytes(10).toString('hex');
+    db.prepare('INSERT OR IGNORE INTO referral_codes (user_id, code, created_at) VALUES (?, ?, ?)').run(userId, code, now());
+    return db.prepare('SELECT code FROM referral_codes WHERE user_id = ?').get(userId).code;
+  },
+  findUserId(code) {
+    if (!/^[0-9a-f]{20}$/.test(String(code || ''))) return null;
+    const r = db.prepare('SELECT user_id FROM referral_codes WHERE code = ?').get(code);
+    return r ? r.user_id : null;
+  },
+};
+
+const Referrals = {
+  create({ referrerUserId, referredUserId, code, status = 'pending', voidReason = '' }) {
+    const t = now();
+    const id = generateId();
+    const r = db.prepare(`INSERT OR IGNORE INTO referrals (id, referrer_user_id, referred_user_id, code, status, void_reason, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, referrerUserId, referredUserId, code, status, voidReason, t, t);
+    return r.changes === 1 ? id : null;
+  },
+  getByReferred(userId) {
+    return db.prepare('SELECT * FROM referrals WHERE referred_user_id = ?').get(userId) || null;
+  },
+  setStatus(id, status, voidReason = '') {
+    db.prepare('UPDATE referrals SET status = ?, void_reason = ?, updated_at = ? WHERE id = ?').run(status, voidReason, now(), id);
+  },
+  // 特典の付与を始める印を付ける（reward_granted_at が空で、上限未満のときだけ成功＝1文で判定するため、同時に呼ばれても二重に付与しない）
+  claimReward(id, referrerUserId, maxRewards) {
+    return db.prepare(`UPDATE referrals SET status = 'rewarded', reward_granted_at = ?, updated_at = ?
+      WHERE id = ? AND reward_granted_at = '' AND (SELECT COUNT(*) FROM referrals WHERE referrer_user_id = ? AND reward_granted_at <> '') < ?`)
+      .run(now(), now(), id, referrerUserId, maxRewards).changes === 1;
+  },
+  // Stripeへの付与に失敗したとき、印を戻す（Webhookの再送で、もう一度付与する）
+  revertClaim(id) {
+    db.prepare("UPDATE referrals SET status = 'pending', reward_granted_at = '', reward_amount = 0, updated_at = ? WHERE id = ?").run(now(), id);
+  },
+  setRewardAmount(id, amount) {
+    db.prepare('UPDATE referrals SET reward_amount = ?, updated_at = ? WHERE id = ?').run(amount, now(), id);
+  },
+  // 紹介した人の画面に出す件数だけ（紹介された人のメールアドレスなどは返さない）
+  statsFor(referrerUserId) {
+    const rows = db.prepare('SELECT status, COUNT(*) AS n FROM referrals WHERE referrer_user_id = ? GROUP BY status').all(referrerUserId);
+    const by = Object.fromEntries(rows.map((r) => [r.status, r.n]));
+    const total = rows.reduce((n, r) => n + r.n, 0);
+    return { total, pending: by.pending || 0, rewarded: by.rewarded || 0, held: by.held || 0, capped: by.capped || 0, void: by.void || 0 };
+  },
+};
+
 // 複数の行をまとめて書き込む（全部書くか、何も書かないか）。fn は同期の関数
 function transaction(fn) {
   db.exec('BEGIN IMMEDIATE');
   try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { try { db.exec('ROLLBACK'); } catch { /* */ } throw e; }
 }
 
-module.exports = { transaction, migrateLegacyRows, OPEN_STRIPE_STATUSES, UploadTickets, ApiUsage, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };
+module.exports = { ReferralCodes, Referrals, transaction, migrateLegacyRows, OPEN_STRIPE_STATUSES, UploadTickets, ApiUsage, AiUsage, AiJobs, AutoRules, ApiKeys, MAX_API_KEYS, MediaAssets, Subscriptions, StripeEvents, SnsAccounts, OAuthStates, ScheduledPosts, ACTIVE_STATUSES };

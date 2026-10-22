@@ -96,15 +96,27 @@ function quickLimitText(sub) {
   if (ids.includes('facebook')) parts.push('Facebookページ 2,200（かんたん投稿の上限）');
   return parts.length ? parts.join('／') : '対応SNSは準備中です';
 }
-function limitsText() {
+function limitsText(maxAccounts = core.LIMITS.maxAccounts) {
   const L = core.LIMITS;
-  return `連携できるSNSアカウントは${L.maxAccounts}件まで、未投稿の予約は${L.maxPending}件まで、同じ日（日本時間）に投稿する予約は${L.maxPerDay}件まで${xLive() ? `、Xへの投稿は日本時間の暦月ごとに${L.xPerMonth}件まで（ツリーは1件ずつ数えます。毎日Xへ自動運用すると、月の上限をほぼ使い切ります）` : ''}です`;
+  return `連携できるSNSアカウントは${maxAccounts}件まで、未投稿の予約は${L.maxPending}件まで、同じ日（日本時間）に投稿する予約は${L.maxPerDay}件まで${xLive() ? `、Xへの投稿は日本時間の暦月ごとに${L.xPerMonth}件まで（ツリーは1件ずつ数えます。毎日Xへ自動運用すると、月の上限をほぼ使い切ります）` : ''}です`;
 }
 const END_TEXT = '契約期間が終わると、SNSの連携情報を削除し、未投稿の予約・下書きと自動運用の設定を取り消し、AIアシスタントとの接続とAPIキーを無効にします（再開するときは、連携をやり直してください）';
 const FILE_TEXT = 'アップロード・取り込み・AIで作ったファイルは、画像（JPEG・PNG）が8MBまで、動画（MP4・MOV）が100MBまで、保存できる合計は1人あたり300MBまでです。予約・下書きに使っているファイルは、その投稿が終わるか取り消されるまで保存し、投稿が終わってから2日後以降に自動で削除します。どの投稿にも使わなかったファイルは、作成から1日後以降に自動で削除します。各SNSが取得できるよう、保存している間は、推測できない長いURLで外部から取得できる状態になります';
 function trialText(trialDays, price) {
   return `初めてお申し込みの方は、お申込みの完了から${trialDays}日間は無料です（終了日時は、お申込み後にマイページに表示します）。お申込みの際に、お支払い方法（クレジットカード）の登録が必要です。終了日時になると自動で有料の契約に切り替わり、その時点で初回の月額${price}を請求します。終了日時より前に解約すれば、料金はかかりません`;
 }
+
+// 紹介の表記（見出し・条件）。マイページの紹介カードで使う文。規約（第4条の2）・特商法表記・登録画面・最終確認画面も、同じ言い方にそろえる
+const REFERRAL_HEADLINE = '紹介された人は30日間無料。紹介した人には、条件を満たすと1か月分の利用料金に相当するクレジットが付きます';
+const REFERRAL_CONDITIONS = '条件あり：無料期間のあとは自動で課金が始まります／特典は、紹介された人が最初に支払ったあとに付きます／特典には上限があります';
+const REFERRAL_RULES = [
+  '紹介された人は、紹介のURLから登録した場合に限り、初めてのお申込みのとき30日間無料です（お支払い方法の登録が必要で、無料期間が終わると自動で課金が始まります）。すでに契約したことがある人は対象外です',
+  '紹介した人への特典（1か月分の利用料金に相当するクレジット）は、紹介された人が無料期間のあとの最初の有料の請求を支払ったあとに付きます（請求の前に解約した場合は付きません）。紹介した人の契約が続いていないときは付きません。特典は、直接紹介した人の分だけです',
+  '特典は、次回以降の請求から自動で差し引くクレジットです（現金への交換・返金はできません）。1人が受けられる特典は、最大{limit}件までです',
+  '紹介するときは、紹介特典を受ける立場であることが分かるように、「PR」「紹介特典あり」などと表示してください',
+  '「必ず稼げる」「ずっと無料で使える」などの虚偽・誇大な説明、無差別なDM・メール・大量投稿などの迷惑な勧誘はしないでください。各SNSの規約を守ってください',
+  '自分自身や、同じ人と判断できる別のメールアドレスの紹介は無効です。上の表示・勧誘のルールに重大な違反があるとき（または、是正を求めても改められないとき）や、不正な紹介と確認したとき、または紹介された人の最初の支払いが返金・チャージバックになったときは、特典の取り消しや利用の停止（特典・無料期間を与えないことを含みます）をすることがあります。取り消すときは理由をお知らせし、取り消す範囲は未使用のクレジットの残高の範囲です（すでに使った分は請求しません）',
+];
 
 function landingPage({ user, billingReady, trialDays = 0 }) {
   const price = yen(core.priceYen());
@@ -255,6 +267,11 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
   const ttNote = `TikTokは、このサービスがTikTokの投稿の監査（Audit）を通るまで、${TT_PRE_AUDIT}です。`;
   const ours = `未投稿の予約${L.maxPending}件まで、同じ日（日本時間）に投稿する予約${L.maxPerDay}件まで${xLive() ? `、Xは月${L.xPerMonth}件まで` : ''}`;
   const treeNames = live.filter((p) => p.id === 'threads' || p.id === 'x').map((p) => p.label).join('と');
+  // 30件プラン（SNS運用代行の人向け）は、Stripeの価格（STRIPE_PRICE_ID_AGENCY）と表示する月額（SERVICE_PRICE_JPY_AGENCY）が設定されているときだけ出す。
+  // 上の比較（サービスA）は通常プランだけの比較で、30件プランは混ぜない
+  const agencyLp = core.agencyOnLp();
+  const agencyPrice = yen(core.priceYen('agency'));
+  const agencyMax = L.maxAccountsAgency;
   const cta = (where) => billingReady
     ? `<a class="btn-lp" href="${user ? '/service/checkout' : '/service/signup'}">${user ? '申込みに進む' : 'アカウントを作って申し込む'}</a>
        <p class="small" style="text-align:center">アカウントは無料で作れます。お支払いは、確認画面で内容をご確認いただいたあとに始まります。${trialDays ? `初めての方は${trialDays}日間無料です（お支払い方法の登録が必要。期間が終わると自動で課金が始まります）。` : ''}</p>`
@@ -281,7 +298,7 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
       <div class="stats">
         <div class="stat"><b>${live.length ? `${live.length}つ` : '準備中'}</b><span>使えるSNS</span></div>
         <div class="stat"><b>90日</b><span>先まで予約できる</span></div>
-        <div class="stat"><b>${L.maxAccounts}件</b><span>連携できるアカウント（最大）</span></div>
+        <div class="stat"><b>${L.maxAccounts}件</b><span>${agencyLp ? `連携できるアカウント（通常プラン。${agencyMax}件のプランもあります）` : '連携できるアカウント（最大）'}</span></div>
       </div>
       ${cta('hero')}
     </section>
@@ -379,7 +396,8 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
 
     <section class="paper">
       <span class="tag" style="color:#0B6B57;border-color:#0B6B57">料金</span>
-      <h2>プランはひとつだけ。</h2>
+      <h2>${agencyLp ? 'プランは2つ。' : 'プランはひとつだけ。'}</h2>
+      ${agencyLp ? '<h3>通常プラン</h3>' : ''}
       <div style="font-size:42px;font-weight:800;line-height:1.2">${price}<small style="font-size:14px;font-weight:600;margin-left:4px">／月（税込）</small></div>
       <p class="small">1か月ごとの自動更新です。いつでも解約でき、解約後も契約期間の終わりまでご利用いただけます。${trialDays ? `初めての方は${trialDays}日間無料です（お支払い方法の登録が必要。期間が終わると自動で課金が始まります）。` : ''}</p>
       <ul class="dots small">
@@ -400,6 +418,18 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
         <tr>${th('無料体験')}<td>${trialDays ? `${trialDays}日間（初めての方）` : 'なし'}</td><td>${COMPARE.trial}</td></tr>
       </table></div>
       <p class="small">${COMPARE.name}の価格・条件は、${checked}に同社の公式サイト（料金と概要のページ）で確認したものです（その後、変わっている場合があります）。機能・上限・使えるSNSは、両者で異なります。いちばん安いサービスであることをお約束するものではありません。</p>` : ''}
+      ${agencyLp ? `<div style="border-top:1px solid #C9C2B3;margin-top:18px;padding-top:14px" id="agency-plan">
+        <h3>${escapeHtml(core.PLAN_LABEL.agency)}</h3>
+        <div style="font-size:42px;font-weight:800;line-height:1.2">${agencyPrice}<small style="font-size:14px;font-weight:600;margin-left:4px">／月（税込）</small></div>
+        <p class="small">SNSの運用を代行するなど、たくさんのアカウントを扱う方のためのプランです。連携できるSNSアカウントを${agencyMax}件までにした、通常プランの上位のプランです。1か月ごとの自動更新で、いつでも解約できます。</p>
+        <ul class="dots small">
+          <li>連携できるSNSアカウントは${agencyMax}件まで（通常プランは${L.maxAccounts}件まで）</li>
+          <li>${ours}（通常プランと同じです）</li>
+          <li>通常プランのそのほかの機能は、すべて同じです</li>
+        </ul>
+        <p class="small">お申込みの最終確認画面で、プランを選べます。申込みのあとも、マイページから通常プランとの間で変更できます（30件から通常への変更は、次回の更新日からです。連携が${L.maxAccounts}件を超えている間は変更できません）。</p>
+        ${billingReady && user ? `<a class="btn-lp" href="/service/checkout?plan=agency">${escapeHtml(core.PLAN_LABEL.agency)}で申込みに進む</a>` : ''}
+      </div>` : ''}
       ${cta('pricing')}
     </section>
 
@@ -432,19 +462,20 @@ function lpPage({ user, billingReady, trialDays = 0 }) {
 }
 
 // ── ログイン・登録 ──
-function authPage(kind, error, next = '') {
+function authPage(kind, error, next = '', ref = '') {
   const signup = kind === 'signup';
   return wrap(signup ? 'アカウント作成' : 'ログイン', `
     ${topNav(null)}
     <div class="auth"><div class="auth-head">${crest(58)}<h1>${signup ? 'アカウント作成' : 'ログイン'}</h1>
       <p class="lead">${signup ? 'メールアドレスとパスワードを登録します（無料）。' : 'ご契約のアカウントでログインしてください。'}</p></div>
       ${error ? `<div class="notice error" style="margin:0 0 14px"><div>${escapeHtml(error)}</div></div>` : ''}
-      <div class="card"><form method="POST" action="/service/${signup ? 'signup' : 'login'}">${next ? `<input type="hidden" name="next" value="${escapeHtml(next)}">` : ''}
+      <div class="card"><form method="POST" action="/service/${signup ? 'signup' : 'login'}">${next ? `<input type="hidden" name="next" value="${escapeHtml(next)}">` : ''}${signup && ref ? `<input type="hidden" name="ref" value="${escapeHtml(ref)}">` : ''}
         <div class="field"><label class="lbl" for="email">メールアドレス</label><input id="email" type="email" name="email" required autofocus autocomplete="email"></div>
         <div class="field"><label class="lbl" for="password">パスワード${signup ? '（8文字以上）' : ''}</label>
           <input id="password" type="password" name="password" required minlength="8" autocomplete="${signup ? 'new-password' : 'current-password'}"></div>
         <button class="btn btn-primary btn-block" type="submit">${signup ? 'アカウントを作成' : 'ログイン'}</button>
       </form></div>
+      ${signup && ref ? '<div class="notice"><div><b>紹介された人は30日間無料です。</b>紹介のURLから登録しています。紹介のコードが有効な場合、初めてのお申込みのとき30日間無料です。条件あり：お支払い方法の登録が必要で、無料期間が終わると自動で課金が始まります。</div></div>' : ''}
       <p class="muted center">${signup ? 'アカウントをお持ちの方は <a href="/service/login">ログイン</a>' : 'はじめての方は <a href="/service/signup">アカウント作成</a>'}</p>
     </div>
     ${legalLinks()}
@@ -452,9 +483,17 @@ function authPage(kind, error, next = '') {
 }
 
 // ── 申込みの最終確認 ──
-function checkoutPage({ user, csrf, error, trialDays = 0 }) {
-  const price = yen(core.priceYen());
+function checkoutPage({ user, csrf, error, trialDays = 0, plan = 'standard', agencyOffered = false, referral = false }) {
+  // plan：選んだプラン。30件プランは、agencyOffered（STRIPE_PRICE_ID_AGENCY が設定されている）ときだけ選べる
+  const chosen = plan === 'agency' && agencyOffered ? 'agency' : 'standard';
+  const price = yen(core.priceYen(chosen));
+  const maxAcc = core.maxAccountsFor(chosen);
+  const planLabel = escapeHtml(core.PLAN_LABEL[chosen]);
   const names = snsNames();
+  const other = chosen === 'agency' ? 'standard' : 'agency';
+  const planRow = agencyOffered
+    ? `<tr><th>プラン</th><td><b>${planLabel}</b>（連携できるSNSアカウントは${maxAcc}件まで・月額 ${price}）<br><span class="small">${escapeHtml(core.PLAN_LABEL[other])}（連携${core.maxAccountsFor(other)}件まで・月額 ${yen(core.priceYen(other))}）にする場合は、<a href="/service/checkout?plan=${other}">こちら</a>から選び直してください。申込みのあとも、マイページで変更できます（30件から通常への変更は、次回の更新日からです）。</span></td></tr>`
+    : '';
   return wrap('お申込みの最終確認', `
     ${topNav(user)}
     <header class="page-head"><div class="eyebrow">Confirm</div><h1>お申込みの最終確認</h1>
@@ -463,14 +502,15 @@ function checkoutPage({ user, csrf, error, trialDays = 0 }) {
     <div class="card">
       <table class="t kv">
         <tr><th>サービス</th><td>${nameOf()}</td></tr>
+        ${planRow}
         <tr><th>料金</th><td><b>月額 ${price}（税込）</b></td></tr>
-        ${trialDays ? `<tr><th>無料期間</th><td><b>お申込みの完了から${trialDays}日間は無料</b>です（終了日時は、お申込み後にマイページに表示します）。決済ページで、お支払い方法の登録が必要です。<b>終了日時になると自動で有料の契約に切り替わり、その時点で初回の月額 ${price} を請求します。</b>料金をかけずにやめる場合は、終了日時より前に、マイページの「解約する」から手続きしてください。</td></tr>` : ''}
+        ${trialDays ? `<tr><th>無料期間</th><td>${referral ? '<b>紹介された人は30日間無料（条件あり）：</b>' : ''}<b>お申込みの完了から${trialDays}日間は無料</b>です（終了日時は、お申込み後にマイページに表示します）。決済ページで、お支払い方法の登録が必要です。<b>終了日時になると自動で有料の契約に切り替わり、その時点で初回の月額 ${price} を請求します。</b>料金をかけずにやめる場合は、終了日時より前に、マイページの「解約する」から手続きしてください。${referral ? '紹介による無料期間は、初めてのお申込みのときだけです。' : ''}</td></tr>` : ''}
         <tr><th>お支払いの時期</th><td>${trialDays ? `無料期間の終了日時に、初回の ${price} を請求します。` : '決済ページでお支払いが完了した時点で、初回の料金をお支払いいただきます。'}2回目以降は、毎月、契約の更新日に自動で請求します。</td></tr>
         <tr><th>提供の時期</th><td>決済ページでの手続きが完了した直後から、ご利用いただけます。</td></tr>
         <tr><th>契約期間と更新</th><td>1か月ごとの自動更新です。解約しない限り、毎月、同じ日に ${price} が、お支払い方法に請求されます。</td></tr>
         <tr><th>解約の方法</th><td>ログイン後のマイページにある「解約する」ボタンから、いつでも手続きできます。解約すると、次回の更新が止まります。解約後も、${trialDays ? '無料期間または' : ''}すでにお支払いいただいた契約期間の終わりまでは、ご利用いただけます。${END_TEXT}。</td></tr>
         <tr><th>返金</th><td>お支払い済みの料金は、法令上必要な場合を除き、返金いたしません（日割りでの返金もありません）。お支払いが確認できない間は、予約した投稿を実行しません。</td></tr>
-        <tr><th>対応SNSと上限</th><td>${names ? `${escapeHtml(names)}。` : '対応SNSは準備中です。'}${limitsText()}。${aiLimitsText() ? `${aiLimitsText()}。` : ''}</td></tr>
+        <tr><th>対応SNSと上限</th><td>${names ? `${escapeHtml(names)}。` : '対応SNSは準備中です。'}${limitsText(maxAcc)}。${aiLimitsText() ? `${aiLimitsText()}。` : ''}</td></tr>
         <tr><th>SNSごとの条件</th><td>${names ? `${escapeHtml(snsRulesText())}。` : ''}各SNS側の審査・仕様により、使える機能や公開範囲が制限される場合があります。</td></tr>
         <tr><th>ファイル</th><td>${FILE_TEXT}。</td></tr>
         <tr><th>お支払い方法</th><td>クレジットカード（決済代行：Stripe）。カード情報は当サービスには保存されません。</td></tr>
@@ -479,8 +519,9 @@ function checkoutPage({ user, csrf, error, trialDays = 0 }) {
     ${legalLinks()}
     <form method="POST" action="/service/checkout" class="card">
       <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
+      <input type="hidden" name="plan" value="${chosen}">
       <label class="check"><input type="checkbox" name="agree" value="1" required>
-        <span class="small"><a href="/service/legal/terms" target="_blank" rel="noopener">利用規約</a>と<a href="/service/legal/tokushoho" target="_blank" rel="noopener">特定商取引法に基づく表記</a>、<a href="/service/legal/privacy" target="_blank" rel="noopener">プライバシーポリシー</a>を読み、上記の内容（${trialDays ? `${trialDays}日間の無料期間のあと自動で` : ''}月額 ${price}・自動更新・返金なし）に同意します。</span></label>
+        <span class="small"><a href="/service/legal/terms" target="_blank" rel="noopener">利用規約</a>と<a href="/service/legal/tokushoho" target="_blank" rel="noopener">特定商取引法に基づく表記</a>、<a href="/service/legal/privacy" target="_blank" rel="noopener">プライバシーポリシー</a>を読み、上記の内容（${agencyOffered ? `${planLabel}・連携${maxAcc}件まで・` : ''}${trialDays ? `${trialDays}日間の無料期間のあと自動で` : ''}月額 ${price}・自動更新・返金なし）に同意します。</span></label>
       <button class="btn btn-primary btn-block" type="submit" style="margin-top:10px">${trialDays ? `同意して無料期間を始める（${trialDays}日後から月額 ${price}）` : `同意して支払いへ進む（月額 ${price}）`}</button>
     </form>
   `);
@@ -527,7 +568,7 @@ function usageCard(userId, sub) {
   const [mf, mt] = core.jstMonthBounds(nowIso);
   const L = core.LIMITS; const day = aiLib().day(); const av = aiLib().available(); const al = aiLib().limits();
   const rows = [
-    ['連携しているSNSアカウント', `${st.SnsAccounts.countForUser(userId)} / ${L.maxAccounts}件`],
+    ['連携しているSNSアカウント', `${st.SnsAccounts.countForUser(userId)} / ${core.accountLimitFor(userId)}件`],
     ['未投稿の予約', `${st.ScheduledPosts.countPending(userId)} / ${L.maxPending}件`],
     ...(xLive(sub) ? [['今月のXへの投稿（日本時間の暦月・ツリーは1件ずつ）', `${st.ScheduledPosts.countXUnits(userId, mf, mt)} / ${L.xPerMonth}件`]] : []),
     ['同じ日（日本時間）に投稿する予約', `1日${L.maxPerDay}件まで`],
@@ -597,7 +638,45 @@ function removalNoticesHtml(notices, csrf) {
   }).join('');
 }
 
-function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], mcpConnections = [], newKey = '', aiAvail = {}, autoRules = [], removalNotices = [] }) {
+// マイページ：プランの変更（通常→30件はすぐ。30件→通常は次回の更新日から）
+function planChangeHtml({ sub, plan, accounts, agencyOffered, csrf }) {
+  if (!sub || !sub.stripe_subscription_id || !['active', 'trialing'].includes(sub.status) || sub.cancel_at_period_end) return '';
+  const form = (target, label, confirmText, cls = 'btn') => `<form class="inline" method="POST" action="/service/billing/plan" onsubmit="return confirm('${confirmText}')"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><input type="hidden" name="plan" value="${target}"><button class="${cls}" type="submit">${label}</button></form>`;
+  if (plan === 'standard') {
+    if (!agencyOffered) return '';
+    const trialing = sub.status === 'trialing';
+    const a = core.LIMITS.maxAccountsAgency; const p = yen(core.priceYen('agency'));
+    return `<div class="card-title" style="margin-top:12px">プランの変更</div>
+      <p class="small">${escapeHtml(core.PLAN_LABEL.agency)}にすると、連携できるSNSアカウントが${a}件までになります（月額 ${p}・税込）。変更はすぐに反映され、${trialing ? '無料期間中のため日割りはなく、最初の請求から30件プランの月額になります' : '今の契約期間の差額は日割りで計算して、次回の請求に含まれます'}。通常プランに戻すときは、次回の更新日からになります（連携が${core.LIMITS.maxAccounts}件を超えている間は戻せません）。</p>
+      <div class="btn-row">${form('agency', '30件プランに変更する', `${core.PLAN_LABEL.agency}（月額 ${p}）にすぐ変更します。${trialing ? '無料期間中のため日割りはなく、最初の請求から30件プランの月額になります' : '日割りの差額が次回の請求に含まれます'}。よろしいですか？`, 'btn btn-primary')}</div>`;
+  }
+  const n = (accounts || []).length; const std = core.LIMITS.maxAccounts; const sp = yen(core.priceYen('standard'));
+  if (sub.pending_plan === 'standard') {
+    return `<div class="card-title" style="margin-top:12px">プランの変更</div>
+      <p class="small">次回の更新日から、通常プラン（連携${std}件まで・月額 ${sp}）に切り替わります。それまでは30件プランですが、新しく連携できるのは${std}件までです。</p>
+      <div class="btn-row">${form('agency', '切り替えの予約を取り消す', '通常プランへの切り替えの予約を取り消します（30件プランのままになります）。よろしいですか？', 'btn btn-ghost')}</div>`;
+  }
+  return `<div class="card-title" style="margin-top:12px">プランの変更</div>
+    <p class="small">通常プラン（連携${std}件まで・月額 ${sp}）に戻すときは、次回の更新日から切り替わります（それまでは30件プランです）。${n > std ? `<b>いま連携しているSNSアカウントが${n}件あるため、${n - std}件以上を解除してから変更してください。</b>` : ''}</p>
+    ${n > std ? '' : `<div class="btn-row">${form('standard', '通常プランに変更する（次回の更新日から）', `次回の更新日から通常プラン（月額 ${sp}）に切り替えます。それまでは30件プランです。よろしいですか？`, 'btn btn-ghost')}</div>`}`;
+}
+
+// マイページ：紹介カード（紹介機能が働いているときだけ表示する。r は lib/referral.js の infoFor）
+function referralCard(r) {
+  const st = r.stats;
+  return `<div class="card" id="referral"><div class="card-title">友だちを紹介する</div>
+    <p><b>${escapeHtml(REFERRAL_HEADLINE)}</b></p>
+    <p class="small"><b>${escapeHtml(REFERRAL_CONDITIONS)}（最大${r.max}件まで）。</b></p>
+    <p class="small">あなた専用の紹介のURLです。このURLから登録した方は、初めてのお申込みのとき30日間無料になります。登録した方が、無料期間のあとの最初の有料の請求を支払うと、あなたの次回以降の請求から、1か月分の利用料金に相当するクレジットが差し引かれます。</p>
+    <p class="small"><code style="word-break:break-all">${escapeHtml(r.url)}</code></p>
+    <table class="t kv" style="margin-top:6px">
+      <tr><th>紹介のURLから登録した人</th><td>${st.total}人</td></tr>
+      <tr><th>特典を付けた</th><td>${st.rewarded}件（上限 ${r.max}件）</td></tr>
+    </table>
+    <ul class="plain small" style="margin-top:8px">${REFERRAL_RULES.map((t) => `<li>${escapeHtml(t.replace('{limit}', r.max))}。</li>`).join('')}</ul></div>`;
+}
+
+function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, portalReady, apiKeys = [], mcpConnections = [], newKey = '', aiAvail = {}, autoRules = [], removalNotices = [], referral = null, agencyOffered = false }) {
   const active = !!sub && ['active', 'trialing', 'test'].includes(sub.status);
   const [stLabel, stClass] = STATUS_LABEL[(sub && sub.status) || 'none'] || STATUS_LABEL.none;
   const accHtml = accounts.length ? accounts.map((a) => {
@@ -711,12 +790,17 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
       <td><span class="${c}">${l}</span>${viewOnSnsLink(p, '<br>')}${p.status === 'pending' ? `<br><form class="inline" method="POST" action="/service/app/post/${escapeHtml(p.id)}/cancel"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-sm btn-ghost" type="submit">取り消し</button></form>` : ''}</td></tr>`;
   }).join('') : '<tr><td colspan="4" class="small">予約はまだありません。</td></tr>';
   const renewal = sub && sub.current_period_end ? core.formatJst(sub.current_period_end) : '';
+  const plan = core.planOf(sub);
+  const planPrice = yen(core.priceYen(plan));
+  const planChange = planChangeHtml({ sub, plan, accounts, agencyOffered, csrf });
   const billing = sub && sub.status === 'test' ? `<div class="card"><div class="card-title">ご利用の状態</div><p class="small">状態：<span class="${stClass}">${stLabel}</span><br>運営者が動作確認のために付与したテスト利用です。料金はかかりません。運営者が取り消すと、SNSの連携とAIアシスタントとの接続が解除され、APIキーが無効になり、未投稿の予約・下書きが取り消されます。</p></div>` : sub && sub.stripe_subscription_id ? `
     <div class="card"><div class="card-title">ご契約・お支払い</div>
       <p class="small">状態：<span class="${stClass}">${stLabel}</span>
       ${renewal ? `<br>${sub.status === 'trialing'
-        ? (sub.cancel_at_period_end ? `解約手続き済み。無料期間の終了日時 <b>${escapeHtml(renewal)}</b> まで、ご利用いただけます（料金はかかりません）。` : `無料期間の終了日時：<b>${escapeHtml(renewal)}</b>（この日時に、初回の${yen(core.priceYen())}を請求します。料金をかけずにやめる場合は、この日時より前に解約してください）`)
-        : (sub.cancel_at_period_end ? `解約手続き済み。<b>${escapeHtml(renewal)}</b> までご利用いただけます（以降は更新されません）。` : `次回の更新日：<b>${escapeHtml(renewal)}</b>（${yen(core.priceYen())}）`)}` : ''}</p>
+        ? (sub.cancel_at_period_end ? `解約手続き済み。無料期間の終了日時 <b>${escapeHtml(renewal)}</b> まで、ご利用いただけます（料金はかかりません）。` : `無料期間の終了日時：<b>${escapeHtml(renewal)}</b>（この日時に、初回の${planPrice}を請求します。料金をかけずにやめる場合は、この日時より前に解約してください）`)
+        : (sub.cancel_at_period_end ? `解約手続き済み。<b>${escapeHtml(renewal)}</b> までご利用いただけます（以降は更新されません）。` : `次回の更新日：<b>${escapeHtml(renewal)}</b>（${planPrice}${sub.pending_plan === 'standard' ? `。この日から通常プランの${yen(core.priceYen('standard'))}に切り替わります` : ''}）`)}` : ''}
+      <br>プラン：<b>${escapeHtml(core.PLAN_LABEL[plan])}</b>（連携できるSNSアカウントは${core.accountLimitFor(user.id)}件まで・月額 ${planPrice}）${sub.pending_plan === 'standard' ? '<br>次回の更新日から、通常プランに切り替わります（予約中）。' : ''}</p>
+      ${planChange}
       <div class="btn-row">
         ${sub.status === 'canceled' ? '<a class="btn btn-primary" href="/service/checkout">再度申し込む</a>' : sub.cancel_at_period_end
           ? `<form class="inline" method="POST" action="/service/billing/resume"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn-primary" type="submit">解約を取り消す</button></form>`
@@ -733,6 +817,7 @@ function dashboardPage({ user, sub, accounts, posts, csrf, flash, snsReady, port
     ${billing}
     ${active ? usageCard(user.id, sub) : ''}
     ${removalNoticesHtml(removalNotices, csrf)}
+    ${active && referral ? referralCard(referral) : ''}
     <div class="card"><div class="card-title">連携しているSNS</div>${accHtml}
       <div class="btn-row" style="margin-top:10px">${active ? connectBtns : '<span class="small">ご契約後に連携できます。</span>'}</div></div>
     ${active ? `<div class="card"><div class="card-title">投稿の作成と管理</div><p class="small">ツリー（連投）・複数の画像・SNSごとの本文・下書きは「投稿を作る」から。予約の一覧はカレンダーで確認できます。</p>
@@ -1121,6 +1206,17 @@ function metaDeletionStatusPage({ request, code = '', user }) {
   </div>${legalLinks()}`);
 }
 
+// 30件プランの設定の確認（価格IDの中身は表示しない）。表示する月額と、Stripeで作る価格の金額の一致は、画面からは確かめられないため、運営者が確かめる
+function agencyNote(env) {
+  const idSet = !!String(env.STRIPE_PRICE_ID_AGENCY || '').trim();
+  const priceSet = Number(env.SERVICE_PRICE_JPY_AGENCY) > 0;
+  const shown = Number(env.SERVICE_PRICE_JPY_AGENCY || 3300);
+  const stdSame = idSet && env.STRIPE_PRICE_ID_AGENCY === env.STRIPE_PRICE_ID ? '。通常プランと同じ価格IDになっています（別の価格IDを設定してください）' : '';
+  if (!idSet) return `未設定（30件プランは、画面に出さず、申込みも断ります）。使う場合は、Stripeで月額${yen(shown)}の価格を作り、そのIDを設定する`;
+  return `設定済み。画面に表示する月額：${yen(shown)}${priceSet ? '（SERVICE_PRICE_JPY_AGENCY）' : '（未設定のため既定の3,300円。販売ページには、SERVICE_PRICE_JPY_AGENCY を設定するまで30件プランを出しません）'}。連携の上限：${envNum(env.SERVICE_MAX_ACCOUNTS_AGENCY, 30)}件。Stripeの価格の金額が、画面に表示する月額と同じかを、Stripeのダッシュボードで確かめる（違うと、表示と請求額が食い違います）${stdSame}`;
+}
+const envNum = (v, d) => { const n = parseInt(v || '', 10); return Number.isFinite(n) && n > 0 ? n : d; };
+
 // 運営用：設定の確認（値は表示せず、設定されているかだけを示す）
 function settingsChecklist(env = process.env) {
   const has = (...ks) => ks.every((k) => !!env[k]);
@@ -1156,6 +1252,8 @@ function settingsChecklist(env = process.env) {
     ['AIの画像（OPENAI_API_KEY）', has('OPENAI_API_KEY'), '任意'],
     ['AIの動画（GEMINI_API_KEY・AI_DAILY_VIDEO）', aiLib().available().video, '当面は提供しない（設定しない）。提供するときは規約・プライバシーポリシーの改定が必要'],
     ['Stripe（STRIPE_SECRET_KEY・STRIPE_WEBHOOK_SECRET・STRIPE_PRICE_ID）', has('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID'), '販売に必要（テスト利用だけなら不要）'],
+    ['30件プラン（STRIPE_PRICE_ID_AGENCY・SERVICE_PRICE_JPY_AGENCY）', has('STRIPE_PRICE_ID_AGENCY'), agencyNote(env)],
+    ['紹介機能（REFERRAL_ENABLED・REFERRAL_MAX_REWARDS）', require('./referral').enabled(env), require('./referral').enabled(env) ? `働いている（1人あたり最大${require('./referral').maxRewards(env)}件の特典）。販売前の条件（上限の決定・連鎖販売取引に当たらないかの弁護士確認と審査ログへの記録）が済んでいることを確かめる。有効にするときは、規約・特商法表記の改定日と TERMS_VERSION を更新する` : `止まっている（紹介コードの発行・表示、登録画面の案内、紹介された人の30日無料、特典の付与のすべてが止まっています）。理由：${require('./referral').disabledReason(env)}。なお、法務ページ（規約・特商法表記）には紹介の記載が常に表示されます。有効にするまでは「提供していない間は適用されない」と読める記載になっています`],
     ['問い合わせ先（SERVICE_CONTACT_EMAIL）', has('SERVICE_CONTACT_EMAIL'), '販売に必要'],
     ['代表者の氏名（SERVICE_REPRESENTATIVE）', has('SERVICE_REPRESENTATIVE'), 'プライバシーポリシーの事業者情報に表示する（販売前に設定）'],
     ['法務文書の未記入の箇所（【】）', core.legalPlaceholders().length === 0, core.legalPlaceholders().length ? `残っている箇所：${core.legalPlaceholders().join('、')}` : '規約・特商法表記・プライバシーポリシーに、未記入の【】はありません'],

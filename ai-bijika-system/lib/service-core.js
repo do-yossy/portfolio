@@ -7,7 +7,9 @@ const registry = require('./sns');
 const envInt = (k, d) => { const v = parseInt(process.env[k] || '', 10); return Number.isFinite(v) && v > 0 ? v : d; };
 // 上限は環境変数で変えられる（費用・保存容量・各SNSの規約上の上限に合わせる）
 const LIMITS = {
+  // 連携できるSNSアカウントの数。maxAccounts は通常プラン、maxAccountsAgency は30件プラン（利用者ごとの上限は accountLimitFor を使う）
   get maxAccounts() { return envInt('SERVICE_MAX_ACCOUNTS', 10); },
+  get maxAccountsAgency() { return envInt('SERVICE_MAX_ACCOUNTS_AGENCY', 30); },
   get maxPending() { return envInt('SERVICE_MAX_PENDING', 300); },
   get maxPerDay() { return envInt('SERVICE_MAX_PER_DAY', 50); },
   // XのAPIは投稿数に応じて費用がかかるため、Xへの投稿は1人あたり月の上限を設ける（ツリーは1件ずつ数える）
@@ -23,16 +25,50 @@ const JST_OFFSET_MS = 9 * 3600 * 1000;
 
 // サービス名（画面・法務文書の【サービス名】に入る）。ミチシルベ本体とは別の商品として扱う
 const serviceName = () => process.env.SERVICE_NAME || 'SNSまとめて予約';
-const priceYen = () => Number(process.env.SERVICE_PRICE_JPY || 1100);
+// 表示する月額（税込）。Stripeの価格と同じ金額にすること。plan は 'standard'（通常。既定1,100円）／'agency'（30件プラン。既定3,300円）
+const priceYen = (plan = 'standard') => (plan === 'agency' ? Number(process.env.SERVICE_PRICE_JPY_AGENCY || 3300) : Number(process.env.SERVICE_PRICE_JPY || 1100));
+
+// ── プラン ──
+// standard：連携10件・月額1,100円／agency：SNS運用代行の人向け。連携30件・月額3,300円。
+// 「更にプラスαする際はプラス料金」（追加アカウントの単位・金額）は未決定のため実装しない。決まったら、プランの定義（PLAN_LABEL・LIMITS・priceYen）と同じ形で足す。
+const PLAN_LABEL = { standard: '通常プラン', agency: '30件プラン（SNS運用代行向け）' };
+// 30件プランを売ってよいか：Stripeの価格（STRIPE_PRICE_ID_AGENCY）が設定されているときだけ。未設定なら、画面に出さず、申込みも断る
+const agencyOffered = (env = process.env) => !!String(env.STRIPE_PRICE_ID_AGENCY || '').trim();
+// 販売ページ（LP）に30件プランの段を出すか：上に加えて、表示する月額（SERVICE_PRICE_JPY_AGENCY）を運営者が明示しているとき
+const agencyOnLp = (env = process.env) => agencyOffered(env) && Number(env.SERVICE_PRICE_JPY_AGENCY) > 0;
+const planOf = (sub) => (sub && sub.plan === 'agency' ? 'agency' : 'standard');
+const maxAccountsFor = (plan) => (plan === 'agency' ? LIMITS.maxAccountsAgency : LIMITS.maxAccounts);
+// この利用者が連携できるSNSアカウントの数。30件→通常へ切り替えを予約している間は、通常プランの上限で数える
+// （切り替わる日に、通常プランの上限を超えた状態にならないように）
+function accountLimitFor(userId) {
+  const sub = Subscriptions.get(userId);
+  return planOf(sub) === 'agency' && sub.pending_plan !== 'standard' ? LIMITS.maxAccountsAgency : LIMITS.maxAccounts;
+}
+// Stripeの価格IDからプランを判定する。どちらでもなければ null（プランを変えない）
+function planFromPriceId(priceId, env = process.env) {
+  const id = String(priceId || '');
+  if (!id) return null;
+  if (env.STRIPE_PRICE_ID_AGENCY && id === env.STRIPE_PRICE_ID_AGENCY) return 'agency';
+  if (env.STRIPE_PRICE_ID && id === env.STRIPE_PRICE_ID) return 'standard';
+  return null;
+}
 // 無料トライアルの日数（0なら無し）。初めて申し込む人だけが対象
 const trialDays = () => { const v = parseInt(process.env.SERVICE_TRIAL_DAYS || '0', 10); return Number.isFinite(v) && v > 0 && v <= 30 ? v : 0; };
+// 紹介された人の、初めての申込みの無料期間（日）。紹介した人には、特典として1か月分のクレジットを付ける（lib/referral.js。紹介機能が働いているときだけ）
+const REFERRAL_TRIAL_DAYS = 30;
 function trialFor(userId) {
-  const d = trialDays();
-  if (!d) return 0;
   const s = Subscriptions.get(userId);
-  return s && s.stripe_subscription_id ? 0 : d; // 一度でも契約したことがあれば対象外
+  if (s && s.stripe_subscription_id) return 0; // 一度でも契約したことがあれば対象外（紹介された人も、初めての申込みのときだけ）
+  return Math.max(trialDays(), referralTrialFor(userId));
 }
-const TERMS_VERSION = '2026-10-15';
+// 紹介されて登録した人で、紹介がまだ有効（pending）なら30日。無効（自分自身・すでに契約したことがある など）なら0
+function referralTrialFor(userId) {
+  const r = require('./service-store').Referrals.getByReferred(userId);
+  if (!require('./referral').enabled()) return 0; // 紹介機能が止まっているときは、記録があっても無料期間を付けない
+  return r && r.status === 'pending' ? REFERRAL_TRIAL_DAYS : 0;
+}
+// 規約等の本文を変えたときは、ここも新しい日付にする（同意の記録に残る版）。2026-10-22：プラン（30件）・紹介特典・紹介の記録の追記
+const TERMS_VERSION = '2026-10-22';
 
 const contactEmail = () => {
   const e = String(process.env.SERVICE_CONTACT_EMAIL || '').trim();
@@ -344,7 +380,7 @@ function createPosts({ userId, accountIds, text, scheduledAtIso, mediaId, option
 // 連携の開始：認可画面のURLを返す
 // 審査（SNS_APPROVED）の前のSNSは、テスト利用の利用者だけが連携できる（画面のボタンと同じ判定を、サーバー側でもかける）
 const NOT_APPROVED_ERROR = 'このSNSの連携は、準備中です（SNS側の審査が終わるまで、ご利用いただけません）。';
-const accountLimitError = () => `連携できるSNSアカウントは${LIMITS.maxAccounts}件までです。`;
+const accountLimitError = (userId) => `連携できるSNSアカウントは${accountLimitFor(userId)}件までです。`;
 function startConnect({ userId, platform }) {
   const ad = registry.get(platform);
   if (!ad || !ad.isConfigured()) return { ok: false, error: 'このSNSの連携は、現在ご利用いただけません。' };
@@ -352,8 +388,8 @@ function startConnect({ userId, platform }) {
   if (!snsEnabled()) return { ok: false, error: 'SNS連携は現在ご利用いただけません。' };
   // 件数の上限。そのSNSに「再連携が必要」の連携があれば、再連携（既存の行の更新で、件数は増えない）かもしれないため、ここでは断らない。
   // 新しい連携になるかどうかは、SNSのアカウントが分かる連携の完了（finishConnect）で判定する
-  if (SnsAccounts.countForUser(userId) >= LIMITS.maxAccounts && !SnsAccounts.listForUser(userId).some((a) => a.platform === platform && a.status === 'reauth_required')) {
-    return { ok: false, error: accountLimitError() };
+  if (SnsAccounts.countForUser(userId) >= accountLimitFor(userId) && !SnsAccounts.listForUser(userId).some((a) => a.platform === platform && a.status === 'reauth_required')) {
+    return { ok: false, error: accountLimitError(userId) };
   }
   const pkce = ad.usesPkce ? ad.newPkce() : null;
   const state = OAuthStates.create({ userId, platform, codeVerifier: pkce ? pkce.verifier : '' });
@@ -376,8 +412,8 @@ async function finishConnect({ userId, platform, code, state }) {
     // 件数の上限は、どのSNSアカウントかが分かったここで判定する。同じSNSアカウントの行がすでにあれば、再連携（upsert が既存の行の更新）で
     // 件数は増えないため、上限に数えない（上限まで連携していても、「再連携が必要」の連携を有効に戻せるように）。
     // 新しい連携になる場合だけ、上限で断る（受け取ったトークンは保存しない）。ここから upsert までは同期のため、間に割り込まれない
-    if (!SnsAccounts.findForUser(userId, platform, t.externalUserId) && SnsAccounts.countForUser(userId) >= LIMITS.maxAccounts) {
-      return { ok: false, error: accountLimitError() };
+    if (!SnsAccounts.findForUser(userId, platform, t.externalUserId) && SnsAccounts.countForUser(userId) >= accountLimitFor(userId)) {
+      return { ok: false, error: accountLimitError(userId) };
     }
     SnsAccounts.upsert({
       userId, platform, externalUserId: t.externalUserId, handle: t.handle,
@@ -394,6 +430,6 @@ async function finishConnect({ userId, platform, code, state }) {
 }
 
 module.exports = {
-  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, legalFinal, legalMarkdown, approvedSns, snsApproved, liveSns, connectMode, NOT_APPROVED_ERROR, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, snsEnabled, contactEmail, salesOpen, redirectUriFor,
+  LIMITS, LEGAL_FILES, legalDir, legalPlaceholders, legalFinal, legalMarkdown, approvedSns, snsApproved, liveSns, connectMode, NOT_APPROVED_ERROR, MAX_DAYS_AHEAD, TERMS_VERSION, serviceName, priceYen, trialDays, trialFor, referralTrialFor, REFERRAL_TRIAL_DAYS, PLAN_LABEL, agencyOffered, agencyOnLp, planOf, maxAccountsFor, accountLimitFor, planFromPriceId, snsEnabled, contactEmail, salesOpen, redirectUriFor,
   jstLocalToIso, jstDayBounds, jstMonthBounds, formatJst, formatJstShort, createPost, createPosts, promoteDraft, capacityError, CATEGORIES, MAX_DRAFTS, startConnect, finishConnect,
 };

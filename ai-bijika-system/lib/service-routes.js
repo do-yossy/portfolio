@@ -18,6 +18,7 @@ const apiV1 = require('./api-v1');
 const mcp = require('./mcp');
 const oauth = require('./oauth');
 const consent = require('./consent');
+const referral = require('./referral');
 const ai = require('./ai');
 const aiAuto = require('./ai-auto');
 const metaSigned = require('./meta-signed-request');
@@ -45,6 +46,11 @@ const FLASH = {
   disconnected: ['ok', '連携を解除しました。'],
   sub_canceled: ['ok', '解約の手続きをしました。契約期間の終わりまでご利用いただけます。'],
   sub_resumed: ['ok', '解約を取り消しました。引き続きご利用いただけます。'],
+  plan_agency: ['ok', '30件プランに変更しました。日割りの差額は、次回の請求に含まれます。'],
+  plan_agency_trial: ['ok', '30件プランに変更しました。無料期間中のため日割りはなく、最初の請求から30件プランの月額になります。'],
+  plan_standard: ['ok', '通常プランに変更しました（無料期間中のため、最初の請求から通常の月額です）。'],
+  plan_standard_scheduled: ['ok', '通常プランへの変更を予約しました。次回の更新日から通常プラン（連携は10件まで）になります。'],
+  plan_released: ['ok', '通常プランへの変更の予約を取り消しました。引き続き30件プランです。'],
   csrf: ['error', '操作の有効期限が切れました。もう一度お試しください。'],
   failed: ['error', '処理に失敗しました。時間をおいてもう一度お試しください。'],
 };
@@ -182,19 +188,24 @@ async function handle(ctx) {
   if (pathname === '/service/docs/api' && method === 'GET') { sendHtml(res, 200, ui.apiDocsPage(user, String(process.env.SERVICE_BASE_URL || '').replace(/\/+$/, ''))); return true; }
 
   if (pathname === '/service/signup' && method === 'GET') {
-    if (user) redirect(res, '/service/app'); else sendHtml(res, 200, ui.authPage('signup'));
+    // 紹介のURL（?ref=紹介コード）から来た人は、コードを登録の画面に引き継ぐ（形式が正しいものだけ。コードが有効かどうかは、ここでは示さない）
+    const ref = referral.enabled() && referral.validCode(url.searchParams.get('ref')) ? url.searchParams.get('ref') : '';
+    if (user) redirect(res, '/service/app'); else sendHtml(res, 200, ui.authPage('signup', '', '', ref));
     return true;
   }
   if (pathname === '/service/signup' && method === 'POST') {
     const ip = clientIp(req);
     if (!signupLimiter.allow(ip)) { sendHtml(res, 429, ui.authPage('signup', '試行回数が多すぎます。しばらくしてからお試しください。')); return true; }
     signupLimiter.fail(ip);
-    const { email, password } = await readForm(req);
+    const { email, password, ref: rawRef } = await readForm(req);
+    const ref = referral.enabled() && referral.validCode(rawRef) ? rawRef : '';
     const e = String(email || '').trim().toLowerCase();
-    if (!validEmail(e) || !password || String(password).length < 8) { sendHtml(res, 400, ui.authPage('signup', '正しいメールアドレスと、8文字以上のパスワードを入力してください。')); return true; }
-    if (Users.findByEmail(e)) { sendHtml(res, 400, ui.authPage('signup', 'このメールアドレスは既に登録されています。ログインしてください。')); return true; }
+    if (!validEmail(e) || !password || String(password).length < 8) { sendHtml(res, 400, ui.authPage('signup', '正しいメールアドレスと、8文字以上のパスワードを入力してください。', '', ref)); return true; }
+    if (Users.findByEmail(e)) { sendHtml(res, 400, ui.authPage('signup', 'このメールアドレスは既に登録されています。ログインしてください。', '', ref)); return true; }
     const { hash, salt } = auth.hashPassword(String(password));
     const id = Users.create({ email: e, passwordHash: hash, passwordSalt: salt });
+    // 紹介されて登録した記録（users 表ではなく referrals 表）。失敗しても登録は止めない
+    if (ref) { try { referral.recordSignup({ referredUserId: id, referredEmail: e, code: ref }); } catch (err) { console.error('[referral signup]', err.message); } }
     const token = auth.createSession(id);
     redirect(res, salesOpen ? '/service/checkout' : '/service', { 'Set-Cookie': auth.sessionCookie(token) });
     return true;
@@ -240,6 +251,7 @@ async function handle(ctx) {
       posts: ScheduledPosts.listForUser(user.id), csrf: token, flash,
       snsReady: core.snsEnabled(), portalReady: billingReady,
       removalNotices: metaDeletion.Notices.listForUser(user.id),
+      referral: referral.infoFor(user.id), agencyOffered: core.agencyOffered(),
     }));
   };
   const needCsrf = async () => {
@@ -256,31 +268,42 @@ async function handle(ctx) {
     const cur = Subscriptions.get(user.id);
     return !!cur && !!cur.stripe_subscription_id && require('./service-store').OPEN_STRIPE_STATUSES.has(cur.status);
   };
+  // 最終確認画面。plan は選んだプラン（30件プランは、STRIPE_PRICE_ID_AGENCY が設定されているときだけ選べる）
+  const checkoutView = (status, plan, error) => {
+    const agencyOk = core.agencyOffered();
+    const p = plan === 'agency' && agencyOk ? 'agency' : 'standard';
+    sendHtml(res, status, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), referral: core.referralTrialFor(user.id) > 0, plan: p, agencyOffered: agencyOk, csrf: token, error }));
+  };
   if (pathname === '/service/checkout' && method === 'GET') {
     if (!salesOpen) { redirect(res, '/service'); return true; }
     if (hasOpenSubscription()) { redirect(res, '/service/app'); return true; }
-    sendHtml(res, 200, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token }));
+    const want = url.searchParams.get('plan') === 'agency' ? 'agency' : 'standard';
+    checkoutView(want === 'agency' && !core.agencyOffered() ? 400 : 200, want, want === 'agency' && !core.agencyOffered() ? '30件プランは、現在お申込みいただけません。' : undefined);
     return true;
   }
   if (pathname === '/service/checkout' && method === 'POST') {
     if (!salesOpen) { redirect(res, '/service'); return true; }
     if (hasOpenSubscription()) { redirect(res, '/service/app'); return true; }
     const body = await readForm(req);
-    if (!csrf.verify(sessionToken, body.csrf)) { sendHtml(res, 403, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '操作の有効期限が切れました。もう一度お試しください。' })); return true; }
-    if (body.agree !== '1') { sendHtml(res, 400, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '内容への同意にチェックを入れてください。' })); return true; }
+    const want = body.plan === 'agency' ? 'agency' : 'standard';
+    // 使えないプランは、申込みも断る（画面に出していなくても、フォームを直接送られた場合に備えて、サーバー側で判定する）
+    if (want === 'agency' && !core.agencyOffered()) { checkoutView(400, 'standard', '30件プランは、現在お申込みいただけません。'); return true; }
+    if (!csrf.verify(sessionToken, body.csrf)) { checkoutView(403, want, '操作の有効期限が切れました。もう一度お試しください。'); return true; }
+    if (body.agree !== '1') { checkoutView(400, want, '内容への同意にチェックを入れてください。'); return true; }
     try {
       const cur = Subscriptions.get(user.id);
+      const trial = core.trialFor(user.id);
       Subscriptions.upsert(user.id, { agreed_at: new Date().toISOString(), agreed_version: core.TERMS_VERSION });
-      // 同意の記録（証拠）：その時点で示した法務文書の本文の控えと、最終確認画面の条件
+      // 同意の記録（証拠）：その時点で示した法務文書の本文の控えと、最終確認画面の条件（選んだプランの金額・連携の上限、紹介による無料期間か）
       const docs = {};
       for (const f of core.LEGAL_FILES) { try { docs[f] = core.legalMarkdown(f); } catch { /* 文書が無い場合は控えなし */ } }
       consent.record({ userId: user.id, email: user.email, kind: 'checkout', termsVersion: core.TERMS_VERSION, docs, req,
-        detail: { price: core.priceYen(), trialDays: core.trialFor(user.id), limits: { accounts: core.LIMITS.maxAccounts, pending: core.LIMITS.maxPending, perDay: core.LIMITS.maxPerDay, xPerMonth: core.LIMITS.xPerMonth } } });
-      const checkoutUrl = await billing.createCheckoutSession({ userId: user.id, email: user.email, customerId: cur && cur.stripe_customer_id, trialDays: core.trialFor(user.id) });
+        detail: { plan: want, price: core.priceYen(want), trialDays: trial, referralTrial: core.referralTrialFor(user.id) > 0, limits: { accounts: core.maxAccountsFor(want), pending: core.LIMITS.maxPending, perDay: core.LIMITS.maxPerDay, xPerMonth: core.LIMITS.xPerMonth } } });
+      const checkoutUrl = await billing.createCheckoutSession({ userId: user.id, email: user.email, customerId: cur && cur.stripe_customer_id, trialDays: trial, plan: want });
       redirect(res, checkoutUrl, {}, 303);
     } catch (e) {
       console.error('[checkout]', e.message);
-      sendHtml(res, 502, ui.checkoutPage({ user, trialDays: core.trialFor(user.id), csrf: token, error: '決済ページの準備に失敗しました。時間をおいてもう一度お試しください。' }));
+      checkoutView(502, want, '決済ページの準備に失敗しました。時間をおいてもう一度お試しください。');
     }
     return true;
   }
@@ -544,6 +567,21 @@ async function handle(ctx) {
       redirect(res, `/service/app?f=${pathname.endsWith('/cancel') ? 'sub_canceled' : 'sub_resumed'}`);
     } catch (e) {
       console.error('[billing]', e.message);
+      dashboard(502, flashOf('failed'));
+    }
+    return true;
+  }
+  // プランの変更：通常→30件（すぐ切り替え）／30件→通常（次回の更新日から。連携が10件を超えていれば断る）／予約の取り消し（30件のまま）
+  if (pathname === '/service/billing/plan' && method === 'POST') {
+    const body = await needCsrf(); if (!body) return true;
+    try {
+      const r = await billing.changePlan(user.id, body.plan === 'agency' ? 'agency' : 'standard');
+      if (!r.ok) { dashboard(400, { type: 'error', text: r.error }); return true; }
+      const nowSub = Subscriptions.get(user.id);
+      const f = r.released ? 'plan_released' : r.scheduled ? 'plan_standard_scheduled' : r.unchanged ? '' : (r.plan === 'agency' ? (nowSub && nowSub.status === 'trialing' ? 'plan_agency_trial' : 'plan_agency') : 'plan_standard');
+      redirect(res, f ? `/service/app?f=${f}` : '/service/app');
+    } catch (e) {
+      console.error('[plan change]', e.message);
       dashboard(502, flashOf('failed'));
     }
     return true;
