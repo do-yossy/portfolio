@@ -10,6 +10,7 @@ import { TEMPLATES, CATEGORIES, LEVELS, forLevel } from './src/content.js';
 import { validEmail, buildSql, hashToken } from './scripts/recovery-link.mjs';
 import { billingPlan } from './src/stripe.js';
 import { buildSql as fbSql, report as fbReport } from './scripts/feedback-report.mjs';
+import { parseInput, validateTest, jstMonth, reserveUse, usedThisMonth, testmakerOn, extractJson, MONTHLY_LIMIT } from './src/testmaker.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, name) => {
@@ -435,6 +436,107 @@ ok(lpAll.includes(`全${TEMPLATES.length}点`) && TEMPLATES.every((t) => lpAll.i
 const smpl = await (await get('/sample')).text();
 ok(smpl.includes('記入例を見る') && smpl.includes(`${TEMPLATES.length}点のひな形`), '見本ページに、記入例と、全点数が出る');
 delete env.LP_PUBLIC;
+
+// ---------- A: 「テスト・評価」のひな形 ----------
+{
+  const tests = TEMPLATES.filter((t) => t.category === 'テスト・評価');
+  ok(tests.length === 6, 'テスト・評価のひな形が6点ある');
+  ok(forLevel(tests.find((t) => t.id === 'test-mondai-sho'), 'elementary') && !forLevel(tests.find((t) => t.id === 'test-mondai-sho'), 'junior'), '小学校の一体型は小学校だけ、中学・高校の型は小学校に出ない');
+  ok(!forLevel(tests.find((t) => t.id === 'test-mondai-chuko'), 'elementary') && forLevel(tests.find((t) => t.id === 'test-mondai-chuko'), 'high'), '中学・高校の問題用紙の型は、小学校に出さない');
+  const haiten = tests.find((t) => t.id === 'test-haiten');
+  ok(haiten.body.includes('知識・技能') && haiten.body.includes('思考・判断・表現') && !/\|\s*(主体的|態度)/.test(haiten.body), '配点表の観点は、知識・技能と思考・判断・表現の2つだけ');
+  ok(tests.every((t) => !/(教科書|問題集)の(本文|問題)をそのまま/.test(t.body)) && tests.some((t) => t.tips.join('').includes('そのまま写さない')), '教科書の問題を写さないことを案内している');
+}
+
+// ---------- B: テストのたたき台づくり(AI版・既定オフ) ----------
+const tmCookie = recCookie;
+const envOn = { ...env, TESTMAKER_ENABLED: 'true', ANTHROPIC_API_KEY: 'sk-ant-test-key' };
+const postTm = (e, fields, headers = {}) => worker.fetch(new Request('https://x.test/m/test', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: tmCookie, ...headers }, body: new URLSearchParams(fields).toString() }), e);
+const form = { level: 'junior', subject: '数学', grade: '2年', units: '一次関数\n図形の性質', total: '100', minutes: '50', count: '4', extra: '' };
+{
+  // 既定ではオフ: キーがあっても、スイッチが無ければ存在しない
+  ok(!testmakerOn(env) && !testmakerOn({ ANTHROPIC_API_KEY: 'k' }) && !testmakerOn({ TESTMAKER_ENABLED: 'true' }) && testmakerOn(envOn), 'スイッチとキーの両方が揃うまでオフ');
+  ok((await worker.fetch(new Request('https://x.test/m/test', { headers: { cookie: tmCookie } }), env)).status === 404, 'オフのあいだは /m/test が404');
+  ok((await postTm(env, form)).status === 404, 'オフのあいだは POST も404');
+  ok(!(await (await get('/m', tmCookie)).text()).includes('/m/test'), 'オフのあいだは会員ページにリンクが出ない');
+  ok((await worker.fetch(new Request('https://x.test/m/test'), envOn)).status === 403, '会員証が無ければ入れない');
+
+  // 入力の検査
+  const g = (o) => (k) => o[k];
+  ok(parseInput(g(form)).ok && parseInput(g(form)).value.units.length === 2 && parseInput(g(form)).value.total === 100, '正しい入力は通る');
+  ok(!parseInput(g({ ...form, extra: '児童の答案を使って' })).ok && parseInput(g({ ...form, extra: '児童の答案を使って' })).error.includes('作成を止めました'), '「児童」「答案」などの語があれば作成を止める');
+  ok(!parseInput(g({ ...form, units: '成績処理' })).ok && !parseInput(g({ ...form, subject: '生徒指導' })).ok, '単元・教科の欄でも、氏名・成績・生徒などの語を止める');
+  ok(!parseInput(g({ ...form, level: 'x' })).ok && !parseInput(g({ ...form, units: '' })).ok && !parseInput(g({ ...form, total: '5' })).ok && !parseInput(g({ ...form, count: '99' })).ok, '校種・単元・満点・問題数の範囲を検査する');
+  ok(parseInput(g({ ...form, units: 'a\nb\nc\nd\ne' })).value.units.length === 3, '単元は3つまで');
+  ok(parseInput(g({ ...form, total: '', minutes: '', count: '' })).value.total === 100, '空欄は既定値(満点100)');
+
+  // 月の境界(日本時間)
+  ok(jstMonth(Date.parse('2026-10-31T14:59:00Z')) === '2026-10' && jstMonth(Date.parse('2026-10-31T15:00:00Z')) === '2026-11', '回数は、日本時間の毎月1日0時に切り替わる');
+
+  // 回数の上限(原子的に数える)
+  const rdb = makeDb();
+  let granted = 0;
+  for (let i = 0; i < MONTHLY_LIMIT + 3; i++) if (await reserveUse(rdb, 'cus_limit', '2026-11')) granted++;
+  ok(granted === MONTHLY_LIMIT && (await usedThisMonth(rdb, 'cus_limit', '2026-11')) === MONTHLY_LIMIT, `月${MONTHLY_LIMIT}回までで、それ以上は数えない`);
+  ok(await reserveUse(rdb, 'cus_limit', '2026-12') && await reserveUse(rdb, 'cus_other', '2026-11'), '翌月・別の会員には、別に数える');
+
+  // 点検
+  const q = (o) => ({ text: '問', answer: '答', aspect: '知識・技能', difficulty: 'ふつう', unit: '一次関数', points: 25, scoring: [{ point: 25, criterion: '正答' }], ...o });
+  ok(validateTest({ questions: [q(), q(), q(), q()] }, 100).warnings.length === 0, '配点の合計が満点と合えば、警告なし');
+  ok(validateTest({ questions: [q(), q()] }, 100).warnings.some((w) => w.includes('満点')), '配点の合計が満点と合わなければ、警告を出す');
+  ok(validateTest({ questions: [q({ aspect: '態度' })] }, 25).warnings.some((w) => w.includes('観点')), '2つ以外の観点は、警告を出す');
+  ok(validateTest({ questions: [q({ scoring: [{ point: 10, criterion: 'x' }] })] }, 25).warnings.some((w) => w.includes('採点基準')), '採点基準の点が配点と合わなければ、警告を出す');
+  ok(validateTest({ questions: [q({ text: '' })] }, 25).error && validateTest(null, 100).error && extractJson('前置き {"a":1} 後') .a === 1 && extractJson('なし') === null, '壊れた結果は、エラーにする');
+
+  // 作成→検算(API はモック)
+  const calls = [];
+  const gen = { title: '一次関数 テスト', questions: [1, 2, 3, 4].map((n) => ({ no: n, aspect: n < 4 ? '知識・技能' : '思考・判断・表現', difficulty: 'ふつう', unit: '一次関数', text: `問題文${n}`, answer: `答え${n}号`, points: 25, scoring: [{ point: 25, criterion: `基準${n}` }] })) };
+  let mode = 'ok';
+  globalThis.fetch = async (url, init) => {
+    if (!String(url).startsWith('https://api.anthropic.com/')) return realFetch(url, init);
+    const b = JSON.parse(init.body);
+    calls.push({ url: String(url), headers: init.headers, body: b });
+    const verify = b.system.includes('解く役');
+    if (mode === 'down') return new Response('boom sk-ant-test-key', { status: 500 });
+    if (mode === 'verify-down' && verify) return new Response('x', { status: 500 });
+    if (mode === 'garbage' && !verify) return new Response(JSON.stringify({ content: [{ type: 'text', text: 'すみません、作れません' }], usage: {} }), { status: 200 });
+    const text = verify ? JSON.stringify({ answers: [{ no: 1, answer: '答え1号' }, { no: 2, answer: '答え2号' }, { no: 3, answer: 'ちがう答え' }, { no: 4, answer: '答え4号' }] }) : JSON.stringify(gen);
+    return new Response(JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 100, output_tokens: 200 } }), { status: 200 });
+  };
+
+  const okRes = await postTm(envOn, form);
+  const okHtml = await okRes.text();
+  ok(okRes.status === 200 && okHtml.includes('たたき台') && okHtml.includes('配点表') && okHtml.includes('一次関数 テスト') && okHtml.includes('問題文1'), '作成できる(問題・模範解答・配点表が出る)');
+  ok(calls.length === 2 && calls[0].url === 'https://api.anthropic.com/v1/messages' && calls[0].headers['x-api-key'] === 'sk-ant-test-key' && calls[0].body.model, '作成と検算で、APIを2回呼ぶ');
+  ok(!calls[1].body.messages[0].content.includes('答え1号') && !calls[1].body.messages[0].content.includes('基準1') && calls[1].body.messages[0].content.includes('問題文1'), '検算には、模範解答と採点基準を渡さない');
+  ok(okHtml.includes('⚠') && okHtml.includes('検算:食い違い') && okHtml.includes('ちがう答え') && okHtml.includes('検算:一致'), '食い違った問題に印が付く');
+  ok(!okHtml.includes('sk-ant-test-key'), 'APIキーは画面に出ない');
+  ok(okHtml.includes('1/15回') || okHtml.includes(`1/${MONTHLY_LIMIT}回`), '今月の回数が出る');
+  const row = await env.DB.prepare('SELECT count, in_tokens, out_tokens FROM test_usage ORDER BY rowid DESC LIMIT 1').first();
+  ok(row && row.count === 1 && row.in_tokens === 200 && row.out_tokens === 400, '回数(1回)とトークン数(2回ぶんの合計)が記録される');
+
+  // 失敗時は回数を戻す
+  const countNow = async () => (await env.DB.prepare('SELECT SUM(count) AS n FROM test_usage').first()).n;
+  const n0 = await countNow();
+  mode = 'down';
+  const downRes = await postTm(envOn, form);
+  const downHtml = await downRes.text();
+  ok(downRes.status === 502 && downHtml.includes('回数には数えていません') && !downHtml.includes('sk-ant') && (await countNow()) === n0, 'APIが落ちたら502で、回数は戻り、キーや応答は画面に出ない');
+  mode = 'garbage';
+  ok((await postTm(envOn, form)).status === 502 && (await countNow()) === n0, '作成結果が壊れていたら502で、回数は戻る');
+  mode = 'verify-down';
+  const vdHtml = await (await postTm(envOn, form)).text();
+  ok(vdHtml.includes('検算ができませんでした') && !vdHtml.includes('検算:一致') && (await countNow()) === n0 + 1, '検算だけが失敗したら、たたき台に「検算できなかった」と出て、回数は数える');
+  mode = 'ok';
+
+  // 入力エラー・他サイトからの送信
+  calls.length = 0;
+  const badRes = await postTm(envOn, { ...form, extra: '生徒の氏名を入れて' });
+  ok(badRes.status === 400 && calls.length === 0 && (await countNow()) === n0 + 1, '止める語があれば、APIを呼ばず、回数も数えない');
+  ok((await postTm(envOn, form, { origin: 'https://evil.test' })).status === 404 && calls.length === 0, '他のサイトからの送信は受けない');
+  ok((await worker.fetch(new Request('https://x.test/m/test', { headers: { cookie: tmCookie } }), envOn)).status === 200, 'オンのときは、フォームが開く');
+  ok((await (await worker.fetch(new Request('https://x.test/m', { headers: { cookie: tmCookie } }), envOn)).text()).includes('/m/test'), 'オンのときは会員ページにリンクが出る');
+}
 
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);

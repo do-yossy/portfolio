@@ -61,3 +61,14 @@ CREATE TABLE IF NOT EXISTS feedback (
 -- 既存のDBには、次の2行を1回だけ実行する(school_level: 校種、roles: 担当。どちらも選択式で任意)
 -- ALTER TABLE feedback ADD COLUMN school_level TEXT;
 -- ALTER TABLE feedback ADD COLUMN roles TEXT;
+
+-- テストのたたき台づくり(AI版)の月ごとの回数。作った内容は保存しない。回数とトークン数だけを、会員ごと・暦月(日本時間)ごとに持つ
+-- 本番に適用するとき: npx.cmd wrangler d1 execute sakumon --remote --file=schema.sql(冪等)。機能は TESTMAKER_ENABLED="true" になるまでオフ
+CREATE TABLE IF NOT EXISTS test_usage (
+  customer_id TEXT NOT NULL,
+  ym TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  in_tokens INTEGER NOT NULL DEFAULT 0,
+  out_tokens INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (customer_id, ym)
+);

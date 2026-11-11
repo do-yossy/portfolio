@@ -6,6 +6,7 @@ import {
 import { TEMPLATES, LEVELS, findTemplate } from './content.js';
 import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, SCHOOL_LEVELS, ROLES, feedbackPage, feedbackThanksPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
+import { testmakerOn, parseInput, runTestMaker, usedThisMonth, jstMonth, testFormPage, testResultPage, MONTHLY_LIMIT } from './testmaker.js';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
@@ -176,10 +177,26 @@ export default {
     }
 
     if (pathname === '/m' || pathname.startsWith('/m/')) {
-      if (method !== 'GET' && !(method === 'POST' && pathname === '/m/feedback')) return notFound();
+      if (method !== 'GET' && !(method === 'POST' && (pathname === '/m/feedback' || pathname === '/m/test'))) return notFound();
       const member = await currentMember(request, env);
       if (!member) return html(inactivePage(mailLoginOn(env)), 403);
       if (!isActive(member)) return html(inactivePage(mailLoginOn(env)), 403);
+      // テストのたたき台づくり(AI版)。TESTMAKER_ENABLED="true" と ANTHROPIC_API_KEY が揃うまでは、存在しないのと同じ(404)
+      if (pathname === '/m/test') {
+        if (!testmakerOn(env)) return notFound();
+        const used = await usedThisMonth(env.DB, member.customer_id, jstMonth());
+        if (method === 'GET') return html(testFormPage(used));
+        const origin = request.headers.get('origin');
+        if (origin && origin !== url.origin) return notFound();
+        const form = await request.formData().catch(() => null);
+        if (!form) return html(testFormPage(used, '入力内容を読み取れませんでした。もう一度お試しください。'), 400);
+        const p = parseInput((k) => form.get(k));
+        if (!p.ok) return html(testFormPage(used, p.error, p.kept), 400);
+        const r = await runTestMaker(env, env.DB, member.customer_id, p.value);
+        if (r.status === 'limit') return html(testFormPage(used, `今月の作成回数(${MONTHLY_LIMIT}回)を使い切りました。毎月1日に戻ります。`, p.kept), 429);
+        if (r.status === 'error') return html(testFormPage(used, '作成できませんでした。回数には数えていません。しばらくしてから、もう一度お試しください。', p.kept), 502);
+        return html(testResultPage(r, p.value), 200, { 'Cache-Control': 'no-store' });
+      }
       if (pathname === '/m/feedback') {
         if (method === 'GET') return html(feedbackPage(findTemplate(url.searchParams.get('t') || '')));
         const origin = request.headers.get('origin');
@@ -195,7 +212,7 @@ export default {
         if (!saved) return html(feedbackPage(tpl, '本日は、これ以上送れません。明日以降に、もう一度お試しください。', kept), 429);
         return html(feedbackThanksPage());
       }
-      if (pathname === '/m') { const lv = url.searchParams.get('level'); return html(memberPage(TEMPLATES, Object.hasOwn(LEVELS, lv) ? lv : '')); }
+      if (pathname === '/m') { const lv = url.searchParams.get('level'); return html(memberPage(TEMPLATES, Object.hasOwn(LEVELS, lv) ? lv : '', { testmaker: testmakerOn(env) })); }
       if (pathname === '/m/guide') return html(guidePage());
       if (pathname === '/m/portal') {
         const p = await createPortalSession(env, member.customer_id, `${url.origin}/m`);

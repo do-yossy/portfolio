@@ -241,7 +241,7 @@ export const pendingPage = () =>
     `<div class="hero"><h1>お支払いを確認しています</h1><p class="lead">確認が終わっていません。少し待ってから、このページを再読み込みしてください。</p></div>`,
   );
 
-export const memberPage = (templates, level) => {
+export const memberPage = (templates, level, extras = {}) => {
   const groups = templatesByCategory(level).map((g) => ({ category: g.category, items: g.items.filter((t) => templates.includes(t)) })).filter((g) => g.items.length);
   const shown = groups.reduce((n, g) => n + g.items.length, 0);
   const tab = (key, label) => `<a class="btn sub" style="padding:8px 16px;font-size:15px${(level || '') === key ? ';background:var(--brand);color:#fff' : ''}" href="/m${key ? '?level=' + key : ''}">${label}</a>`;
@@ -252,7 +252,7 @@ export const memberPage = (templates, level) => {
 <p class="lead">使いたいものを選んでください。はじめての方は、「使い方ガイド」をご覧ください。</p>
 <p class="note">校種で、絞り込めます。</p>
 <p>${tab('', 'すべて')} ${tab('elementary', '小学校')} ${tab('junior', '中学校')} ${tab('high', '高校')}</p>
-<p><a class="btn sub" href="/m/guide">使い方ガイド</a> <a class="btn sub" href="/m/feedback">ご意見・ご要望を送る</a></p>
+<p><a class="btn sub" href="/m/guide">使い方ガイド</a> <a class="btn sub" href="/m/feedback">ご意見・ご要望を送る</a>${extras.testmaker ? ' <a class="btn sub" href="/m/test">テストのたたき台を作る</a>' : ''}</p>
 ${groups.map((g) => `<h2 style="margin:22px 0 10px;font-size:18px">${esc(g.category)}</h2><ul class="list">${g.items.map((t) => `<li><a href="/m/t/${esc(t.id)}">${esc(t.title)}<span>${esc(t.use)}</span></a></li>`).join('')}</ul>`).join('')}
 </div>
 <section>

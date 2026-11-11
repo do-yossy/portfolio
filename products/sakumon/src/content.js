@@ -1,13 +1,15 @@
+import { TEST_TEMPLATES } from './content-test.js';
+
 // 契約者に渡すひな形(教材)。保護者向けの文書の「書き出し」。{{...}} は、先生が自分の内容に書き換える部分。
 // 各ひな形: use(使う場面) / body(ひな形) / example(記入例。架空の内容・2026年のカレンダーに合わせた日付) / tips(書き方のポイント)
 // 記入例には、実在の児童・保護者・教員の名前や病名を入れない(担任名は「○○」)。
-export const CATEGORIES = ['学級経営', '連絡・お願い', '行事', '面談・家庭訪問', '保護者会・参観', '教科・授業', '部活動', '進路', '生活・出欠'];
+export const CATEGORIES = ['学級経営', '連絡・お願い', '行事', '面談・家庭訪問', '保護者会・参観', '教科・授業', '部活動', '進路', '生活・出欠', 'テスト・評価'];
 
 // 校種。levels を持たないひな形は、どの校種でも表示する。levels があるものは、その校種だけ(例: 中学・高校)
 export const LEVELS = { elementary: '小学校', junior: '中学校', high: '高校' };
 export const forLevel = (t, level) => !level || !t.levels || t.levels.includes(level);
 
-export const TEMPLATES = [
+const BASE_TEMPLATES = [
   // ---------- 学級経営 ----------
   {
     id: 'gakunen-hajime',
@@ -1244,6 +1246,9 @@ SNSでのやりとりなどで、お子さんが困っているご様子があ�
     ],
   },
 ];
+
+// 「テスト・評価」のひな形は content-test.js に分けてある
+export const TEMPLATES = [...BASE_TEMPLATES, ...TEST_TEMPLATES];
 
 export const findTemplate = (id) => TEMPLATES.find((t) => t.id === id);
 export const templatesByCategory = (level) => CATEGORIES.map((c) => ({ category: c, items: TEMPLATES.filter((t) => t.category === c && forLevel(t, level)) })).filter((g) => g.items.length);
