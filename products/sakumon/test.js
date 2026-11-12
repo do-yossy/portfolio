@@ -289,6 +289,8 @@ ok(smLegal.includes('/legal/tokushoho') && smLegal.includes('お問い合わせ'
 delete env.LEGAL_PUBLIC;
 const lpRefund = await (await get('/')).text();
 ok(lpRefund.includes('お支払い済みの料金の返金はありません') && lpRefund.includes('ご契約のメールアドレスなどは除きます'), 'LPに、返金なしと、「送られない」の範囲の限定が書かれている');
+ok(lpRefund.includes('連続7日以上') && lpRefund.includes('その月の料金を返金します') && smNoLegal.includes('連続7日以上'), 'LPと見本ページに、「当社の責めで連続7日以上使えない場合は、その月の料金を返金」が書かれている');
+ok(COMPANY.refundPolicy.includes('連続して7日以上') && COMPANY.refundPolicy.includes('その月の料金を返金します') && tokushohoPage(COMPANY).includes('連続して7日以上') && termsPage(COMPANY).includes('連続して7日以上'), '特商法の表記と利用規約にも、同じ返金の条件が出る');
 delete env.LP_PUBLIC;
 ok(privacyPage(COMPANY).includes('流入元の目印'), 'プライバシーポリシーに、流入元の目印の取得が書かれている');
 

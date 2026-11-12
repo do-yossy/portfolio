@@ -121,7 +121,7 @@ ${templatesByCategory().map((g) => `<h3 style="margin:18px 0 8px">${esc(g.catego
 <h2>料金</h2>
 <div class="price">
 <div class="yen">980円<small>／月(税込)</small></div>
-<ul><li>すべてのひな形が使えます</li><li>お申し込みの月は、月末までの日割り料金(月の最後の2日間のお申し込みは、お申し込み月の料金なし)</li><li>翌月1日から、毎月1日に自動で更新</li><li>いつでも解約できます</li><li>解約後も、請求期間の終わり(月末)まで使えます</li><li>お支払い済みの料金の返金はありません</li></ul>
+<ul><li>すべてのひな形が使えます</li><li>お申し込みの月は、月末までの日割り料金(月の最後の2日間のお申し込みは、お申し込み月の料金なし)</li><li>翌月1日から、毎月1日に自動で更新</li><li>いつでも解約できます</li><li>解約後も、請求期間の終わり(月末)まで使えます</li><li>お支払い済みの料金の返金はありません(ただし、当社の責めで連続7日以上ご利用いただけなかった場合は、その月の料金を返金します)</li></ul>
 <div><a class="btn" href="/subscribe${q}">月額プランに申し込む</a></div>
 </div>
 </section>
@@ -155,7 +155,7 @@ export const samplePage = (t, src = '', legalOpen = false) => {
 <button class="btn" type="button" data-copy="#tpl">文面をコピー</button>
 <details style="margin-top:14px"><summary>記入例を見る(架空の内容)</summary><pre class="tpl" id="ex" style="margin-top:10px">${esc(t.example)}</pre></details>
 <section><h2>ほかのひな形も使いたい方へ</h2>
-<p>サクモンには、この見本を含めて${TEMPLATES.length}点のひな形があります。月額980円(税込)。お申し込みの月は日割り、翌月1日から毎月1日に自動で更新します。解約は、毎月の末日(日本時間)までに手続きしてください。お支払い済みの料金の返金はありません。</p>
+<p>サクモンには、この見本を含めて${TEMPLATES.length}点のひな形があります。月額980円(税込)。お申し込みの月は日割り、翌月1日から毎月1日に自動で更新します。解約は、毎月の末日(日本時間)までに手続きしてください。お支払い済みの料金の返金はありません。ただし、当社の責めで連続7日以上ご利用いただけなかった場合は、その月の料金を返金します。</p>
 <p><a class="btn" href="/subscribe${q}">月額プランに申し込む</a></p></section>
 <footer>運営:${esc(COMPANY.sellerName)}${legalOpen ? legalLinks + contactLink : ''}</footer>
 </div>`,
