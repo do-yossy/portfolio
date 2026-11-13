@@ -13,6 +13,11 @@ database_id = "2f6654aa-7b10-463b-ad6e-e441e42dd771"
 LP_PUBLIC = "false"
 # 法務ページ(特商法・規約・プライバシー)の公開スイッチ。"true" でも、src/company.js に空欄があるあいだは404のまま
 LEGAL_PUBLIC = "false"
+# テストのたたき台づくり(AI版)のスイッチ。オンにするのは、README「テストのたたき台づくり」の手順の最後(DBの表の追加 → 法務の審査 → APIキーの登録 のあと)。
+# オンにするときだけ、次の行の先頭の # を外して deploy する。ANTHROPIC_API_KEY が無いあいだは、"true" でも機能は動かない(404)。
+# TESTMAKER_ENABLED = "true"
+# TESTMAKER_MODEL = "claude-sonnet-5-5"   # 任意。モデルを変えるとき
 
 # 秘密情報は wrangler secret put で登録する(ここには書かない)
 #   STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_ID
+#   ANTHROPIC_API_KEY(AI版をオンにするときだけ)

@@ -109,7 +109,7 @@ export default {
 
     // 法務ページ。LEGAL_PUBLIC が "true" で、会社情報の必須項目がすべて埋まっているときだけ公開する(空欄があれば404)
     const legalPage = LEGAL_PAGES[pathname];
-    if (legalPage && method === 'GET') return legalOpen(env) ? html(legalPage(COMPANY, mailLoginOn(env))) : notFound();
+    if (legalPage && method === 'GET') return legalOpen(env) ? html(legalPage(COMPANY, mailLoginOn(env), testmakerOn(env))) : notFound();
 
     if (pathname === '/subscribe' && method === 'GET') {
       const s = await createCheckoutSession(env, url.origin, Date.now(), srcOf(url));
@@ -213,7 +213,7 @@ export default {
         return html(feedbackThanksPage());
       }
       if (pathname === '/m') { const lv = url.searchParams.get('level'); return html(memberPage(TEMPLATES, Object.hasOwn(LEVELS, lv) ? lv : '', { testmaker: testmakerOn(env) })); }
-      if (pathname === '/m/guide') return html(guidePage());
+      if (pathname === '/m/guide') return html(guidePage(testmakerOn(env)));
       if (pathname === '/m/portal') {
         const p = await createPortalSession(env, member.customer_id, `${url.origin}/m`);
         return redirect(p.url);

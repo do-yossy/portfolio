@@ -540,6 +540,22 @@ const form = { level: 'junior', subject: '数学', grade: '2年', units: '一次
   ok((await (await worker.fetch(new Request('https://x.test/m', { headers: { cookie: tmCookie } }), envOn)).text()).includes('/m/test'), 'オンのときは会員ページにリンクが出る');
 }
 
+// ---------- 法務・ガイド:AI機能がオンのときだけ、AIに関する記載が出る / 返金の範囲と手順 ----------
+{
+  const tOff = termsPage(COMPANY, false);
+  const tOn = termsPage(COMPANY, false, true);
+  ok(!tOff.includes('外部のAIサービス') && tOn.includes('外部のAIサービス') && tOn.includes('15回') && tOn.includes('氏名・答案・成績'), '規約:AIに関する記載は、オンのときだけ出る(利用の条件・月15回・入力してはいけない情報)');
+  ok(tOff.includes('「当社の責め」とは') && tOff.includes('不可抗力') && tOff.includes('返金を希望する方は') && tOff.includes('Stripe を通じて'), '規約:「当社の責め」の範囲と、返金の手順が、常に出る');
+  const pOff = privacyPage(COMPANY, false);
+  const pOn = privacyPage(COMPANY, false, true);
+  ok(!pOff.includes('Anthropic') && pOn.includes('Anthropic, PBC') && pOn.includes('サーバーには保存しません') && pOn.includes('トークン数'), 'プライバシーポリシー:AIの委託先と、保存しない内容は、オンのときだけ出る');
+  const envLegal = { ...env, LEGAL_PUBLIC: 'true' };
+  const envLegalOn = { ...envOn, LEGAL_PUBLIC: 'true' };
+  const lp = (e, path) => worker.fetch(new Request(`https://x.test${path}`, { headers: path.startsWith('/m') ? { cookie: tmCookie } : {} }), e).then((r) => r.text());
+  ok(!(await lp(envLegal, '/legal/privacy')).includes('Anthropic') && (await lp(envLegalOn, '/legal/privacy')).includes('Anthropic, PBC'), '配信:キーが無いうちは、プライバシーポリシーにAIの記載が出ない(キーが登録されると出る)');
+  ok(!(await lp(env, '/m/guide')).includes('外部のAIサービス') && (await lp(envOn, '/m/guide')).includes('外部のAIサービス'), '使い方ガイド:AIへの送信の注意は、オンのときだけ出る');
+}
+
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
