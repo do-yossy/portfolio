@@ -221,7 +221,7 @@ ok(legalOpen({ LEGAL_PUBLIC: 'true' }, FULL), 'スイッチが"true"で全項目
 ok(!legalOpen({ LEGAL_PUBLIC: 'true' }, BLANK), 'スイッチが"true"でも、空欄があれば公開されない');
 ok(!legalOpen({}, COMPANY) && !legalOpen({ LEGAL_PUBLIC: 'false' }, COMPANY), '全項目が記入済みでも、スイッチが入るまでは公開されない');
 const tk = tokushohoPage(FULL), tkBlank = tokushohoPage(COMPANY);
-ok(tk.includes('安藤 嘉啓') && tk.includes('大阪府大阪市浪速区') && tk.includes('月額980円(税込)') && tk.includes('テスト返金方針') && !tk.includes('【未記入'), '特商法の表記に、記入済みの内容が出る');
+ok(tk.includes('安藤 嘉啓') && tk.includes('大阪府大阪市浪速区') && tk.includes('月額1,100円(税込)') && tk.includes('テスト返金方針') && !tk.includes('【未記入'), '特商法の表記に、記入済みの内容が出る');
 ok(privacyPage(BLANK).includes('【未記入:保管期間】') && privacyPage(COMPANY).includes('契約期間中および解約後1年間') && tkBlank.includes('請求があれば遅滞なく開示します') && tkBlank.includes('返金しません'), '空欄は【未記入】と目立つ表示になり、記入済みの内容は出る(確認用)');
 ok(termsPage(FULL).includes('大阪地方裁判所') && termsPage(FULL).includes('2026年10月1日') && !termsPage(FULL).includes('【未記入'), '規約に、管轄と制定日が出る');
 ok(privacyPage(FULL).includes('解約から5年') && privacyPage(FULL).includes('Stripe') && privacyPage(FULL).includes('Resend'), 'プライバシーポリシーに、保管期間と委託先が出る');

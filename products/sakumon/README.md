@@ -1,6 +1,6 @@
 # サクモン(Cloudflare Workers 版)
 
-先生向け文面ひな形集の月額サブスク(980円・税込)。AI API は使わない。サーバーは借りず、Cloudflare Workers + D1 の無料枠で動かす。
+先生向け文面ひな形集の月額サブスク(1,100円・税込)。AI API は使わない。サーバーは借りず、Cloudflare Workers + D1 の無料枠で動かす。
 
 - 決済: Stripe Checkout(月額プラン)。**申込月は日割り、翌月1日(日本時間0時)から毎月1日に自動継続**(`src/stripe.js` の `billingPlan`。Checkout の `subscription_data[billing_cycle_anchor]` + `proration_behavior`)。月末の2日以内の申込は、日割り額がJPYの最低決済額(50円)を下回りうるため日割りせず、初回は翌月1日
 - 契約状態: Stripe Webhook → D1(`members` テーブル)
@@ -130,7 +130,7 @@ npx.cmd wrangler d1 execute sakumon --remote --command "SELECT kind, usable, fix
 本番にこの表を作るには、公開前に `schema.sql` を適用する(冪等)。
 
 ### 残り・未決
-- 月額が980円か1,100円かは、代表が決める(本番のStripe商品・LP・規約・見本は、いま980円)。
+- 月額は**1,100円(税込)**に決定(代表 2026-11-15)。コード・LP・規約・特商法・見本は1,100円に直した。**Stripe の本番の価格は、まだ980円**(price_1UQVNLFriZp4SUisyOfpXhCV)。新しい価格(1,100円・毎月・税込)を作り、`wrangler secret put STRIPE_PRICE_ID` で差し替えるまで、公開しない(LPは1,100円と表示するのに、請求が980円になる)。既存の契約者はいない前提(先行の先生は無料開通)。
 - 告知にWordの作例を付ける場合の作例ファイルは、実際にAIで作ったものを、先生が確認してから(捏造しない)。`scripts/make-sample-docx.mjs` は、形式確認用の見本(中身は私が書いた架空の問題)で、告知には使わない。
 - LP・ガイド・規約の文面は、監査役を通してから公開する(11/16の監査基準の改定後)。
 - サーバー契約は不要(Cloudflare)。必要なのは、APIキーの登録(`wrangler secret put ANTHROPIC_API_KEY`)と、DBの表の追加だけ。
