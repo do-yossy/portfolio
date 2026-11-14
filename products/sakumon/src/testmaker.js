@@ -201,7 +201,7 @@ export async function runTestMaker(env, db, customer, v, { fetchFn = globalThis.
 
 
 // ---- 先生が直した内容の受け取り(Word出力用)と、評価の記録 ----
-export const SCHOOL_PC_NOTE = '学校のパソコンで使うことは、学校の情報セキュリティの方針で禁止されている場合があります。ご自宅や私物のパソコンで作り、Wordファイルを学校に持ち込む使い方をおすすめします。';
+export const SCHOOL_PC_NOTE = '学校のパソコンで使うことは、学校の情報セキュリティの方針で禁止されている場合があります。ご利用の端末や、作ったファイルの扱いは、所属校・自治体の情報セキュリティの方針に従ってください。';
 
 const num = (v, min, max) => {
   const n = Number(String(v ?? '').normalize('NFKC').trim());
@@ -269,7 +269,7 @@ export const testFormPage = (used, error, kept = {}) =>
 <div class="hero tm" style="padding-top:8px">
 <a class="back" href="/m">← 一覧へ戻る</a>
 <h1 style="font-size:26px">テストのたたき台を作る</h1>
-<p class="lead" style="font-size:16px">種類(定期テスト・小テスト・漢字テスト・計算テスト・宿題プリント)・校種・教科・単元を選ぶと、問題・模範解答・採点基準・配点表のたたき台ができます。答えを見せずに解き直して、模範解答と食い違う問題に印を付けます。画面で直して、Wordで出力できます。</p>
+<p class="lead" style="font-size:16px">種類(定期テスト・小テスト・漢字テスト・計算テスト・宿題プリント)・校種・教科・単元を選ぶと、問題・模範解答・採点基準・配点表のたたき台ができます。答えを見せずに解き直して、模範解答と食い違う問題に印を付けます(一致しても、正しいとは限りません。長い記述の答えは比べません)。画面で直して、Wordで出力できます。</p>
 <p class="note">今月の回数:${used}/${MONTHLY_LIMIT}回(毎月1日に戻ります)。作った内容は保存されません。画面を閉じる前に、Wordに出力してください。</p>
 <p class="note">${esc(SCHOOL_PC_NOTE)}</p>
 <p class="note">入力した内容は、作成のため、外部のAIサービスに送られます。児童生徒の氏名・答案・成績は、入力しないでください。</p>
@@ -290,7 +290,7 @@ ${error ? `<div class="err">${esc(error)}</div>` : ''}
 </form></div>`,
   );
 
-const CHECK_LABEL = { match: '検算:一致', mismatch: '検算:食い違い(要確認)', skipped: '検算:記述のため比べていません', missing: '検算:結果なし' };
+const CHECK_LABEL = { match: '検算:一致(正しいとは限りません)', mismatch: '検算:食い違い(要確認)', skipped: '検算:記述のため比べていません', missing: '検算:結果なし' };
 
 const scoringText = (q) => q.scoring.map((s) => `${s.point}点 ${s.criterion}`).join('\n');
 

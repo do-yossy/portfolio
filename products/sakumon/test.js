@@ -643,7 +643,7 @@ const form = { level: 'junior', subject: '数学', grade: '2年', units: '一次
 
   // 結果画面
   const resPage = testResultPage({ title: 'T', questions: [{ no: 1, aspect: '知識・技能', difficulty: 'ふつう', unit: 'u', text: 't', answer: 'a', points: 100, scoring: [], check: 'match' }], warnings: [], verified: true, used: 1 }, { kind: '小テスト', level: 'junior', subject: '数学', grade: '2年', total: 100, minutes: 20 });
-  ok(resPage.includes('action="/m/test/docx"') && resPage.includes('action="/m/test/rating"') && resPage.includes('私物のパソコン') && resPage.includes('name="q1_text"'), '結果画面:直せる欄・Word出力・評価・学校PCの注意がある');
+  ok(resPage.includes('action="/m/test/docx"') && resPage.includes('action="/m/test/rating"') && resPage.includes('情報セキュリティの方針に従ってください') && resPage.includes('name="q1_text"'), '結果画面:直せる欄・Word出力・評価・学校PCの注意がある');
 
   // 無料開通
   const gdb = makeDb();
@@ -659,8 +659,8 @@ const form = { level: 'junior', subject: '数学', grade: '2年', units: '一次
   ok(isActive({ status: 'active', subscription_id: 'sub_123' }) && !isActive({ status: 'canceled', subscription_id: null }) && !isActive(null), '通常の契約の判定は変わらない');
 
   // 学校PCの案内
-  ok((await (await worker.fetch(new Request('https://x.test/m/guide', { headers: { cookie: tmCookie } }), env)).text()).includes('私物のパソコン'), '使い方ガイドに、学校PCの案内がある');
-  ok(landing(true, '', false).includes('私物のパソコン') && !/学校のパソコンで(も)?(使えます|使える)/.test(landing(true, '', false)), 'LPに、学校PCの案内がある(「使える」とは書かない)');
+  ok((await (await worker.fetch(new Request('https://x.test/m/guide', { headers: { cookie: tmCookie } }), env)).text()).includes('情報セキュリティの方針に従ってください'), '使い方ガイドに、学校PCの案内がある');
+  ok(landing(true, '', false).includes('情報セキュリティの方針に従ってください') && !/学校のパソコンで(も)?(使えます|使える)/.test(landing(true, '', false)), 'LPに、学校PCの案内がある(「使える」とは書かない)');
 }
 
 globalThis.fetch = realFetch;
