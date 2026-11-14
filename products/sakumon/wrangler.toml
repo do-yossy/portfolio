@@ -15,7 +15,7 @@ LP_PUBLIC = "false"
 LEGAL_PUBLIC = "false"
 # テストのたたき台づくり(AI版)のスイッチ。オンにするのは、README「テストのたたき台づくり」の手順の最後(DBの表の追加 → 法務の審査 → APIキーの登録 のあと)。
 # オンにするときだけ、次の行の先頭の # を外して deploy する。ANTHROPIC_API_KEY が無いあいだは、"true" でも機能は動かない(404)。
-# TESTMAKER_ENABLED = "true"
+TESTMAKER_ENABLED = "true"
 # TESTMAKER_MODEL = "claude-sonnet-5-5"   # 任意。モデルを変えるとき
 
 # 秘密情報は wrangler secret put で登録する(ここには書かない)
