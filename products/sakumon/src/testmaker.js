@@ -1,6 +1,7 @@
 // テストのたたき台づくり(AI版)。既定ではオフ。TESTMAKER_ENABLED="true" かつ ANTHROPIC_API_KEY があるときだけ動く。
 // 原本の設計(docs/引き継ぎ_AI版テスト作成.md)のうち、作成→検算→点検(配点)までを実装した。
-// 未実装: Word出力 / 小問の類題差し替え / 別版 / 先生の評価の記録 / 小学校の漢字配当表。
+// 種類: 定期テスト・小テスト・漢字テスト・計算テスト・宿題プリント。結果は画面で直せて、Word(.docx)で出力できる。先生の評価(使えた/直す時間)は回数だけ記録する。
+// 未実装: 小問の類題差し替え / 別版 / 小学校の漢字配当表。
 // 守ること: 教科書の本文・図・問題は使わない / 児童生徒の氏名・答案・成績は扱わない / 観点は2つだけ / 出力はたたき台(採用判断は先生)。
 // 作った内容はサーバーに保存しない。保存するのは、会員ごと・月ごとの回数とトークン数だけ。
 import { LEVELS } from './content.js';
@@ -9,6 +10,14 @@ import { esc, layout } from './pages.js';
 export const MONTHLY_LIMIT = 15;
 export const ASPECTS = ['知識・技能', '思考・判断・表現'];
 export const DIFFICULTIES = ['やさしい', 'ふつう', '難しい'];
+export const KINDS = ['定期テスト', '小テスト', '漢字テスト', '計算テスト', '宿題プリント'];
+const KIND_GUIDE = {
+  定期テスト: '',
+  小テスト: '種類:小テスト。10〜20分で終わる分量にし、単元を絞る。\n',
+  漢字テスト: '種類:漢字テスト。読みと書きの問題にする。1問につき1語を基本にし、配点は同じにそろえる。問題文には、学年に合わない難しい漢字は使わない(学年の配当は、先生が確認する)。\n',
+  計算テスト: '種類:計算テスト。計算問題にする。答えは数値か式だけにし、配点は同じにそろえる。\n',
+  宿題プリント: '種類:宿題プリント。家庭で、ひとりで取り組める分量にする。ヒントになる言葉を、問題文に添えてよい。\n',
+};
 const BANNED_WORDS = ['生徒', '児童', '氏名', '成績', '答案'];
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -28,15 +37,17 @@ const intIn = (v, min, max, dflt) => {
 // フォームの入力を検査する。氏名・成績・答案などの語が入っていたら作成を止める
 export function parseInput(get) {
   const level = clean(get('level'), 20);
+  const kind = clean(get('kind'), 20) || KINDS[0];
   const subject = clean(get('subject'), 20);
   const grade = clean(get('grade'), 10);
   const units = clean(get('units'), 200).split(/[\n、,]/).map((u) => u.trim()).filter(Boolean).slice(0, 3).map((u) => u.slice(0, 40));
   const extra = clean(get('extra'), 200);
   const total = intIn(get('total'), 20, 100, 100);
   const minutes = intIn(get('minutes'), 10, 90, 50);
-  const count = intIn(get('count'), 3, 12, 6);
-  const kept = { level, subject, grade, units: units.join('\n'), extra, total: String(get('total') ?? ''), minutes: String(get('minutes') ?? ''), count: String(get('count') ?? '') };
+  const count = intIn(get('count'), 3, 20, 6);
+  const kept = { kind, level, subject, grade, units: units.join('\n'), extra, total: String(get('total') ?? ''), minutes: String(get('minutes') ?? ''), count: String(get('count') ?? '') };
   const fail = (error) => ({ ok: false, error, kept });
+  if (!KINDS.includes(kind)) return fail('種類を選んでください。');
   if (!Object.hasOwn(LEVELS, level)) return fail('校種を選んでください。');
   if (!subject) return fail('教科を入力してください。');
   if (!grade) return fail('学年・科目を入力してください。');
@@ -44,7 +55,7 @@ export function parseInput(get) {
   if ([total, minutes, count].some(Number.isNaN)) return fail('満点・時間・問題数は、範囲内の整数で入力してください。');
   const hit = BANNED_WORDS.find((w) => [subject, grade, extra, ...units].join(' ').includes(w));
   if (hit) return fail(`入力に「${hit}」を含む語があるため、作成を止めました。児童生徒の氏名・答案・成績は扱えません。単元名と条件だけを入力してください。`);
-  return { ok: true, value: { level, subject, grade, units, extra, total, minutes, count }, kept };
+  return { ok: true, value: { kind, level, subject, grade, units, extra, total, minutes, count }, kept };
 }
 
 const SYSTEM_RULES = `あなたは、日本の学校の先生がテストを作るのを手伝う作問の補助者です。出力は「たたき台」で、採用するかは先生が決めます。
@@ -60,21 +71,22 @@ const SYSTEM_RULES = `あなたは、日本の学校の先生がテストを作�
 
 export function buildGeneratePrompt(v) {
   const user = `次の条件で、テストのたたき台を作ってください。
+種類:${v.kind || KINDS[0]}
 校種:${LEVELS[v.level]}
 教科:${v.subject}
 学年・科目:${v.grade}
 単元:${v.units.join('、')}
 満点:${v.total}点 / 時間:${v.minutes}分 / 小問の数:${v.count}問ほど
 観点の配分の目安:知識・技能 6〜7割、思考・判断・表現 3〜4割
-${v.level === 'elementary' ? '小学校向け:児童にわかる言い回しにし、習っていない漢字は避ける。算数は「式」と「答え」を分けて答えさせる。\n' : ''}${v.extra ? `先生からの追加の条件:${v.extra}\n` : ''}`;
-  return { system: SYSTEM_RULES, user, maxTokens: 4096 };
+${KIND_GUIDE[v.kind] || ''}${v.level === 'elementary' ? '小学校向け:児童にわかる言い回しにし、習っていない漢字は避ける。算数は「式」と「答え」を分けて答えさせる。\n' : ''}${v.extra ? `先生からの追加の条件:${v.extra}\n` : ''}`;
+  return { system: SYSTEM_RULES, user, maxTokens: v.count > 12 ? 8000 : 4096 };
 }
 
 // 検算: 模範解答を見せずに、別の呼び出しで解き直させる
 export function buildVerifyPrompt(questions) {
   const system = 'あなたは、テストの問題を解く役です。各問題に、あなた自身で考えて答えてください。出力は、次の形のJSONだけ。説明文やコードブロックは付けない。\n{"answers":[{"no":1,"answer":"答え"}]}';
   const user = questions.map((q) => `問題${q.no}(${q.points}点):\n${q.text}`).join('\n\n');
-  return { system, user, maxTokens: 2048 };
+  return { system, user, maxTokens: questions.length > 12 ? 4096 : 2048 };
 }
 
 export function extractJson(text) {
@@ -187,6 +199,65 @@ export async function runTestMaker(env, db, customer, v, { fetchFn = globalThis.
   }
 }
 
+
+// ---- 先生が直した内容の受け取り(Word出力用)と、評価の記録 ----
+export const SCHOOL_PC_NOTE = '学校のパソコンで使うことは、学校の情報セキュリティの方針で禁止されている場合があります。ご自宅や私物のパソコンで作り、Wordファイルを学校に持ち込む使い方をおすすめします。';
+
+const num = (v, min, max) => {
+  const n = Number(String(v ?? '').normalize('NFKC').trim());
+  return Number.isInteger(n) && n >= min && n <= max ? n : NaN;
+};
+const parseScoring = (text) =>
+  clean(text, 1000)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 6)
+    .map((l) => {
+      const m = l.normalize('NFKC').match(/^(\d{1,3})\s*点?\s*(.*)$/);
+      return m ? { point: Number(m[1]), criterion: clean(m[2], 300) } : { point: 0, criterion: clean(l, 300) };
+    })
+    .filter((s) => s.criterion);
+
+export function parseEditedTest(get) {
+  const kind = clean(get('kind'), 20);
+  const level = clean(get('level'), 20);
+  const n = num(get('n'), 1, 20);
+  if (!KINDS.includes(kind) || !Object.hasOwn(LEVELS, level) || Number.isNaN(n)) return { ok: false, error: '入力内容を読み取れませんでした。' };
+  const questions = [];
+  for (let i = 1; i <= n; i++) {
+    const text = clean(get(`q${i}_text`), 2000);
+    const points = num(get(`q${i}_points`), 0, 100);
+    if (!text || Number.isNaN(points)) return { ok: false, error: `問${i}:問題文を入れ、配点は0〜100の整数にしてください。` };
+    const aspect = clean(get(`q${i}_aspect`), 20);
+    const difficulty = clean(get(`q${i}_difficulty`), 10);
+    questions.push({ no: i, aspect: ASPECTS.includes(aspect) ? aspect : '', difficulty: DIFFICULTIES.includes(difficulty) ? difficulty : '', unit: clean(get(`q${i}_unit`), 40), text, answer: clean(get(`q${i}_answer`), 2000), points, scoring: parseScoring(get(`q${i}_scoring`)) });
+  }
+  return {
+    ok: true,
+    value: { kind, levelLabel: LEVELS[level], subject: clean(get('subject'), 20), grade: clean(get('grade'), 10), total: num(get('total'), 20, 100) || 100, minutes: num(get('minutes'), 10, 90) || 50, title: clean(get('title'), 60) || 'テスト(たたき台)', questions },
+  };
+}
+
+export const docxFileName = (title) => (String(title).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim().slice(0, 40) || 'テスト') + '.docx';
+
+export const USABLE = ['yes', 'partial', 'no'];
+export const FIX = ['le10', 'le30', 'gt30'];
+export function parseRating(get) {
+  const usable = clean(get('usable'), 10);
+  const fix = clean(get('fix'), 10);
+  const kind = clean(get('kind'), 20);
+  if (!USABLE.includes(usable) || !FIX.includes(fix) || !KINDS.includes(kind)) return null;
+  return { usable, fix, kind };
+}
+// 1人あたり24時間に30件まで。保存できたら true
+export async function saveRating(db, customer, r, nowSec = Math.floor(Date.now() / 1000)) {
+  const recent = await db.prepare('SELECT COUNT(*) AS n FROM test_rating WHERE customer_id = ? AND created_at > ?').bind(customer, nowSec - 86400).first();
+  if (recent && recent.n >= 30) return false;
+  await db.prepare('INSERT INTO test_rating (customer_id, kind, usable, fix_minutes, created_at) VALUES (?, ?, ?, ?, ?)').bind(customer, r.kind, r.usable, r.fix, nowSec).run();
+  return true;
+}
+
 // ---- 画面 ----
 const nl = (s) => esc(s).replace(/\n/g, '<br>');
 const FIELD = 'width:100%;font-size:17px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-family:inherit';
@@ -198,11 +269,14 @@ export const testFormPage = (used, error, kept = {}) =>
 <div class="hero tm" style="padding-top:8px">
 <a class="back" href="/m">← 一覧へ戻る</a>
 <h1 style="font-size:26px">テストのたたき台を作る</h1>
-<p class="lead" style="font-size:16px">校種・教科・単元を選ぶと、問題・模範解答・採点基準・配点表のたたき台ができます。そのあと、答えを見せずに解き直して、模範解答と食い違う問題に印を付けます。</p>
-<p class="note">今月の回数:${used}/${MONTHLY_LIMIT}回(毎月1日に戻ります)。作った内容は保存されません。画面を閉じる前に、印刷するか、書き写してください。</p>
+<p class="lead" style="font-size:16px">種類(定期テスト・小テスト・漢字テスト・計算テスト・宿題プリント)・校種・教科・単元を選ぶと、問題・模範解答・採点基準・配点表のたたき台ができます。答えを見せずに解き直して、模範解答と食い違う問題に印を付けます。画面で直して、Wordで出力できます。</p>
+<p class="note">今月の回数:${used}/${MONTHLY_LIMIT}回(毎月1日に戻ります)。作った内容は保存されません。画面を閉じる前に、Wordに出力してください。</p>
+<p class="note">${esc(SCHOOL_PC_NOTE)}</p>
 <p class="note">入力した内容は、作成のため、外部のAIサービスに送られます。児童生徒の氏名・答案・成績は、入力しないでください。</p>
 ${error ? `<div class="err">${esc(error)}</div>` : ''}
 <form method="post" action="/m/test">
+<label for="kind">種類</label>
+<select id="kind" name="kind" required>${KINDS.map((k) => `<option value="${k}" ${kept.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
 <label for="level">校種</label>
 <select id="level" name="level" required>${Object.entries(LEVELS).map(([k, v]) => `<option value="${k}" ${kept.level === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
 <label for="subject">教科</label><input id="subject" name="subject" maxlength="20" value="${esc(kept.subject || '')}" required>
@@ -210,7 +284,7 @@ ${error ? `<div class="err">${esc(error)}</div>` : ''}
 <label for="units">単元(3つまで。1行に1つ)</label><textarea id="units" name="units" rows="3" maxlength="200" required>${esc(kept.units || '')}</textarea>
 <label for="total">満点(20〜100。空欄は100)</label><input id="total" name="total" inputmode="numeric" value="${esc(kept.total || '')}">
 <label for="minutes">時間・分(10〜90。空欄は50)</label><input id="minutes" name="minutes" inputmode="numeric" value="${esc(kept.minutes || '')}">
-<label for="count">小問の数(3〜12。空欄は6)</label><input id="count" name="count" inputmode="numeric" value="${esc(kept.count || '')}">
+<label for="count">小問の数(3〜20。空欄は6)</label><input id="count" name="count" inputmode="numeric" value="${esc(kept.count || '')}">
 <label for="extra">追加の条件(任意・200字まで)</label><textarea id="extra" name="extra" rows="3" maxlength="200">${esc(kept.extra || '')}</textarea>
 <p style="margin-top:16px"><button class="btn" type="submit">作成する(1回に数える)</button></p>
 </form></div>`,
@@ -218,29 +292,50 @@ ${error ? `<div class="err">${esc(error)}</div>` : ''}
 
 const CHECK_LABEL = { match: '検算:一致', mismatch: '検算:食い違い(要確認)', skipped: '検算:記述のため比べていません', missing: '検算:結果なし' };
 
+const scoringText = (q) => q.scoring.map((s) => `${s.point}点 ${s.criterion}`).join('\n');
+
+// 結果は、先生が画面で直してから、Word(.docx)で出力する。作った内容はサーバーに保存しない
 export const testResultPage = (r, v) => {
-  const byAspect = (a) => r.questions.filter((q) => q.aspect === a).reduce((n, q) => n + q.points, 0);
   const sum = r.questions.reduce((n, q) => n + q.points, 0);
-  const mark = (q) => (q.check === 'mismatch' ? '<strong style="color:#a33">⚠ </strong>' : '');
+  const T = 'width:100%;font-size:16px;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit';
+  const hid = (k, val) => `<input type="hidden" name="${k}" value="${esc(val)}">`;
   return layout(
     r.title,
-    `<style>@media print{.noprint{display:none}}table.tm{border-collapse:collapse;width:100%}table.tm th,table.tm td{border:1px solid var(--line);padding:6px 8px;text-align:left}.warn{background:var(--warn);border:1px solid var(--warn-line);border-radius:10px;padding:12px 14px;margin:12px 0}</style>
+    `<style>.warn{background:var(--warn);border:1px solid var(--warn-line);border-radius:10px;padding:12px 14px;margin:12px 0}.qb{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0}.qb label{display:block;margin:10px 0 4px;font-weight:700;font-size:14px}</style>
 <div class="hero" style="padding-top:8px">
-<p class="noprint"><a class="back" href="/m/test">← 条件を変えて作り直す</a></p>
-<div class="warn"><strong>これは「たたき台」です。</strong>内容の正しさ・難しさ・配点は、先生が確認してから使ってください。教科書の問題と似ていないかも、ご確認ください。${r.verified ? '' : '<br><strong>検算ができませんでした。</strong>模範解答は、ご自身で解いて確かめてください。'}</div>
+<p><a class="back" href="/m/test">← 条件を変えて作り直す</a></p>
+<div class="warn"><strong>これは「たたき台」です。</strong>内容の正しさ・難しさ・配点は、先生が確認し、下の欄で直してから、Wordで出力してください。教科書の問題と似ていないかも、ご確認ください。${r.verified ? '' : '<br><strong>検算ができませんでした。</strong>模範解答は、ご自身で解いて確かめてください。'}</div>
+<div class="warn">${esc(SCHOOL_PC_NOTE)}</div>
 ${r.warnings.length ? `<div class="warn"><strong>点検で見つかったこと</strong><ul>${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
-<h1 style="font-size:24px">${esc(r.title)}</h1>
-<p>${esc(LEVELS[v.level])} ${esc(v.subject)} ${esc(v.grade)} / 満点${v.total}点 / ${v.minutes}分</p>
-<h2>問題用紙</h2>
-${r.questions.map((q) => `<p><strong>問${q.no}</strong>(${q.points}点)${nl(q.text)}</p>`).join('')}
-<h2>模範解答と採点基準</h2>
-${r.questions.map((q) => `<p>${mark(q)}<strong>問${q.no}</strong>(${q.points}点)<br>模範解答:${nl(q.answer)}${q.scoring.length ? `<br>採点基準:${q.scoring.map((s) => `${s.point}点 ${esc(s.criterion)}`).join(' / ')}` : ''}<br><small>${CHECK_LABEL[q.check] || ''}${q.check === 'mismatch' && q.solved ? `(解き直しの答え:${esc(q.solved)})` : ''}</small></p>`).join('')}
-<h2>配点表</h2>
-<table class="tm"><tr><th>問</th><th>単元</th><th>観点</th><th>難しさ</th><th>配点</th></tr>
-${r.questions.map((q) => `<tr><td>${q.no}</td><td>${esc(q.unit)}</td><td>${esc(q.aspect || '未設定')}</td><td>${esc(q.difficulty)}</td><td>${q.points}</td></tr>`).join('')}
-<tr><th colspan="4">合計(満点${v.total}点)</th><th>${sum}</th></tr></table>
-<p>知識・技能:${byAspect(ASPECTS[0])}点 / 思考・判断・表現:${byAspect(ASPECTS[1])}点</p>
-<p class="noprint note">今月の回数:${r.used}/${MONTHLY_LIMIT}回。印刷するには、ブラウザの印刷機能をお使いください。</p>
+<p>${esc(v.kind || KINDS[0])} / ${esc(LEVELS[v.level])} ${esc(v.subject)} ${esc(v.grade)} / 満点${v.total}点 / ${v.minutes}分 / いまの配点の合計 ${sum}点</p>
+<p class="note">この画面を閉じると、内容は消えます(保存されません)。Wordに出力してから、閉じてください。</p>
+<form method="post" action="/m/test/docx">
+${hid('kind', v.kind || KINDS[0])}${hid('level', v.level)}${hid('subject', v.subject)}${hid('grade', v.grade)}${hid('total', v.total)}${hid('minutes', v.minutes)}${hid('n', r.questions.length)}
+<label for="title" style="display:block;font-weight:700;margin-top:12px">テスト名</label><input id="title" name="title" maxlength="60" value="${esc(r.title)}" style="${T}">
+${r.questions
+  .map(
+    (q) => `<div class="qb"><strong>${q.check === 'mismatch' ? '<span style="color:#a33">⚠ </span>' : ''}問${q.no}</strong> <small>${esc(CHECK_LABEL[q.check] || '')}${q.check === 'mismatch' && q.solved ? `(解き直しの答え:${esc(q.solved)})` : ''}</small>
+${hid(`q${q.no}_aspect`, q.aspect || '')}${hid(`q${q.no}_difficulty`, q.difficulty)}${hid(`q${q.no}_unit`, q.unit)}
+<label for="q${q.no}_text">問題文</label><textarea id="q${q.no}_text" name="q${q.no}_text" rows="4" maxlength="2000" style="${T}">${esc(q.text)}</textarea>
+<label for="q${q.no}_answer">模範解答</label><textarea id="q${q.no}_answer" name="q${q.no}_answer" rows="2" maxlength="2000" style="${T}">${esc(q.answer)}</textarea>
+<label for="q${q.no}_points">配点(点)</label><input id="q${q.no}_points" name="q${q.no}_points" inputmode="numeric" value="${q.points}" style="${T};max-width:120px">
+<label for="q${q.no}_scoring">採点基準(1行に1つ。「3点 式が正しい」の形)</label><textarea id="q${q.no}_scoring" name="q${q.no}_scoring" rows="2" maxlength="1000" style="${T}">${esc(scoringText(q))}</textarea>
+<small>観点:${esc(q.aspect || '未設定(先生が決めてください)')} / 難しさ:${esc(q.difficulty)}</small></div>`,
+  )
+  .join('')}
+<p><button class="btn" type="submit">Wordで出力する(.docx)</button></p>
+<p class="note">問題用紙・解答用紙・模範解答と採点基準・配点表が、1つのWordファイルに入ります。今月の回数:${r.used}/${MONTHLY_LIMIT}回。</p>
+</form>
+<form method="post" action="/m/test/rating" class="qb">
+<strong>使ってみて、どうでしたか(任意・今後の改善に使います)</strong>
+${hid('kind', v.kind || KINDS[0])}
+<label for="usable">そのまま、または少し直して使えそうですか</label>
+<select id="usable" name="usable" style="${T}"><option value="yes">使えそう</option><option value="partial">かなり直せば使えそう</option><option value="no">使えなさそう</option></select>
+<label for="fix">直す時間の目安</label>
+<select id="fix" name="fix" style="${T}"><option value="le10">10分以内</option><option value="le30">30分以内</option><option value="gt30">30分より長い</option></select>
+<p><button class="btn" type="submit">送る</button></p>
+<p class="note">送られるのは、この2つの選択と種類だけです。作った内容や入力した条件は送られません。</p>
+</form>
 </div>`,
   );
 };

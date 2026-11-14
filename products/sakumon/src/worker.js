@@ -4,9 +4,10 @@ import {
   newToken, claimCheckout, createSession, findBySession, consumeRecoveryLink, saveFeedback,
 } from './db.js';
 import { TEMPLATES, LEVELS, findTemplate } from './content.js';
-import { html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, SCHOOL_LEVELS, ROLES, feedbackPage, feedbackThanksPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
+import { layout, html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, SCHOOL_LEVELS, ROLES, feedbackPage, feedbackThanksPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
-import { testmakerOn, parseInput, runTestMaker, usedThisMonth, jstMonth, testFormPage, testResultPage, MONTHLY_LIMIT } from './testmaker.js';
+import { testmakerOn, parseInput, runTestMaker, usedThisMonth, jstMonth, testFormPage, testResultPage, MONTHLY_LIMIT, parseEditedTest, docxFileName, parseRating, saveRating } from './testmaker.js';
+import { buildTestDocx } from './docx.js';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
@@ -177,7 +178,7 @@ export default {
     }
 
     if (pathname === '/m' || pathname.startsWith('/m/')) {
-      if (method !== 'GET' && !(method === 'POST' && (pathname === '/m/feedback' || pathname === '/m/test'))) return notFound();
+      if (method !== 'GET' && !(method === 'POST' && (pathname === '/m/feedback' || pathname === '/m/test' || pathname === '/m/test/docx' || pathname === '/m/test/rating'))) return notFound();
       const member = await currentMember(request, env);
       if (!member) return html(inactivePage(mailLoginOn(env)), 403);
       if (!isActive(member)) return html(inactivePage(mailLoginOn(env)), 403);
@@ -197,6 +198,34 @@ export default {
         if (r.status === 'error') return html(testFormPage(used, '作成できませんでした。回数には数えていません。しばらくしてから、もう一度お試しください。', p.kept), 502);
         return html(testResultPage(r, p.value), 200, { 'Cache-Control': 'no-store' });
       }
+      // 先生が画面で直した内容を、Word(.docx)にして返す。内容は保存しない。回数には数えない
+      if (pathname === '/m/test/docx') {
+        if (!testmakerOn(env) || method !== 'POST') return notFound();
+        const origin = request.headers.get('origin');
+        if (origin && origin !== url.origin) return notFound();
+        const form = await request.formData().catch(() => null);
+        const p = form ? parseEditedTest((k) => form.get(k)) : { ok: false, error: '入力内容を読み取れませんでした。' };
+        if (!p.ok) return html(testFormPage(await usedThisMonth(env.DB, member.customer_id, jstMonth()), p.error), 400);
+        const bytes = buildTestDocx(p.value);
+        return new Response(bytes, {
+          headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition': `attachment; filename="test.docx"; filename*=UTF-8''${encodeURIComponent(docxFileName(p.value.title))}`,
+            'Cache-Control': 'no-store',
+          },
+        });
+      }
+      // 先生の評価(使えそうか・直す時間)。選択式の2項目と種類だけを、会員ごとに記録する
+      if (pathname === '/m/test/rating') {
+        if (!testmakerOn(env) || method !== 'POST') return notFound();
+        const origin = request.headers.get('origin');
+        if (origin && origin !== url.origin) return notFound();
+        const form = await request.formData().catch(() => null);
+        const r = form && parseRating((k) => form.get(k));
+        if (!r) return html(testFormPage(await usedThisMonth(env.DB, member.customer_id, jstMonth()), '評価を読み取れませんでした。'), 400);
+        const saved = await saveRating(env.DB, member.customer_id, r);
+        return html(layout('ありがとうございました', `<div class="hero"><h1 style="font-size:24px">${saved ? 'ありがとうございました' : '本日は、これ以上送れません'}</h1><p><a class="btn" href="/m/test">もう1つ作る</a></p><p><a href="/m">ひな形一覧へ</a></p></div>`), saved ? 200 : 429);
+      }
       if (pathname === '/m/feedback') {
         if (method === 'GET') return html(feedbackPage(findTemplate(url.searchParams.get('t') || '')));
         const origin = request.headers.get('origin');
@@ -215,6 +244,7 @@ export default {
       if (pathname === '/m') { const lv = url.searchParams.get('level'); return html(memberPage(TEMPLATES, Object.hasOwn(LEVELS, lv) ? lv : '', { testmaker: testmakerOn(env) })); }
       if (pathname === '/m/guide') return html(guidePage(testmakerOn(env)));
       if (pathname === '/m/portal') {
+        if (member.customer_id.startsWith('manual_')) return html(layout('お支払いの設定', '<div class="hero"><h1 style="font-size:24px">お支払いの設定</h1><p>この契約は、運営が開通した無料のご利用期間中です。お支払いの設定はありません。期間が終わったら、お申し込みのうえ、続けてご利用いただけます。</p><p><a href="/m">ひな形一覧へ</a></p></div>'));
         const p = await createPortalSession(env, member.customer_id, `${url.origin}/m`);
         return redirect(p.url);
       }

@@ -41,7 +41,12 @@ export async function recordEvent(db, id) {
 
 export const forgetEvent = (db, id) => db.prepare('DELETE FROM events WHERE id = ?').bind(id).run();
 
-export const isActive = (m) => !!m && (m.status === 'active' || m.status === 'trialing');
+// 運営が無料で開通した会員(scripts/grant-member.mjs)は、subscription_id が 'manual:<終了の時刻(秒)>'。終了を過ぎたら使えない
+export const isActive = (m, nowSec = now()) => {
+  if (!m || !(m.status === 'active' || m.status === 'trialing')) return false;
+  const g = /^manual:(\d+)$/.exec(m.subscription_id || '');
+  return !(g && Number(g[1]) <= nowSec);
+};
 
 // ---- ブラウザ単位の会員証 ----
 // (入り直しのリンクの消費は、このブロックの下の consumeRecoveryLink)

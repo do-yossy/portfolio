@@ -10,7 +10,7 @@ import { TEMPLATES, CATEGORIES, LEVELS, forLevel } from './src/content.js';
 import { validEmail, buildSql, hashToken } from './scripts/recovery-link.mjs';
 import { billingPlan } from './src/stripe.js';
 import { buildSql as fbSql, report as fbReport } from './scripts/feedback-report.mjs';
-import { parseInput, validateTest, jstMonth, reserveUse, usedThisMonth, testmakerOn, extractJson, MONTHLY_LIMIT } from './src/testmaker.js';
+import { testResultPage, parseInput, validateTest, jstMonth, reserveUse, usedThisMonth, testmakerOn, extractJson, MONTHLY_LIMIT } from './src/testmaker.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, name) => {
@@ -554,6 +554,113 @@ const form = { level: 'junior', subject: '数学', grade: '2年', units: '一次
   const lp = (e, path) => worker.fetch(new Request(`https://x.test${path}`, { headers: path.startsWith('/m') ? { cookie: tmCookie } : {} }), e).then((r) => r.text());
   ok(!(await lp(envLegal, '/legal/privacy')).includes('Anthropic') && (await lp(envLegalOn, '/legal/privacy')).includes('Anthropic, PBC'), '配信:キーが無いうちは、プライバシーポリシーにAIの記載が出ない(キーが登録されると出る)');
   ok(!(await lp(env, '/m/guide')).includes('外部のAIサービス') && (await lp(envOn, '/m/guide')).includes('外部のAIサービス'), '使い方ガイド:AIへの送信の注意は、オンのときだけ出る');
+}
+
+
+// ---- 11/20公開に向けた追加: 種類・直せる結果・Word出力・評価の記録・無料開通・学校PCの案内 ----
+{
+  const { buildTestDocx, crc32, zipStore } = await import('./src/docx.js');
+  const { KINDS, buildGeneratePrompt, parseEditedTest, parseRating, saveRating, docxFileName } = await import('./src/testmaker.js');
+  const { isActive } = await import('./src/db.js');
+  const { buildGrantSql } = await import('./scripts/grant-member.mjs');
+
+  // zip / docx
+  ok(crc32(new TextEncoder().encode('123456789')) === 0xcbf43926, 'CRC32が標準の値と一致する');
+  const sample = {
+    title: '一次関数 小テスト', kind: '小テスト', levelLabel: '中学校', subject: '数学', grade: '2年', total: 100, minutes: 20,
+    questions: [
+      { no: 1, aspect: '知識・技能', difficulty: 'ふつう', unit: '一次関数', text: 'y=2x+1 の x=3 のときの y を求めなさい。', answer: '7', points: 50, scoring: [{ point: 50, criterion: '7と答えている' }] },
+      { no: 2, aspect: '思考・判断・表現', difficulty: '難しい', unit: '一次関数', text: '傾きが3で点(1,2)を通る直線の式を<書きなさい>。&', answer: 'y=3x-1', points: 50, scoring: [] },
+    ],
+  };
+  const bytes = buildTestDocx(sample);
+  ok(bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4, 'docx: zipの先頭が正しい');
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocd = bytes.length - 22;
+  ok(dv.getUint32(eocd, true) === 0x06054b50 && dv.getUint16(eocd + 10, true) === 3, 'docx: ファイルが3つ入っている');
+  // 中央ディレクトリを読んで、各ファイルの本体とCRCが一致するか確かめる
+  let p = dv.getUint32(eocd + 16, true);
+  const names = [];
+  let crcOk = true;
+  const dec = new TextDecoder();
+  for (let i = 0; i < 3; i++) {
+    const crc = dv.getUint32(p + 16, true), size = dv.getUint32(p + 24, true), nl = dv.getUint16(p + 28, true), off = dv.getUint32(p + 42, true);
+    names.push(dec.decode(bytes.subarray(p + 46, p + 46 + nl)));
+    const lnl = dv.getUint16(off + 26, true);
+    const data = bytes.subarray(off + 30 + lnl, off + 30 + lnl + size);
+    if (crc32(data) !== crc) crcOk = false;
+    if (names[i] === 'word/document.xml') {
+      const x = dec.decode(data);
+      ok(x.includes('問1(50点)') && x.includes('解答用紙') && x.includes('模範解答と採点基準(先生用)') && x.includes('配点表') && x.includes('&lt;書きなさい&gt;') && x.includes('&amp;'), 'docx: 4つの部分が入り、記号がエスケープされる');
+      ok(x.includes('知識・技能:50点') && x.includes('思考・判断・表現:50点'), 'docx: 観点ごとの合計が入る');
+    }
+    p += 46 + nl;
+  }
+  ok(crcOk && names.join() === '[Content_Types].xml,_rels/.rels,word/document.xml', 'docx: 各ファイルのCRCと名前が正しい');
+  ok(zipStore([{ name: 'a.txt', data: 'あ' }]).length > 0, 'zipStore:日本語の内容でも作れる');
+
+  // 種類
+  ok(KINDS.length === 5 && KINDS.includes('漢字テスト') && KINDS.includes('計算テスト') && KINDS.includes('宿題プリント'), '種類が5つある');
+  const base = { level: 'elementary', subject: '算数', grade: '3年', units: 'わり算', total: '100', minutes: '20', count: '20' };
+  const pk = parseInput((k) => ({ ...base, kind: '計算テスト' })[k]);
+  ok(pk.ok && pk.value.kind === '計算テスト' && pk.value.count === 20, '種類を選べ、小問は20問まで');
+  ok(parseInput((k) => ({ ...base })[k]).value.kind === '定期テスト', '種類の指定が無ければ定期テスト');
+  ok(!parseInput((k) => ({ ...base, kind: 'あやしい' })[k]).ok, '知らない種類は止める');
+  ok(!parseInput((k) => ({ ...base, count: '21' })[k]).ok, '小問21問は止める');
+  ok(buildGeneratePrompt(pk.value).user.includes('計算問題') && buildGeneratePrompt(pk.value).maxTokens === 8000, '計算テストの指示と、長い出力の上限が入る');
+  ok(buildGeneratePrompt({ ...pk.value, kind: '漢字テスト' }).user.includes('読みと書き') && buildGeneratePrompt({ ...pk.value, kind: '宿題プリント' }).user.includes('家庭で'), '漢字テスト・宿題プリントの指示が入る');
+
+  // 直した内容の受け取り
+  const fields = { kind: '小テスト', level: 'junior', subject: '数学', grade: '2年', total: '100', minutes: '20', n: '2', title: '一次関数/小テスト', q1_text: '問題1', q1_answer: '7', q1_points: '50', q1_scoring: '50点 7と答えている', q1_aspect: '知識・技能', q2_text: '問題2', q2_answer: 'x', q2_points: '50', q2_scoring: '30点 式\n20 答え', q2_aspect: 'でたらめ' };
+  const pe = parseEditedTest((k) => fields[k]);
+  ok(pe.ok && pe.value.questions.length === 2 && pe.value.questions[0].scoring[0].point === 50 && pe.value.questions[1].scoring.length === 2 && pe.value.questions[1].aspect === '', '直した内容を読み取れる(配点・採点基準・知らない観点)');
+  ok(!parseEditedTest((k) => ({ ...fields, q2_text: '' })[k]).ok && !parseEditedTest((k) => ({ ...fields, q1_points: '1000' })[k]).ok && !parseEditedTest((k) => ({ ...fields, n: '21' })[k]).ok && !parseEditedTest((k) => ({ ...fields, kind: 'x' })[k]).ok, '空の問題文・範囲外の配点・21問・知らない種類は断る');
+  ok(docxFileName('一次関数/小テスト:1') === '一次関数小テスト1.docx' && docxFileName('///') === 'テスト.docx', 'ファイル名から記号を除く');
+
+  // 配信(オン/オフ・認証・Origin)
+  const post = (path, e, f, headers = {}) => worker.fetch(new Request(`https://x.test${path}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: tmCookie, ...headers }, body: new URLSearchParams(f).toString() }), e);
+  ok((await post('/m/test/docx', env, fields)).status === 404 && (await post('/m/test/rating', env, { kind: '小テスト', usable: 'yes', fix: 'le10' })).status === 404, 'オフのあいだは、Word出力も評価も404');
+  const noCookie = await worker.fetch(new Request('https://x.test/m/test/docx', { method: 'POST', body: new URLSearchParams(fields) }), envOn);
+  ok(noCookie.status === 403, '会員証が無ければ、Word出力できない');
+  const dres = await post('/m/test/docx', envOn, fields);
+  const dbytes = new Uint8Array(await dres.arrayBuffer());
+  ok(dres.status === 200 && dres.headers.get('content-type').includes('wordprocessingml.document') && dres.headers.get('content-disposition').includes('filename*=UTF-8\'\'') && dbytes[0] === 0x50 && dres.headers.get('cache-control') === 'no-store', 'Word出力:docxが返る');
+  ok((await post('/m/test/docx', envOn, fields, { origin: 'https://evil.test' })).status === 404, 'Word出力:別のオリジンは断る');
+  ok((await worker.fetch(new Request('https://x.test/m/test/docx', { headers: { cookie: tmCookie } }), envOn)).status === 404, 'Word出力:GETは404');
+  ok((await post('/m/test/docx', envOn, { ...fields, q1_text: '' })).status === 400, 'Word出力:不正な内容は400');
+
+  // 評価
+  ok(parseRating((k) => ({ kind: '小テスト', usable: 'yes', fix: 'le10' })[k])?.usable === 'yes' && !parseRating((k) => ({ kind: '小テスト', usable: 'x', fix: 'le10' })[k]) && !parseRating((k) => ({ kind: 'x', usable: 'yes', fix: 'le10' })[k]), '評価の入力を検査する');
+  const rok = await post('/m/test/rating', envOn, { kind: '小テスト', usable: 'partial', fix: 'gt30' });
+  ok(rok.status === 200, '評価を送れる');
+  const row = await envOn.DB.prepare('SELECT kind, usable, fix_minutes FROM test_rating').first();
+  ok(row && row.kind === '小テスト' && row.usable === 'partial' && row.fix_minutes === 'gt30', '評価は種類と2項目だけが保存される');
+  ok((await post('/m/test/rating', envOn, { kind: '小テスト', usable: 'zzz', fix: 'le10' })).status === 400, '評価:不正な値は400');
+  const rdb2 = makeDb();
+  let saved = 0;
+  for (let i = 0; i < 32; i++) if (await saveRating(rdb2, 'c1', { kind: '小テスト', usable: 'yes', fix: 'le10' }, 1000)) saved++;
+  ok(saved === 30, '評価は1人あたり24時間に30件まで');
+
+  // 結果画面
+  const resPage = testResultPage({ title: 'T', questions: [{ no: 1, aspect: '知識・技能', difficulty: 'ふつう', unit: 'u', text: 't', answer: 'a', points: 100, scoring: [], check: 'match' }], warnings: [], verified: true, used: 1 }, { kind: '小テスト', level: 'junior', subject: '数学', grade: '2年', total: 100, minutes: 20 });
+  ok(resPage.includes('action="/m/test/docx"') && resPage.includes('action="/m/test/rating"') && resPage.includes('私物のパソコン') && resPage.includes('name="q1_text"'), '結果画面:直せる欄・Word出力・評価・学校PCの注意がある');
+
+  // 無料開通
+  const gdb = makeDb();
+  const sql = buildGrantSql('sensei@example.com', 3, 1000, 'abc');
+  await gdb.prepare(sql).run();
+  const gm = await gdb.prepare("SELECT * FROM members WHERE email = 'sensei@example.com'").first();
+  ok(gm && gm.customer_id === 'manual_abc' && gm.status === 'trialing' && gm.subscription_id === `manual:${1000 + 90 * 86400}`, '無料開通:会員が作られ、終了日時が入る');
+  ok(isActive(gm, 1000 + 90 * 86400 - 1) && !isActive(gm, 1000 + 90 * 86400), '無料開通:終了の時刻を過ぎると使えない');
+  const before = (await gdb.prepare('SELECT COUNT(*) AS n FROM members').first()).n;
+  await gdb.prepare(buildGrantSql('SENSEI@example.com', 3, 2000, 'def')).run();
+  ok((await gdb.prepare('SELECT COUNT(*) AS n FROM members').first()).n === before, '無料開通:同じメールで有効な会員がいれば、増やさない');
+  ok((() => { try { buildGrantSql("a'b@example.com"); return false; } catch { return true; } })() && (() => { try { buildGrantSql('a@example.com', 13); return false; } catch { return true; } })() && (() => { try { buildGrantSql('a@example.com', 0); return false; } catch { return true; } })(), '無料開通:メールの記号・月数の範囲を検査する');
+  ok(isActive({ status: 'active', subscription_id: 'sub_123' }) && !isActive({ status: 'canceled', subscription_id: null }) && !isActive(null), '通常の契約の判定は変わらない');
+
+  // 学校PCの案内
+  ok((await (await worker.fetch(new Request('https://x.test/m/guide', { headers: { cookie: tmCookie } }), env)).text()).includes('私物のパソコン'), '使い方ガイドに、学校PCの案内がある');
+  ok(landing(true, '', false).includes('私物のパソコン') && !/学校のパソコンで(も)?(使えます|使える)/.test(landing(true, '', false)), 'LPに、学校PCの案内がある(「使える」とは書かない)');
 }
 
 globalThis.fetch = realFetch;

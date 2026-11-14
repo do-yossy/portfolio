@@ -62,6 +62,16 @@ CREATE TABLE IF NOT EXISTS feedback (
 -- ALTER TABLE feedback ADD COLUMN school_level TEXT;
 -- ALTER TABLE feedback ADD COLUMN roles TEXT;
 
+-- テストのたたき台づくりの、先生の評価(使えそうか・直す時間)。選択式の2項目と種類だけ。作った内容や条件は持たない。10件たまるまで、集計の数字は外に出さない
+CREATE TABLE IF NOT EXISTS test_rating (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  usable TEXT NOT NULL,
+  fix_minutes TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
 -- テストのたたき台づくり(AI版)の月ごとの回数。作った内容は保存しない。回数とトークン数だけを、会員ごと・暦月(日本時間)ごとに持つ
 -- 本番に適用するとき: npx.cmd wrangler d1 execute sakumon --remote --file=schema.sql(冪等)。機能は TESTMAKER_ENABLED="true" になるまでオフ
 CREATE TABLE IF NOT EXISTS test_usage (
