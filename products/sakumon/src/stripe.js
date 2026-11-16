@@ -49,7 +49,7 @@ async function api(env, method, path, params) {
 // ---- 請求の方式: 7日間の無料体験のあと、月額1,980円(税込)。体験が終わった日から、毎月同じ日に自動で更新 ----
 // 以前の「申込月は日割り・毎月1日に更新」は、無料体験と合わせられないため、やめた(2026-11-16 代表決定)
 export const TRIAL_DAYS = 7;
-const TRIAL_NOTE = `${TRIAL_DAYS}日間の無料体験のあと、月額1,980円(税込)が自動で請求され、以後、毎月自動で更新されます。体験期間中に解約すれば、料金はかかりません。`;
+const TRIAL_NOTE = `${TRIAL_DAYS}日間の無料体験のあと、月額1,980円(税込)が自動で請求され、以後、毎月自動で更新されます。最初の請求は、お申し込みから7日後です。それまでに、お申し込み後の会員ページから解約すれば、料金はかかりません。`;
 
 export function createCheckoutSession(env, origin, nowMs = Date.now(), src = '') {
   const params = {

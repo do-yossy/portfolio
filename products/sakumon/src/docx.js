@@ -90,7 +90,7 @@ export function buildTestDocx(t) {
     para('配点表', { bold: true, size: 28, pageBreak: true }),
     table([800, 2400, 2400, 1400, 1000], [['問', '単元', '観点', '難しさ', '配点'], ...qs.map((q) => [String(q.no), q.unit || '', q.aspect || '', q.difficulty || '', String(q.points)]), ['合計', '', '', '', String(sum)]]),
     para(`知識・技能:${qs.filter((q) => q.aspect === '知識・技能').reduce((n, q) => n + q.points, 0)}点 / 思考・判断・表現:${qs.filter((q) => q.aspect === '思考・判断・表現').reduce((n, q) => n + q.points, 0)}点`),
-    para('※ サクモンのAIが作ったたたき台を、作成した先生が確認・修正したものです。内容の正しさと採否は、作成した先生が判断してください。', { size: 18 }),
+    para('※ サクモンのAIが作ったたたき台です。作成した先生が、内容を確認・修正してください。内容の正しさと採否は、作成した先生が判断してください。', { size: 18 }),
   ].join('');
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   return zipStore([

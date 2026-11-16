@@ -201,7 +201,7 @@ export async function runTestMaker(env, db, customer, v, { fetchFn = globalThis.
 
 
 // ---- 先生が直した内容の受け取り(Word出力用)と、評価の記録 ----
-export const SCHOOL_PC_NOTE = 'スマホやパソコンで作れます。作ったWordやPDFを学校に持ち込むかどうか、持ち込み方(自分宛メール・コンビニのネットプリント・学校のパソコンで開いて印刷など)は、所属校・自治体の情報セキュリティの方針に従ってください。学校のパソコンで使うことが禁止されている場合があります。';
+export const SCHOOL_PC_NOTE = 'スマホやパソコンで作れます。作ったWordやPDFを学校に持ち込むかどうか、持ち込み方(自分宛メール・コンビニのネットプリント・学校のパソコンで開いて印刷など)は、所属校・自治体の情報セキュリティの方針に従ってください。学校のパソコンで使うことが禁止されている場合があります。認められているか分からないときは、学校に持ち込まず、ご自身の端末で使うだけにしてください。';
 
 const num = (v, min, max) => {
   const n = Number(String(v ?? '').normalize('NFKC').trim());
@@ -281,7 +281,7 @@ ${qs.map((q) => `<p class="q"><strong>問${q.no}</strong>(${q.points}点)\n模�
 <div class="sheet pb"><h1>配点表</h1>
 <table><tr><th>問</th><th>単元</th><th>観点</th><th>難しさ</th><th>配点</th></tr>${qs.map((q) => `<tr><td>${q.no}</td><td>${esc(q.unit)}</td><td>${esc(q.aspect)}</td><td>${esc(q.difficulty)}</td><td>${q.points}</td></tr>`).join('')}<tr><th colspan="4">合計</th><th>${sum}</th></tr></table>
 <p>知識・技能:${aspectSum('知識・技能')}点 / 思考・判断・表現:${aspectSum('思考・判断・表現')}点</p>
-<p class="note">※ サクモンのAIが作ったたたき台を、作成した先生が確認・修正したものです。内容の正しさと採否は、作成した先生が判断してください。</p></div>
+<p class="note">※ サクモンのAIが作ったたたき台です。作成した先生が、内容を確認・修正してください。内容の正しさと採否は、作成した先生が判断してください。</p></div>
 </body></html>`;
 };
 
