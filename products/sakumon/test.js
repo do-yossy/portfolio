@@ -652,6 +652,29 @@ const form = { level: 'junior', subject: '数学', grade: '2年', units: '一次
   ok(landing(true, '', false).includes('情報セキュリティの方針に従ってください') && !/学校のパソコンで(も)?(使えます|使える)/.test(landing(true, '', false)), 'LPに、学校PCの案内がある(「使える」とは書かない)');
 }
 
+
+// ---- スマホ前提: 印刷用ページ(PDFとして保存)・注意書き ----
+{
+  const { testPrintPage, parseEditedTest } = await import('./src/testmaker.js');
+  const f = { kind: '小テスト', level: 'junior', subject: '数学', grade: '2年', total: '100', minutes: '20', n: '2', title: '一次関数 <小テスト>', q1_text: '問1 x=3のときyは?', q1_answer: '7', q1_points: '50', q1_scoring: '50点 7と答えている', q1_aspect: '知識・技能', q2_text: '問2', q2_answer: 'x', q2_points: '50', q2_scoring: '', q2_aspect: '思考・判断・表現' };
+  const pe = parseEditedTest((k) => f[k]);
+  const pp = testPrintPage(pe.value);
+  ok(pp.includes('window.print()') && pp.includes('width=device-width') && pp.includes('@page{size:A4') && (pp.match(/class="sheet pb"/g) || []).length === 3, '印刷用ページ:スマホ幅・A4・4つの部分(改ページ3回)・印刷ボタン');
+  ok(pp.includes('一次関数 &lt;小テスト&gt;') && !pp.includes('<小テスト>') && pp.includes('解答用紙') && pp.includes('模範解答と採点基準(先生用)') && pp.includes('配点表'), '印刷用ページ:記号をエスケープし、各部分が入る');
+  ok(pp.includes('情報セキュリティの方針に従ってください') && !/学校のパソコンで(も)?(使えます|使える)/.test(pp), '印刷用ページ:学校の方針に従う注意があり、「使える」とは書かない');
+  const post = (path, e, fields, headers = {}) => worker.fetch(new Request(`https://x.test${path}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: tmCookie, ...headers }, body: new URLSearchParams(fields).toString() }), e);
+  ok((await post('/m/test/print', env, f)).status === 404, '印刷用ページ:オフのあいだは404');
+  const r = await post('/m/test/print', envOn, f);
+  ok(r.status === 200 && (r.headers.get('content-type') || '').includes('text/html') && r.headers.get('cache-control') === 'no-store' && (await r.text()).includes('印刷 / PDFとして保存'), '印刷用ページ:オンで返り、保存されない');
+  ok((await post('/m/test/print', envOn, f, { origin: 'https://evil.test' })).status === 404 && (await post('/m/test/print', envOn, { ...f, q1_text: '' })).status === 400, '印刷用ページ:別オリジンは断り、不正な内容は400');
+  ok((await worker.fetch(new Request('https://x.test/m/test/print', { headers: { cookie: tmCookie } }), envOn)).status === 404, '印刷用ページ:GETは404');
+  const noC = await worker.fetch(new Request('https://x.test/m/test/print', { method: 'POST', body: new URLSearchParams(f) }), envOn);
+  ok(noC.status === 403, '印刷用ページ:会員証が無ければ入れない');
+  const form = await (await worker.fetch(new Request('https://x.test/m/test', { headers: { cookie: tmCookie } }), envOn)).text();
+  ok(form.includes('1〜2分') && form.includes('スマホやパソコンで作れます') && form.includes('ネットプリント'), '作成画面:作成中の注意と、スマホ・持ち込み方の案内がある');
+  ok((await (await worker.fetch(new Request('https://x.test/m/guide', { headers: { cookie: tmCookie } }), env)).text()).includes('ネットプリント'), '使い方ガイドに、持ち込み方の案内(学校の方針に従う)がある');
+}
+
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -6,7 +6,7 @@ import {
 import { TEMPLATES, LEVELS, findTemplate } from './content.js';
 import { layout, html, landing, samplePage, SAMPLE_ID, mailLoginOn, loginOffPage, guidePage, recoverPage, recoverFailPage, comingSoonPage, successPage, claimedPage, pendingPage, SCHOOL_LEVELS, ROLES, feedbackPage, feedbackThanksPage, memberPage, templatePage, inactivePage, notFound, loginPage, codePage } from './pages.js';
 import { issueCode, verifyCode, sendCodeMail, normalizeEmail } from './login.js';
-import { testmakerOn, parseInput, runTestMaker, usedThisMonth, jstMonth, testFormPage, testResultPage, MONTHLY_LIMIT, parseEditedTest, docxFileName, parseRating, saveRating } from './testmaker.js';
+import { testmakerOn, parseInput, runTestMaker, usedThisMonth, jstMonth, testFormPage, testResultPage, MONTHLY_LIMIT, parseEditedTest, docxFileName, parseRating, saveRating, testPrintPage } from './testmaker.js';
 import { buildTestDocx } from './docx.js';
 
 const json = (obj, status = 200) =>
@@ -178,7 +178,7 @@ export default {
     }
 
     if (pathname === '/m' || pathname.startsWith('/m/')) {
-      if (method !== 'GET' && !(method === 'POST' && (pathname === '/m/feedback' || pathname === '/m/test' || pathname === '/m/test/docx' || pathname === '/m/test/rating'))) return notFound();
+      if (method !== 'GET' && !(method === 'POST' && (pathname === '/m/feedback' || pathname === '/m/test' || pathname === '/m/test/docx' || pathname === '/m/test/print' || pathname === '/m/test/rating'))) return notFound();
       const member = await currentMember(request, env);
       if (!member) return html(inactivePage(mailLoginOn(env)), 403);
       if (!isActive(member)) return html(inactivePage(mailLoginOn(env)), 403);
@@ -214,6 +214,16 @@ export default {
             'Cache-Control': 'no-store',
           },
         });
+      }
+      // スマホ向けの印刷用ページ(ブラウザの「PDFとして保存」でPDFにできる)。内容は保存しない・回数には数えない
+      if (pathname === '/m/test/print') {
+        if (!testmakerOn(env) || method !== 'POST') return notFound();
+        const origin = request.headers.get('origin');
+        if (origin && origin !== url.origin) return notFound();
+        const form = await request.formData().catch(() => null);
+        const p = form ? parseEditedTest((k) => form.get(k)) : { ok: false, error: '入力内容を読み取れませんでした。' };
+        if (!p.ok) return html(testFormPage(await usedThisMonth(env.DB, member.customer_id, jstMonth()), p.error), 400);
+        return html(testPrintPage(p.value), 200, { 'Cache-Control': 'no-store' });
       }
       // 先生の評価(使えそうか・直す時間)。選択式の2項目と種類だけを、会員ごとに記録する
       if (pathname === '/m/test/rating') {

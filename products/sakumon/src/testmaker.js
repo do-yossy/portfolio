@@ -201,7 +201,7 @@ export async function runTestMaker(env, db, customer, v, { fetchFn = globalThis.
 
 
 // ---- 先生が直した内容の受け取り(Word出力用)と、評価の記録 ----
-export const SCHOOL_PC_NOTE = '学校のパソコンで使うことは、学校の情報セキュリティの方針で禁止されている場合があります。ご利用の端末や、作ったファイルの扱いは、所属校・自治体の情報セキュリティの方針に従ってください。';
+export const SCHOOL_PC_NOTE = 'スマホやパソコンで作れます。作ったWordやPDFを学校に持ち込むかどうか、持ち込み方(自分宛メール・コンビニのネットプリント・学校のパソコンで開いて印刷など)は、所属校・自治体の情報セキュリティの方針に従ってください。学校のパソコンで使うことが禁止されている場合があります。';
 
 const num = (v, min, max) => {
   const n = Number(String(v ?? '').normalize('NFKC').trim());
@@ -258,6 +258,33 @@ export async function saveRating(db, customer, r, nowSec = Math.floor(Date.now()
   return true;
 }
 
+
+// スマホ向け: 印刷用ページ。ブラウザの「印刷 → PDFとして保存」で、PDFにできる(サーバー側でWordをPDFに変換する方法は、Workers では使えない)
+// 先生が直した内容(parseEditedTest の結果)を受け取り、問題用紙・解答用紙・模範解答と採点基準(先生用)・配点表を、A4で改ページして並べる。保存はしない
+export const testPrintPage = (t) => {
+  const qs = t.questions;
+  const sum = qs.reduce((n, q) => n + q.points, 0);
+  const aspectSum = (a) => qs.filter((q) => q.aspect === a).reduce((n, q) => n + q.points, 0);
+  const NAME = '　　年　　組　　番　　名前(　　　　　　　　　　　　)';
+  const CSS = `@page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;font-family:"Yu Mincho","游明朝","Hiragino Mincho ProN",serif;color:#000;background:#fff;line-height:1.7;font-size:15px}.bar{background:#f4f1e8;border-bottom:1px solid #ccc;padding:12px 16px;font-family:system-ui,sans-serif;font-size:15px}.bar button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;background:#1f6f4a;color:#fff;margin:6px 0}.bar p{margin:6px 0}.sheet{padding:16px;max-width:210mm;margin:0 auto}.pb{page-break-before:always;break-before:page}h1{font-size:22px;text-align:center;margin:0 0 4px}.sub{text-align:center;margin:0 0 10px}.q{margin:0 0 16px;white-space:pre-wrap}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:6px 8px;text-align:left;vertical-align:top}.ans td{height:70px}.note{font-size:12px;margin-top:14px}@media print{.bar{display:none}.sheet{padding:0}}`;
+  return `<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(t.title)}</title><style>${CSS}</style></head><body>
+<div class="bar"><p><strong>PDFにして保存・印刷する</strong></p><p>下のボタンを押し、表示された画面で「PDFとして保存」(または「PDFに保存」)を選んでください。選べないときは、ブラウザの共有・印刷のメニューから、同じ項目を探してください。</p><button type="button" onclick="window.print()">印刷 / PDFとして保存</button><p>この画面を閉じると、内容は消えます(保存されません)。ファイルを学校に持ち込むかどうかや、持ち込み方は、所属校・自治体の情報セキュリティの方針に従ってください。</p></div>
+<div class="sheet"><h1>${esc(t.title)}</h1><p class="sub">${esc(t.levelLabel)} ${esc(t.subject)} ${esc(t.grade)} / ${t.minutes}分 / ${t.total}点満点</p><p>${NAME}</p>
+${qs.map((q) => `<p class="q"><strong>問${q.no}</strong>(${q.points}点)\n${esc(q.text)}</p>`).join('')}
+</div>
+<div class="sheet pb"><h1>${esc(t.title)} 解答用紙</h1><p>${NAME}</p>
+<table class="ans"><tr><th style="width:12%">問</th><th>解答</th><th style="width:20%">得点 / 配点</th></tr>${qs.map((q) => `<tr><td>問${q.no}</td><td></td><td>/ ${q.points}</td></tr>`).join('')}</table></div>
+<div class="sheet pb"><h1>模範解答と採点基準(先生用)</h1>
+${qs.map((q) => `<p class="q"><strong>問${q.no}</strong>(${q.points}点)\n模範解答:${esc(q.answer)}${q.scoring.length ? `\n採点基準:${q.scoring.map((s) => `${s.point}点 ${esc(s.criterion)}`).join(' / ')}` : ''}</p>`).join('')}
+</div>
+<div class="sheet pb"><h1>配点表</h1>
+<table><tr><th>問</th><th>単元</th><th>観点</th><th>難しさ</th><th>配点</th></tr>${qs.map((q) => `<tr><td>${q.no}</td><td>${esc(q.unit)}</td><td>${esc(q.aspect)}</td><td>${esc(q.difficulty)}</td><td>${q.points}</td></tr>`).join('')}<tr><th colspan="4">合計</th><th>${sum}</th></tr></table>
+<p>知識・技能:${aspectSum('知識・技能')}点 / 思考・判断・表現:${aspectSum('思考・判断・表現')}点</p>
+<p class="note">※ サクモンのAIが作ったたたき台を、作成した先生が確認・修正したものです。内容の正しさと採否は、作成した先生が判断してください。</p></div>
+</body></html>`;
+};
+
 // ---- 画面 ----
 const nl = (s) => esc(s).replace(/\n/g, '<br>');
 const FIELD = 'width:100%;font-size:17px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-family:inherit';
@@ -272,6 +299,7 @@ export const testFormPage = (used, error, kept = {}) =>
 <p class="lead" style="font-size:16px">種類(定期テスト・小テスト・漢字テスト・計算テスト・宿題プリント)・校種・教科・単元を選ぶと、問題・模範解答・採点基準・配点表のたたき台ができます。答えを見せずに解き直して、模範解答と食い違う問題に印を付けます(一致しても、正しいとは限りません。長い記述の答えは比べません)。画面で直して、Wordで出力できます。</p>
 <p class="note">今月の回数:${used}/${MONTHLY_LIMIT}回(毎月1日に戻ります)。作った内容は保存されません。画面を閉じる前に、Wordに出力してください。</p>
 <p class="note">${esc(SCHOOL_PC_NOTE)}</p>
+<p class="note">作成には、1〜2分かかることがあります。作成中は、画面を閉じたり、ほかのアプリに切り替えたりしないでください(スマホでは、画面を消さないでください)。</p>
 <p class="note">入力した内容は、作成のため、外部のAIサービスに送られます。児童生徒の氏名・答案・成績は、入力しないでください。</p>
 ${error ? `<div class="err">${esc(error)}</div>` : ''}
 <form method="post" action="/m/test">
@@ -324,7 +352,8 @@ ${hid(`q${q.no}_aspect`, q.aspect || '')}${hid(`q${q.no}_difficulty`, q.difficul
   )
   .join('')}
 <p><button class="btn" type="submit">Wordで出力する(.docx)</button></p>
-<p class="note">問題用紙・解答用紙・模範解答と採点基準・配点表が、1つのWordファイルに入ります。今月の回数:${r.used}/${MONTHLY_LIMIT}回。</p>
+<p><button class="btn" type="submit" formaction="/m/test/print" formtarget="_blank">PDF・印刷用のページを開く(スマホ向け)</button></p>
+<p class="note">問題用紙・解答用紙・模範解答と採点基準・配点表が、1つのWordファイルに入ります。スマホでは、「PDF・印刷用のページ」から、PDFとして保存できます。今月の回数:${r.used}/${MONTHLY_LIMIT}回。</p>
 </form>
 <form method="post" action="/m/test/rating" class="qb">
 <strong>使ってみて、どうでしたか(任意・今後の改善に使います)</strong>
