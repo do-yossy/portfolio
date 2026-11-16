@@ -8,7 +8,6 @@ import { tokushohoPage, termsPage, privacyPage } from './src/legal.js';
 import { landing } from './src/pages.js';
 import { TEMPLATES, CATEGORIES, LEVELS, forLevel } from './src/content.js';
 import { validEmail, buildSql, hashToken } from './scripts/recovery-link.mjs';
-import { billingPlan } from './src/stripe.js';
 import { buildSql as fbSql, report as fbReport } from './scripts/feedback-report.mjs';
 import { testResultPage, parseInput, validateTest, jstMonth, reserveUse, usedThisMonth, testmakerOn, extractJson, MONTHLY_LIMIT } from './src/testmaker.js';
 
@@ -221,7 +220,7 @@ ok(legalOpen({ LEGAL_PUBLIC: 'true' }, FULL), 'スイッチが"true"で全項目
 ok(!legalOpen({ LEGAL_PUBLIC: 'true' }, BLANK), 'スイッチが"true"でも、空欄があれば公開されない');
 ok(!legalOpen({}, COMPANY) && !legalOpen({ LEGAL_PUBLIC: 'false' }, COMPANY), '全項目が記入済みでも、スイッチが入るまでは公開されない');
 const tk = tokushohoPage(FULL), tkBlank = tokushohoPage(COMPANY);
-ok(tk.includes('安藤 嘉啓') && tk.includes('大阪府大阪市浪速区') && tk.includes('月額980円(税込)') && tk.includes('テスト返金方針') && !tk.includes('【未記入'), '特商法の表記に、記入済みの内容が出る');
+ok(tk.includes('安藤 嘉啓') && tk.includes('大阪府大阪市浪速区') && tk.includes('月額1,980円(税込)') && tk.includes('テスト返金方針') && !tk.includes('【未記入'), '特商法の表記に、記入済みの内容が出る');
 ok(privacyPage(BLANK).includes('【未記入:保管期間】') && privacyPage(COMPANY).includes('契約期間中および解約後1年間') && tkBlank.includes('請求があれば遅滞なく開示します') && tkBlank.includes('返金しません'), '空欄は【未記入】と目立つ表示になり、記入済みの内容は出る(確認用)');
 ok(termsPage(FULL).includes('大阪地方裁判所') && termsPage(FULL).includes('2026年10月1日') && !termsPage(FULL).includes('【未記入'), '規約に、管轄と制定日が出る');
 ok(privacyPage(FULL).includes('解約から5年') && privacyPage(FULL).includes('Stripe') && privacyPage(FULL).includes('Resend'), 'プライバシーポリシーに、保管期間と委託先が出る');
@@ -233,22 +232,12 @@ ok((await (await get('/')).text()).includes('/legal/terms'), '法務が公開で
 delete env.LEGAL_PUBLIC;
 delete env.LP_PUBLIC;
 
-// --- 請求の方式(申込月は日割り・翌月1日から毎月1日に自動継続) ---
-const at = (s) => Date.parse(s + '+09:00');
-const jstOf = (sec) => new Date(sec * 1000 + 9 * 3600 * 1000).toISOString().slice(0, 16);
-const p1 = billingPlan(at('2026-10-17T12:00:00'));
-ok(jstOf(p1.anchor) === '2026-11-01T00:00' && p1.proration === 'create_prorations', '月の途中の申込: 翌月1日0時(日本時間)が請求日で、申込月は日割り');
-ok(jstOf(billingPlan(at('2026-12-15T09:00:00')).anchor) === '2027-01-01T00:00', '12月の申込は、翌年1月1日が請求日(年またぎ)');
-ok(jstOf(billingPlan(at('2026-10-01T00:00:00')).anchor) === '2026-11-01T00:00', '月初(1日0時)の申込も、翌月1日が請求日');
-ok(billingPlan(at('2026-10-29T12:00:00')).proration === 'create_prorations', '月末まで2日以上あれば日割りで請求する');
-ok(billingPlan(at('2026-10-30T12:00:00')).proration === 'none' && billingPlan(at('2026-10-31T12:00:00')).proration === 'none', '月末の2日以内は、最低決済額(50円)を下回るため日割りせず、翌月1日が初回の請求');
-// UTCでは前日でも、日本時間で翌日なら、日本時間で数える
-ok(jstOf(billingPlan(Date.parse('2026-10-31T16:00:00Z')).anchor) === '2026-12-01T00:00', '日本時間11月1日0時(UTC10月31日16時)の申込は、12月1日が請求日');
+// --- 請求の方式(7日間の無料体験のあと、月額1,980円。体験が終わった日から毎月同じ日に更新) ---
 const sub = await get('/subscribe');
 ok(sub.status === 303 && String(sub.headers.get('location')).startsWith('https://checkout.stripe.test/'), '申込ボタンはStripeの決済画面へ転送する');
 const sent = new URLSearchParams(lastCheckoutBody);
-ok(/^\d{10}$/.test(sent.get('subscription_data[billing_cycle_anchor]')) && ['create_prorations', 'none'].includes(sent.get('subscription_data[proration_behavior]')), 'Stripeに、請求日と日割りの指定を送っている');
-ok(Number(sent.get('subscription_data[billing_cycle_anchor]')) * 1000 > Date.now() && sent.get('managed_payments[enabled]') === 'false' && sent.get('mode') === 'subscription', '請求日は未来で、Managed Paymentsは使わない');
+ok(sent.get('subscription_data[trial_period_days]') === '7' && sent.get('payment_method_collection') === 'always' && !sent.has('subscription_data[billing_cycle_anchor]') && !sent.has('subscription_data[proration_behavior]'), 'Stripeに、7日間の無料体験を指定し、請求日の固定・日割りは送らない')
+ok(sent.get('managed_payments[enabled]') === 'false' && sent.get('mode') === 'subscription' && sent.get('custom_text[submit][message]').includes('1,980円'), 'Managed Paymentsは使わず、決済画面に体験後の請求を表示する')
 ok(sent.get('adaptive_pricing[enabled]') === 'false', '通貨の自動変換(Adaptive Pricing)を使わない=常に円で表示・請求する');
 
 // --- 集客の導線(流入元の目印・見本ページ・共有用のメタ情報) ---
@@ -282,15 +271,15 @@ ok(new URLSearchParams(lastCheckoutBody).get('metadata[src]') === 'note', 'src�
 // --- 審査指摘の反映(見本ページの運営者表示・条件の明記・流入元のポリシー記載) ---
 env.LP_PUBLIC = 'true';
 const smNoLegal = await (await get('/sample')).text();
-ok(smNoLegal.includes('運営:株式会社Social Quality') && smNoLegal.includes('返金はありません') && smNoLegal.includes('毎月の末日') && smNoLegal.includes('日割り'), '見本ページに、運営者名と、料金・解約・返金の条件が書かれている');
+ok(smNoLegal.includes('運営:株式会社Social Quality') && smNoLegal.includes('返金はありません') && smNoLegal.includes('7日間の無料体験') && smNoLegal.includes('1,980円'), '見本ページに、運営者名と、料金・解約・返金の条件が書かれている');
 env.LEGAL_PUBLIC = 'true';
 const smLegal = await (await get('/sample')).text();
 ok(smLegal.includes('/legal/tokushoho') && smLegal.includes('お問い合わせ'), '法務が公開できる状態なら、見本ページにも法務リンクとお問い合わせが出る');
 delete env.LEGAL_PUBLIC;
 const lpRefund = await (await get('/')).text();
 ok(lpRefund.includes('お支払い済みの料金の返金はありません') && lpRefund.includes('ご契約のメールアドレスなどは除きます'), 'LPに、返金なしと、「送られない」の範囲の限定が書かれている');
-ok(lpRefund.includes('連続7日以上') && lpRefund.includes('その月の料金を返金します') && smNoLegal.includes('連続7日以上'), 'LPと見本ページに、「当社の責めで連続7日以上使えない場合は、その月の料金を返金」が書かれている');
-ok(COMPANY.refundPolicy.includes('連続して7日以上') && COMPANY.refundPolicy.includes('その月の料金を返金します') && tokushohoPage(COMPANY).includes('連続して7日以上') && termsPage(COMPANY).includes('連続して7日以上'), '特商法の表記と利用規約にも、同じ返金の条件が出る');
+ok(lpRefund.includes('連続7日以上') && lpRefund.includes('直近にお支払いいただいた1か月分の料金を返金します') && smNoLegal.includes('連続7日以上'), 'LPと見本ページに、「当社の責めで連続7日以上使えない場合は、その月の料金を返金」が書かれている');
+ok(COMPANY.refundPolicy.includes('連続して7日以上') && COMPANY.refundPolicy.includes('直近にお支払いいただいた1か月分の料金を返金します') && tokushohoPage(COMPANY).includes('連続して7日以上') && termsPage(COMPANY).includes('連続して7日以上'), '特商法の表記と利用規約にも、同じ返金の条件が出る');
 delete env.LP_PUBLIC;
 ok(privacyPage(COMPANY).includes('流入元の目印'), 'プライバシーポリシーに、流入元の目印の取得が書かれている');
 

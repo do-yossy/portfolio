@@ -121,7 +121,7 @@ npx.cmd wrangler d1 execute sakumon --remote --command "SELECT kind, usable, fix
 本番にこの表を作るには、公開前に `schema.sql` を適用する(冪等)。
 
 ### 残り・未決
-- 月額が980円か1,100円かは、代表が決める(本番のStripe商品・LP・規約・見本は、いま980円)。
+- 月額は1,980円(税込)・7日間無料体験に決定(2026-11-16)。Stripeの本番の価格の差し替えは未了(README参照)。
 - 告知にWordの作例を付ける場合の作例ファイルは、実際にAIで作ったものを、先生が確認してから(捏造しない)。`scripts/make-sample-docx.mjs` は、形式確認用の見本(中身は私が書いた架空の問題)で、告知には使わない。
 - LP・ガイド・規約の文面は、監査役を通してから公開する(11/16の監査基準の改定後)。
 - サーバー契約は不要(Cloudflare)。必要なのは、APIキーの登録(`wrangler secret put ANTHROPIC_API_KEY`)と、DBの表の追加だけ。

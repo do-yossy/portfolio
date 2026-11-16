@@ -46,31 +46,20 @@ async function api(env, method, path, params) {
   return json;
 }
 
-// ---- 請求の方式: 申込月は日割り、翌月1日(日本時間0時)から毎月1日に自動継続 ----
-const JST_MS = 9 * 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
-// 残りがこれより短いと、日割り額がJPYの最低決済額(50円)を下回りうるので、日割り請求をしない(次の1日まで無料)
-const MIN_PRORATION_MS = 2 * DAY_MS;
-
-// 翌月1日0時(日本時間)のUNIX秒と、申込月の扱い(日割りにするか)
-export function billingPlan(nowMs = Date.now()) {
-  const jst = new Date(nowMs + JST_MS);
-  const anchorMs = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + 1, 1) - JST_MS;
-  return {
-    anchor: Math.floor(anchorMs / 1000),
-    proration: anchorMs - nowMs < MIN_PRORATION_MS ? 'none' : 'create_prorations',
-  };
-}
+// ---- 請求の方式: 7日間の無料体験のあと、月額1,980円(税込)。体験が終わった日から、毎月同じ日に自動で更新 ----
+// 以前の「申込月は日割り・毎月1日に更新」は、無料体験と合わせられないため、やめた(2026-11-16 代表決定)
+export const TRIAL_DAYS = 7;
+const TRIAL_NOTE = `${TRIAL_DAYS}日間の無料体験のあと、月額1,980円(税込)が自動で請求され、以後、毎月自動で更新されます。体験期間中に解約すれば、料金はかかりません。`;
 
 export function createCheckoutSession(env, origin, nowMs = Date.now(), src = '') {
-  const plan = billingPlan(nowMs);
   const params = {
     mode: 'subscription',
-    'subscription_data[billing_cycle_anchor]': String(plan.anchor),
-    'subscription_data[proration_behavior]': plan.proration,
+    'subscription_data[trial_period_days]': String(TRIAL_DAYS),
+    payment_method_collection: 'always',
+    'custom_text[submit][message]': TRIAL_NOTE,
     // 会社が販売者として売る前提(特商法表記)。Managed Payments(Stripeが販売者)は使わない
     'managed_payments[enabled]': 'false',
-    // 閲覧者の国に合わせた通貨の自動変換(Adaptive Pricing)は使わない。常に円(980円・日割りも円)で表示・請求する
+    // 閲覧者の国に合わせた通貨の自動変換(Adaptive Pricing)は使わない。常に円(1,980円も円)で表示・請求する
     'adaptive_pricing[enabled]': 'false',
     'line_items[0][price]': env.STRIPE_PRICE_ID,
     'line_items[0][quantity]': '1',

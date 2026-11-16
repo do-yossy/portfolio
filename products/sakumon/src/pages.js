@@ -80,7 +80,7 @@ export const html = (body, status = 200, headers = {}) =>
 // 法務ページは、会社情報がそろって公開スイッチが入るまで出さない。そのあいだはリンクも出さない
 const legalLinks = `<p><a href="/legal/tokushoho">特定商取引法に基づく表記</a>　<a href="/legal/terms">利用規約</a>　<a href="/legal/privacy">プライバシーポリシー</a></p>`;
 
-const LP_META = '<meta name="description" content="先生が保護者向けの文書を書くときの「書き出し」を用意する、文面ひな形集。月額980円(税込)。いつでも解約できます。">\n<meta property="og:type" content="website">\n<meta property="og:title" content="サクモン | 先生のための文面ひな形集">\n<meta property="og:description" content="学級通信も、保護者へのお知らせも。ゼロから書かない。月額980円(税込)・いつでも解約できます。">\n<meta name="twitter:card" content="summary">';
+const LP_META = '<meta name="description" content="先生が保護者向けの文書を書くときの「書き出し」を用意する、文面ひな形集。7日間無料体験・その後 月額1,980円(税込)。いつでも解約できます。">\n<meta property="og:type" content="website">\n<meta property="og:title" content="サクモン | 先生のための文面ひな形集">\n<meta property="og:description" content="学級通信も、保護者へのお知らせも。ゼロから書かない。7日間無料体験・その後 月額1,980円(税込)・いつでも解約できます。">\n<meta name="twitter:card" content="summary">';
 
 const contactLink = `<p><a href="${esc(encodeURI(COMPANY.contactUrl))}" rel="noopener">お問い合わせ</a></p>`;
 const contactAnchor = `<a href="${esc(encodeURI(COMPANY.contactUrl))}" rel="noopener">お問い合わせフォーム</a>`;
@@ -121,17 +121,17 @@ ${templatesByCategory().map((g) => `<h3 style="margin:18px 0 8px">${esc(g.catego
 <section>
 <h2>料金</h2>
 <div class="price">
-<div class="yen">980円<small>／月(税込)</small></div>
-<ul><li>すべてのひな形が使えます</li><li>お申し込みの月は、月末までの日割り料金(月の最後の2日間のお申し込みは、お申し込み月の料金なし)</li><li>翌月1日から、毎月1日に自動で更新</li><li>いつでも解約できます</li><li>解約後も、請求期間の終わり(月末)まで使えます</li><li>お支払い済みの料金の返金はありません(ただし、当社の責めで連続7日以上ご利用いただけなかった場合は、その月の料金を返金します)</li></ul>
+<div class="yen">1,980円<small>／月(税込)・7日間無料体験</small></div>
+<ul><li>すべてのひな形が使えます</li><li>お申し込みから7日間は、無料でお試しできます(体験期間中に解約すれば、料金はかかりません)</li><li>体験が終わった日に、月額1,980円(税込)が自動で請求され、以後、毎月同じ日に自動で更新</li><li>いつでも解約できます</li><li>解約後も、お支払い済みの請求期間の終わりまで使えます</li><li>お支払い済みの料金の返金はありません(ただし、当社の責めで連続7日以上ご利用いただけなかった場合は、直近にお支払いいただいた1か月分の料金を返金します)</li></ul>
 <div><a class="btn" href="/subscribe${q}">月額プランに申し込む</a></div>
 </div>
 </section>
 
 <section>
 <h2>よくある質問</h2>
-<details><summary>料金はいつ請求されますか?</summary><p>お申し込みのときに、その月の残りの日数分の日割り料金(税込)をお支払いいただきます。金額は、決済画面に表示されます。翌月1日からは、毎月1日に月額980円(税込)が自動で請求されます。その月の最後の2日間(最終日とその前日)にお申し込みの場合は、お申し込み時のお支払いはなく、翌月1日が初回です。</p></details>
+<details><summary>料金はいつ請求されますか?</summary><p>お申し込みの時点では、請求されません(クレジットカードの登録は必要です)。7日間の無料体験のあと、月額1,980円(税込)が自動で請求され、以後、毎月同じ日に自動で更新されます。体験期間中に解約すれば、料金はかかりません。</p></details>
 <details><summary>支払い方法は?</summary><p>クレジットカードです。決済は Stripe を通じて行われ、カード番号はサクモンには保存されません。</p></details>
-<details><summary>解約はどうすればいいですか?</summary><p>申し込み後のあなた専用ページに、解約・支払い方法の変更・請求書の確認へのリンクがあります。いつでも、ご自身で手続きできます。解約しても、請求期間の終わり(月末)までは利用できます。翌月分の請求を避けるには、毎月の末日(日本時間)までに解約の手続きを完了してください。</p></details>
+<details><summary>解約はどうすればいいですか?</summary><p>申し込み後のあなた専用ページに、解約・支払い方法の変更・請求書の確認へのリンクがあります。いつでも、ご自身で手続きできます。解約しても、お支払い済みの請求期間の終わり(無料体験中の場合は、体験の終わり)までは利用できます。次回の請求を避けるには、請求日の前までに解約の手続きを完了してください。</p></details>
 <details><summary>ログインは必要ですか?</summary><p>パスワードはありません。お申し込みをしたブラウザは、会員として使えます(会員証の有効期間は最長1年です)。${mail ? '別の端末や、ブラウザのデータを消した後は、お申し込みのメールアドレスに届く6桁の確認コードでログインできます。' : '別の端末で使いたいときや、ブラウザのデータを消したときは、' + contactAnchor + 'からご連絡ください。ご本人の確認のうえ、入り直しのためのリンクをお送りします。新しくお申し込みをする前に、必ずご連絡ください(二重のご請求を防ぐためです)。'}</p></details>
 <details><summary>複数の端末で使えますか?</summary><p>同じ契約で使える端末は、最大3台までです。4台目で使い始めると、最も古い端末の利用が終了します。</p></details>
 </section>
@@ -156,7 +156,7 @@ export const samplePage = (t, src = '', legalOpen = false) => {
 <button class="btn" type="button" data-copy="#tpl">文面をコピー</button>
 <details style="margin-top:14px"><summary>記入例を見る(架空の内容)</summary><pre class="tpl" id="ex" style="margin-top:10px">${esc(t.example)}</pre></details>
 <section><h2>ほかのひな形も使いたい方へ</h2>
-<p>サクモンには、この見本を含めて${TEMPLATES.length}点のひな形があります。月額980円(税込)。お申し込みの月は日割り、翌月1日から毎月1日に自動で更新します。解約は、毎月の末日(日本時間)までに手続きしてください。お支払い済みの料金の返金はありません。ただし、当社の責めで連続7日以上ご利用いただけなかった場合は、その月の料金を返金します。</p>
+<p>サクモンには、この見本を含めて${TEMPLATES.length}点のひな形があります。月額1,980円(税込)。7日間の無料体験のあと、自動で請求され、以後、毎月同じ日に自動で更新します。解約は、次回の請求日の前までに手続きしてください。お支払い済みの料金の返金はありません。ただし、当社の責めで連続7日以上ご利用いただけなかった場合は、直近にお支払いいただいた1か月分の料金を返金します。</p>
 <p><a class="btn" href="/subscribe${q}">月額プランに申し込む</a></p></section>
 <footer>運営:${esc(COMPANY.sellerName)}${legalOpen ? legalLinks + contactLink : ''}</footer>
 </div>`,
