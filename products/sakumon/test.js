@@ -675,6 +675,8 @@ const form = { level: 'junior', subject: '数学', grade: '2年', units: '一次
   ok((await (await worker.fetch(new Request('https://x.test/m/guide', { headers: { cookie: tmCookie } }), env)).text()).includes('ネットプリント'), '使い方ガイドに、持ち込み方の案内(学校の方針に従う)がある');
 }
 
+ok(termsPage(FULL, true, true).includes('最終改定日(施行日):2026年11月20日') && privacyPage(FULL, true, true).includes('最終改定日(施行日):2026年11月20日') && !legalMissing(COMPANY).includes('revisedDate'), '規約・プライバシーポリシーに、最終改定日(施行日)が出る');
+ok(privacyPage(FULL, true, true).includes('主に米国の事業者') && privacyPage(FULL, true, true).includes('日本の個人情報保護法とは異なります') && privacyPage(FULL, true, true).includes('Anthropic, PBC に送信するのは') && !privacyPage(FULL, true, false).includes('Anthropic, PBC に送信するのは'), 'プライバシーポリシー:委託先の所在国(米国)と制度の違いを書き、AI送信の注意はAIが有効なときだけ出る');
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
