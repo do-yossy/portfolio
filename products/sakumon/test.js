@@ -677,6 +677,16 @@ const form = { level: 'junior', subject: '数学', grade: '2年', units: '一次
 
 ok(termsPage(FULL, true, true).includes('最終改定日(施行日):2026年11月20日') && privacyPage(FULL, true, true).includes('最終改定日(施行日):2026年11月20日') && !legalMissing(COMPANY).includes('revisedDate'), '規約・プライバシーポリシーに、最終改定日(施行日)が出る');
 ok(privacyPage(FULL, true, true).includes('主に米国の事業者') && privacyPage(FULL, true, true).includes('日本の個人情報保護法とは異なります') && privacyPage(FULL, true, true).includes('Anthropic, PBC に送信するのは') && !privacyPage(FULL, true, false).includes('Anthropic, PBC に送信するのは'), 'プライバシーポリシー:委託先の所在国(米国)と制度の違いを書き、AI送信の注意はAIが有効なときだけ出る');
+{
+  const lpOff = landing(true, '', true, false);
+  const lpOn = landing(true, '', true, true);
+  const aiPart = lpOn.slice(lpOn.indexOf('テストのたたき台を作る(AI)'), lpOn.indexOf('<h2>使い方</h2>'));
+  ok(!lpOff.includes('Anthropic') && !lpOff.includes('1か月に15回まで') && !lpOff.includes('テストのたたき台を作る(AI)'), 'LP:AIが無効のあいだは、AIの記載が出ない');
+  ok(lpOn.includes('テストのたたき台を作る(AI)') && lpOn.includes('外部のAIサービス(Anthropic, PBC)に送信されます') && lpOn.includes('1か月に15回まで') && lpOn.includes('個人が分かる情報は、入力しないでください') && lpOn.includes('サーバーには保存しません'), 'LP:AI有効のとき、機能・外部AIへの送信・月15回・保存しないことが出る');
+  ok(aiPart.includes('正しいとは限りません') && !/学校のパソコンで(も)?(使えます|使える)|必ず|時間が(○|\d+)?分?減|人の先生が使/.test(aiPart), 'LP:AIの節は、検算の限界を書き、断定(学校のPC・必ず・時間が減る・利用人数)をしない');
+  ok(landing(false, '', true, true).includes('詳しくは、プライバシーポリシーをご覧ください') === false && lpOn.includes('詳しくは、プライバシーポリシーをご覧ください'), 'LP:法務ページが非公開のあいだは、ポリシーへの案内を出さない');
+}
+
 globalThis.fetch = realFetch;
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -101,7 +101,7 @@ export default {
 
     if (pathname === '/stripe/webhook' && method === 'POST') return webhook(request, env);
     // LPは、オーナーの承認と監査役のレビューが済むまで非公開。公開するときは wrangler.toml の LP_PUBLIC を "true" にする
-    if (pathname === '/' && method === 'GET') return html(env.LP_PUBLIC === 'true' ? landing(legalOpen(env), srcOf(url), mailLoginOn(env)) : comingSoonPage());
+    if (pathname === '/' && method === 'GET') return html(env.LP_PUBLIC === 'true' ? landing(legalOpen(env), srcOf(url), mailLoginOn(env), testmakerOn(env)) : comingSoonPage());
 
     // ひな形の見本(申し込む前に見られる)。LPと同じく、LP_PUBLIC が "true" のときだけ出す
     if (pathname === '/sample' && method === 'GET') {
